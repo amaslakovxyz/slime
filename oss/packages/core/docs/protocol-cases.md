@@ -1,5 +1,11 @@
 # Protocol stress test: can `{ input, output }` express real requests?
 
+> **Status: the structured protocol tested here was dropped on 2026-11-20.**
+> v1 keeps the free-text `{ intent, input, output }` format (PLAN.md §4).
+> The cases stay as benchmark material: almost all of them can be written as
+> an intent, and the ambiguous ones (#18, #19, #23) are the cases the startup
+> dictionary (§4.4) should make reliable.
+
 * **Date:** 2026-11-20
 * **Protocol under test:** PLAN.md §4 (`input`: `from`, `where`, `orderBy`,
   `limit`, `offset`; `output`: shape notation; names are the caller's words)

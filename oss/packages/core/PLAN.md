@@ -53,51 +53,38 @@ Status: **Decided**, **Proposed** (default unless someone objects) or
 
 ## 4. Request format and matching
 
-`slime.query(request)` takes `{ input, output }` and returns `{ data, meta }`.
-The caller describes the request in its own words. Names don't have to match
-the database: the model maps each name to the closest table, column or
-expression it can see. That mapping is the point of Slime. The cases this
-format was tested against are in
-[docs/protocol-cases.md](docs/protocol-cases.md).
+`slime.query(request)` takes `{ intent, input?, output }` and returns
+`{ data, meta }`. The caller says what it wants in words, passes the values
+separately, and gives the shape it wants back:
 
-```jsonc
+```json
 {
-  "input": {
-    "from": "invoices",                           // optional hint, one word or a list
-    "where": {
-      "status": "paid",                           // shorthand for { "eq": "paid" }
-      "issuedAt": { "gte": "2026-01-01", "lt": "2027-01-01" }
-    },
-    "groupBy": [{ "month": "month" }],            // output name → time bucket
-    "orderBy": [{ "month": "asc" }],              // list: first entry sorts first
-    "limit": 12
-  },
-  "output": [{ "month": "date", "revenue": "integer" }]
+  "intent": "top N accounts by total paid amount, highest first",
+  "input": { "limit": 5, "country": "DE" },
+  "output": [{ "name": "string", "totalPaid": "integer" }]
 }
 ```
+
+The more precisely the intent is written, the more precise the generated
+query. If a result is wrong, the developer rewords the intent: that is a new
+key, so Slime generates again, and the old handler expires unused.
+
+A structured protocol (`from`, `where` with operators, `groupBy`, paths) was
+designed and dropped on 2026-11-20. It turned the request into a query
+language to learn, and the mistakes seen so far were about meaning, which
+structure doesn't fix. It is in this file's git history, and the 35 cases it
+was tested on stay in [docs/protocol-cases.md](docs/protocol-cases.md) as
+benchmark material.
 
 ### 4.1 Fields
 
 | Field | Required | Rules |
 |---|---|---|
-| `output` | **yes** (R2) | The response shape (§4.2). Keys are returned exactly as written. |
-| `input` | no (missing means `{}`) | An object with only these keys, all optional: `from`, `where`, `groupBy`, `orderBy`, `limit`, `offset`. Any other key is an `INVALID_REQUEST` error that lists the allowed keys. |
-| `input.from` | no | A word or a list of words naming what the data is about. A hint for the model, not a table name; list order doesn't matter. The model decides which tables to read and how to join them. |
-| `input.where` | no | `{ name: condition }`, all combined with AND. A condition is a value (shorthand for `eq`) or `{ operator: value, … }`; several operators on one name are combined with AND. A name that is an aggregated `output` field filters groups (`HAVING`, R13). |
-| `input.groupBy` | no | A list of `output` paths. An entry is a path (`"plan"`) or a time bucket `{ path: granularity }`, where granularity is `day`, `week`, `month`, `quarter` or `year`. Every `output` field in the same list that isn't grouped is an aggregate. Without `groupBy` the model decides, and `meta.mapping` shows its choice (R14). |
-| `input.orderBy` | no | A list of `{ name: "asc" \| "desc" }`; a single object is allowed as shorthand. A name that is an `output` path (`"accounts.totalPaid"`) sorts the list that contains it (R15). |
-| `input.limit`, `input.offset` | no | A non-negative integer, which applies to the top-level list, or `{ path: integer }` per list, for example `{ "items": 20 }` or `{ "$": 10, "accounts": 3 }` (`$` is the top-level list) (R15). The row cap still applies. |
-| `intent` | not in v1 (R1) | Free text for meaning that neither the structure nor the glossary (R19) expresses. |
+| `intent` | **yes** | Non-empty string, at most 500 characters. What is wanted, in words. Values belong in `input`, not in the text (R7). |
+| `input` | no (missing means `{}`) | Object, at most 20 keys. Names match `^[A-Za-z_][A-Za-z0-9_]{0,63}$`. Values: string, number, boolean, `null`, or a list of those. `limit` and `offset` are reserved (R6). |
+| `output` | **yes** | The response shape (§4.2). Keys are returned exactly as written. |
 
-**Paths** name `output` fields by their keys joined with dots, skipping list
-levels. In `[{ "plan": "string", "accounts": [{ "name": "string" }] }]`, the
-paths are `plan`, `accounts` and `accounts.name`.
-
-**Operators** (R17): `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `in` (a list;
-`[]` matches nothing), `notIn`, `contains` (text, case-insensitive),
-`startsWith` (text, case-insensitive), `isNull` (`true` or `false`).
-
-### 4.2 Output notation (R16)
+### 4.2 Output notation
 
 * **Leaves:** `"string"`, `"number"`, `"integer"`, `"boolean"`, `"date"`
   (`YYYY-MM-DD`) or `"datetime"` (ISO 8601 with time zone), each optionally
@@ -108,73 +95,75 @@ paths are `plan`, `accounts` and `accounts.name`.
   * a list means rows;
   * an object means one row: `data` is `null` when there is none, and more
     than one is a `SHAPE_MISMATCH`.
-* **Every leaf sits under a name.** A bare `"string"` or `["string"]` at the
-  top level is an `INVALID_REQUEST`, because nothing says what it holds;
-  write `{ "countries": ["string"] }` or `[{ "country": "string" }]`.
 * **Limits:** at most 6 levels deep and 50 fields.
 
 ### 4.3 Decisions
 
 | # | Question | Decision | Status |
 |---|---|---|---|
-| R1 | What does a request contain? | `{ input, output }`. `intent` comes later as an optional field. When it comes, its normalized text becomes part of the request key, because it changes the meaning. | Decided |
-| R2 | Is `output` required? | Yes. It's the main description of what's wanted, and it keeps the response shape fixed. | Decided |
-| R3 | What goes in `input`? | Only the structure keys `from`, `where`, `groupBy`, `orderBy`, `limit` and `offset`. | Decided |
-| R4 | Do names have to match the schema? | No. Every name in `input` and `output` is the caller's word. The model maps it to the closest table, column or expression. `output` keys come back exactly as written. | Decided |
-| R5 | Several sources? | `from` takes a list. It is only a hint; joins are the model's job. | Decided |
-| R6 | Are operators fuzzy too? | No. Operators, sort directions and time-bucket granularities are fixed lists, because they decide what the SQL does. An unknown one is an `INVALID_REQUEST` error that lists the valid ones. | Decided |
-| R7 | How do value types count in matching? | Coarse types: `string`, `number` (whole and decimal together), `boolean`, `list`. | Decided |
-| R8 | What does `null` mean in `where`? | Not given: the condition is dropped before matching, so optional dashboard filters can be sent as `null`. To ask for nulls, use `{ "isNull": true }`. | Decided |
-| R9 | Does the caller see how names were mapped? | Yes. The model returns a mapping (name → column or expression, plus the grouping it chose), and `meta.mapping` shows it. If a name can't be mapped, the request fails with `FIELD_NOT_FOUND`, listing the closest names the model can see. The model maps a name only when the meaning matches, never to the nearest column just because it's close. Columns the database user can't read are never shown to the model, so they can't be mapped. | Decided |
-| R10 | Are different spellings matched together? | No. `totalPaid` and `total_paid` are different requests, each mapped once. `output` keys can't be merged anyway, because they are returned as written. | Decided |
-| R11 | Can Slime check the generated code against the request without a model? | Yes, after each run: every list respects its `limit`; rows follow `orderBy` when the sort name is in `output`; `eq` and `in` filters hold when the filtered name is in `output` and maps to the same column; a top-level object has at most one row. A failed check counts as a failed run, so the handler doesn't move up a tier. | Decided |
-| R12 | `or` conditions? | Not in v1. | Decided |
-| R13 | Filters on aggregates? | A `where` name that is an aggregated `output` field becomes `HAVING`: `where: { "accounts": { "gt": 10 } }` with `output: [{ "plan": "string", "accounts": "integer" }]` keeps plans with more than 10 accounts. | Decided |
-| R14 | How is grouping expressed? | `groupBy` lists the `output` paths to group by. A time bucket's granularity is a **value**, bound as a parameter (`date_trunc($n, …)`), so one handler serves day, week and month. Without `groupBy` the model infers the grouping from the shape. | Decided |
-| R15 | Sorting and limits inside nested lists? | `orderBy` names and `limit`/`offset` keys can be `output` paths, so "top 3 accounts in each plan" and "page of `items` plus `total`" can be written. | Decided |
-| R16 | Output rules? | §4.2: `date` and `datetime` leaves, a top-level object is one row or `null`, every leaf is named. | Decided |
-| R17 | Which operators? | The list in §4.1, including `notIn` and `startsWith`. | Decided |
-| R18 | Are values checked? | Names are fuzzy, values are exact. The connector reads the allowed values of enum-like columns (Postgres enums and `CHECK … IN (…)`) into the schema. Before running, Slime checks `eq`, `ne`, `in` and `notIn` values on names mapped to such a column and fails with `INVALID_VALUE`, listing the allowed values. The model sees the allowed values (they are schema, not request data). On a cache miss the check runs right after generation, once the mapping is known. | Decided |
-| R19 | Where does the meaning of a measure go? | In an app-wide `glossary` in `SlimeConfig`, for example `{ revenue: "sum of paid invoices, in cents", failedRate: "share from 0 to 1" }`. The model sees it with the schema, and its hash is part of the handler key, so changing a definition regenerates the handlers that depend on it. Per-request `intent` (R1) remains a later addition. | Decided |
+| R1 | What does a request contain? | `{ intent, input?, output }`. `intent` and `output` are required; `input` is optional. | Decided |
+| R2 | What is hashed? | All three fields: the normalized `intent` (R3), the input signature (R4) and `output`. Different request = different key = a new generation. | Decided |
+| R3 | How is `intent` normalized? | Unicode NFKC, lowercase, repeated whitespace collapsed to one space, trimmed, trailing `.!?;:,` removed. Nothing more: no synonyms, no stemming, no model. A key must be deterministic. | Decided |
+| R4 | What of `input` is hashed? | The key **names** only, sorted. Never the values, so `{ limit: 5 }` and `{ limit: 50 }` share a handler. Types are not in the key either: the handler records each parameter's coarse type (`string`, `number`, `boolean`, `list`) from the first non-null value it sees, and a later value of another type fails with `INVALID_REQUEST`. So `5` and `5.5` share a handler, and a parameter behaves like a typed route parameter. | Proposed |
+| R5 | Optional filters (`null`)? | Every parameter may be `null`, meaning "not given". The key doesn't change, and the generator is told every parameter is nullable, so it writes `($1 IS NULL OR country = $1)`. A frontend with 5 optional filters always sends all 5 keys and gets **one** handler, not 32. Leaving a key out entirely is a different request. | Proposed |
+| R6 | Paging? | `input.limit` and `input.offset` are reserved: non-negative integers. After each run Slime checks, without a model, that the top-level list has at most `limit` rows; a failed check is a failed run. | Decided |
+| R7 | Values written into the intent? | In explore mode, an intent containing literals (a number with 2+ digits, quoted text, an email, an id) is an `INVALID_REQUEST` error that says to move the value into `input`. In locked mode it can't generate anyway. | Proposed |
+| R8 | Explore vs locked in production? | Generation is for development. In explore mode anyone who can send a request (including from a browser's devtools) can make Slime generate a new read query against everything `slime_reader` sees. So the documented setup is: **explore in development, locked in production** (C6), serving only handlers that were saved (Liquid) or crystallized. Intents then act as named routes. | Decided |
+| R9 | Can the developer see what was generated? | Yes. `meta` carries `sql`, `shapeJs` and the model's `assumptions`. On every new generation core emits an `onEvent` event (C11) with them, so a dev setup can print it to the console. A wrong answer is only fixable if it's visible. | Decided |
+| R10 | Matching by meaning (embeddings, a model normalizing the text)? | No. A non-deterministic key is worse than one extra generation. | Decided |
 
-### 4.4 Matching
+### 4.4 Startup dictionary (open)
 
-* **Request key:** SHA-256 over the canonical structure without values:
-  * `from` as a sorted list;
-  * each `where` condition as name, operators and coarse value types, sorted
-    by name;
-  * `groupBy` entries in order, each marked as plain or time bucket (the
-    granularity is a value);
-  * `orderBy` names and directions, in order;
-  * which lists have a `limit` or `offset`;
-  * `output`;
-  * `intent`, once it exists.
-* **Parameters:** these values are bound into the SQL rather than written into
-  the code:
-  * `where` values;
-  * `limit` and `offset` values;
-  * time-bucket granularities.
+**Idea.** Heavy context work happens once, when the app starts, not on every
+generation. When `createSlime()` starts, it reads the database through the
+connector and builds a **dictionary**: everything the model needs to know
+about this database. It stores the dictionary and reuses it for every
+generation. `slime.query()` then only generates against it.
 
-  `{ "country": "DE", "limit": 5 }` and `{ "country": "FR", "limit": 50 }`
-  share a handler.
-* **Gas and Liquid:** reused only when all of these are the same:
-  * the request key;
-  * the schema hash;
-  * the glossary hash;
-  * the prompt hash;
-  * the model.
-* **Crystal:** reused when the request key, the schema hash and the glossary
-  hash are the same.
+**Draft of what the dictionary holds:**
+
+* **Schema:** tables, columns, types, comments, primary and foreign keys
+  (what `describe()` returns today).
+* **Allowed values** of enum-like columns: Postgres enums and
+  `CHECK … IN (…)`. These let the model write correct literals, and let Slime
+  reject `status: "cancelled"` when the column only has `canceled`.
+* **App glossary** from `SlimeConfig`, for example
+  `{ revenue: "sum of paid invoices, in cents" }`: what the app's words mean.
+* **SQL notes**, written once by a model at startup: rules for this schema
+  such as "group by ids, not names", "amounts are integer cents",
+  "`issued_at` is the invoice date". The background review keeps catching
+  these mistakes; writing them down once means every generation gets them.
+
+**How it would work:**
+
+* The dictionary has a hash. The hash is part of every handler key, so a
+  schema or glossary change regenerates the handlers that depend on it.
+* It is rebuilt only when the schema or the glossary changes. Otherwise it is
+  loaded from where it was stored.
+* In locked mode it is only loaded, never built, because building it may
+  need a model.
+
+**To decide:**
+
+1. **What goes in.** Is the list above right? Should it also hold sample
+   values for low-cardinality columns? That means reading data, not just the
+   schema.
+2. **Who writes the SQL notes.** A model at startup, hand-written in the
+   config, or both, with hand-written notes winning?
+3. **Where it's stored.** In the handler store (the `slime_meta` database), or
+   as a file in the app's repo so people can review and edit it, like
+   Crystal?
+4. **When it's built.** Blocking inside `createSlime()`, so the first request
+   waits, or in the background, with generations waiting until it's ready?
 
 ### 4.5 What the model sees
 
-* the schema: only what the database user can read, with comments and the
-  allowed values of enum-like columns;
-* the glossary;
-* the request's structure: `from`, the `where` names with their operators and
-  coarse types, `groupBy`, `orderBy`, which lists are limited, and `output`.
+* the dictionary (§4.4); until it exists, the schema plus the glossary;
+* the intent;
+* the input key names, with their types when known;
+* `output`.
 
-It never sees request values or rows.
+It never sees input values or rows.
 
 ### 4.6 What comes back
 
@@ -184,47 +173,24 @@ It never sees request values or rows.
   * `tier` and `cache`;
   * `timingsMs`;
   * `sql`, `shapeJs` and `assumptions`;
-  * `mapping` (R9);
   * `warnings`;
   * `review`.
 * **Errors** are thrown as `SlimeError`: `{ code, message, retryable }` with an
-  HTTP `status` (C9). New codes:
-  * `FIELD_NOT_FOUND`: a name can't be mapped (R9);
-  * `INVALID_VALUE`: a value isn't allowed for its column (R18).
+  HTTP `status` (C9).
 
-### 4.7 How the protocol is published
+### 4.7 Changes from the sandbox
 
-The protocol is free in its names but strict in its structure, so it ships as
-a type. All three forms come from one definition in `src/protocol/`:
-
-1. **TypeScript types** (`SlimeRequest`, `Shape`) exported from
-   `@slime-kit/core`. `slime.query()` infers the type of `data` from a
-   literal `output`. For example, `output: [{ name: 'string' }] as const`
-   gives `data: { name: string }[]`.
-2. **JSON Schema** at `@slime-kit/core/request.schema.json`. It validates
-   requests in any language, drives editor autocomplete, and works as an
-   agent's tool input schema.
-3. **`PROTOCOL.md`**: the rules plus the examples from
-   `docs/protocol-cases.md`, written so a coding agent can build a
-   frontend's requests without reading the source. It may also ship as
-   `llms.txt`.
-
-### 4.8 Changes from the sandbox
-
-* The free-text `intent` and the free-form `input` are replaced by a
-  structured `input` (R1, R3), with grouping (R14), nested sorting and limits
-  (R15) and filters on aggregates (R13).
-* Output notation: `date` and `datetime` leaves, one-row objects, named leaves
-  (R16).
-* The model returns a name mapping, shown in `meta.mapping` (R9).
-* Checks without the model: after each run (R11), and on values against
-  enum columns (R18).
-* An app-wide glossary (R19).
-* Whole and decimal numbers share a handler (R7).
-* `null` filters are dropped (R8).
-
-The generator and reviewer prompts change accordingly. The sandbox's parsing,
-shape and matching tests are ported in M1, rewritten for this format.
+* `output` becomes required.
+* Input types move out of the key and into the handler (R4), so `5` and `5.5`
+  share a handler.
+* Nullable parameters (R5): one handler for any combination of optional
+  filters.
+* Reserved `limit`/`offset` with a check after each run (R6).
+* `date` and `datetime` leaves; a top-level object means one row (§4.2).
+* Literals in the intent are an error in explore mode, not just a warning
+  (R7).
+* Locked is the documented production mode (R8).
+* The startup dictionary (§4.4), once it is designed.
 
 ## 5. Draft public API
 
@@ -242,7 +208,7 @@ const config = new SlimeConfig({
   generator: claude.generator({ apiKey: process.env.ANTHROPIC_API_KEY!, model: 'claude-haiku-5-5' }), // omit = locked mode
   reviewer: claude.reviewer({ apiKey: process.env.ANTHROPIC_API_KEY!, model: 'claude-opus-5-5' }),    // omit = no review
   crystal: crystals,                // import { crystals } from './slime-crystal/index.js'; omit = off
-  glossary: { revenue: 'sum of paid invoices, in cents' },        // optional; meaning of the app's words (R19)
+  glossary: { revenue: 'sum of paid invoices, in cents' },        // optional; meaning of the app's words (§4.4)
   tiers: { gasToLiquidRuns: 3, gasWindowMs: 3_600_000 },           // optional, defaults shown
   limits: { rowCap: 1_000, statementTimeoutMs: 2_000, maxGenerationsPerHour: 200 },
   onEvent: (e) => console.log(JSON.stringify(e)),
@@ -266,12 +232,12 @@ await slime.close(); // on shutdown
 Contracts (Ports) that core exports, unchanged from the sandbox unless noted:
 
 * `Connector`: `describe`, `check`, `run`, `safetyCheck`, `close`. The
-  schema from `describe` gains the allowed values of enum-like columns (R18);
+  schema from `describe` may gain the allowed values of enum-like columns
+  (§4.4);
 * `Generator` and `Reviewer`;
 * `HandlerStore`: gains the table name as an option, which replaces PR #7's
   `SLIME_META_TABLE`;
-* `SlimeError` and its error codes, plus `FIELD_NOT_FOUND` and
-  `INVALID_VALUE` (§4.6).
+* `SlimeError` and its error codes.
 
 ## 6. Package layout (target)
 
@@ -283,8 +249,9 @@ oss/packages/core/
 │   ├── index.ts        # createSlime, SlimeConfig, types, SlimeError
 │   ├── config.ts       # SlimeConfig: defaults, validation, with()
 │   ├── engine/         # engine, tiers, review loop, coalescing, rate limits
-│   ├── protocol/       # request types, parsing, canonical key, JSON Schema (§4)
-│   ├── checks/         # shape, sql guard, lint, result checks (R11), value checks (R18)
+│   ├── request/        # parsing, normalization, request key (§4)
+│   ├── dictionary/     # startup dictionary (§4.4)
+│   ├── checks/         # shape, sql guard, lint, limit check (R6)
 │   ├── sandbox/        # SandboxRunner Port + QuickJS worker (shape-worker.mjs)
 │   ├── crystal/        # Crystal registry types; serving crystal handlers
 │   ├── postgres/       # connector + store   → @slime-kit/core/postgres
@@ -303,12 +270,12 @@ one ports is named, so parity can be checked.
 | # | Milestone | Done when |
 |---|---|---|
 | M0 | **Skeleton.** Root `package.json` with workspaces, core `package.json` with an exports map, `tsconfig`, `node:test`, a CI job "Core tests". | `npm test -w @slime-kit/core` runs; `npm pack` builds a tarball; CI is green. |
-| M1 | **Protocol, contracts and pure parts.** Request types, parsing and the canonical request key (§4); output notation with `date`/`datetime` (R16); the JSON Schema generated from the types (§4.7); Ports, `SlimeError` with the new codes; SQL guard and lint; `SlimeConfig` with defaults, validation and `glossary`. | `units.test.ts` ported; every case in `docs/protocol-cases.md` parses (or is refused) as documented; the JSON Schema accepts and rejects the same requests as the parser. |
-| M2 | **Engine, Gas path.** `createSlime`, `query`, memory store, offline generator, `SandboxRunner` with the QuickJS worker, coalescing, rate limits, locked mode, the result checks (R11), `meta.mapping`. | `engine.test.ts` and `sandbox.test.ts` ported; result checks reject a wrong sort, limit and filter; no `config` singleton anywhere. |
-| M3 | **Postgres.** Connector with the start-up safety check and enum values in the schema; value checks (R18); store with a configurable table. | `postgres.test.ts` and `persistence.test.ts` ported; `status: "cancelled"` fails with `INVALID_VALUE` listing the allowed values. |
-| M4 | **Models and Liquid.** Claude and Groq generators and reviewers with the new prompts (mapping, grouping, glossary, `FIELD_NOT_FOUND`); the review loop; promotion to Liquid. | Review and promotion tests pass; one live run against Groq or Claude on the protocol cases. |
+| M1 | **Request, contracts and pure parts.** Request parsing, intent normalization and the request key (§4); output notation with `date`/`datetime`; Ports and `SlimeError`; SQL guard and lint; `SlimeConfig` with defaults, validation and `glossary`. | `units.test.ts` ported and adjusted for §4.7. |
+| M2 | **Engine, Gas path.** `createSlime`, `query`, memory store, offline generator, `SandboxRunner` with the QuickJS worker, coalescing, rate limits, locked mode, typed and nullable parameters (R4, R5), the limit check (R6). | `engine.test.ts` and `sandbox.test.ts` ported; one handler serves every combination of `null` filters; no `config` singleton anywhere. |
+| M3 | **Postgres and the dictionary.** Connector with the start-up safety check; store with a configurable table; the startup dictionary once §4.4 is decided. | `postgres.test.ts` and `persistence.test.ts` ported. |
+| M4 | **Models and Liquid.** Claude and Groq generators and reviewers with prompts updated for §4 (nullable parameters, the dictionary); the review loop; promotion to Liquid. | Review and promotion tests pass; one live run against Groq or Claude. |
 | M5 | **Crystal.** Serving from an imported registry; the crystallize job writing TS or JS; the `check` command. | `crystal*.test.ts` ported; a hand-edited Crystal file fails `check`; TS and JS output both pass the equivalence test. |
-| M6 | **Use it as a package.** An example app in `oss/examples/` that installs the packed tarball and calls `slime.query()` from an endpoint; `PROTOCOL.md` for people and agents; the bench rewritten in the new format and run on core. Then retire `sandbox/`. | The example answers a query from the tarball; the bench is at least as correct as the sandbox's. |
+| M6 | **Use it as a package.** An example app in `oss/examples/` that installs the packed tarball and calls `slime.query()` from an endpoint; docs for the request format; the bench ported to run on core. Then retire `sandbox/`. | The example answers a query from the tarball; the bench is at least as correct as the sandbox's. |
 
 ## 8. Risks
 
@@ -334,6 +301,11 @@ one ports is named, so parity can be checked.
 
 ## 9. Next decision
 
-C1–C11 are decided. Still to do: confirm C12 (what's out of scope), and agree
-with the PR #7 author that core is built at `oss/packages/core` (§2). Then
-start M0, the skeleton.
+C1–C11 and most of §4 are decided. Still to do:
+
+* R4, R5 and R7 (Proposed);
+* the startup dictionary (§4.4);
+* confirm C12 (what's out of scope);
+* agree with the PR #7 author that core is built at `oss/packages/core` (§2).
+
+M0, the skeleton, doesn't depend on any of these and can start now.

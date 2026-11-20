@@ -12,15 +12,14 @@ const slime = await createSlime(new SlimeConfig({ connector, generator }));
 
 // inside any endpoint
 const { data, meta } = await slime.query({
-  input: { from: 'accounts', where: { country: 'DE' }, orderBy: [{ totalPaid: 'desc' }], limit: 5 },
+  intent: 'top N accounts by total paid amount, highest first',
+  input: { limit: 5, country: 'DE' },
   output: [{ name: 'string', totalPaid: 'integer' }],
 });
 ```
 
-Names are the caller's own words and don't have to match the database. The
-first time Slime sees a request, a model maps the names to the closest tables
-and columns, then writes a read-only SQL query plus an optional shaping
-function. Slime checks and runs them, then caches the
+The first time Slime sees a request, a model writes a read-only SQL query
+plus an optional shaping function. Slime checks and runs them, then caches the
 result as a handler. Repeat requests reuse the handler, even with different
 input values. Handlers move up through three tiers:
 
