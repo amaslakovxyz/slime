@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.10" # native S3 lockfile
+  required_version = ">= 1.11" # use_lockfile is GA from 1.11 (experimental in 1.10)
 
   required_providers {
     aws = {
@@ -23,15 +23,19 @@ terraform {
 }
 
 # Credentials from the environment: AWS_PROFILE=slime locally.
+locals {
+  tags = {
+    Project   = var.project
+    ManagedBy = "terraform"
+    Stack     = "aws-landing"
+  }
+}
+
 provider "aws" {
   region = var.region
 
   default_tags {
-    tags = {
-      Project   = var.project
-      ManagedBy = "terraform"
-      Stack     = "aws-landing"
-    }
+    tags = local.tags
   }
 }
 
@@ -42,10 +46,6 @@ provider "aws" {
   region = "us-east-1"
 
   default_tags {
-    tags = {
-      Project   = var.project
-      ManagedBy = "terraform"
-      Stack     = "aws-landing"
-    }
+    tags = local.tags
   }
 }

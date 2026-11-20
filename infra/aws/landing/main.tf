@@ -2,7 +2,7 @@
 #
 #   layer    slime-landing-site  <- landing/ minus tools/ and README (unpacked at /opt)
 #   function slime-landing       <- function/index.mjs (static file server)
-#   URL      public, auth NONE
+#   URL      AWS_IAM; only CloudFront (OAC, domain.tf) may invoke it
 #
 # Site files are a layer so Terraform packages them straight from landing/
 # with no build step; editing landing/ yields a new layer version on apply.

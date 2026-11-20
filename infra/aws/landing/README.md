@@ -6,7 +6,7 @@ CloudFront in front of a Lambda Function URL in `eu-central-1`.
 | Resource | Notes |
 |---|---|
 | Layer `slime-landing-site` | `landing/` minus `README.md` and `tools/`; unpacked at `/opt` |
-| Function `slime-landing` | Node 22, arm64, 256 MB; [`function/index.mjs`](function/index.mjs) serves only files present in the layer (allowlist = path-traversal guard), gzips text, sets cache and security headers |
+| Function `slime-landing` | Node 22, arm64, 256 MB; [`function/index.mjs`](function/index.mjs) serves only files present in the layer (allowlist = path-traversal guard) and sets `Cache-Control`; compression and security headers come from CloudFront |
 | Function URL | `AWS_IAM` auth; only the CloudFront distribution may call it (Origin Access Control signs requests). Direct hits get 403 and never run the function, so nobody can bypass the cache and exhaust the account's shared Lambda concurrency (10) |
 | Log group `/aws/lambda/slime-landing` | 14-day retention |
 
@@ -37,7 +37,7 @@ also shields the function: the account Lambda concurrency limit is 10.
 | Resource | Notes |
 |---|---|
 | ACM certificate (`us-east-1`) | apex + `www`, DNS-validated in the registrar-created zone |
-| CloudFront distribution | `PriceClass_100`, HTTP→HTTPS redirect, `Managed-CachingOptimized`, origin = Function URL host |
+| CloudFront distribution | `PriceClass_100`, HTTP→HTTPS redirect, `Managed-CachingOptimized`, `Managed-SecurityHeadersPolicy`, edge gzip/brotli, origin = Function URL host |
 | Route 53 `A`/`AAAA` aliases | apex and `www` → CloudFront |
 
 The hosted zone is not managed here and keeps the iCloud mail records (MX,
