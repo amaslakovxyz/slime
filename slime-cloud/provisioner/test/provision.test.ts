@@ -37,6 +37,10 @@ const endpoint = (status: Endpoint['status']): Endpoint => ({
   updatedAt: '2026-11-20T00:00:00.000Z',
 });
 
+/** The stream image the admin's PutItem/UpdateItem produces: key plus attributes. */
+const streamImage = (status: Endpoint['status'], key = { pk: 'USER#demo@slime.dev', sk: 'ENDPOINT#ep-a1b2c3d4e5' }) =>
+  marshall({ ...key, ...endpoint(status) });
+
 const awsError = (name: string, message = name) => Object.assign(new Error(message), { name });
 
 type Call = { command: string; input: any };
@@ -234,7 +238,7 @@ describe('teardown', () => {
         throw awsError('ResourceNotFoundException');
       },
     });
-    await dispatch({ Records: [{ eventName: 'MODIFY', dynamodb: { NewImage: marshall(endpoint('deleting')) } }] }, deps);
+    await dispatch({ Records: [{ eventName: 'MODIFY', dynamodb: { NewImage: streamImage('deleting') } }] }, deps);
 
     assert.deepEqual(names(), [
       'DeleteFunctionUrlConfigCommand',
@@ -267,6 +271,20 @@ describe('teardown', () => {
       TableName: 'slime-control',
       Key: { pk: 'USER#demo@slime.dev', sk: 'ENDPOINT#ep-a1b2c3d4e5' },
     });
+  });
+
+  test('ignores an image whose key is not that endpoint item (forged through a USAGE# partition)', async () => {
+    const { deps, calls } = fakeDeps({});
+    await dispatch(
+      {
+        Records: [
+          { eventName: 'MODIFY', dynamodb: { NewImage: streamImage('deleting', { pk: 'USAGE#ep-ffffffffff', sk: '2026-11' }) } },
+          { eventName: 'MODIFY', dynamodb: { NewImage: streamImage('pending', { pk: 'USER#other@slime.dev', sk: 'ENDPOINT#ep-a1b2c3d4e5' }) } },
+        ],
+      },
+      deps,
+    );
+    assert.deepEqual(calls, []);
   });
 
   test('a failing step marks the endpoint failed so it can be deleted again', async () => {

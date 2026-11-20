@@ -129,7 +129,14 @@ async function deploy(ep: Endpoint, deps: Deps): Promise<string> {
         Effect: 'Allow',
         Action: ['dynamodb:UpdateItem'],
         Resource: tableArn(config.controlTable),
-        Condition: { 'ForAllValues:StringEquals': { 'dynamodb:LeadingKeys': [`USAGE#${id}`] } },
+        // Only the counter attributes: the role cannot shape an item that looks
+        // like an endpoint record (defence in depth with the stream filter).
+        Condition: {
+          'ForAllValues:StringEquals': {
+            'dynamodb:LeadingKeys': [`USAGE#${id}`],
+            'dynamodb:Attributes': ['pk', 'sk', 'requests', 'generations', 'updatedAt'],
+          },
+        },
       },
       {
         Sid: 'Settings',

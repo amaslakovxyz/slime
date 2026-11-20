@@ -245,6 +245,9 @@ resource "aws_lambda_event_source_mapping" "provisioner" {
         eventName = ["INSERT", "MODIFY"]
         dynamodb = {
           NewImage = {
+            # Endpoint items live under USER#; endpoint roles can write only
+            # USAGE#<id>, so they cannot forge a record that reaches the worker.
+            pk     = { S = [{ prefix = "USER#" }] }
             type   = { S = ["endpoint"] }
             status = { S = ["pending", "deleting"] }
           }

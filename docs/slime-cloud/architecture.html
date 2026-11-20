@@ -451,7 +451,7 @@ footer { text-align: center; font: 400 12px/1.5 var(--font-mono); color: var(--w
     </svg>
   </div>
   <p class="scroll-hint">← scroll the diagram sideways →</p>
-  <p class="note gas">Mint dashed states match the event-source filter <code>eventName ∈ {INSERT, MODIFY}</code>, <code>type = endpoint</code>, <code>status ∈ {pending, deleting}</code>. The admin only allows delete from <code>ready</code> or <code>failed</code> (<code>ConditionExpression #s IN (:ready, :failed)</code>).</p>
+  <p class="note gas">Mint dashed states match the event-source filter <code>eventName ∈ {INSERT, MODIFY}</code>, <code>pk</code> prefix <code>USER#</code>, <code>type = endpoint</code>, <code>status ∈ {pending, deleting}</code>. The admin only allows delete from <code>ready</code> or <code>failed</code> (<code>ConditionExpression #s IN (:ready, :failed)</code>).</p>
 </section>
 
 <!-- 5. Data model -->
@@ -513,8 +513,8 @@ footer { text-align: center; font: 400 12px/1.5 var(--font-mono); color: var(--w
         </tr>
         <tr>
           <td>Stream filter</td>
-          <td>event source mapping on <code>slime-control</code>: <code>type = endpoint</code>, <code>status ∈ {pending, deleting}</code>, batch 1, 2 retries</td>
-          <td>worker writes (<code>provisioning|ready|failed</code>) never match, so no self-trigger loop</td>
+          <td>event source mapping on <code>slime-control</code>: <code>pk</code> prefix <code>USER#</code>, <code>type = endpoint</code>, <code>status ∈ {pending, deleting}</code>, batch 1, 2 retries; the worker also requires <code>pk = USER#&lt;owner&gt;</code>, <code>sk = ENDPOINT#&lt;endpointId&gt;</code></td>
+          <td>worker writes (<code>provisioning|ready|failed</code>) never match, so no self-trigger loop; endpoint roles may only <code>UpdateItem</code> counter attributes in <code>USAGE#&lt;id&gt;</code> (<code>dynamodb:Attributes</code>), so they cannot forge a teardown of another endpoint</td>
         </tr>
         <tr>
           <td>Endpoint auth</td>
