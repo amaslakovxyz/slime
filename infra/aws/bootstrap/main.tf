@@ -135,14 +135,19 @@ resource "aws_budgets_budget" "monthly" {
   }
 }
 
-# Project budget: tight limit scoped to the home region. The account already
+# Project budget: tight limit on slime spend only. The account already
 # carries unrelated spend (domain registration, Route 53, tax), so an
 # account-wide $15 budget would breach on day one and never alert again that
-# month. region-guard keeps every regional slime resource in var.region, which
-# makes the Region filter a working proxy for "slime spend" before the Project
-# cost-allocation tag can be activated. Global services (CloudFront, Route 53)
-# are not counted here; the account-wide budget above still covers them.
-# Budgets only alert; they do not stop spend.
+# month.
+#
+# Filter, in order of preference:
+#   - Project cost-allocation tag (var.project_cost_tag_active = true): exact,
+#     includes global services such as CloudFront. AWS only lets the tag be
+#     activated after it has appeared in billing data (~24h after first use).
+#   - Region = var.region until then: region-guard keeps every regional slime
+#     resource there; CloudFront ("global") is not counted, the account-wide
+#     budget above still covers it.
+# Budgets alert; the freeze action in finops.tf is what reacts at 100%.
 
 resource "aws_budgets_budget" "project" {
   name         = "${var.project}-monthly"
@@ -152,8 +157,8 @@ resource "aws_budgets_budget" "project" {
   time_unit    = "MONTHLY"
 
   cost_filter {
-    name   = "Region"
-    values = [var.region]
+    name   = var.project_cost_tag_active ? "TagKeyValue" : "Region"
+    values = var.project_cost_tag_active ? ["user:Project$${var.project}"] : [var.region]
   }
 
   notification {
