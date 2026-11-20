@@ -225,6 +225,16 @@ data "aws_iam_policy_document" "gha_apply_guard" {
     resources = [aws_s3_bucket.state.arn, "${aws_s3_bucket.state.arn}/*"]
   }
 
+  # CI never applies bootstrap. Without this, the apply role could rewrite the
+  # state of the stack that defines its own guard rails, and the next human
+  # apply would act on a forged picture of the account.
+  statement {
+    sid       = "DenyBootstrapStateWrites"
+    effect    = "Deny"
+    actions   = ["s3:PutObject", "s3:DeleteObject"]
+    resources = ["${aws_s3_bucket.state.arn}/bootstrap/*"]
+  }
+
   statement {
     sid    = "DenyForeignLambdaChanges"
     effect = "Deny"
