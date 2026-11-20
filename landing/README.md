@@ -27,6 +27,9 @@ Served from AWS Lambda; the stack lives in
 it on every push to `main` that touches `landing/` or `infra/aws/`.
 GitHub Pages is not an option: this private repo is on GitHub Free.
 
+The same folder is also served from AWS Lambda; see
+[`infra/aws/landing/`](../infra/aws/landing/README.md).
+
 ## Where things come from
 
 - Colors, fonts and component styles:
