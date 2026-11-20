@@ -69,4 +69,4 @@ jobs:
         with:
           node-version: 22
       - if: hashFiles('infra/aws/landing/function/index.test.mjs') != ''
-        run: node --test infra/aws/landing/function/
+        run: node --test infra/aws/landing/function/index.test.mjs
