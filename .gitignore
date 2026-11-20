@@ -10,3 +10,9 @@
 .worktrees/
 .superpowers/
 .remember/
+
+# Dependencies
+node_modules/
+
+# Local app database
+data/

@@ -1,0 +1,16 @@
+{
+  "name": "liquid-engine",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lee": "bun run src/lee.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.11.0",
+    "quickjs-emscripten": "^0.32.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.5",
+    "typescript": "^7.0.2"
+  }
+}
