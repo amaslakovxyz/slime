@@ -3,10 +3,11 @@
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import type { Connector } from '@slime-cloud/core/connectors/types.js';
-import type { Engine } from '@slime-cloud/core/engine.js';
+import type { Engine, QueryMeta } from '@slime-cloud/core/engine.js';
 import { SlimeError } from '@slime-cloud/core/errors.js';
 
-export function createApp(engine: Engine, connector: Connector): Hono {
+/** `onQuery` sees every answered query (the Lambda entry meters usage with it). */
+export function createApp(engine: Engine, connector: Connector, onQuery?: (meta: QueryMeta) => void): Hono {
   const app = new Hono();
 
   app.onError((err, c) => {
@@ -29,6 +30,7 @@ export function createApp(engine: Engine, connector: Connector): Hono {
         throw new SlimeError('INVALID_REQUEST', 'Body must be valid JSON.');
       });
       const { data, meta } = await engine.query(body);
+      onQuery?.(meta);
       c.header('Server-Timing', `total;dur=${meta.timingsMs.total}, generate;dur=${meta.timingsMs.generate}`);
       console.log(
         JSON.stringify({ at: new Date().toISOString(), handler: meta.handlerId, tier: meta.tier, cache: meta.cache, ms: meta.timingsMs }),

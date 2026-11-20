@@ -8,6 +8,11 @@
 //   emscripten-module.wasm QuickJS release-sync build, found by URL next to the worker
 //   offline/handlers.json  canned handlers for SLIME_PROVIDER=offline (read from cwd)
 //   crystal/               Crystal folder, if the repo has one
+//
+// dist/layer/slime/ is the same bundle laid out as the Gas Lambda layer
+// (infra/aws/platform/gas-layer.tf): it extracts to /opt/slime/, and provisioned
+// endpoints run it through a one-line shim (slime-cloud/provisioner/shim). The
+// worker and wasm resolve by import.meta.url, so they load from /opt/slime/ too.
 import { build } from 'esbuild';
 import { cpSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -45,4 +50,8 @@ cpSync(wasm, join(out, 'emscripten-module.wasm'));
 cpSync(join(core, 'offline'), join(out, 'offline'), { recursive: true });
 if (existsSync(join(core, 'crystal'))) cpSync(join(core, 'crystal'), join(out, 'crystal'), { recursive: true });
 
-console.log(`built ${out}`);
+const layer = join(root, 'dist/layer');
+rmSync(layer, { recursive: true, force: true });
+cpSync(out, join(layer, 'slime'), { recursive: true });
+
+console.log(`built ${out} and ${layer}/slime`);

@@ -1,8 +1,11 @@
 // Lambda entry for the Slime runtime (Function URL; see infra/aws/platform/runtime.tf).
 //
 // Cold start:
-//   1. Every SSM parameter under SLIME_SSM_PREFIX becomes an env var named after
-//      its last path segment (/slime/runtime/DATABASE_URL -> DATABASE_URL).
+//   1. Every SSM parameter under each path in SLIME_SSM_PREFIX (comma-separated)
+//      becomes an env var named after its last path segment
+//      (/slime/runtime/DATABASE_URL -> DATABASE_URL). Paths load in order, so a
+//      later one overrides an earlier one: provisioned endpoints use
+//      "/slime/shared/,/slime/endpoints/<id>/" (shared model keys, then their own).
 //      Secrets therefore never pass through Terraform state or the function config.
 //   2. Only then are config.ts and the engine imported: config reads env at import.
 //   3. The engine starts on the first request and is retried on the next one if
@@ -40,7 +43,9 @@ async function loadParameters(prefix: string): Promise<void> {
   } while (NextToken);
 }
 
-if (process.env.SLIME_SSM_PREFIX) await loadParameters(process.env.SLIME_SSM_PREFIX);
+for (const prefix of (process.env.SLIME_SSM_PREFIX ?? '').split(',')) {
+  if (prefix.trim()) await loadParameters(prefix.trim());
+}
 
 type Runtime = { app: Hono; flush: () => Promise<void> };
 let booting: Promise<Runtime> | null = null;
@@ -51,11 +56,19 @@ function boot(): Promise<Runtime> {
     const { PostgresConnector } = await import('@slime-cloud/core/connectors/postgres.js');
     const { Engine } = await import('@slime-cloud/core/engine.js');
     const { DynamoHandlerStore } = await import('./store-dynamodb.js');
+    const { UsageMeter } = await import('./usage.js');
     const { createApp } = await import('./app.js');
     const connector = new PostgresConnector(config.databaseUrl);
     const store = new DynamoHandlerStore(process.env.SLIME_HANDLERS_TABLE ?? '', process.env.SLIME_TENANT_ID ?? '');
     const engine = await Engine.create(connector, { store });
-    return { app: createApp(engine, connector), flush: () => engine.flush() };
+    // Only provisioned endpoints meter usage (slime-runtime has no usage table).
+    const meter = process.env.SLIME_USAGE_TABLE
+      ? new UsageMeter(process.env.SLIME_USAGE_TABLE, process.env.SLIME_TENANT_ID ?? '')
+      : undefined;
+    return {
+      app: createApp(engine, connector, (m) => meter?.record(m)),
+      flush: () => Promise.all([engine.flush(), meter?.flush()]).then(() => {}),
+    };
   })().catch((err) => {
     booting = null;
     throw err;
