@@ -112,53 +112,27 @@ benchmark material.
 | R9 | Can the developer see what was generated? | Yes. `meta` carries `sql`, `shapeJs` and the model's `assumptions`. On every new generation core emits an `onEvent` event (C11) with them, so a dev setup can print it to the console. A wrong answer is only fixable if it's visible. | Decided |
 | R10 | Matching by meaning (embeddings, a model normalizing the text)? | No. A non-deterministic key is worse than one extra generation. | Decided |
 
-### 4.4 Startup dictionary (open)
+### 4.4 Startup dictionary
 
-**Idea.** Heavy context work happens once, when the app starts, not on every
-generation. When `createSlime()` starts, it reads the database through the
-connector and builds a **dictionary**: everything the model needs to know
-about this database. It stores the dictionary and reuses it for every
-generation. `slime.query()` then only generates against it.
+Heavy context work happens once, when the app starts, not on every
+generation. `createSlime()` starts building a **dictionary** of the database
+in the background. `slime.query()` generates against it.
 
-**Draft of what the dictionary holds:**
-
-* **Schema:** tables, columns, types, comments, primary and foreign keys
-  (what `describe()` returns today).
-* **Allowed values** of enum-like columns: Postgres enums and
-  `CHECK … IN (…)`. These let the model write correct literals, and let Slime
-  reject `status: "cancelled"` when the column only has `canceled`.
-* **App glossary** from `SlimeConfig`, for example
-  `{ revenue: "sum of paid invoices, in cents" }`: what the app's words mean.
-* **SQL notes**, written once by a model at startup: rules for this schema
-  such as "group by ids, not names", "amounts are integer cents",
-  "`issued_at` is the invoice date". The background review keeps catching
-  these mistakes; writing them down once means every generation gets them.
-
-**How it would work:**
-
-* The dictionary has a hash. The hash is part of every handler key, so a
-  schema or glossary change regenerates the handlers that depend on it.
-* It is rebuilt only when the schema or the glossary changes. Otherwise it is
-  loaded from where it was stored.
-* In locked mode it is only loaded, never built, because building it may
-  need a model.
-
-**To decide:**
-
-1. **What goes in.** Is the list above right? Should it also hold sample
-   values for low-cardinality columns? That means reading data, not just the
-   schema.
-2. **Who writes the SQL notes.** A model at startup, hand-written in the
-   config, or both, with hand-written notes winning?
-3. **Where it's stored.** In the handler store (the `slime_meta` database), or
-   as a file in the app's repo so people can review and edit it, like
-   Crystal?
-4. **When it's built.** Blocking inside `createSlime()`, so the first request
-   waits, or in the background, with generations waiting until it's ready?
+| # | Question | Decision | Status |
+|---|---|---|---|
+| D1 | What does Slime read from the database? | Metadata only, never row data: tables, columns, types, comments, primary and foreign keys, and the allowed values of enum-like columns. Those come from the catalog (Postgres enums and `CHECK … IN (…)` constraints), not from the rows. | Decided |
+| D2 | Who writes the dictionary? | A model, in a step inside `createSlime()`. It reads the metadata plus the app's `glossary` and writes **SQL notes** for this schema, for example "group by ids, not names", "amounts are integer cents", "`issued_at` is the invoice date". The app can add its own `rules` in `SlimeConfig`. They are stored next to the model's notes, and the app's rules win when the two conflict. | Decided |
+| D3 | Where is it stored? | In the same store as Liquid handlers (`slime_meta` in Postgres, owned by `slime_writer`; or in memory if no store is configured). The `HandlerStore` Port gains `loadDictionary(key)` and `saveDictionary(dictionary)`. | Decided |
+| D4 | Blocking or background? | Background. `createSlime()` returns at once. | Decided |
+| D5 | What happens to requests before it's ready? | Cache hits (Liquid and Crystal loaded at startup) are served immediately; they don't need the dictionary. New generations wait for it. If building it fails, core emits an `onEvent` error and generations go ahead with the plain metadata. | Proposed |
+| D6 | When is it rebuilt? | When its inputs change: the metadata hash, the `glossary`, the `rules` or the model that writes the notes. Otherwise it is loaded from the store. Its hash is part of every Gas and Liquid handler key, so a rebuilt dictionary regenerates the handlers that depend on it. | Proposed |
+| D7 | Locked mode? | Only loaded, never built: locked mode has no model. If none is stored, locked mode serves its saved handlers without one. | Proposed |
+| D8 | Can the developer see it? | `slime.dictionary()` returns it, and building it emits an `onEvent` event with the notes, so a dev setup can print them. | Proposed |
 
 ### 4.5 What the model sees
 
-* the dictionary (§4.4); until it exists, the schema plus the glossary;
+* the dictionary (§4.4): metadata, glossary, the model's SQL notes and the app's
+  rules;
 * the intent;
 * the input key names, with their types when known;
 * `output`.
@@ -190,7 +164,7 @@ It never sees input values or rows.
 * Literals in the intent are an error in explore mode, not just a warning
   (R7).
 * Locked is the documented production mode (R8).
-* The startup dictionary (§4.4), once it is designed.
+* The startup dictionary, built by a model in the background (§4.4).
 
 ## 5. Draft public API
 
@@ -209,6 +183,7 @@ const config = new SlimeConfig({
   reviewer: claude.reviewer({ apiKey: process.env.ANTHROPIC_API_KEY!, model: 'claude-opus-5-5' }),    // omit = no review
   crystal: crystals,                // import { crystals } from './slime-crystal/index.js'; omit = off
   glossary: { revenue: 'sum of paid invoices, in cents' },        // optional; meaning of the app's words (§4.4)
+  rules: ['Count only paid invoices as revenue.'],                 // optional; added to the model's SQL notes (D2)
   tiers: { gasToLiquidRuns: 3, gasWindowMs: 3_600_000 },           // optional, defaults shown
   limits: { rowCap: 1_000, statementTimeoutMs: 2_000, maxGenerationsPerHour: 200 },
   onEvent: (e) => console.log(JSON.stringify(e)),
@@ -236,7 +211,7 @@ Contracts (Ports) that core exports, unchanged from the sandbox unless noted:
   (§4.4);
 * `Generator` and `Reviewer`;
 * `HandlerStore`: gains the table name as an option, which replaces PR #7's
-  `SLIME_META_TABLE`;
+  `SLIME_META_TABLE`, and `loadDictionary`/`saveDictionary` (D3);
 * `SlimeError` and its error codes.
 
 ## 6. Package layout (target)
@@ -272,7 +247,7 @@ one ports is named, so parity can be checked.
 | M0 | **Skeleton.** Root `package.json` with workspaces, core `package.json` with an exports map, `tsconfig`, `node:test`, a CI job "Core tests". | `npm test -w @slime-kit/core` runs; `npm pack` builds a tarball; CI is green. |
 | M1 | **Request, contracts and pure parts.** Request parsing, intent normalization and the request key (§4); output notation with `date`/`datetime`; Ports and `SlimeError`; SQL guard and lint; `SlimeConfig` with defaults, validation and `glossary`. | `units.test.ts` ported and adjusted for §4.7. |
 | M2 | **Engine, Gas path.** `createSlime`, `query`, memory store, offline generator, `SandboxRunner` with the QuickJS worker, coalescing, rate limits, locked mode, typed and nullable parameters (R4, R5), the limit check (R6). | `engine.test.ts` and `sandbox.test.ts` ported; one handler serves every combination of `null` filters; no `config` singleton anywhere. |
-| M3 | **Postgres and the dictionary.** Connector with the start-up safety check; store with a configurable table; the startup dictionary once §4.4 is decided. | `postgres.test.ts` and `persistence.test.ts` ported. |
+| M3 | **Postgres and the dictionary.** Connector with the start-up safety check and enum values from the catalog; store with a configurable table and dictionary storage; the background dictionary build (§4.4). | `postgres.test.ts` and `persistence.test.ts` ported; a restart loads the dictionary instead of rebuilding it; changing `rules` rebuilds it. |
 | M4 | **Models and Liquid.** Claude and Groq generators and reviewers with prompts updated for §4 (nullable parameters, the dictionary); the review loop; promotion to Liquid. | Review and promotion tests pass; one live run against Groq or Claude. |
 | M5 | **Crystal.** Serving from an imported registry; the crystallize job writing TS or JS; the `check` command. | `crystal*.test.ts` ported; a hand-edited Crystal file fails `check`; TS and JS output both pass the equivalence test. |
 | M6 | **Use it as a package.** An example app in `oss/examples/` that installs the packed tarball and calls `slime.query()` from an endpoint; docs for the request format; the bench ported to run on core. Then retire `sandbox/`. | The example answers a query from the tarball; the bench is at least as correct as the sandbox's. |
@@ -303,8 +278,7 @@ one ports is named, so parity can be checked.
 
 C1–C11 and most of §4 are decided. Still to do:
 
-* R4, R5 and R7 (Proposed);
-* the startup dictionary (§4.4);
+* R4, R5 and R7, and D5–D8 (Proposed);
 * confirm C12 (what's out of scope);
 * agree with the PR #7 author that core is built at `oss/packages/core` (§2).
 
