@@ -1,8 +1,15 @@
 # Slime landing page
 
-A static marketing page for Slime: one self-contained `index.html` (HTML, CSS
-and a little vanilla JS), no build step. Single-file and dark-only, per the
-brand book's rules for generated UI.
+A static marketing page for Slime: one `index.html` (HTML, CSS and a little
+vanilla JS), no build step, dark-only per the brand book. The layout follows
+heroui.com (floating pill header that condenses on scroll, centred hero,
+two-tone section heads, media cards, stats row); colours, fonts and copy are
+Slime's own.
+
+- `assets/state-*.webp`: the Gas / Liquid / Crystal card images, rendered
+  with three.js by [`tools/render-states/`](tools/render-states/). To
+  regenerate: `node landing/tools/render-states/capture.mjs landing/assets`
+  (needs Google Chrome; macOS path in the script).
 
 ## Preview locally
 
