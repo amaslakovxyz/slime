@@ -62,6 +62,17 @@ resource "aws_acm_certificate_validation" "site" {
 
 # --- CloudFront ----------------------------------------------------------------
 
+# CloudFront signs every origin request with SigV4 so the IAM-authenticated
+# Function URL accepts it (see aws_lambda_function_url in main.tf). Only GET
+# and HEAD are allowed, so no request body needs a payload hash.
+resource "aws_cloudfront_origin_access_control" "function_url" {
+  name                              = "${local.name}-function-url"
+  description                       = "Signs CloudFront requests to the landing Function URL"
+  origin_access_control_origin_type = "lambda"
+  signing_behavior                  = "always"
+  signing_protocol                  = "sigv4"
+}
+
 # AWS managed policies (stable IDs).
 data "aws_cloudfront_cache_policy" "caching_optimized" {
   name = "Managed-CachingOptimized"
@@ -76,8 +87,9 @@ resource "aws_cloudfront_distribution" "site" {
   price_class     = "PriceClass_100" # NA + EU edges only; cheapest
 
   origin {
-    origin_id   = "function-url"
-    domain_name = local.origin_host
+    origin_id                = "function-url"
+    domain_name              = local.origin_host
+    origin_access_control_id = aws_cloudfront_origin_access_control.function_url.id
 
     custom_origin_config {
       http_port              = 80

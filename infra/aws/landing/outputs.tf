@@ -1,5 +1,5 @@
 output "url" {
-  description = "Public landing URL (Lambda Function URL)."
+  description = "Lambda Function URL (CloudFront origin; IAM-auth, direct requests get 403)."
   value       = aws_lambda_function_url.landing.function_url
 }
 

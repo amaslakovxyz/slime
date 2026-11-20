@@ -99,26 +99,31 @@ resource "aws_lambda_function" "landing" {
   depends_on = [aws_iam_role_policy.landing_logs]
 }
 
+# The URL is IAM-authenticated: only our CloudFront distribution (signing via
+# Origin Access Control, see domain.tf) may call it. Direct hits on the
+# *.lambda-url.* host get 403 and never run the function, so traffic cannot
+# bypass the CloudFront cache and burn the account's shared concurrency (10).
 resource "aws_lambda_function_url" "landing" {
   function_name      = aws_lambda_function.landing.function_name
-  authorization_type = "NONE"
+  authorization_type = "AWS_IAM"
 }
 
-# Public Function URLs need both statements (AWS requirement since Oct 2025);
-# the second is scoped to URL invocations so the function is not publicly
-# invokable through the Lambda Invoke API.
-resource "aws_lambda_permission" "public_url" {
-  statement_id           = "PublicFunctionUrl"
+# Both statements are required for a Function URL (AWS change, Oct 2025),
+# each scoped to this one distribution.
+resource "aws_lambda_permission" "cloudfront_url" {
+  statement_id           = "CloudFrontFunctionUrl"
   action                 = "lambda:InvokeFunctionUrl"
   function_name          = aws_lambda_function.landing.function_name
-  principal              = "*"
-  function_url_auth_type = "NONE"
+  principal              = "cloudfront.amazonaws.com"
+  source_arn             = aws_cloudfront_distribution.site.arn
+  function_url_auth_type = "AWS_IAM"
 }
 
-resource "aws_lambda_permission" "public_invoke_via_url" {
-  statement_id             = "PublicInvokeViaFunctionUrl"
+resource "aws_lambda_permission" "cloudfront_invoke_via_url" {
+  statement_id             = "CloudFrontInvokeViaFunctionUrl"
   action                   = "lambda:InvokeFunction"
   function_name            = aws_lambda_function.landing.function_name
-  principal                = "*"
+  principal                = "cloudfront.amazonaws.com"
+  source_arn               = aws_cloudfront_distribution.site.arn
   invoked_via_function_url = true
 }

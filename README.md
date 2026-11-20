@@ -37,8 +37,8 @@ Backend -- Slime runtime:
     - [slime_master_brand_book_design_system.html](./docs/brand/slime_master_brand_book_design_system.html) - Interactive brand book and component kit.
     - [slime_marketing_positioning_tone_of_voice_use_cases.md](./docs/brand/slime_marketing_positioning_tone_of_voice_use_cases.md) - Positioning, tone of voice, use cases, and messaging.
 - `.github/workflows/` (no contract file) - [ci.yml](./.github/workflows/ci.yml)
-  runs the pre-commit job on every push and pull request;
-  [pages.yml](./.github/workflows/pages.yml) deploys `landing/` to GitHub Pages.
+  runs the pre-commit job on every push and pull request. The landing page is
+  deployed with Terraform from [infra/aws/landing](./infra/aws/landing/README.md).
 
 Root files: [AGENTS.md](./AGENTS.md) (repository contract for agents),
 [justfile](./justfile) (task runner), and
@@ -59,8 +59,8 @@ Root files: [AGENTS.md](./AGENTS.md) (repository contract for agents),
 - No runtime side effects in code yet (`None`).
 - CI: [ci.yml](./.github/workflows/ci.yml) job `pre-commit` runs
   `pre-commit/action@v3.0.1` on `push` and `pull_request`.
-- Deploy: [pages.yml](./.github/workflows/pages.yml) publishes `landing/` to
-  GitHub Pages on every push to `main` that touches `landing/`.
+- Deploy: `landing/` is served by CloudFront + Lambda, applied with Terraform
+  from [infra/aws/landing](./infra/aws/landing/README.md).
 
 ## System Verification
 
