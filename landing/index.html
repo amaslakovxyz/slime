@@ -16,6 +16,16 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Oi&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Titan+One&display=swap" rel="stylesheet">
 
+  <!-- three.js for the hero slime. Pinned version; the page works without it (CSS fallback blob). -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+      }
+    }
+  </script>
+
   <style>
     /* Tokens from the brand book (§2). Slime is dark-only by brand rule (§7.3). */
     :root {
@@ -153,102 +163,66 @@
     .hero .lead { max-width: 540px; font-size: 1.2rem; margin-top: 26px; }
     .hero-ctas { display: flex; gap: 14px; margin-top: 38px; flex-wrap: wrap; }
 
+    /* Hero card: the 3D slime on top, the feed menu below, one surface. */
     .hero-right { position: relative; min-width: 0; }
-    .hero-visual { position: relative; height: 440px; }
-    .hero-visual::before { /* soft plasma halo behind the goo */
-      content: ""; position: absolute; inset: 8% 4%;
-      background: radial-gradient(closest-side, rgba(255,20,118,.32), rgba(143,0,67,.12) 55%, transparent 100%);
-      filter: blur(30px);
+    .slime-card {
+      position: relative; border-radius: 28px; overflow: hidden;
+      background: radial-gradient(120% 70% at 50% 0%, rgba(255,20,118,.10), transparent 60%), var(--bg-surface);
+      border: 1px solid var(--border-color);
+      box-shadow: 0 30px 80px rgba(0,0,0,.45);
     }
-    .goo {
-      position: absolute; inset: 0; filter: url(#goo);
-      transform: scale(var(--grow, 1)); transform-origin: 42% 42%;
-      transition: transform .6s cubic-bezier(.34, 1.56, .64, 1);
+    .stage { position: relative; height: 340px; cursor: grab; touch-action: pan-y; }
+    .stage:active { cursor: grabbing; }
+    .stage::before { /* plasma halo behind the slime */
+      content: ""; position: absolute; left: 50%; top: 50%; width: 64%; aspect-ratio: 1; transform: translate(-50%, -50%);
+      background: radial-gradient(closest-side, rgba(255,20,118,.32), rgba(143,0,67,.12) 60%, transparent);
+      filter: blur(26px); pointer-events: none;
     }
-    .goo.gulp { animation: gulp .6s ease; }
-    @keyframes gulp {
-      0% { transform: scale(var(--grow, 1)); }
-      35% { transform: scale(calc(var(--grow, 1) * 1.09), calc(var(--grow, 1) * .94)); }
-      65% { transform: scale(calc(var(--grow, 1) * .96), calc(var(--grow, 1) * 1.05)); }
-      100% { transform: scale(var(--grow, 1)); }
+    .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    .stage-fallback { /* shown until WebGL is ready, or if it never is */
+      position: absolute; left: 50%; top: 50%; width: 150px; height: 150px; margin: -75px 0 0 -75px;
+      border-radius: 42% 58% 70% 30% / 45% 45% 55% 55%;
+      background: radial-gradient(circle at 32% 28%, var(--plasma-highlight), var(--plasma-primary) 45%, var(--plasma-shadow));
+      box-shadow: 0 20px 60px var(--glow-primary);
+      animation: morph 9s ease-in-out infinite; transition: opacity .6s ease;
     }
-    /* A swallowed item: a plasma droplet that merges into the body through the goo filter. */
-    .droplet {
-      position: absolute; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%;
-      background: radial-gradient(circle at 32% 28%, var(--plasma-highlight), var(--plasma-primary) 50%, var(--plasma-shadow));
-      transition: left .55s cubic-bezier(.55, 0, .45, 1), top .55s cubic-bezier(.55, 0, .45, 1), transform .55s ease;
+    .stage.ready .stage-fallback { opacity: 0; }
+    .stage-status { position: absolute; top: 18px; left: 18px; z-index: 2; }
+    .stage-hint {
+      position: absolute; top: 24px; right: 20px; z-index: 2; pointer-events: none;
+      font-family: var(--font-mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--wireframe-grey);
     }
 
-    /* Feed tray */
-    .feed {
-      position: relative; z-index: 3; margin-top: 4px; padding: 18px 18px 20px; border-radius: 20px;
-      background: rgba(22,16,25,.78); border: 1px solid var(--border-color);
-      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    /* The menu: minimal, but reads like one. */
+    .menu { padding: 22px 30px 20px; border-top: 1px dashed var(--border-bright); }
+    .menu-head { text-align: center; margin-bottom: 10px; }
+    .menu-kicker { font-family: var(--font-mono); font-size: 11px; letter-spacing: .24em; text-transform: uppercase; color: var(--wireframe-grey); }
+    .menu-title { font-size: 30px; margin: 6px 0 0; }
+    .menu-list { list-style: none; margin: 0; padding: 0; }
+    .menu-list li + li { border-top: 1px solid rgba(45,31,51,.7); }
+    .dish {
+      width: 100%; display: grid; grid-template-columns: auto 1fr auto; align-items: baseline; column-gap: 10px;
+      padding: 10px 2px; background: none; border: 0; cursor: pointer; text-align: left; color: var(--text-pure); font: inherit;
     }
-    .feed-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 12px; margin-bottom: 14px; }
-    .feed-head .wordmark { font-size: 24px; white-space: nowrap; }
-    .feed-count { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); letter-spacing: .06em; white-space: nowrap; }
-    .feed-reset {
-      font: inherit; color: var(--plasma-highlight); background: none; border: 0; padding: 0; margin-left: 8px;
-      cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
+    .dish-name { font-family: var(--font-mono); font-size: 14px; font-weight: 500; transition: color .2s ease; }
+    .dish-leader { border-bottom: 1.5px dotted var(--border-bright); transform: translateY(-4px); transition: border-color .2s ease; }
+    .dish-kind { font-size: 11.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--text-muted); white-space: nowrap; }
+    .dish-out {
+      grid-column: 1 / -1; font-family: var(--font-mono); font-size: 12px; color: var(--gas-accent);
+      max-height: 0; opacity: 0; overflow: hidden; transition: max-height .4s ease, opacity .4s ease, margin .4s ease;
     }
-    .foods { display: flex; flex-wrap: wrap; gap: 8px; }
-    .food {
-      display: inline-flex; flex-direction: column; align-items: flex-start; gap: 3px;
-      padding: 9px 13px; border-radius: 12px; cursor: pointer;
-      font-family: var(--font-mono); font-size: 13px; color: var(--text-pure); text-align: left;
-      background: var(--bg-canvas); border: 1px dashed var(--wireframe-grey);
-      transition: border-color .2s ease, transform .2s ease, opacity .3s ease, box-shadow .2s ease;
+    .dish:hover:not(:disabled) .dish-name { color: var(--plasma-highlight); }
+    .dish:hover:not(:disabled) .dish-leader { border-color: var(--plasma-primary); }
+    .dish:disabled { cursor: default; }
+    .dish:disabled .dish-name { color: var(--wireframe-grey); text-decoration: line-through; text-decoration-color: var(--plasma-primary); }
+    .dish:disabled .dish-kind { color: var(--plasma-highlight); }
+    .dish.eaten .dish-out { max-height: 40px; opacity: 1; margin-top: 4px; }
+    .menu-foot {
+      display: flex; justify-content: center; align-items: center; gap: 12px; margin-top: 8px; padding-top: 12px;
+      border-top: 1px dashed var(--border-bright);
+      font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); letter-spacing: .06em;
     }
-    .food .kind { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--wireframe-grey); }
-    .food:hover:not(:disabled) { border-style: solid; border-color: var(--plasma-primary); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(255,20,118,.25); }
-    .food:disabled { opacity: .3; cursor: default; text-decoration: line-through; }
-    .flyer {
-      position: absolute; z-index: 6; pointer-events: none; margin: 0;
-      transition: transform .6s cubic-bezier(.5, -0.25, .7, 1), opacity .22s ease .32s;
-    }
-    .blob {
-      position: absolute; border-radius: 42% 58% 70% 30% / 45% 45% 55% 55%;
-      background: radial-gradient(circle at 32% 28%, var(--plasma-highlight) 0%, var(--plasma-primary) 42%, var(--plasma-shadow) 100%);
-      animation: drift 14s ease-in-out infinite, morph 9s ease-in-out infinite;
-    }
-    .b1 { width: 300px; height: 300px; left: 22%; top: 20%; }
-    .b2 { width: 170px; height: 170px; left: 54%; top: 12%; animation-duration: 11s, 7s; animation-delay: -3s, -2s; }
-    .b3 { width: 150px; height: 150px; left: 14%; top: 56%; animation-duration: 16s, 10s; animation-delay: -6s, -1s; }
-    .b4 { width: 120px; height: 120px; left: 62%; top: 58%; animation-duration: 12s, 8s; animation-delay: -8s, -4s; }
-    .b5 { width: 70px;  height: 70px;  left: 78%; top: 36%; animation-duration: 10s, 6s; animation-delay: -2s, -3s; }
-    .gloss { /* specular highlight on the main body */
-      position: absolute; left: 31%; top: 27%; width: 120px; height: 60px; border-radius: 50%;
-      background: radial-gradient(closest-side, rgba(255,255,255,.55), rgba(255,133,192,0));
-      transform: rotate(-24deg); filter: blur(2px); pointer-events: none;
-      animation: drift 14s ease-in-out infinite;
-    }
-    .vapor {
-      position: absolute; border-radius: 50%; border: 1.5px dashed var(--gas-border);
-      background: radial-gradient(circle at 35% 30%, rgba(56,248,184,.35), rgba(56,248,184,.04) 70%);
-      animation: rise 7s ease-in-out infinite;
-    }
-    .v1 { width: 46px; height: 46px; left: 12%; top: 18%; }
-    .v2 { width: 26px; height: 26px; left: 84%; top: 18%; animation-delay: -2.5s; }
-    .v3 { width: 34px; height: 34px; left: 86%; top: 74%; animation-delay: -4.5s; }
-
-    .float-chip {
-      position: absolute; z-index: 2;
-      display: flex; flex-direction: column; gap: 6px;
-      padding: 14px 16px; border-radius: var(--radius-md);
-      background: rgba(22,16,25,.82); border: 1px solid var(--border-color);
-      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-      box-shadow: 0 18px 40px rgba(0,0,0,.45);
-      font-family: var(--font-mono); font-size: 12.5px; color: var(--text-muted);
-      animation: bob 6s ease-in-out infinite;
-    }
-    .float-chip strong { color: var(--text-pure); font-weight: 500; }
-    .float-chip.c1 { left: 0; top: 4%; max-width: 280px; }
-    .float-chip.c2 { right: 0; bottom: 4%; animation-delay: -3s; max-width: 260px; }
-    .float-chip .sub { color: var(--text-muted); }
-    .float-chip.pop { animation: pop .5s ease, bob 6s ease-in-out .5s infinite; }
-    @keyframes pop { 0% { transform: scale(.92); } 60% { transform: scale(1.04); } 100% { transform: scale(1); } }
-    .float-chip .ms { font-size: 22px; font-weight: 700; color: var(--text-pure); letter-spacing: -.01em; }
+    .feed-reset { font: inherit; color: var(--plasma-highlight); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 
     @keyframes drift {
       0%, 100% { transform: translate(0, 0); }
@@ -451,7 +425,7 @@
     @media (max-width: 960px) {
       section { padding: 96px 0; }
       .hero-grid, .trust-grid { grid-template-columns: 1fr; gap: 40px; }
-      .hero-visual { height: 400px; }
+      .stage { height: 320px; }
       .demo-body { grid-template-columns: 1fr; }
       .demo-col + .demo-col { border-left: 0; border-top: 1px solid var(--border-color); }
       .states, .audiences { grid-template-columns: 1fr; }
@@ -465,18 +439,12 @@
       section { padding: 76px 0; }
       .section-head { margin-bottom: 40px; }
       .hero { padding: 24px 0 76px; }
-      .hero-visual { height: 320px; }
-      .b1 { width: 200px; height: 200px; }
-      .b2 { width: 110px; height: 110px; }
-      .b3 { width: 100px; height: 100px; }
-      .b4 { width: 80px; height: 80px; }
-      .b5 { width: 46px; height: 46px; }
-      .gloss { width: 80px; height: 40px; }
-      .float-chip { font-size: 11.5px; padding: 10px 12px; max-width: 220px; }
-      .feed { padding: 16px 14px 18px; }
-      .feed-head .wordmark { font-size: 21px; }
-      .food { font-size: 12px; padding: 8px 11px; }
-      .float-chip .ms { font-size: 18px; }
+      .stage { height: 280px; }
+      .stage-hint { display: none; }
+      .menu { padding: 20px 18px 18px; }
+      .menu-title { font-size: 26px; }
+      .dish-name { font-size: 13px; }
+      .dish-kind { font-size: 10.5px; }
       .cases { grid-template-columns: 1fr; }
       .case { padding: 26px 22px; }
       .cage { display: none; }
@@ -494,16 +462,6 @@
   </style>
 </head>
 <body>
-  <!-- Goo filter: blurs the blobs together, then sharpens the alpha so they merge like gel. -->
-  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
-    <defs>
-      <filter id="goo" color-interpolation-filters="sRGB">
-        <feGaussianBlur in="SourceGraphic" stdDeviation="16" result="blur"/>
-        <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -9" result="goo"/>
-        <feComposite in="SourceGraphic" in2="goo" operator="atop"/>
-      </filter>
-    </defs>
-  </svg>
 
   <header class="nav" id="nav">
     <div class="container nav-inner">
@@ -533,35 +491,25 @@
         </div>
 
         <div class="hero-right">
-          <div class="hero-visual" id="hero-visual">
-            <div class="goo" id="goo" aria-hidden="true">
-              <div class="blob b1" id="blob-main"></div><div class="blob b2"></div><div class="blob b3"></div>
-              <div class="blob b4"></div><div class="blob b5"></div>
+          <div class="slime-card">
+            <div class="stage" id="slime-stage">
+              <div class="stage-fallback" aria-hidden="true"></div>
+              <span class="tag gas stage-status" id="slime-status" role="status" aria-live="polite"><span class="dot"></span>Hungry</span>
+              <span class="stage-hint" aria-hidden="true">poke it</span>
             </div>
-            <div class="gloss" aria-hidden="true"></div>
-            <span class="vapor v1" aria-hidden="true"></span><span class="vapor v2" aria-hidden="true"></span><span class="vapor v3" aria-hidden="true"></span>
-            <div class="float-chip c1" id="chip-in">
-              <span class="tag gas" style="align-self:flex-start" id="chip-in-tag"><span class="dot"></span>Hungry</span>
-              <span id="chip-in-line"><strong>status:</strong> feed me something ↓</span>
-            </div>
-            <div class="float-chip c2" id="chip-out" aria-live="polite">
-              <span class="tag liquid" style="align-self:flex-start" id="chip-out-tag"><span class="dot"></span>Liquid · cache hit</span>
-              <span class="ms" id="chip-out-ms">14 ms</span>
-              <span class="sub" id="chip-out-sub">top accounts by revenue</span>
-            </div>
-          </div>
-
-          <div class="feed">
-            <div class="feed-head">
-              <span class="wordmark slime-text">Feed the Slime</span>
-              <span class="feed-count"><span id="feed-count">0 / 5 swallowed</span><button class="feed-reset" id="feed-reset" type="button" hidden>feed again</button></span>
-            </div>
-            <div class="foods" id="foods">
-              <button class="food" type="button" data-kind="old endpoint" data-result="orders by region, last 30 days" data-ms="12"><span class="kind">old endpoint</span>GET /api/v1/orders</button>
-              <button class="food" type="button" data-kind="database" data-result="top accounts by revenue" data-ms="14"><span class="kind">database</span>postgres://billing</button>
-              <button class="food" type="button" data-kind="file" data-result="churn risk by plan" data-ms="9"><span class="kind">file</span>customers.csv</button>
-              <button class="food" type="button" data-kind="legacy API" data-result="unpaid invoices this month" data-ms="17"><span class="kind">legacy API</span>SOAP InvoiceService</button>
-              <button class="food" type="button" data-kind="event data" data-result="signups per day, by channel" data-ms="11"><span class="kind">event data</span>{ webhook }</button>
+            <div class="menu">
+              <div class="menu-head">
+                <span class="menu-kicker">Today's menu</span>
+                <p class="wordmark slime-text menu-title">Feed the Slime</p>
+              </div>
+              <ul class="menu-list" id="menu-list">
+                <li><button class="dish" type="button" data-kind="old endpoint"><span class="dish-name">GET /api/v1/orders</span><span class="dish-leader" aria-hidden="true"></span><span class="dish-kind">old endpoint</span><span class="dish-out">→ now serves: orders by region, last 30 days · 12 ms</span></button></li>
+                <li><button class="dish" type="button" data-kind="database"><span class="dish-name">postgres://billing</span><span class="dish-leader" aria-hidden="true"></span><span class="dish-kind">database</span><span class="dish-out">→ now serves: top accounts by revenue · 14 ms</span></button></li>
+                <li><button class="dish" type="button" data-kind="file"><span class="dish-name">customers.csv</span><span class="dish-leader" aria-hidden="true"></span><span class="dish-kind">file</span><span class="dish-out">→ now serves: churn risk by plan · 9 ms</span></button></li>
+                <li><button class="dish" type="button" data-kind="legacy API"><span class="dish-name">SOAP InvoiceService</span><span class="dish-leader" aria-hidden="true"></span><span class="dish-kind">legacy API</span><span class="dish-out">→ now serves: unpaid invoices this month · 17 ms</span></button></li>
+                <li><button class="dish" type="button" data-kind="event data"><span class="dish-name">{ webhook }</span><span class="dish-leader" aria-hidden="true"></span><span class="dish-kind">event data</span><span class="dish-out">→ now serves: signups per day, by channel · 11 ms</span></button></li>
+              </ul>
+              <div class="menu-foot"><span id="feed-count">0 of 5 served</span><button class="feed-reset" id="feed-reset" type="button" hidden>feed again</button></div>
             </div>
           </div>
         </div>
@@ -826,100 +774,51 @@
         reveals.forEach(function (el) { el.classList.add('in'); });
       }
 
-      /* ---------- Feed the Slime (hero) ----------
-         Click a source: it flies into the blob, merges as a droplet through the
-         goo filter, the body gulps and grows, and the chips show the new shape
-         Slime can now serve from it. Purely illustrative. */
-      var visual = document.getElementById('hero-visual');
-      var goo = document.getElementById('goo');
-      var mainBlob = document.getElementById('blob-main');
-      var foodBtns = document.querySelectorAll('#foods .food');
+      /* ---------- Feed the Slime (hero menu) ----------
+         The menu updates its own UI and fires 'slime:feed' / 'slime:reset'.
+         The 3D module below listens and drops a droplet into the slime, so the
+         menu still works when WebGL or the CDN is unavailable. */
+      var dishes = document.querySelectorAll('#menu-list .dish');
       var countEl = document.getElementById('feed-count');
       var resetBtn = document.getElementById('feed-reset');
-      var chipIn = document.getElementById('chip-in');
-      var chipInTag = document.getElementById('chip-in-tag');
-      var chipInLine = document.getElementById('chip-in-line');
-      var chipOut = document.getElementById('chip-out');
-      var chipOutTag = document.getElementById('chip-out-tag');
-      var chipOutMs = document.getElementById('chip-out-ms');
-      var chipOutSub = document.getElementById('chip-out-sub');
-      var eaten = 0;
+      var statusTag = document.getElementById('slime-status');
+      var served = 0;
 
-      function pop(el) { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
-      function center(r) { return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
-
-      function digest(btn) {
-        var label = btn.lastChild.textContent;
-        chipInTag.innerHTML = '<span class="dot"></span>Gas · digesting';
-        chipInLine.innerHTML = '<strong>' + esc(btn.dataset.kind) + ':</strong> ' + esc(label);
-        pop(chipIn);
-        goo.classList.remove('gulp'); void goo.offsetWidth; goo.classList.add('gulp');
-        eaten += 1;
-        goo.style.setProperty('--grow', (1 + eaten * 0.035).toFixed(3));
-        countEl.textContent = eaten + ' / ' + foodBtns.length + ' swallowed';
-        setTimeout(function () {
-          chipOutTag.innerHTML = '<span class="dot"></span>Liquid · new shape';
-          chipOutMs.textContent = btn.dataset.ms + ' ms';
-          chipOutSub.textContent = btn.dataset.result;
-          pop(chipOut);
-          if (eaten === foodBtns.length) {
-            chipInTag.innerHTML = '<span class="dot"></span>Gas · full';
-            chipInLine.innerHTML = '<strong>status:</strong> one backend, any shape';
-            resetBtn.hidden = false;
-          }
-        }, reduceMotion ? 0 : 650);
+      function setSlimeStatus(cls, text) {
+        statusTag.className = 'tag stage-status ' + cls;
+        statusTag.innerHTML = '<span class="dot"></span>' + text;
       }
 
-      function feed(btn) {
-        if (btn.disabled) return;
-        btn.disabled = true;
-        if (reduceMotion) { digest(btn); return; }
+      dishes.forEach(function (d) {
+        d.addEventListener('click', function () {
+          if (d.disabled) return;
+          d.disabled = true;
+          served += 1;
+          var n = served;
+          setSlimeStatus('gas', 'Gas · digesting');
+          document.dispatchEvent(new CustomEvent('slime:feed'));
+          // Matches the droplet's travel time in the 3D module.
+          setTimeout(function () {
+            d.classList.add('eaten');
+            d.querySelector('.dish-kind').textContent = '✓ served';
+            countEl.textContent = n + ' of ' + dishes.length + ' served';
+            if (n === dishes.length) { setSlimeStatus('liquid', 'Full · any shape'); resetBtn.hidden = false; }
+            else { setSlimeStatus('liquid', 'Liquid · new shape'); }
+          }, reduceMotion ? 0 : 1100);
+        });
+      });
 
-        var v = visual.getBoundingClientRect();
-        var from = btn.getBoundingClientRect();
-        var mouth = center(mainBlob.getBoundingClientRect());
-        // The flyer stops short of the centre, at the body's edge, where a droplet takes over.
-        var edge = { x: mouth.x + (center(from).x - mouth.x) * 0.45, y: mouth.y + (center(from).y - mouth.y) * 0.45 };
-
-        var flyer = btn.cloneNode(true);
-        flyer.disabled = false; // the source button is already disabled; the flyer shouldn't look it
-        flyer.setAttribute('aria-hidden', 'true');
-        flyer.classList.add('flyer');
-        flyer.style.left = (from.left - v.left) + 'px';
-        flyer.style.top = (from.top - v.top) + 'px';
-        flyer.style.width = from.width + 'px';
-        visual.appendChild(flyer);
-        void flyer.offsetWidth;
-        flyer.style.transform = 'translate(' + (edge.x - center(from).x) + 'px,' + (edge.y - center(from).y) + 'px) scale(.25)';
-        flyer.style.opacity = '0';
-
-        setTimeout(function () {
-          flyer.remove();
-          var g = goo.getBoundingClientRect();
-          var scale = g.width / goo.offsetWidth || 1; // goo is scaled by --grow
-          var d = document.createElement('span');
-          d.className = 'droplet';
-          d.style.left = ((edge.x - g.left) / scale) + 'px';
-          d.style.top = ((edge.y - g.top) / scale) + 'px';
-          goo.appendChild(d);
-          void d.offsetWidth;
-          d.style.left = ((mouth.x - g.left) / scale) + 'px';
-          d.style.top = ((mouth.y - g.top) / scale) + 'px';
-          d.style.transform = 'scale(.4)';
-          setTimeout(function () { d.remove(); }, 600);
-          digest(btn);
-        }, 520);
-      }
-
-      foodBtns.forEach(function (b) { b.addEventListener('click', function () { feed(b); }); });
       resetBtn.addEventListener('click', function () {
-        eaten = 0;
-        goo.style.setProperty('--grow', '1');
-        foodBtns.forEach(function (b) { b.disabled = false; });
-        countEl.textContent = '0 / ' + foodBtns.length + ' swallowed';
-        chipInTag.innerHTML = '<span class="dot"></span>Hungry';
-        chipInLine.innerHTML = '<strong>status:</strong> feed me something ↓';
+        served = 0;
+        dishes.forEach(function (d) {
+          d.disabled = false;
+          d.classList.remove('eaten');
+          d.querySelector('.dish-kind').textContent = d.dataset.kind;
+        });
+        countEl.textContent = '0 of ' + dishes.length + ' served';
+        setSlimeStatus('gas', 'Hungry');
         resetBtn.hidden = true;
+        document.dispatchEvent(new CustomEvent('slime:reset'));
       });
 
       /* ---------- Scripted demo ----------
@@ -1062,6 +961,174 @@
         else if (state === 'liquid') reset();
       });
     })();
+  </script>
+
+  <!-- Hero slime: marching-cubes metaballs in a glossy physical material. -->
+  <script type="module">
+    import * as THREE from 'three';
+    import { MarchingCubes } from 'three/addons/objects/MarchingCubes.js';
+    import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+    const stage = document.getElementById('slime-stage');
+    const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // If WebGL is unavailable this throws, the module stops, and the CSS fallback blob stays.
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setClearColor(0x000000, 0);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 0.9;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    stage.prepend(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+    const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 50);
+    camera.position.set(0, 0, 6.2);
+
+    // Brand colours: Laser Plasma body, Bruised Berry depth, Specular Jelly sheen, Cryo Mint rim.
+    const material = new THREE.MeshPhysicalMaterial({
+      color: 0xff1476,
+      emissive: 0x8f0043,
+      emissiveIntensity: 0.22,
+      roughness: 0.14,
+      metalness: 0.0,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.04,
+      sheen: 0.35,
+      sheenColor: new THREE.Color(0xff85c0),
+      sheenRoughness: 0.4,
+      iridescence: 0.25,
+      iridescenceIOR: 1.3,
+      envMapIntensity: 0.65,
+    });
+
+    const RES = 56;
+    const blob = new MarchingCubes(RES, material, false, false, 60000);
+    blob.isolation = 80;
+    const SCALE = 2.8;
+    blob.scale.setScalar(SCALE);
+    blob.position.y = -0.12; // a little low, so a fully fed slime clears the status tag
+    scene.add(blob);
+
+    const key = new THREE.DirectionalLight(0xffffff, 2.4);
+    key.position.set(-2.5, 3, 4);
+    const rim = new THREE.DirectionalLight(0x38f8b8, 2.2);
+    rim.position.set(3, -1.5, -2.5);
+    const fill = new THREE.PointLight(0xff85c0, 18, 20, 2);
+    fill.position.set(2.5, 1.5, 3);
+    scene.add(key, rim, fill);
+
+    // --- living motion -------------------------------------------------------
+    const BALLS = 7;
+    const seeds = Array.from({ length: BALLS }, (_, i) => ({
+      phase: i * 2.399,                     // golden angle spreads them out
+      speed: 0.32 + 0.11 * ((i * 7) % 5) / 4,
+      radius: 0.09 + 0.06 * ((i * 3) % 4) / 3,
+    }));
+    const DROP_T = reduceMotion ? 0.01 : 1.1; // seconds a fed droplet takes to merge
+    const drops = [];
+    const s = { grow: 0, growTarget: 0, jiggle: 0, reach: 0, reachTarget: 0, px: 0, py: 0, tx: 0, ty: 0 };
+
+    const clamp01 = (v) => Math.min(1, Math.max(0, v));
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
+    // Two small satellites orbit wide: they stretch into tendrils and pinch back in.
+    const satellites = [
+      { phase: 0.0, speed: 0.42, orbit: 0.2, tilt: 0.6 },
+      { phase: 2.6, speed: -0.33, orbit: 0.22, tilt: -0.9 },
+    ];
+
+    function buildField(t, now) {
+      blob.reset();
+      const g = s.grow;
+      const strength = 0.32 + g * 0.03;
+      // Jiggle is a fast surface wobble, never a bigger orbit, so the body stays in one piece.
+      const wob = s.jiggle * 0.035;
+      for (let i = 0; i < BALLS; i++) {
+        const b = seeds[i];
+        const a = t * b.speed + b.phase;
+        const r = b.radius + g * 0.004;
+        blob.addBall(
+          0.5 + Math.sin(a) * r + Math.sin(a * 0.43 + i) * 0.025 + Math.sin(t * 17 + i) * wob,
+          0.5 + Math.cos(a * 1.13) * r * 0.85 + Math.cos(t * 19 + i * 2) * wob,
+          0.5 + Math.sin(a * 0.71 + i * 1.3) * r * 0.7,
+          strength, 12
+        );
+      }
+      for (const sat of satellites) {
+        const a = t * sat.speed + sat.phase;
+        const o = sat.orbit + g * 0.008 + Math.sin(t * 0.9 + sat.phase) * 0.03;
+        blob.addBall(0.5 + Math.cos(a) * o, 0.5 + Math.sin(a) * o * Math.cos(sat.tilt), 0.5 + Math.sin(a) * o * Math.sin(sat.tilt), 0.07, 12);
+      }
+      // A tendril that reaches toward the pointer.
+      if (s.reach > 0.01) blob.addBall(0.5 + s.px, 0.5 + s.py, 0.56, 0.12 * s.reach, 12);
+      // Fed droplets rise from the menu side and merge into the body.
+      for (let i = drops.length - 1; i >= 0; i--) {
+        const d = drops[i];
+        const e = ease(clamp01((now - d.t0) / DROP_T));
+        blob.addBall(lerp(d.x0, 0.5, e), lerp(0.2, 0.47, e), 0.5, lerp(0.09, 0.2, e), 12);
+        if (e >= 1) { drops.splice(i, 1); s.growTarget += 1; s.jiggle = 1; }
+      }
+      blob.update();
+    }
+
+    // --- interaction ---------------------------------------------------------
+    function toField(ev) {
+      const r = stage.getBoundingClientRect();
+      const nx = ((ev.clientX - r.left) / r.width) * 2 - 1;
+      const ny = -(((ev.clientY - r.top) / r.height) * 2 - 1);
+      const halfH = camera.position.z * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+      let fx = (nx * halfH * camera.aspect) / SCALE / 2;
+      let fy = (ny * halfH) / SCALE / 2;
+      const len = Math.hypot(fx, fy), max = 0.2; // stay attached to the body
+      if (len > max) { fx *= max / len; fy *= max / len; }
+      s.tx = fx; s.ty = fy;
+    }
+    stage.addEventListener('pointermove', (ev) => { toField(ev); s.reachTarget = 1; });
+    stage.addEventListener('pointerleave', () => { s.reachTarget = 0; });
+    stage.addEventListener('pointerdown', (ev) => { toField(ev); s.reachTarget = 1; s.jiggle = 1; });
+    document.addEventListener('slime:feed', () => {
+      drops.push({ t0: performance.now() / 1000, x0: 0.5 + (Math.random() - 0.5) * 0.3 });
+    });
+    document.addEventListener('slime:reset', () => { s.growTarget = 0; s.jiggle = 1; });
+
+    // --- sizing & loop -------------------------------------------------------
+    function resize() {
+      const w = stage.clientWidth, h = stage.clientHeight;
+      if (!w || !h) return;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+    new ResizeObserver(resize).observe(stage);
+    resize();
+
+    let visible = true;
+    new IntersectionObserver(([e]) => { visible = e.isIntersecting; }).observe(stage);
+
+    const speed = reduceMotion ? 0.15 : 1;
+    let t = 0, last = performance.now();
+    function frame(nowMs) {
+      requestAnimationFrame(frame);
+      const dt = Math.min(0.05, (nowMs - last) / 1000);
+      last = nowMs;
+      if (!visible || document.hidden) return;
+      t += dt * speed;
+      s.grow += (s.growTarget - s.grow) * 0.05;
+      s.jiggle *= 0.965;
+      s.reach += (s.reachTarget - s.reach) * 0.06;
+      s.px += (s.tx - s.px) * 0.08;
+      s.py += (s.ty - s.py) * 0.08;
+      buildField(t, nowMs / 1000);
+      blob.rotation.y = Math.sin(t * 0.25) * 0.35 + s.px * 0.6;
+      blob.rotation.x = Math.cos(t * 0.2) * 0.12 - s.py * 0.6;
+      renderer.render(scene, camera);
+    }
+    requestAnimationFrame((n) => { last = n; frame(n); stage.classList.add('ready'); });
   </script>
 </body>
 </html>

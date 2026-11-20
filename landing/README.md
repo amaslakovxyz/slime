@@ -31,6 +31,12 @@ Source: GitHub Actions**.
 
 ## Notes
 
+- The hero slime is three.js (pinned `three@0.170.0` from jsDelivr via an
+  import map): marching-cubes metaballs in a glossy `MeshPhysicalMaterial`.
+  Clicking a menu item fires a `slime:feed` event; the 3D module drops a
+  droplet into the slime and it grows. If WebGL or the CDN is unavailable, a
+  CSS blob stays in its place and the menu still works.
+
 - The "How it works" demo is a scripted animation, not a live call to the
   server. Its timings (about 2.8 s for a new request, 14 ms cached) are kept in
   the range the sandbox prototype shows, so the page matches the live demo.
