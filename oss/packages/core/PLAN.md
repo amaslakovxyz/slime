@@ -189,17 +189,20 @@ handlers with their fixtures, run counts, the dictionary) goes through the
 
 ```ts
 export interface SlimeStore {
+  init?(): Promise<void>;  // optional: create or check a table
   get(ns: string, key: string): Promise<unknown | undefined>;
   put(ns: string, key: string, value: unknown): Promise<void>;
-  list(ns: string, prefix?: string): Promise<unknown[]>; // keys starting with prefix
+  list(ns: string, prefix?: string): Promise<{ key: string; value: unknown }[]>; // keys starting with prefix
   delete(ns: string, key: string): Promise<void>;
+  close?(): Promise<void>; // optional: release connections
 }
 ```
 
-The engine builds the keys, for example
-`handlers` / `${schemaHash}#${glossaryHash}#${promptHash}#${model}#${requestKey}`.
-Loading "every handler for this schema, prompt and model" is then one
-`list(ns, prefix)`.
+The engine builds the keys: `handlers` / `${scope}#${requestKey}`, where
+`scope` is a 16-character hash of the schema, dictionary, prompt and model
+hashes. Loading "every handler for this scope" is then one
+`list('handlers', scope + '#')`, and keys stay short and safe for file
+names.
 
 The app picks the store in `SlimeConfig`:
 

@@ -26,8 +26,8 @@ Backend -- Slime runtime:
 - [oss/packages/core/](./oss/packages/core/README.md) - `@slime-cloud/core`,
   the engine rebuilt from `sandbox/` as an installable library. Design phase:
   [PLAN.md](./oss/packages/core/PLAN.md) holds the decisions and milestones.
-  Package skeleton only (M0); part of the root npm workspaces, the only
-  workspace so far.
+  M0–M1 done: package skeleton, request format and key, contracts,
+  `SlimeConfig`. No engine yet. The only npm workspace so far.
 - `docs/` (no contract file; documentation only)
   - [architecture-spec.md](./docs/architecture-spec.md) - Development spec for
     the Slime runtime: request path, DB API, Gatekeeper rules, and Gas / Liquid

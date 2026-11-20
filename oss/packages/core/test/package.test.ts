@@ -20,6 +20,7 @@ test('stays private until go-public, so nothing is published by accident', () =>
   assert.equal(pkg.private, true);
 });
 
-test('the public entry loads', async () => {
-  await import('../src/index.js');
+test('the public entry exports the config and errors, and nothing internal', async () => {
+  const api = await import('../src/index.js');
+  assert.deepEqual(Object.keys(api).sort(), ['DEFAULT_LIMITS', 'DEFAULT_TIERS', 'SlimeConfig', 'SlimeConfigError', 'SlimeError']);
 });

@@ -29,9 +29,16 @@ input values. Handlers move up through three tiers:
 * **Crystal:** rewritten by an agent into TS or JS modules in the app's own
   code, and passed to Slime through the config.
 
-> **Status:** M0, the package skeleton, is done: it builds, tests and packs,
-> but exports nothing yet. The API above is the target. Decisions and
-> milestones are in [PLAN.md](PLAN.md).
+> **Status:** M1 is done:
+> * the request format and cache key;
+> * the parameter type rules;
+> * SQL lint;
+> * the contracts (`Connector`, `Generator`, `Reviewer`, `SlimeStore`,
+>   `SandboxRunner`);
+> * `SlimeConfig` and `SlimeError`.
+>
+> `createSlime()` and `slime.query()` come with M2. The API above is the
+> target. Decisions and milestones are in [PLAN.md](PLAN.md).
 
 ## Development
 
