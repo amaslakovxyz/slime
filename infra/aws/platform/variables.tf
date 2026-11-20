@@ -9,3 +9,15 @@ variable "region" {
   type        = string
   default     = "eu-central-1"
 }
+
+variable "runtime_tenant_id" {
+  description = "Partition key the single-tenant runtime writes its handlers under."
+  type        = string
+  default     = "demo"
+}
+
+variable "log_retention_days" {
+  description = "CloudWatch retention for Lambda logs in this stack."
+  type        = number
+  default     = 14
+}

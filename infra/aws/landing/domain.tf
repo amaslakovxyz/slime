@@ -78,6 +78,11 @@ data "aws_cloudfront_cache_policy" "caching_optimized" {
   name = "Managed-CachingOptimized"
 }
 
+# HSTS, nosniff, Referrer-Policy, X-Frame-Options SAMEORIGIN, XSS protection.
+data "aws_cloudfront_response_headers_policy" "security_headers" {
+  name = "Managed-SecurityHeadersPolicy"
+}
+
 resource "aws_cloudfront_distribution" "site" {
   enabled         = true
   is_ipv6_enabled = true
@@ -100,16 +105,18 @@ resource "aws_cloudfront_distribution" "site" {
   }
 
   # No origin request policy: CloudFront then sends the origin's own Host
-  # header, which the Function URL requires. The function honours
-  # Cache-Control (HTML 5 min, assets 1 day) and gzips by Accept-Encoding,
-  # which CachingOptimized normalises into the cache key.
+  # header, which the Function URL requires. The function sets Cache-Control
+  # (HTML 5 min, assets 1 day) and returns uncompressed bodies; CloudFront
+  # compresses at the edge (gzip + brotli, keyed by CachingOptimized) and adds
+  # the security headers.
   default_cache_behavior {
-    target_origin_id       = "function-url"
-    viewer_protocol_policy = "redirect-to-https"
-    allowed_methods        = ["GET", "HEAD"]
-    cached_methods         = ["GET", "HEAD"]
-    cache_policy_id        = data.aws_cloudfront_cache_policy.caching_optimized.id
-    compress               = true
+    target_origin_id           = "function-url"
+    viewer_protocol_policy     = "redirect-to-https"
+    allowed_methods            = ["GET", "HEAD"]
+    cached_methods             = ["GET", "HEAD"]
+    cache_policy_id            = data.aws_cloudfront_cache_policy.caching_optimized.id
+    response_headers_policy_id = data.aws_cloudfront_response_headers_policy.security_headers.id
+    compress                   = true
   }
 
   restrictions {

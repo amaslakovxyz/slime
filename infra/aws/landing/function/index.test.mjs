@@ -2,7 +2,6 @@
 // Serves the real landing/ directory, the same files the layer ships.
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
-import { gunzipSync } from "node:zlib";
 import test from "node:test";
 
 process.env.SITE_ROOT = fileURLToPath(new URL("../../../../landing", import.meta.url));
@@ -19,10 +18,12 @@ test("root serves index.html", async () => {
   assert.match(Buffer.from(res.body, "base64").toString(), /<html/i);
 });
 
-test("html is gzipped when the client accepts it", async () => {
+// CloudFront compresses at the edge (gzip/brotli); the origin never does.
+test("origin returns identity encoding even if the client accepts gzip", async () => {
   const res = await get("/", { "accept-encoding": "gzip, br" });
-  assert.equal(res.headers["content-encoding"], "gzip");
-  assert.match(gunzipSync(Buffer.from(res.body, "base64")).toString(), /<html/i);
+  assert.equal(res.headers["content-encoding"], undefined);
+  assert.equal(res.headers["cache-control"], "public, max-age=300");
+  assert.match(Buffer.from(res.body, "base64").toString(), /<html/i);
 });
 
 test("assets are served as binary with long cache", async () => {
