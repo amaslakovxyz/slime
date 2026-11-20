@@ -1,8 +1,8 @@
-# slime-kit layers + Slime Cloud MVP Implementation Plan
+# Slime Cloud layers + MVP Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Turn `sandbox/` into the `@slime-kit/core` and `@slime-kit/server`
+**Goal:** Turn `sandbox/` into the `@slime-cloud/core` and `@slime-cloud/server`
 packages inside an npm-workspaces monorepo. Then add a minimal Slime Cloud: one
 onboarding page, one admin page, and one Slime Server process per customer.
 
@@ -21,10 +21,10 @@ onboarding page, one admin page, and one Slime Server process per customer.
 
 ## Global Constraints
 
-- Work in a worktree `slime/.worktrees/slime-kit-mvp` on branch `feat/slime-kit-mvp` from `origin/main`. Open a PR; never push `main`.
+- Work in a worktree `slime/.worktrees/slime-cloud-mvp` on branch `feat/slime-cloud-mvp` from `origin/main`. Open a PR; never push `main`.
 - **Before Task 1:** the team agrees on when `sandbox/` moves. `origin/feat/crystal` and `feat/database-adapters` edit it (design R1).
 - Add no new npm dependencies. Every new import comes from packages already in `sandbox/package.json`.
-- `oss/` never imports `platform/` or `@slime-cloud/*`. Task 1 adds a CI check that enforces this.
+- `oss/` never imports `platform/` or a platform package (`@slime-cloud/control-plane`). Task 1 adds a CI check that enforces this.
 - Package versions stay `0.1.0` with `"private": true` until go-public (design §6).
 - Commit with explicit `git add <paths>`. Pre-commit must pass; never use `--no-verify`.
 - Database tests need `npm run db:up`. CI sets `REQUIRE_DB=1`.
@@ -50,7 +50,7 @@ onboarding page, one admin page, and one Slime Server process per customer.
 - Modify: `oss/packages/core/package.json`, `.github/workflows/ci.yml`
 
 **Interfaces:**
-- Produces: workspace package `@slime-kit/core`; root scripts `db:up`, `db:down`, `typecheck`, `test`.
+- Produces: workspace package `@slime-cloud/core`; root scripts `db:up`, `db:down`, `typecheck`, `test`.
 
 - [ ] **Step 1: Record the baseline.**
   Run `cd sandbox && npm ci && npm run db:up && REQUIRE_DB=1 npm test`.
@@ -76,7 +76,7 @@ onboarding page, one admin page, and one Slime Server process per customer.
 ```
 
 - [ ] **Step 4: Edit `oss/packages/core/package.json`:**
-  - set `"name": "@slime-kit/core"`;
+  - set `"name": "@slime-cloud/core"`;
   - add `"exports": { ".": "./src/index.ts", "./package.json": "./package.json" }`;
   - set `"engines": { "node": ">=22.9" }`;
   - delete the `db:up` and `db:down` scripts;
@@ -91,7 +91,7 @@ onboarding page, one admin page, and one Slime Server process per customer.
 
 ```yaml
       - name: OSS never imports platform code
-        run: "! git grep -nE '(\\.\\./)+platform/|@slime-cloud/' -- oss/"
+        run: "! git grep -nE '(\\.\\./)+platform/|@slime-cloud/control-plane' -- oss/"
 ```
 
 - [ ] **Step 6: Install and verify.**
@@ -103,12 +103,12 @@ onboarding page, one admin page, and one Slime Server process per customer.
 ```bash
 git add package.json package-lock.json oss .github/workflows/ci.yml   # the sandbox/ moves and the lockfile removal are already staged by git mv / git rm
 git status --short sandbox   # must print nothing
-git commit -m "chore: npm workspaces; sandbox becomes oss/packages/core (@slime-kit/core)"
+git commit -m "chore: npm workspaces; sandbox becomes oss/packages/core (@slime-cloud/core)"
 ```
 
 ---
 
-### Task 2: `@slime-kit/server` with optional API keys
+### Task 2: `@slime-cloud/server` with optional API keys
 
 **Files:**
 - Move: `oss/packages/core/src/index.ts` → `oss/packages/server/src/cli.ts` (`git mv`, then edit)
@@ -126,7 +126,7 @@ git commit -m "chore: npm workspaces; sandbox becomes oss/packages/core (@slime-
 **Interfaces:**
 - Produces:
   - `createApp(opts: AppOptions): Hono` with `AppOptions = { engine: AppEngine; connector: Pick<Connector,'safetyCheck'>; apiKey?: string; adminKey?: string }`;
-  - CLI `@slime-kit/server/cli`, configured by env `PORT`, `HOST` (default `127.0.0.1`), `SLIME_API_KEY`, `SLIME_ADMIN_KEY`, plus all existing core variables;
+  - CLI `@slime-cloud/server/cli`, configured by env `PORT`, `HOST` (default `127.0.0.1`), `SLIME_API_KEY`, `SLIME_ADMIN_KEY`, plus all existing core variables;
   - core barrel exports `Engine`, `EngineDeps`, `QueryMeta`, `Tier`, `config`, `Provider`, `SlimeError`, `ErrorCode`, `PostgresConnector`, `Connector`, `SafetyReport`, `SchemaInfo`, `MemoryHandlerStore`, `PostgresHandlerStore`, `HandlerStore`.
 
 - [ ] **Step 1: Write the failing test** `oss/packages/server/test/app.test.ts`:
@@ -177,7 +177,7 @@ test('adminKey guards /healthz and /v0/handlers*, and the api key does not open 
 
 ```json
 {
-  "name": "@slime-kit/server",
+  "name": "@slime-cloud/server",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -191,7 +191,7 @@ test('adminKey guards /healthz and /v0/handlers*, and the api key does not open 
     "test": "node --import tsx --test 'test/**/*.test.ts'"
   },
   "dependencies": {
-    "@slime-kit/core": "*",
+    "@slime-cloud/core": "*",
     "@hono/node-server": "<version from core>",
     "hono": "<version from core>",
     "tsx": "<version from core>"
@@ -205,9 +205,9 @@ test('adminKey guards /healthz and /v0/handlers*, and the api key does not open 
   - remove `hono`, `@hono/node-server` and the `dev`/`start` scripts;
   - set `"bench": "node --env-file-if-exists=.env --import tsx src/bench.ts"`.
 
-  Then run `npm install`, and `npm test -w @slime-kit/server`. Expected: FAIL, because `../src/app.js` is not found.
+  Then run `npm install`, and `npm test -w @slime-cloud/server`. Expected: FAIL, because `../src/app.js` is not found.
 
-- [ ] **Step 3: Write `oss/packages/core/src/index.ts`** (the public API of `@slime-kit/core`):
+- [ ] **Step 3: Write `oss/packages/core/src/index.ts`** (the public API of `@slime-cloud/core`):
 
 ```ts
 export { Engine, type EngineDeps, type QueryMeta, type Tier } from './engine.js';
@@ -227,7 +227,7 @@ import { Hono } from 'hono';
 import { bearerAuth } from 'hono/bearer-auth';
 import { bodyLimit } from 'hono/body-limit';
 import { HTTPException } from 'hono/http-exception';
-import { SlimeError, type Connector, type Engine } from '@slime-kit/core';
+import { SlimeError, type Connector, type Engine } from '@slime-cloud/core';
 
 export type AppEngine = Pick<Engine, 'query' | 'stats' | 'listHandlers' | 'evict'>;
 
@@ -291,7 +291,7 @@ export function createApp({ engine, connector, apiKey, adminKey }: AppOptions): 
 
 ```ts
 import { serve } from '@hono/node-server';
-import { Engine, PostgresConnector, config } from '@slime-kit/core';
+import { Engine, PostgresConnector, config } from '@slime-cloud/core';
 import { createApp } from './app.js';
 
 const connector = new PostgresConnector(config.databaseUrl);
@@ -307,9 +307,9 @@ const server = serve({ fetch: app.fetch, port: config.port, hostname }, (info) =
 });
 ```
 
-- [ ] **Step 6: Run** `npm test -w @slime-kit/server` (expected: 3 pass), then `npm run typecheck` and `REQUIRE_DB=1 npm test` (core count unchanged).
+- [ ] **Step 6: Run** `npm test -w @slime-cloud/server` (expected: 3 pass), then `npm run typecheck` and `REQUIRE_DB=1 npm test` (core count unchanged).
   Smoke test:
-  - run `SLIME_PROVIDER=offline SLIME_API_KEY=k npm start -w @slime-kit/server`;
+  - run `SLIME_PROVIDER=offline SLIME_API_KEY=k npm start -w @slime-cloud/server`;
   - `curl -s -o /dev/null -w '%{http_code}' -X POST 127.0.0.1:3000/v0/query -d '{}'` must print `401`;
   - the same request with `-H 'authorization: Bearer k' -H 'content-type: application/json'` must not print 401.
 
@@ -317,7 +317,7 @@ const server = serve({ fetch: app.fetch, port: config.port, hostname }, (info) =
 
 ```bash
 git add oss package-lock.json
-git commit -m "feat: @slime-kit/server package with optional API and admin keys"
+git commit -m "feat: @slime-cloud/server package with optional API and admin keys"
 ```
 
 ---
@@ -371,7 +371,7 @@ test('Engine.create without an injected store uses config.metaTable', { skip: !h
 });
 ```
 
-- [ ] **Step 2: Run** `REQUIRE_DB=1 npm test -w @slime-kit/core`. Expected: FAIL. `typecheck` also fails, because `metaTable` is not on `config`.
+- [ ] **Step 2: Run** `REQUIRE_DB=1 npm test -w @slime-cloud/core`. Expected: FAIL. `typecheck` also fails, because `metaTable` is not on `config`.
 
 - [ ] **Step 3: Implement.** In `config.ts`, add right after `metaDatabaseUrl`:
 
@@ -403,8 +403,8 @@ git commit -m "feat(core): SLIME_META_TABLE selects the slime_meta handler table
 
 **Interfaces:**
 - Consumes:
-  - `@slime-kit/core`: `PostgresConnector`, `SafetyReport`;
-  - `@slime-kit/server/cli`, whose env is described in Task 2;
+  - `@slime-cloud/core`: `PostgresConnector`, `SafetyReport`;
+  - `@slime-cloud/server/cli`, whose env is described in Task 2;
   - `SLIME_META_TABLE` from Task 3.
 - Produces: `npm start -w @slime-cloud/control-plane`, which serves `GET/POST /onboarding` and `GET /admin`.
 
@@ -423,8 +423,8 @@ git commit -m "feat(core): SLIME_META_TABLE selects the slime_meta handler table
     "test": "node --import tsx --test 'test/**/*.test.ts'"
   },
   "dependencies": {
-    "@slime-kit/core": "*",
-    "@slime-kit/server": "*",
+    "@slime-cloud/core": "*",
+    "@slime-cloud/server": "*",
     "@hono/node-server": "<version from server>",
     "hono": "<version from server>",
     "tsx": "<version from server>"
@@ -579,9 +579,9 @@ export interface PlatformEnv {
 }
 export type TenantStatus = 'running' | 'exited' | 'not started';
 
-const SERVER_CLI = fileURLToPath(import.meta.resolve('@slime-kit/server/cli'));
+const SERVER_CLI = fileURLToPath(import.meta.resolve('@slime-cloud/server/cli'));
 const SERVER_DIR = dirname(dirname(SERVER_CLI));
-const OFFLINE_FILE = fileURLToPath(new URL('offline/handlers.json', import.meta.resolve('@slime-kit/core/package.json')));
+const OFFLINE_FILE = fileURLToPath(new URL('offline/handlers.json', import.meta.resolve('@slime-cloud/core/package.json')));
 const KEY_VAR = { claude: 'ANTHROPIC_API_KEY', groq: 'GROQ_API_KEY' } as const;
 
 /** The complete env of one tenant's Server. Only PATH is inherited, so a developer's shell cannot leak keys or settings into a tenant. */
@@ -810,7 +810,7 @@ export function adminPage(rows: AdminRow[]) {
 // src/app.ts
 import { Hono } from 'hono';
 import { basicAuth } from 'hono/basic-auth';
-import type { SafetyReport } from '@slime-kit/core';
+import type { SafetyReport } from '@slime-cloud/core';
 import { adminPage, createdPage, onboardingPage } from './pages.js';
 import type { Health } from './probe.js';
 import type { Supervisor } from './supervisor.js';
@@ -874,7 +874,7 @@ export function createControlPlane(d: ControlPlaneDeps): Hono {
 
 ```ts
 import { serve } from '@hono/node-server';
-import { PostgresConnector, type SafetyReport } from '@slime-kit/core';
+import { PostgresConnector, type SafetyReport } from '@slime-cloud/core';
 import { createControlPlane } from './app.js';
 import { probe } from './probe.js';
 import { Supervisor } from './supervisor.js';
@@ -972,14 +972,14 @@ git commit -m "feat(cloud): control plane MVP with onboarding, admin and one Sli
 
 ```bash
 git add README.md oss/packages/core/README.md
-git commit -m "docs: repository map and setup for slime-kit packages and the Slime Cloud MVP"
+git commit -m "docs: repository map and setup for Slime Cloud packages and the Slime Cloud MVP"
 ```
 
 ---
 
 ## Out of scope (design §6)
 
-- Splitting core further (`@slime-kit/postgres`, `@slime-kit/llm`, config injection, `SandboxRunner`, `Telemetry`).
+- Splitting core further (`@slime-cloud/postgres`, `@slime-cloud/llm`, config injection, `SandboxRunner`, `Telemetry`).
 - DynamoDB store; AWS (ECS, NAT EIP, Secrets Manager); `platform/data-plane/`, `platform/infra/`.
 - Accounts, login, billing, metering, a dashboard beyond the admin table.
 - LICENSE, CLA bot, public mirror, npm publishing.
