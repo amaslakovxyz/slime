@@ -39,7 +39,9 @@ Backend -- Slime runtime:
 - `.github/workflows/` (no contract file) - [ci.yml](./.github/workflows/ci.yml)
   runs pre-commit, sandbox tests and the Lambda bundle build on every push and
   pull request; [terraform.yml](./.github/workflows/terraform.yml) plans every
-  `infra/aws/` stack on pull requests and applies them on `main`.
+  `infra/aws/` stack on pull requests and applies them on `main` (the landing
+  page included); [terraform-quality.yml](./.github/workflows/terraform-quality.yml)
+  runs tflint and trivy.
 - [infra/aws/](./infra/aws/README.md) - Terraform: `bootstrap/` (human-applied
   roles, state bucket, budgets) and the CI-applied stacks (`platform/`: Slime
   runtime on Lambda + DynamoDB).
@@ -70,7 +72,7 @@ Root files: [AGENTS.md](./AGENTS.md) (repository contract for agents),
 - Deploy: [terraform.yml](./.github/workflows/terraform.yml) applies every
   `infra/aws/` stack except `bootstrap/` on each push to `main` that touches
   `infra/aws/`, `sandbox/`, `slime-cloud/` or `landing/` (AWS account `025772230981`,
-  `eu-central-1`).
+  `eu-central-1`); `landing/` is served by CloudFront + Lambda.
 
 ## System Verification
 

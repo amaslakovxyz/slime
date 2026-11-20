@@ -1,0 +1,79 @@
+name: Terraform quality
+
+# Static checks for every stack under infra/aws/. No AWS credentials.
+#   tflint  .tflint.hcl         terraform "recommended" preset + AWS ruleset
+#   trivy   .trivyignore.yaml   HIGH/CRITICAL misconfigurations; accepted
+#                               findings carry a written cost rationale
+# Tools are downloaded from their GitHub releases and checked against pinned
+# SHA-256 sums instead of running third-party actions.
+
+on:
+  pull_request:
+    paths:
+      - infra/aws/**
+      - .tflint.hcl
+      - .trivyignore.yaml
+      - .github/workflows/terraform-quality.yml
+  push:
+    branches: [main]
+    paths:
+      - infra/aws/**
+      - .tflint.hcl
+      - .trivyignore.yaml
+      - .github/workflows/terraform-quality.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TFLINT_VERSION: v0.66.0
+  TFLINT_SHA256: 22be11cadc25cd02401e94c0ccc91aa63467debb8485c2a755d98f4c0a9d1e2e
+  TRIVY_VERSION: 0.76.2
+  TRIVY_SHA256: bc0fc726e017b8927a62b2d3531d7a84ee01769daf5c99ed866dced54089fdbf
+
+jobs:
+  tflint:
+    name: TFLint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install tflint
+        run: |
+          curl -fsSL -o /tmp/tflint.zip "https://github.com/terraform-linters/tflint/releases/download/${TFLINT_VERSION}/tflint_linux_amd64.zip"
+          echo "${TFLINT_SHA256}  /tmp/tflint.zip" | sha256sum -c -
+          sudo unzip -q -o /tmp/tflint.zip -d /usr/local/bin
+      - name: Install plugins
+        # Plugin download uses the GitHub API; the token avoids rate limits.
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: tflint --init --config "$PWD/.tflint.hcl"
+      - name: Lint stacks
+        run: |
+          status=0
+          for dir in infra/aws/*/; do
+            echo "::group::$dir"
+            (cd "$dir" && tflint --config "$GITHUB_WORKSPACE/.tflint.hcl" --format compact) || status=1
+            echo "::endgroup::"
+          done
+          exit $status
+
+  trivy:
+    name: Trivy misconfig
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install trivy
+        run: |
+          curl -fsSL -o /tmp/trivy.tgz "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          echo "${TRIVY_SHA256}  /tmp/trivy.tgz" | sha256sum -c -
+          sudo tar -xzf /tmp/trivy.tgz -C /usr/local/bin trivy
+      - name: Scan infra/aws
+        run: >-
+          trivy config --quiet --severity HIGH,CRITICAL --exit-code 1
+          --ignorefile .trivyignore.yaml .

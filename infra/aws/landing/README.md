@@ -1,13 +1,13 @@
 # Landing on AWS Lambda
 
-Serves [`landing/`](../../../landing/) from a Lambda Function URL in
-`eu-central-1`, behind CloudFront on the custom domain.
+Serves [`landing/`](../../../landing/) at https://amaslakov.com/ through
+CloudFront in front of a Lambda Function URL in `eu-central-1`.
 
 | Resource | Notes |
 |---|---|
 | Layer `slime-landing-site` | `landing/` minus `README.md` and `tools/`; unpacked at `/opt` |
 | Function `slime-landing` | Node 22, arm64, 256 MB; [`function/index.mjs`](function/index.mjs) serves only files present in the layer (allowlist = path-traversal guard), gzips text, sets cache and security headers |
-| Function URL | Public (`NONE`); the paired `InvokeFunction` permission is limited to URL invocations |
+| Function URL | `AWS_IAM` auth; only the CloudFront distribution may call it (Origin Access Control signs requests). Direct hits get 403 and never run the function, so nobody can bypass the cache and exhaust the account's shared Lambda concurrency (10) |
 | Log group `/aws/lambda/slime-landing` | 14-day retention |
 
 State: `s3://slime-tfstate-025772230981/landing/terraform.tfstate` (bucket from
@@ -23,7 +23,7 @@ Apply by hand only for recovery:
 cd infra/aws/landing
 AWS_PROFILE=slime terraform init
 AWS_PROFILE=slime terraform apply      # any change in landing/ publishes a new layer version
-terraform output -raw url
+terraform output -raw site_url
 ```
 
 ## Test
