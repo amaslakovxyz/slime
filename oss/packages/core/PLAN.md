@@ -1,6 +1,6 @@
 # @slime-cloud/core: library plan
 
-* **Status:** draft. M0 and M1 are done; M2 is next.
+* **Status:** draft. M0, M1 and M2 are done; M3 is next.
 * **Date:** 2026-11-20 (review fixes applied 2026-11-21)
 * **Owner:** Konstantin (core only; server and Slime Cloud are owned by others)
 
@@ -343,24 +343,27 @@ oss/packages/core/
 │   └── check-pack.mjs    # what npm pack would ship
 ├── docs/                 # protocol-cases.md
 ├── src/
-│   ├── index.ts          # createSlime, SlimeConfig, errors, Port types, file and memory stores
-│   ├── config.ts         # SlimeConfig: defaults, validation, with()
+│   ├── index.ts          # createSlime, SlimeConfig, errors, file and memory stores, types
+│   ├── create-slime.ts   # startup: safety check, store init, dictionary
+│   ├── config.ts         # SlimeConfig class; config/ holds options, defaults, validation
 │   ├── errors.ts         # SlimeError, SlimeConfigError, error codes
+│   ├── guards.ts         # shared type guards
 │   ├── ports.ts          # Connector, Generator, Reviewer, SlimeStore, SandboxRunner
 │   ├── request/          # parse.ts, shape.ts, params.ts, key.ts (§4)
-│   ├── checks/           # sql.ts: SQL guard and lint; limit check (R6, M2+)
-│   ├── store/            # types.ts; file and memory stores, contract test (M2+)
-│   ├── engine/           # (M2+) engine, tiers, review loop, coalescing, rate limits
-│   ├── dictionary/       # (M3+) dictionary rendered from the catalog (§4.4)
-│   ├── shaping/          # (M2+) QuickJS runner and its worker (shape-worker.ts, compiled by tsc),
-│   │                     #       one pool per Slime instance, closed by close()
+│   ├── checks/           # sql.ts: SQL guard and lint; limit.ts: limit check (R6)
+│   ├── store/            # types.ts, file-store.ts, memory-store.ts
+│   ├── engine/           # Slime instance, handler cache, generation, coalescing, rate limits;
+│   │                     #   review loop and promotion arrive in M4
+│   ├── dictionary/       # dictionary rendered from metadata, glossary and rules (§4.4)
+│   ├── shaping/          # QuickJS runner and its worker (shape-worker.ts, compiled by tsc),
+│   │                     #   one pool per Slime instance, closed by close()
+│   ├── offline/          # generator for tests → @slime-cloud/core/offline
 │   ├── crystal/          # (M5+) Crystal registry types; serving crystal handlers
 │   ├── postgres/         # (M3+) connector → @slime-cloud/core/postgres
 │   ├── claude/           # (M4+) generator + reviewer → @slime-cloud/core/claude
 │   ├── groq/             # (M4+) generator + reviewer → @slime-cloud/core/groq
-│   ├── offline/          # (M2+) generator for tests → @slime-cloud/core/offline
 │   └── crystallize/      # (M5+) job, allowlist, check → @slime-cloud/core/crystallize (+ bin)
-└── test/                 # node:test, one file per area
+└── test/                 # node:test, one file per area; store-contract.ts runs against every store
 ```
 
 Dependencies:
@@ -368,13 +371,13 @@ Dependencies:
 | Package | Range | Kind | Needed from |
 |---|---|---|---|
 | `quickjs-emscripten` | ^0.32.0 | dependency | M2 |
-| `zod` | ^4.6.7 | dependency | M2 |
+| `zod` | ^4.6.7 | dependency | M4 (validating model output) |
 | `pg` | ^8.23.1 | optional peer | M3 |
 | `@anthropic-ai/sdk` | ^1.11.0 | optional peer | M4 |
 | `acorn`, `acorn-walk` | ^8.19.0, ^8.3.5 | dependency of `/crystallize` only | M5 |
 
 Groq is called with `fetch`, so it needs no SDK. The main entry depends only
-on `quickjs-emscripten` and `zod`.
+on `quickjs-emscripten` (and `zod` from M4).
 
 ## 7. Milestones
 
@@ -388,8 +391,8 @@ goal. Before a milestone starts, its row gets the files it creates or changes
 |---|---|---|---|
 | M0 | **Skeleton.** Root `package.json` with workspaces, core `package.json` with an exports map, `tsconfig`, `node:test`, a CI job "Core tests". | `npm test -w @slime-cloud/core` runs; `npm pack` builds a tarball; CI is green. | done |
 | M1 | **Request, contracts and pure parts.** Request parsing, intent normalization and the request key (§4); output notation with `date`/`datetime`; Ports and `SlimeError`; SQL guard and lint; `SlimeConfig` with defaults, validation and `glossary`. | `request`, `shape`, `params`, `key`, `sql`, `config` and `package` tests pass. | done |
-| M2 | **Engine, Gas path.** `createSlime` and the instance API (`query`, `flush`, `close`, `evict`, `handlers`, `stats`; `onEvent` with `generated`, `warning` and `error`), the `memory` and `file` stores and the shared store contract test, offline generator, the shaping sandbox with the QuickJS worker, coalescing, rate limits, locked mode, typed and nullable parameters (R4, R5), the limit check (R6), the R7 warning. Engine rules below. | The M2 tests below pass with no database; no core test is skipped because a database is missing; no `config` singleton anywhere. | planned |
-| M3 | **Postgres connector and the dictionary.** Connector with the startup safety check and enum values from the catalog; the dictionary rendered from the catalog (§4.4). CI gets a Postgres service using `sandbox/db/init.sql` (roles and seed data). | `postgres.test.ts` cases pass against Postgres in CI (database tests require `REQUIRE_DB=1` in CI rather than skipping); the file and memory stores pass the shared contract test; changing `rules` changes the dictionary and regenerates handlers in explore mode. | planned |
+| M2 | **Engine, Gas path.** `createSlime` and the instance API (`query`, `flush`, `close`, `evict`, `handlers`, `stats`; `onEvent` with `generated`, `warning` and `error`), the `memory` and `file` stores and the shared store contract test, offline generator, the shaping sandbox with the QuickJS worker, coalescing, rate limits, locked mode, typed and nullable parameters (R4, R5), the limit check (R6), the R7 warning. Engine rules below. | The M2 tests below pass with no database; no core test is skipped because a database is missing; no `config` singleton anywhere. | done |
+| M3 | **Postgres connector.** Connector with the startup safety check and enum values from the catalog, which the M2 dictionary renders (§4.4). CI gets a Postgres service using `sandbox/db/init.sql` (roles and seed data). | `postgres.test.ts` cases pass against Postgres in CI (database tests require `REQUIRE_DB=1` in CI rather than skipping); the file and memory stores pass the shared contract test; changing `rules` changes the dictionary and regenerates handlers in explore mode. | planned |
 | M4 | **Models and Liquid.** Claude and Groq generators and reviewers with prompts updated for §4 (nullable parameters, the dictionary); the review loop; promotion to Liquid (rule below); `reviewed` and `promoted` events. | Review and promotion tests pass; one live run against Groq or Claude. | planned |
 | M5 | **Crystal.** Serving from an imported registry; the crystallize job writing JS with `.d.ts`; the `check` command. | `crystal*.test.ts` ported; a hand-edited Crystal file fails `check`; the output passes the equivalence test. | planned |
 | M6 | **Use it as a package.** An example app that installs the packed tarball and calls `slime.query()` from an endpoint; docs for the request format; the bench ported to run on core. Publishing to npm is not part of v1. | The example (`oss/examples/express`, its own lockfile, run in CI from the packed tarball) answers a query. The bench, ported to `oss/packages/core/bench/`, gets the 5 cases recorded as correct in `concepts_brief.md` right, and refuses the 2 unsafe ones. | planned |
@@ -415,6 +418,15 @@ Required cases:
 * locked mode serves a stored handler and refuses to generate;
 * concurrent identical requests share one generation;
 * the hourly limit gives `GENERATION_RATE_LIMITED`.
+
+**M2 files.** `src/create-slime.ts`; `src/engine/` (`slime-engine.ts`,
+`handler-cache.ts`, `generate.ts`, `execute.ts`, `coalescer.ts`,
+`generation-limits.ts`, `events.ts`, `types.ts`); `src/shaping/`;
+`src/store/file-store.ts` and `memory-store.ts`; `src/dictionary/`;
+`src/offline/`; `src/checks/limit.ts`; `package.json` (`./offline` export,
+`quickjs-emscripten`); `scripts/check-pack.mjs`; tests `engine`, `shaping`,
+`stores` (with `store-contract.ts`), `dictionary` and `package`. `flush()`
+has nothing to wait for until M4 adds reviews and promotion writes.
 
 **M4 promotion rule.** A Gas handler with `gasToLiquidRuns` successful runs on
 distinct inputs inside `gasWindowMs` goes to the reviewer. Approved: saved as
@@ -466,10 +478,12 @@ configured, handlers are promoted after the runs and marked `review: 'none'`.
 
 ## 9. Next decision
 
-M0 and M1 are done. Still to decide:
+M0, M1 and M2 are done. Still to decide:
 
-* **Before M2:** R4, R5, R7, R11, C12, C15 and C4's class shape (all
-  Proposed).
+* **Still Proposed, built as proposed in M2:** R4, R5, R7, R11, C12, C15 and
+  C4's class shape. They stand unless someone objects.
+* **Before M3:** whether the store contract test is exported for custom
+  stores (today it lives in `test/store-contract.ts`).
 * **Before M5:** the `CrystalRegistry` shape, the manifest format and hash,
   the `bin` name, the `Optimizer` Port, how the CLI receives its connector,
   store and optimizer (no env), and where `crystalMinRuns` lives.

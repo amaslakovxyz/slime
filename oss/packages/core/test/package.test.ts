@@ -20,7 +20,22 @@ test('stays private until go-public, so nothing is published by accident', () =>
   assert.equal(pkg.private, true);
 });
 
-test('the public entry exports the config and errors, and nothing internal', async () => {
+test('the public entry exports createSlime, the config, the stores and errors, and nothing internal', async () => {
   const api = await import('../src/index.js');
-  assert.deepEqual(Object.keys(api).sort(), ['DEFAULT_LIMITS', 'DEFAULT_TIERS', 'SlimeConfig', 'SlimeConfigError', 'SlimeError']);
+  assert.deepEqual(Object.keys(api).sort(), [
+    'DEFAULT_LIMITS',
+    'DEFAULT_STORE_DIR',
+    'DEFAULT_TIERS',
+    'SlimeConfig',
+    'SlimeConfigError',
+    'SlimeError',
+    'createSlime',
+    'fileStore',
+    'memoryStore',
+  ]);
+});
+
+test('the offline generator has its own subpath, so the main entry never loads it (C7)', async () => {
+  assert.deepEqual(pkg.exports['./offline'], { types: './dist/offline/index.d.ts', default: './dist/offline/index.js' });
+  assert.deepEqual(Object.keys(await import('../src/offline/index.js')), ['offlineGenerator']);
 });

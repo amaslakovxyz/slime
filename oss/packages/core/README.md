@@ -31,17 +31,12 @@ input values. Handlers move up through three tiers:
 * **Crystal:** rewritten by an agent into JS modules (with `.d.ts`) in the app's own
   code, and passed to Slime through the config.
 
-> **Status:** M1 is done:
-> * the request format and cache key;
-> * the parameter type rules;
-> * SQL lint;
-> * the contracts (`Connector`, `Generator`, `Reviewer`, `SlimeStore`,
->   `SandboxRunner`);
-> * `SlimeConfig` and `SlimeError`.
->
-> `createSlime()`, `slime.query()`, `postgresConnector` and the generators
-> come with M2 and later, so the example above does not run yet. It shows
-> the target API. Decisions and milestones are in [PLAN.md](PLAN.md).
+> **Status:** M2 is done: `createSlime()` and `slime.query()` work on the
+> Gas path, with the file and memory stores, the QuickJS shaping sandbox,
+> coalescing, rate limits, locked mode and the offline generator
+> (`@slime-cloud/core/offline`). `postgresConnector` (M3) and the Claude and
+> Groq generators (M4) don't exist yet, so the example above shows the target
+> API. Decisions and milestones are in [PLAN.md](PLAN.md).
 
 ### Scope
 
@@ -76,8 +71,16 @@ input values. Handlers move up through three tiers:
 ## Subdirectories & System Boundaries
 
 - [src/](./src/README.md): the package sources and its public entry
-  `index.ts`. As of M1 that is `SlimeConfig`, the errors and the Port
-  types. Pure building blocks live in:
+  `index.ts`: `SlimeConfig`, the errors, the Port
+  types, `createSlime()` and the two stores. Building blocks live in:
+  - [src/engine/](./src/engine/README.md): the Slime instance: handler
+    cache, generation with repairs, coalescing, rate limits;
+  - [src/shaping/](./src/shaping/README.md): the QuickJS shaping sandbox in
+    worker threads;
+  - [src/dictionary/](./src/dictionary/README.md): the dictionary rendered
+    from metadata, glossary and rules;
+  - [src/offline/](./src/offline/README.md): the offline generator, the
+    `@slime-cloud/core/offline` entry;
   - [src/config/](./src/config/README.md): `SlimeConfig`'s option types,
     defaults and validation;
   - [src/request/](./src/request/README.md): request parsing, the output
@@ -94,17 +97,16 @@ input values. Handlers move up through three tiers:
 
 ## Global Invariants
 
-- **One public entry.** `package.json` `exports` has only `.`
-  (`dist/index.js` plus types). `test/package.test.ts` pins the value
-  exports to `DEFAULT_LIMITS`, `DEFAULT_TIERS`, `SlimeConfig`,
-  `SlimeConfigError` and `SlimeError`.
+- **One main entry, plus adapter subpaths.** `package.json` `exports` has
+  `.` and `./offline` (C7). `test/package.test.ts` pins the main entry's
+  value exports and the subpath.
 - **What ships.** ESM only (`type: module`), Node `>=22`, compiled `dist/`
   and `README.md` only (`files`). `scripts/check-pack.mjs` enforces this in
   CI.
 - **Private until go-public.** The package is `private: true`. Tests guard
   this, so nothing is published by accident.
-- **No runtime dependencies yet.** `package.json` has only
-  `devDependencies`.
+- **One runtime dependency.** `quickjs-emscripten`, for the shaping
+  sandbox. Drivers and model SDKs will be optional peers (C7).
 - **No environment reading.** Core never reads `process.env` or `.env`. The
   app passes everything in through `SlimeConfig` (`src/config.ts`).
 - **No values in keys or prompts.** Input values are never part of a cache

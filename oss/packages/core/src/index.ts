@@ -1,4 +1,23 @@
-// The public entry. Deep imports are not part of the API; createSlime() arrives with M2.
+// The public entry. Deep imports are not part of the API; adapters have their own subpaths (C7).
+
+export { createSlime } from './create-slime.js';
+export { DEFAULT_STORE_DIR, fileStore } from './store/file-store.js';
+export { memoryStore } from './store/memory-store.js';
+export type {
+  CacheOutcome,
+  HandlerRecord,
+  HandlerSummary,
+  QueryMeta,
+  QueryResult,
+  QueryTimings,
+  ReviewStatus,
+  Slime,
+  SlimeStats,
+  StoredTier,
+  Tier,
+} from './engine/types.js';
+export type { HandlerProvenance } from './request/key.js';
+export type { ParamTypes } from './request/params.js';
 
 export {
   SlimeConfig,

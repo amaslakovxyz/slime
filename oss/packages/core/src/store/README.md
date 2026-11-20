@@ -7,10 +7,11 @@ fixtures, and run counts (see `PLAN.md` C13, C14 and §4.7 in
 [`../../PLAN.md`](../../PLAN.md)). The contract is a small key-value Port, so
 mapping any backend onto it takes four calls.
 
-This directory holds only the contract, in `types.ts`. Core will ship two
-stores, `fileStore(dir)` (the default, `./.slime`) and `memoryStore()`, in
-M2. Any other backend (Postgres, DynamoDB, Redis) is a custom `SlimeStore`
-the app passes in; Slime Cloud brings its own (M7).
+`types.ts` holds the contract. Core ships two stores with no extra packages:
+`fileStore(dir = './.slime')` (`file-store.ts`, the default) and
+`memoryStore()` (`memory-store.ts`, for tests). Any other backend (Postgres,
+DynamoDB, Redis) is a custom `SlimeStore` the app passes in; Slime Cloud
+brings its own (M7).
 
 ## Interface
 
@@ -28,8 +29,15 @@ From `types.ts`:
   - `delete(ns, key): Promise<void>`
   - `close?(): Promise<void>`: optional. Releases connections.
 
-Public package exports, from [`../index.ts`](../index.ts): the types
-`SlimeStore` and `StoreEntry`.
+- `fileStore(dir?)`: one JSON file per key, `<dir>/<ns>/<key>.json`.
+  Writes go to a temporary file and are renamed into place. Namespaces and
+  keys must be safe file names (`SAFE_NAME`); anything else throws.
+- `memoryStore()`: keeps JSON text per key, so a value read back is always a
+  copy.
+
+Public package exports, from [`../index.ts`](../index.ts): `fileStore`,
+`memoryStore`, `DEFAULT_STORE_DIR` and the types `SlimeStore` and
+`StoreEntry`.
 
 Consumers: [`../config.ts`](../config.ts) types the `store` option as
 `SlimeStore` and checks that it has `get`, `put`, `list` and `delete`.
@@ -38,7 +46,7 @@ Consumers: [`../config.ts`](../config.ts) types the `store` option as
 
 - The `store` option is always an object implementing `SlimeStore`; there are
   no `{ type: ... }` store options. When it is omitted, `SlimeConfig.store` is
-  `undefined` and `createSlime()` builds the default file store (M2).
+  `undefined` and `createSlime()` builds the default file store.
 - A store is used as given, not copied or frozen: it has behavior and state.
 - Handlers live in the `handlers` namespace, keyed by the request key alone
   (§4.7). What a handler was generated against (its provenance) is stored
@@ -49,13 +57,13 @@ Consumers: [`../config.ts`](../config.ts) types the `store` option as
 
 ## Side Effects
 
-- None. `types.ts` declares types only and has no I/O.
-- Implementations of the `SlimeStore` contract are expected to do I/O against
-  their backend. None exist in this directory yet.
+- `file-store.ts` reads and writes files under its directory; it creates
+  namespace folders on the first write.
+- `memory-store.ts` and `types.ts` do no I/O.
 
 ## Verification
 
 - Run from the repository root: `npm test -w @slime-cloud/core`
-- `test/config.test.ts` imports only the `SlimeStore` type from this
-  directory. Its `store option (C14, §4.7)` suite covers store validation
-  through `SlimeConfig`.
+- `test/store-contract.ts` is the `SlimeStore` contract;
+  `test/stores.test.ts` runs it against both stores and adds the file
+  store's own rules. `test/config.test.ts` covers the `store` option.

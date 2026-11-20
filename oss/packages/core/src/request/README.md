@@ -23,7 +23,7 @@ and `Shape`.
 - `type InputScalar = string | number | boolean | null`
 - `type InputValue = InputScalar | InputScalar[]`
 - `interface SlimeRequest { intent: string; input?: Record<string, InputValue>; output: Shape }`:
-  what `slime.query()` will accept (M2).
+  what `slime.query()` accepts.
 - `interface ParsedRequest { intent; input; output }`: `input` is always present
   (defaults to `{}`).
 - `const PAGING_PARAMS = ['limit', 'offset']`: reserved paging input names (R6).
@@ -32,7 +32,7 @@ and `Shape`.
 - `literalsInIntent(intent: string): string[]`: labels literal values found in
   the intent (`'quoted text'`, `'a number'`, `'an email address'`, `'a UUID'`).
   It only detects. R7 (adding a warning to `meta.warnings`, not an error,
-  because "top 10" and possessives match too) is the engine's job from M2.
+  because "top 10" and possessives match too) is done by the engine.
 
 ### `shape.ts`: output shape notation (§4.2)
 
@@ -115,7 +115,7 @@ and `Shape`.
   possibly a slightly different schema) finds what explore mode saved.
 - Explore mode treats any `changedProvenance` result as a miss and
   regenerates; locked mode serves the handler and warns once if `schemaHash`
-  changed. The engine applies this from M2.
+  changed. `engine/handler-cache.ts` applies this.
 - Bumping `KEY_VERSION` invalidates every existing key; change it only on purpose.
 
 ## Side Effects

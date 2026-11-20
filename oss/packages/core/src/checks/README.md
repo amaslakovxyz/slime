@@ -8,9 +8,10 @@ database user is the real boundary. `sql.ts` refuses SQL that writes or calls a
 forbidden function, checks that `$n` placeholders map to real input names, and
 rejects handlers that copy an input value into their code.
 
-These functions are internal. Nothing in `src/` imports this directory yet, and
-`src/index.ts` does not re-export it. The only caller today is
-`test/sql.test.ts`.
+`limit.ts` holds the R6 check: a top-level list may not have more rows than
+`input.limit`. These functions are internal: the engine calls them
+(`engine/generate.ts`, `engine/execute.ts`), and `src/index.ts` does not
+re-export them.
 
 ## Interface
 
@@ -21,6 +22,9 @@ These functions are internal. Nothing in `src/` imports this directory yet, and
   (`sql.ts`): calls `assertReadOnlySql(artifact.sql)` and then validates the
   parameter mapping and checks for hardcoded values. Throws
   `SlimeError('INVALID_HANDLER', ...)` on any failure.
+- `assertWithinLimit(data: unknown, input: InputValues): void` (`limit.ts`):
+  throws `SlimeError('INVALID_HANDLER', ...)` when `data` is a list longer
+  than a numeric `input.limit`. Anything else passes.
 - Dependencies: `SlimeError` from `../errors.ts`, `Artifact` type from
   `../ports.ts`.
 

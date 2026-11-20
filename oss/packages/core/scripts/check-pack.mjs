@@ -10,7 +10,14 @@ const [report] = JSON.parse(
 );
 const files = report.files.map((f) => f.path).sort();
 
-const required = ['package.json', 'README.md', 'dist/index.js', 'dist/index.d.ts'];
+const required = [
+  'package.json',
+  'README.md',
+  'dist/index.js',
+  'dist/index.d.ts',
+  'dist/offline/index.js',
+  'dist/shaping/shape-worker.js',
+];
 const forbidden = [/^src\//, /^test\//, /^scripts\//, /^tsconfig/, /^PLAN\.md$/, /^docs\//];
 
 const problems = [
