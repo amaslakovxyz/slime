@@ -1,4 +1,6 @@
-import type { IntentSpec, Effect } from "./types";
+import { join } from "node:path";
+import { sha256Hex } from "./hash";
+import type { IntentSpec, Effect, LoadedIntent } from "./types";
 
 const FIELD = /^(roles|reads|writes|rule|try|invariant (\w+)):\s*(.*)$/;
 
@@ -31,3 +33,12 @@ export function parseIntent(markdown: string, name: string): IntentSpec {
       .map(f => new Function(`return (${f.lines.join(" ")})`)() as Record<string, unknown>),
   };
 }
+
+// Loads intents/<name>.md; null for unknown names. The name pattern is the path-traversal guard.
+export const makeIntentLoader = (dir = "intents") => async (name: string): Promise<LoadedIntent | null> => {
+  if (!/^[a-z0-9_]+$/.test(name)) return null;
+  const file = Bun.file(join(dir, `${name}.md`));
+  if (!(await file.exists())) return null;
+  const md = await file.text();
+  return { spec: parseIntent(md, name), specHash: sha256Hex(md) };
+};
