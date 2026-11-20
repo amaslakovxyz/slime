@@ -54,6 +54,12 @@ Backend -- Slime runtime:
   the Lambda entry and DynamoDB handler store around the core. Imports
   `sandbox/` (the future open-source `@slime-cloud/core`); `sandbox/` never
   imports it.
+- [slime-cloud/provisioner/](./slime-cloud/provisioner) - `slime-provisioner`
+  Lambda: turns `pending` endpoints in `slime-control` into `slime-ep-<id>`
+  functions on the shared Gas layer, and deletes them again.
+- [slime-cloud/admin/](./slime-cloud/admin) - slime cloud admin (Next.js, runs
+  locally): sign-up, endpoints, usage board, OpenTelemetry. Design:
+  [docs/slime-cloud/architecture.html](./docs/slime-cloud/architecture.html).
 
 Root files: [AGENTS.md](./AGENTS.md) (repository contract for agents),
 [justfile](./justfile) (task runner), and
