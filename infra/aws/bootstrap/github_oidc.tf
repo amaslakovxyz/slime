@@ -105,6 +105,11 @@ locals {
     "arn:aws:lambda:*:*:function:${var.project}-*",
     "arn:aws:lambda:*:*:function:${var.project}-*:*",
   ]
+  # Tables, their indexes and streams.
+  project_table_arns = [
+    "arn:aws:dynamodb:*:*:table/${var.project}-*",
+    "arn:aws:dynamodb:*:*:table/${var.project}-*/*",
+  ]
 }
 
 data "aws_iam_policy_document" "gha_foreign_reads" {
@@ -123,6 +128,42 @@ data "aws_iam_policy_document" "gha_foreign_reads" {
       "arn:aws:logs:*:*:log-group:*${var.project}-*",
       "arn:aws:logs:*:*:log-group:*${var.project}-*:*",
     ]
+  }
+
+  # ReadOnlyAccess also grants data-plane reads (item scans, queue receives,
+  # stream reads, image pulls). A PR can rewrite the plan job, so without these
+  # denies any collaborator could dump foreign data, e.g. ex-infra's
+  # terraform-locks table. Terraform never needs item-level reads to plan.
+  # region-guard already blocks every region except var.region.
+  statement {
+    sid    = "DenyForeignTableData"
+    effect = "Deny"
+    actions = [
+      "dynamodb:BatchGetItem", "dynamodb:GetItem", "dynamodb:Query", "dynamodb:Scan",
+      "dynamodb:PartiQLSelect", "dynamodb:GetRecords", "dynamodb:GetShardIterator",
+    ]
+    not_resources = local.project_table_arns
+  }
+
+  statement {
+    sid           = "DenyForeignQueueData"
+    effect        = "Deny"
+    actions       = ["sqs:ReceiveMessage"]
+    not_resources = ["arn:aws:sqs:*:*:${var.project}-*"]
+  }
+
+  statement {
+    sid           = "DenyForeignStreamData"
+    effect        = "Deny"
+    actions       = ["kinesis:GetRecords", "kinesis:GetShardIterator", "kinesis:SubscribeToShard"]
+    not_resources = ["arn:aws:kinesis:*:*:stream/${var.project}-*", "arn:aws:kinesis:*:*:stream/${var.project}-*/*"]
+  }
+
+  statement {
+    sid           = "DenyForeignImagePulls"
+    effect        = "Deny"
+    actions       = ["ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer"]
+    not_resources = ["arn:aws:ecr:*:*:repository/${var.project}-*"]
   }
 }
 
@@ -225,6 +266,16 @@ data "aws_iam_policy_document" "gha_apply_guard" {
     resources = [aws_s3_bucket.state.arn, "${aws_s3_bucket.state.arn}/*"]
   }
 
+  # CI never applies bootstrap. Without this, the apply role could rewrite the
+  # state of the stack that defines its own guard rails, and the next human
+  # apply would act on a forged picture of the account.
+  statement {
+    sid       = "DenyBootstrapStateWrites"
+    effect    = "Deny"
+    actions   = ["s3:PutObject", "s3:DeleteObject"]
+    resources = ["${aws_s3_bucket.state.arn}/bootstrap/*"]
+  }
+
   statement {
     sid    = "DenyForeignLambdaChanges"
     effect = "Deny"
@@ -234,6 +285,19 @@ data "aws_iam_policy_document" "gha_apply_guard" {
       "lambda:UntagResource", "lambda:UpdateFunction*",
     ]
     not_resources = local.project_lambda_arns
+  }
+
+  # ex-infra's terraform-locks table lives in this region; a forged or
+  # deleted lock item would break or bypass its state locking.
+  statement {
+    sid    = "DenyForeignTableChanges"
+    effect = "Deny"
+    actions = [
+      "dynamodb:BatchWriteItem", "dynamodb:DeleteItem", "dynamodb:PutItem", "dynamodb:UpdateItem",
+      "dynamodb:PartiQL*", "dynamodb:DeleteTable", "dynamodb:UpdateTable", "dynamodb:TagResource",
+      "dynamodb:UntagResource", "dynamodb:RestoreTable*", "dynamodb:ExportTableToPointInTime",
+    ]
+    not_resources = local.project_table_arns
   }
 
   statement {

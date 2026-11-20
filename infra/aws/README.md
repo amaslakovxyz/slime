@@ -25,6 +25,8 @@ The CI roles deny anything outside these names, so follow them:
 - IAM roles, policies, instance profiles: `slime-*`
 - S3 buckets: `slime-*`; Secrets Manager: `slime-*`; SSM parameters: `/slime/*`
 - Lambda functions and EventBridge rules: `slime-*`; log groups contain `slime-`
+- DynamoDB tables, SQS queues, Kinesis streams, ECR repositories: `slime-*`
+  (their data is unreadable to CI otherwise)
 - ACM certificates must carry `Project=slime` (provider `default_tags` does it)
 - Regional services only in `eu-central-1`
 - No changes to `slime-deployer`, `slime-gha-*`, OIDC providers, the state

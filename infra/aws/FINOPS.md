@@ -40,7 +40,7 @@ credits); 12-month offers no longer apply, only Always Free.
 |---|---|---|
 | Budget `slime-account-monthly` | $50, alerts 50/80% actual, 100% forecast | Whole account |
 | Budget `slime-monthly` | $15, alerts $10.50 + $15 actual, $15 forecast | Region `eu-central-1` until the `Project` tag is active, then tag `Project=slime` |
-| Budget action `freeze` | 100% actual of `slime-monthly`, automatic | Attaches `slime-budget-freeze` to `slime-deployer` and `slime-gha-apply`: no new paid resources; read, update and delete still work |
+| Budget action `freeze` | 100% actual of `slime-monthly`, automatic | Attaches `slime-budget-freeze` to `slime-deployer` and `slime-gha-apply`: no new paid resources or capacity increases (ECS/RDS/DynamoDB updates are blocked too); reads, code updates and deletes still work |
 | Cost Anomaly Detection | SERVICE monitor, daily email at >= $5 impact | Whole account, free |
 
 Two budgets with one action stay inside AWS Budgets' free allowance.

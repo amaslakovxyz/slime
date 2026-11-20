@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.9"
+  required_version = ">= 1.11" # use_lockfile is GA from 1.11; 1.9 cannot init this backend
 
   required_providers {
     aws = {
