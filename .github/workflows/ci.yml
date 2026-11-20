@@ -88,6 +88,60 @@ jobs:
       # The Lambda bundle deployed by terraform.yml (infra/aws/platform).
       - run: npm run build
 
+  provisioner:
+    name: Slime Cloud provisioner
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: slime-cloud/provisioner
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: slime-cloud/provisioner/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      # Fake AWS clients only; no credentials.
+      - run: npm test
+      # The Lambda bundle deployed by terraform.yml (infra/aws/platform).
+      - run: npm run build
+
+  admin:
+    name: Slime Cloud admin
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: slime-cloud/admin
+    services:
+      dynamodb:
+        image: amazon/dynamodb-local:latest
+        ports:
+          - 8000:8000
+    env:
+      AWS_REGION: eu-central-1
+      AWS_ENDPOINT_URL_DYNAMODB: http://localhost:8000
+      AWS_ACCESS_KEY_ID: local
+      AWS_SECRET_ACCESS_KEY: local
+      SESSION_SECRET: ci-only-session-secret-0123456789abcdef
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: slime-cloud/admin/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      # REQUIRE_DYNAMO makes the DynamoDB Local tests fail instead of skipping.
+      - run: npm test
+        env:
+          REQUIRE_DYNAMO: "1"
+      - run: npm run build
+
   landing:
     name: Landing function tests
     runs-on: ubuntu-latest

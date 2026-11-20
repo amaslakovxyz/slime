@@ -1,0 +1,13 @@
+# Local stand-ins for the AWS control plane: DynamoDB Local for slime-control and
+# slime-handlers, Jaeger for the admin's OpenTelemetry traces.
+services:
+  dynamodb:
+    image: amazon/dynamodb-local:latest
+    command: "-jar DynamoDBLocal.jar -sharedDb -inMemory"
+    ports:
+      - "8000:8000"
+  jaeger:
+    image: jaegertracing/jaeger:latest
+    ports:
+      - "16686:16686" # UI
+      - "4318:4318" # OTLP over HTTP
