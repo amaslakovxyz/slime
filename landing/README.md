@@ -21,15 +21,9 @@ Or open `index.html` directly in a browser.
 
 ## Deploy
 
-[`.github/workflows/pages.yml`](../.github/workflows/pages.yml) publishes this
-folder to GitHub Pages on every push to `main` that touches `landing/`. It can
-also be run by hand from the Actions tab.
-
-One-time setup by a repo admin: **Settings → Pages → Build and deployment →
-Source: GitHub Actions**.
-
-The same folder is also served from AWS Lambda; see
-[`infra/aws/landing/`](../infra/aws/landing/README.md).
+Served at https://amaslakov.com/ by CloudFront in front of AWS Lambda; see
+[`infra/aws/landing/`](../infra/aws/landing/README.md). (GitHub Pages was
+dropped: it is unavailable for private repositories on GitHub Free.)
 
 ## Where things come from
 
