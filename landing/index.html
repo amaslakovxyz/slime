@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Slime — the living backend</title>
-  <meta name="description" content="Vibecode the UI. Let Slime be the backend. Slime turns what your UI or agent asks for into safe, self-optimizing backend logic — without writing a single route.">
+  <meta name="description" content="One backend. Any shape. Feed Slime your databases, old endpoints and files; it reshapes itself into whatever data your product or agents ask for, safely, without writing a single route.">
   <meta property="og:title" content="Slime — the living backend">
-  <meta property="og:description" content="Vibecode the UI. Let Slime be the backend.">
+  <meta property="og:description" content="One backend. Any shape.">
   <meta property="og:type" content="website">
   <meta name="theme-color" content="#0B070C">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3CradialGradient id='g' cx='35%25' cy='30%25' r='75%25'%3E%3Cstop offset='0' stop-color='%23FF85C0'/%3E%3Cstop offset='.5' stop-color='%23FF1476'/%3E%3Cstop offset='1' stop-color='%238F0043'/%3E%3C/radialGradient%3E%3C/defs%3E%3Cpath fill='url(%23g)' d='M32 6c14 0 26 9 26 24 0 10-5 14-5 20 0 5-4 8-9 8-4 0-5-3-8-3s-4 3-9 3c-6 0-9-4-9-9 0-6-6-9-6-19C12 15 18 6 32 6z'/%3E%3C/svg%3E">
@@ -148,19 +148,66 @@
     /* ---------- Hero ---------- */
     .hero { padding: 72px 0 120px; overflow: hidden; }
     .hero-grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 48px; align-items: center; }
-    .hero h1 { font-size: clamp(2.7rem, 6.2vw, 5rem); line-height: 1.02; }
+    .hero h1 { font-size: clamp(2.7rem, 5.6vw, 4.4rem); line-height: 1.02; }
     .hero h1 .line2 { display: block; margin-top: 6px; }
     .hero .lead { max-width: 540px; font-size: 1.2rem; margin-top: 26px; }
     .hero-ctas { display: flex; gap: 14px; margin-top: 38px; flex-wrap: wrap; }
     .hero-meta { display: flex; gap: 10px; margin-top: 44px; flex-wrap: wrap; }
 
-    .hero-visual { position: relative; height: 520px; }
+    .hero-right { position: relative; min-width: 0; }
+    .hero-visual { position: relative; height: 440px; }
     .hero-visual::before { /* soft plasma halo behind the goo */
       content: ""; position: absolute; inset: 8% 4%;
       background: radial-gradient(closest-side, rgba(255,20,118,.32), rgba(143,0,67,.12) 55%, transparent 100%);
       filter: blur(30px);
     }
-    .goo { position: absolute; inset: 0; filter: url(#goo); }
+    .goo {
+      position: absolute; inset: 0; filter: url(#goo);
+      transform: scale(var(--grow, 1)); transform-origin: 42% 42%;
+      transition: transform .6s cubic-bezier(.34, 1.56, .64, 1);
+    }
+    .goo.gulp { animation: gulp .6s ease; }
+    @keyframes gulp {
+      0% { transform: scale(var(--grow, 1)); }
+      35% { transform: scale(calc(var(--grow, 1) * 1.09), calc(var(--grow, 1) * .94)); }
+      65% { transform: scale(calc(var(--grow, 1) * .96), calc(var(--grow, 1) * 1.05)); }
+      100% { transform: scale(var(--grow, 1)); }
+    }
+    /* A swallowed item: a plasma droplet that merges into the body through the goo filter. */
+    .droplet {
+      position: absolute; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%;
+      background: radial-gradient(circle at 32% 28%, var(--plasma-highlight), var(--plasma-primary) 50%, var(--plasma-shadow));
+      transition: left .55s cubic-bezier(.55, 0, .45, 1), top .55s cubic-bezier(.55, 0, .45, 1), transform .55s ease;
+    }
+
+    /* Feed tray */
+    .feed {
+      position: relative; z-index: 3; margin-top: 4px; padding: 18px 18px 20px; border-radius: 20px;
+      background: rgba(22,16,25,.78); border: 1px solid var(--border-color);
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    }
+    .feed-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 12px; margin-bottom: 14px; }
+    .feed-head .wordmark { font-size: 24px; white-space: nowrap; }
+    .feed-count { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); letter-spacing: .06em; white-space: nowrap; }
+    .feed-reset {
+      font: inherit; color: var(--plasma-highlight); background: none; border: 0; padding: 0; margin-left: 8px;
+      cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
+    }
+    .foods { display: flex; flex-wrap: wrap; gap: 8px; }
+    .food {
+      display: inline-flex; flex-direction: column; align-items: flex-start; gap: 3px;
+      padding: 9px 13px; border-radius: 12px; cursor: pointer;
+      font-family: var(--font-mono); font-size: 13px; color: var(--text-pure); text-align: left;
+      background: var(--bg-canvas); border: 1px dashed var(--wireframe-grey);
+      transition: border-color .2s ease, transform .2s ease, opacity .3s ease, box-shadow .2s ease;
+    }
+    .food .kind { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--wireframe-grey); }
+    .food:hover:not(:disabled) { border-style: solid; border-color: var(--plasma-primary); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(255,20,118,.25); }
+    .food:disabled { opacity: .3; cursor: default; text-decoration: line-through; }
+    .flyer {
+      position: absolute; z-index: 6; pointer-events: none; margin: 0;
+      transition: transform .6s cubic-bezier(.5, -0.25, .7, 1), opacity .22s ease .32s;
+    }
     .blob {
       position: absolute; border-radius: 42% 58% 70% 30% / 45% 45% 55% 55%;
       background: radial-gradient(circle at 32% 28%, var(--plasma-highlight) 0%, var(--plasma-primary) 42%, var(--plasma-shadow) 100%);
@@ -197,8 +244,11 @@
       animation: bob 6s ease-in-out infinite;
     }
     .float-chip strong { color: var(--text-pure); font-weight: 500; }
-    .float-chip.c1 { left: 0; top: 6%; }
-    .float-chip.c2 { right: 0; bottom: 8%; animation-delay: -3s; }
+    .float-chip.c1 { left: 0; top: 4%; max-width: 280px; }
+    .float-chip.c2 { right: 0; bottom: 4%; animation-delay: -3s; max-width: 260px; }
+    .float-chip .sub { color: var(--text-muted); }
+    .float-chip.pop { animation: pop .5s ease, bob 6s ease-in-out .5s infinite; }
+    @keyframes pop { 0% { transform: scale(.92); } 60% { transform: scale(1.04); } 100% { transform: scale(1); } }
     .float-chip .ms { font-size: 22px; font-weight: 700; color: var(--text-pure); letter-spacing: -.01em; }
 
     @keyframes drift {
@@ -402,7 +452,7 @@
     @media (max-width: 960px) {
       section { padding: 96px 0; }
       .hero-grid, .trust-grid { grid-template-columns: 1fr; gap: 40px; }
-      .hero-visual { height: 400px; order: -1; margin: -10px 0 -20px; }
+      .hero-visual { height: 400px; }
       .demo-body { grid-template-columns: 1fr; }
       .demo-col + .demo-col { border-left: 0; border-top: 1px solid var(--border-color); }
       .states, .audiences { grid-template-columns: 1fr; }
@@ -423,7 +473,10 @@
       .b4 { width: 80px; height: 80px; }
       .b5 { width: 46px; height: 46px; }
       .gloss { width: 80px; height: 40px; }
-      .float-chip { font-size: 11.5px; padding: 10px 12px; }
+      .float-chip { font-size: 11.5px; padding: 10px 12px; max-width: 220px; }
+      .feed { padding: 16px 14px 18px; }
+      .feed-head .wordmark { font-size: 21px; }
+      .food { font-size: 12px; padding: 8px 11px; }
       .float-chip .ms { font-size: 18px; }
       .cases { grid-template-columns: 1fr; }
       .case { padding: 26px 22px; }
@@ -472,8 +525,8 @@
       <div class="container hero-grid">
         <div>
           <p class="eyebrow">The living backend</p>
-          <h1>Vibecode the UI.<span class="line2 slime-text">Let Slime be the backend.</span></h1>
-          <p class="lead">Your UI or AI agent says what data it needs. Slime writes the logic, runs it safely against your database, and remembers it. No routes. No tickets. No glue code.</p>
+          <h1>One backend.<span class="line2 slime-text">Any shape.</span></h1>
+          <p class="lead">Feed Slime your databases, old endpoints and files. Then ask for whatever data your product or agents need, in whatever shape. Slime writes the logic, runs it safely, and remembers it. No routes. No tickets. No glue code.</p>
           <div class="hero-ctas">
             <a href="#how" class="btn btn-primary">See it work</a>
             <a href="#use-cases" class="btn btn-ghost">Use cases</a>
@@ -485,20 +538,37 @@
           </div>
         </div>
 
-        <div class="hero-visual" aria-hidden="true">
-          <div class="goo">
-            <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
-            <div class="blob b4"></div><div class="blob b5"></div>
+        <div class="hero-right">
+          <div class="hero-visual" id="hero-visual">
+            <div class="goo" id="goo" aria-hidden="true">
+              <div class="blob b1" id="blob-main"></div><div class="blob b2"></div><div class="blob b3"></div>
+              <div class="blob b4"></div><div class="blob b5"></div>
+            </div>
+            <div class="gloss" aria-hidden="true"></div>
+            <span class="vapor v1" aria-hidden="true"></span><span class="vapor v2" aria-hidden="true"></span><span class="vapor v3" aria-hidden="true"></span>
+            <div class="float-chip c1" id="chip-in">
+              <span class="tag gas" style="align-self:flex-start" id="chip-in-tag"><span class="dot"></span>Hungry</span>
+              <span id="chip-in-line"><strong>status:</strong> feed me something ↓</span>
+            </div>
+            <div class="float-chip c2" id="chip-out" aria-live="polite">
+              <span class="tag liquid" style="align-self:flex-start" id="chip-out-tag"><span class="dot"></span>Liquid · cache hit</span>
+              <span class="ms" id="chip-out-ms">14 ms</span>
+              <span class="sub" id="chip-out-sub">top accounts by revenue</span>
+            </div>
           </div>
-          <div class="gloss"></div>
-          <span class="vapor v1"></span><span class="vapor v2"></span><span class="vapor v3"></span>
-          <div class="float-chip c1">
-            <span class="tag gas" style="align-self:flex-start"><span class="dot"></span>Gas · synthesizing</span>
-            <span><strong>intent:</strong> "top accounts by revenue"</span>
-          </div>
-          <div class="float-chip c2">
-            <span class="tag liquid" style="align-self:flex-start"><span class="dot"></span>Liquid · cache hit</span>
-            <span class="ms">14 ms</span>
+
+          <div class="feed">
+            <div class="feed-head">
+              <span class="wordmark slime-text">Feed the Slime</span>
+              <span class="feed-count"><span id="feed-count">0 / 5 swallowed</span><button class="feed-reset" id="feed-reset" type="button" hidden>feed again</button></span>
+            </div>
+            <div class="foods" id="foods">
+              <button class="food" type="button" data-kind="old endpoint" data-result="orders by region, last 30 days" data-ms="12"><span class="kind">old endpoint</span>GET /api/v1/orders</button>
+              <button class="food" type="button" data-kind="database" data-result="top accounts by revenue" data-ms="14"><span class="kind">database</span>postgres://billing</button>
+              <button class="food" type="button" data-kind="file" data-result="churn risk by plan" data-ms="9"><span class="kind">file</span>customers.csv</button>
+              <button class="food" type="button" data-kind="legacy API" data-result="unpaid invoices this month" data-ms="17"><span class="kind">legacy API</span>SOAP InvoiceService</button>
+              <button class="food" type="button" data-kind="event data" data-result="signups per day, by channel" data-ms="11"><span class="kind">event data</span>{ webhook }</button>
+            </div>
           </div>
         </div>
       </div>
@@ -761,6 +831,102 @@
       } else {
         reveals.forEach(function (el) { el.classList.add('in'); });
       }
+
+      /* ---------- Feed the Slime (hero) ----------
+         Click a source: it flies into the blob, merges as a droplet through the
+         goo filter, the body gulps and grows, and the chips show the new shape
+         Slime can now serve from it. Purely illustrative. */
+      var visual = document.getElementById('hero-visual');
+      var goo = document.getElementById('goo');
+      var mainBlob = document.getElementById('blob-main');
+      var foodBtns = document.querySelectorAll('#foods .food');
+      var countEl = document.getElementById('feed-count');
+      var resetBtn = document.getElementById('feed-reset');
+      var chipIn = document.getElementById('chip-in');
+      var chipInTag = document.getElementById('chip-in-tag');
+      var chipInLine = document.getElementById('chip-in-line');
+      var chipOut = document.getElementById('chip-out');
+      var chipOutTag = document.getElementById('chip-out-tag');
+      var chipOutMs = document.getElementById('chip-out-ms');
+      var chipOutSub = document.getElementById('chip-out-sub');
+      var eaten = 0;
+
+      function pop(el) { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
+      function center(r) { return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
+
+      function digest(btn) {
+        var label = btn.lastChild.textContent;
+        chipInTag.innerHTML = '<span class="dot"></span>Gas · digesting';
+        chipInLine.innerHTML = '<strong>' + esc(btn.dataset.kind) + ':</strong> ' + esc(label);
+        pop(chipIn);
+        goo.classList.remove('gulp'); void goo.offsetWidth; goo.classList.add('gulp');
+        eaten += 1;
+        goo.style.setProperty('--grow', (1 + eaten * 0.035).toFixed(3));
+        countEl.textContent = eaten + ' / ' + foodBtns.length + ' swallowed';
+        setTimeout(function () {
+          chipOutTag.innerHTML = '<span class="dot"></span>Liquid · new shape';
+          chipOutMs.textContent = btn.dataset.ms + ' ms';
+          chipOutSub.textContent = btn.dataset.result;
+          pop(chipOut);
+          if (eaten === foodBtns.length) {
+            chipInTag.innerHTML = '<span class="dot"></span>Gas · full';
+            chipInLine.innerHTML = '<strong>status:</strong> one backend, any shape';
+            resetBtn.hidden = false;
+          }
+        }, reduceMotion ? 0 : 650);
+      }
+
+      function feed(btn) {
+        if (btn.disabled) return;
+        btn.disabled = true;
+        if (reduceMotion) { digest(btn); return; }
+
+        var v = visual.getBoundingClientRect();
+        var from = btn.getBoundingClientRect();
+        var mouth = center(mainBlob.getBoundingClientRect());
+        // The flyer stops short of the centre, at the body's edge, where a droplet takes over.
+        var edge = { x: mouth.x + (center(from).x - mouth.x) * 0.45, y: mouth.y + (center(from).y - mouth.y) * 0.45 };
+
+        var flyer = btn.cloneNode(true);
+        flyer.disabled = false; // the source button is already disabled; the flyer shouldn't look it
+        flyer.setAttribute('aria-hidden', 'true');
+        flyer.classList.add('flyer');
+        flyer.style.left = (from.left - v.left) + 'px';
+        flyer.style.top = (from.top - v.top) + 'px';
+        flyer.style.width = from.width + 'px';
+        visual.appendChild(flyer);
+        void flyer.offsetWidth;
+        flyer.style.transform = 'translate(' + (edge.x - center(from).x) + 'px,' + (edge.y - center(from).y) + 'px) scale(.25)';
+        flyer.style.opacity = '0';
+
+        setTimeout(function () {
+          flyer.remove();
+          var g = goo.getBoundingClientRect();
+          var scale = g.width / goo.offsetWidth || 1; // goo is scaled by --grow
+          var d = document.createElement('span');
+          d.className = 'droplet';
+          d.style.left = ((edge.x - g.left) / scale) + 'px';
+          d.style.top = ((edge.y - g.top) / scale) + 'px';
+          goo.appendChild(d);
+          void d.offsetWidth;
+          d.style.left = ((mouth.x - g.left) / scale) + 'px';
+          d.style.top = ((mouth.y - g.top) / scale) + 'px';
+          d.style.transform = 'scale(.4)';
+          setTimeout(function () { d.remove(); }, 600);
+          digest(btn);
+        }, 520);
+      }
+
+      foodBtns.forEach(function (b) { b.addEventListener('click', function () { feed(b); }); });
+      resetBtn.addEventListener('click', function () {
+        eaten = 0;
+        goo.style.setProperty('--grow', '1');
+        foodBtns.forEach(function (b) { b.disabled = false; });
+        countEl.textContent = '0 / ' + foodBtns.length + ' swallowed';
+        chipInTag.innerHTML = '<span class="dot"></span>Hungry';
+        chipInLine.innerHTML = '<strong>status:</strong> feed me something ↓';
+        resetBtn.hidden = true;
+      });
 
       /* ---------- Scripted demo ----------
          This is an illustration, not a live call. Timings are in the range the
