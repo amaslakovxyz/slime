@@ -45,16 +45,20 @@ function stats(xs: number[]): Stats {
   return { n: s.length, mean: s.reduce((a, b) => a + b, 0) / s.length, p50: pct(50), p95: pct(95), p99: pct(99), max: s[s.length - 1] };
 }
 const f = (x: number, d = 3) => x.toFixed(d);
+// The shipped invariant, exactly as the kernel runs it (tenant-scoped via :tenant_id).
+const INV_SQL = parseIntent(readFileSync(join(REPO, "intents", "place_order.md"), "utf8"), "place_order").invariants[0].sql;
+const TENANT = { ":tenant_id": 1 };
 const statCells = (s: Stats) => `${s.n} | ${f(s.mean)} | ${f(s.p50)} | ${f(s.p95)} | ${f(s.p99)} | ${f(s.max)}`;
 const STAT_HDR = "n | mean ms | p50 ms | p95 ms | p99 ms | max ms";
 const STAT_SEP = "---:|---:|---:|---:|---:|---:";
 
 // ── server roots ──
-// Plain byte copy of a flat directory. Not cpSync: on this machine its APFS clonefileat intermittently
+// Plain byte copy of a directory's files (subdirectories such as examples/attacks are skipped). Not cpSync: on this machine its APFS clonefileat intermittently
 // stalled for 30+ s (outside timed regions, but it made total run time unbounded).
 function copyDir(from: string, to: string) {
   mkdirSync(to, { recursive: true });
-  for (const name of readdirSync(from)) writeFileSync(join(to, name), readFileSync(join(from, name)));
+  for (const e of readdirSync(from, { withFileTypes: true }))
+    if (e.isFile()) writeFileSync(join(to, e.name), readFileSync(join(from, e.name)));
 }
 
 function makeRoot(label: string): { root: string; dbPath: string } {
@@ -351,17 +355,17 @@ async function dataScale() {
       // Invariant cost in isolation, on the same DB file, then with an index on stock (bench-local; src untouched).
       if (orders === 0) {
         const db = new Database(r.dbPath);
-        const plan = (db.query("EXPLAIN QUERY PLAN SELECT id FROM products WHERE stock < 0").all() as { detail: string }[]).map(p => p.detail).join("; ");
+        const plan = (db.query(`EXPLAIN QUERY PLAN ${INV_SQL}`).all(TENANT) as { detail: string }[]).map(p => p.detail).join("; ");
         const time = () => {
-          const q = db.query("SELECT id FROM products WHERE stock < 0");
-          for (let i = 0; i < 50; i++) q.all();
+          const q = db.query(INV_SQL);
+          for (let i = 0; i < 50; i++) q.all(TENANT);
           const xs: number[] = [];
-          for (let i = 0; i < N.invQuery; i++) { const a = performance.now(); q.all(); xs.push(performance.now() - a); }
+          for (let i = 0; i < N.invQuery; i++) { const a = performance.now(); q.all(TENANT); xs.push(performance.now() - a); }
           return stats(xs);
         };
         const noIdx = time();
-        db.exec("CREATE INDEX bench_products_stock ON products(stock)");
-        const planIdx = (db.query("EXPLAIN QUERY PLAN SELECT id FROM products WHERE stock < 0").all() as { detail: string }[]).map(p => p.detail).join("; ");
+        db.exec("CREATE INDEX bench_products_tenant_stock ON products(tenant_id, stock)");
+        const planIdx = (db.query(`EXPLAIN QUERY PLAN ${INV_SQL}`).all(TENANT) as { detail: string }[]).map(p => p.detail).join("; ");
         const idx = time();
         db.close();
         invRows.push(`| ${products.toLocaleString("en-US")} | ${plan} | ${f(noIdx.mean)} | ${f(noIdx.p99)} | ${planIdx} | ${f(idx.mean)} | ${f(idx.p99)} |`);
@@ -379,11 +383,11 @@ async function dataScale() {
     `|---:|---:|---|${STAT_SEP}|---:|`,
     ...rows,
     "",
-    "`products returned` is the length of the last `list_products` response: `db.read` caps every read at `LIMIT 100` (no ORDER BY) and the handler then drops sold-out rows (seed product 4), so at every catalog size the reply holds 99 products. `list_products` latency is therefore flat in catalog size, but the catalog is silently truncated beyond 100 rows.",
+    "`products returned` is the length of the last `list_products` response: `db.read` caps every read at `LIMIT 100` (ordered by primary key) and the handler then drops sold-out rows (seed product 4), so at every catalog size the reply holds 99 products. `list_products` latency is therefore flat in catalog size, but the catalog is silently truncated beyond 100 rows.",
     "",
-    `**Invariant \`no_negative_stock\` in isolation** (\`SELECT id FROM products WHERE stock < 0\`, bun:sqlite in the bench process, n=${N.invQuery}; the index exists only in this bench copy):`,
+    `**Invariant \`no_negative_stock\` in isolation** (\`${INV_SQL}\` with \`:tenant_id = 1\`, as the kernel binds it; bun:sqlite in the bench process, n=${N.invQuery}; the index exists only in this bench copy):`,
     "",
-    "| products | query plan (as shipped) | mean ms | p99 ms | plan with `INDEX ON products(stock)` | mean ms | p99 ms |",
+    "| products | query plan (as shipped) | mean ms | p99 ms | plan with `INDEX ON products(tenant_id, stock)` | mean ms | p99 ms |",
     "|---:|---|---:|---:|---|---:|---:|",
     ...invRows,
     "",
@@ -418,14 +422,14 @@ async function inProcess() {
     const qpr = db.query("SELECT code, pct FROM promos WHERE code = ? AND tenant_id = ? LIMIT 100");
     const ins = db.query("INSERT INTO orders (user_id, product_id, qty, promo_code, total_cents, tenant_id) VALUES (?,?,?,?,?,?)");
     const upd = db.query("UPDATE products SET stock = ? WHERE id = ? AND tenant_id = ?");
-    const inv = db.query("SELECT id FROM products WHERE stock < 0");
+    const inv = db.query("SELECT id FROM products WHERE tenant_id = ? AND stock < 0");
     return () => {
       db.exec("BEGIN IMMEDIATE");
       const p = qp.get(5, 1) as { id: number; price_cents: number; stock: number };
       qpr.all("NONE", 1);
       ins.run(42, p.id, 1, null, p.price_cents, 1);
       upd.run(p.stock - 1, p.id, 1);
-      if (inv.all().length) throw new Error("invariant");
+      if (inv.all(1).length) throw new Error("invariant");
       db.exec("COMMIT");
     };
   };
