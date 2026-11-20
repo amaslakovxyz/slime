@@ -1,0 +1,58 @@
+{
+  "number of accounts on each plan": {
+    "unsatisfiable": null,
+    "sql": "SELECT p.name AS \"plan\", count(a.id)::int AS \"accounts\" FROM plans p JOIN accounts a ON a.plan_id = p.id GROUP BY p.id, p.name",
+    "params": [],
+    "shapeJs": null,
+    "assumptions": []
+  },
+  "total paid invoice revenue in cents per month since a given date, month formatted YYYY-MM, oldest first": {
+    "unsatisfiable": null,
+    "sql": "SELECT to_char(date_trunc('month', issued_at), 'YYYY-MM') AS \"month\", sum(amount_cents)::int AS \"revenueCents\" FROM invoices WHERE status = 'paid' AND issued_at >= $1::timestamptz GROUP BY 1 ORDER BY 1",
+    "params": ["since"],
+    "shapeJs": null,
+    "assumptions": []
+  },
+  "top N accounts by total paid invoice amount in cents, highest first": {
+    "unsatisfiable": null,
+    "sql": "SELECT a.name AS \"name\", sum(i.amount_cents)::int AS \"totalPaidCents\" FROM accounts a JOIN invoices i ON i.account_id = a.id AND i.status = 'paid' GROUP BY a.id, a.name ORDER BY 2 DESC LIMIT $1::int",
+    "params": ["limit"],
+    "shapeJs": null,
+    "assumptions": []
+  },
+  "accounts with failed invoices since a date, with how many failed invoices each": {
+    "unsatisfiable": null,
+    "sql": "SELECT a.name AS \"name\", count(*)::int AS \"failedInvoices\" FROM accounts a JOIN invoices i ON i.account_id = a.id WHERE i.status = 'failed' AND i.issued_at >= $1::timestamptz GROUP BY a.id, a.name",
+    "params": ["since"],
+    "shapeJs": null,
+    "assumptions": []
+  },
+  "plans that have accounts in a given country, each with the list of those account names": {
+    "unsatisfiable": null,
+    "sql": "SELECT p.name AS plan, a.name FROM accounts a JOIN plans p ON p.id = a.plan_id WHERE a.country = $1::text ORDER BY p.name, a.name",
+    "params": ["country"],
+    "shapeJs": "function shape(rows) {\n  const byPlan = new Map();\n  for (const r of rows) {\n    if (!byPlan.has(r.plan)) byPlan.set(r.plan, []);\n    byPlan.get(r.plan).push({ name: r.name });\n  }\n  return [...byPlan].map(([plan, accounts]) => ({ plan, accounts }));\n}",
+    "assumptions": []
+  },
+  "top N churn-risk accounts grouped by plan with last invoice status": {
+    "unsatisfiable": null,
+    "sql": "WITH activity AS (SELECT a.id, a.name, p.name AS plan, count(ue.id) FILTER (WHERE ue.occurred_at >= now() - interval '30 days') AS recent_events, (SELECT i.status FROM invoices i WHERE i.account_id = a.id ORDER BY i.issued_at DESC LIMIT 1) AS last_invoice_status FROM accounts a JOIN plans p ON p.id = a.plan_id LEFT JOIN usage_events ue ON ue.account_id = a.id GROUP BY a.id, a.name, p.name), ranked AS (SELECT *, row_number() OVER (PARTITION BY plan ORDER BY recent_events ASC, id) AS rn FROM activity) SELECT plan, name, (1.0 / (recent_events + 1))::float8 AS churn_risk, last_invoice_status FROM ranked WHERE rn <= $1::int ORDER BY plan, churn_risk DESC",
+    "params": ["limit"],
+    "shapeJs": "function shape(rows) {\n  const byPlan = new Map();\n  for (const r of rows) {\n    if (!byPlan.has(r.plan)) byPlan.set(r.plan, []);\n    byPlan.get(r.plan).push({ name: r.name, churnRisk: r.churn_risk, lastInvoiceStatus: r.last_invoice_status });\n  }\n  return { plans: [...byPlan].map(([plan, accounts]) => ({ plan, accounts })) };\n}",
+    "assumptions": ["Churn risk is 1 / (usage events in the last 30 days + 1): fewer recent events means higher risk.", "The limit applies per plan."]
+  },
+  "list account emails with their password hashes": {
+    "unsatisfiable": "Password hashes are not part of the schema Slime can read.",
+    "sql": "",
+    "params": [],
+    "shapeJs": null,
+    "assumptions": []
+  },
+  "delete all canceled subscriptions": {
+    "unsatisfiable": "This request asks to delete data; Slime only reads.",
+    "sql": "",
+    "params": [],
+    "shapeJs": null,
+    "assumptions": []
+  }
+}
