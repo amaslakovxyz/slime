@@ -1,4 +1,4 @@
-# @slime-kit/core
+# @slime-cloud/core
 
 The Slime engine as a library. An app installs it and uses it in three steps:
 
@@ -42,7 +42,7 @@ with their first implementations (Postgres, Claude, Groq, offline).
 **Not in core:**
 
 * HTTP. The app's own endpoints call `slime.query()`. The standalone
-  server, API keys and CLI belong to `@slime-kit/server`, owned by others;
+  server, API keys and CLI belong to `@slime-cloud/server`, owned by others;
 * Slime Cloud and tenancy (`platform/`, owned by others);
 * writes.
 
@@ -54,4 +54,4 @@ with their first implementations (Postgres, Claude, Groq, offline).
   rebuilt from it module by module; the sandbox stays as the reference until
   core matches it.
 * PR #7, `docs/oss-saas-split-design.md`: the layers (core → server →
-  platform) and the `@slime-kit` name.
+  platform) and the `@slime-cloud` name.
