@@ -3,10 +3,10 @@
 ## System Overview
 
 Slime (runtime and CLI `slime`) is a hackathon project in its design phase.
-The repository contains **no source code yet**: only design documents, brand
-material, and repository tooling. The planned runtime is described in
-[docs/architecture-spec.md](./docs/architecture-spec.md); nothing in that spec
-is implemented, so treat it as intent, not as a contract.
+The only code is a prototype in [sandbox/](./sandbox/README.md). It has one
+data endpoint and uses Claude to generate read-only SQL against a demo Postgres.
+Its benchmark measures generation speed and correctness. The specs in `docs/`
+describe intent, not implemented behaviour.
 
 ### Developer notes (original)
 
@@ -18,6 +18,8 @@ Backend -- Slime runtime:
 
 ## Subdirectories & System Boundaries
 
+- [sandbox/](./sandbox/README.md) - Slime v0 prototype (Node 22, TypeScript,
+  Hono, Postgres, Claude, QuickJS) and its speed/correctness benchmark.
 - `docs/` (no contract file; documentation only)
   - [architecture-spec.md](./docs/architecture-spec.md) - Development spec for
     the Slime runtime: request path, DB API, Gatekeeper rules, and Gas / Liquid

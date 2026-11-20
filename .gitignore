@@ -10,3 +10,7 @@
 .worktrees/
 .superpowers/
 .remember/
+
+# Node
+node_modules/
+dist/

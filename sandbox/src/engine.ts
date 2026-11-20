@@ -1,0 +1,422 @@
+import { config } from './config.js';
+import type { Connector, SchemaInfo } from './connectors/types.js';
+import { SlimeError } from './errors.js';
+import {
+  artifactKey,
+  inputSignature,
+  literalWarnings,
+  requestFingerprint,
+  sha256,
+  canonicalJSON,
+} from './fingerprint.js';
+import type { Artifact, Generator } from './generator.js';
+import { runShape, warmSandbox } from './sandbox.js';
+import { assertValidShape, validateAgainstShape, type Shape } from './shape.js';
+
+// Gas: generated recently, kept in a holding area that expires after GAS_WINDOW_MS.
+// Liquid: reached GAS_TO_LIQUID_HITS requests inside the window; kept.
+// Crystal: (built last) optimized code shipped as part of the app. Not in this sandbox.
+export type Tier = 'gas' | 'liquid' | 'crystal';
+
+export interface QueryRequest {
+  intent: string;
+  input: Record<string, unknown>;
+  output: Shape;
+}
+
+interface GenerationStats {
+  ms: number; // model time only
+  waitMs: number; // provider rate-limit waits (free tiers)
+  attempts: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+}
+
+export interface Handler {
+  id: string;
+  fingerprint: string;
+  intent: string;
+  output: Shape;
+  artifact: Artifact;
+  tier: Tier;
+  hits: number;
+  errors: number;
+  createdAt: number;
+  lastUsedAt: number;
+  expiresAt: number | null;
+  generation: GenerationStats;
+}
+
+export interface Timings {
+  generate: number;
+  check: number;
+  execute: number;
+  shape: number;
+  total: number;
+}
+
+export interface QueryMeta {
+  handlerId: string;
+  tier: Tier;
+  cache: 'hit' | 'miss' | 'coalesced';
+  timingsMs: Timings;
+  rowCount: number;
+  truncated: boolean;
+  sql: string;
+  shapeJs: string | null;
+  assumptions: string[];
+  warnings: string[];
+  generation?: GenerationStats;
+}
+
+interface Execution {
+  data: unknown;
+  rowCount: number;
+  truncated: boolean;
+  timings: Omit<Timings, 'total' | 'generate'>;
+}
+
+const WRITE_SQL = /\b(insert|update|delete|merge|drop|alter|create|grant|revoke|truncate|copy|vacuum|set_config|pg_sleep|pg_read_file|lo_import|dblink)\b/i;
+
+export class Engine {
+  private handlers = new Map<string, Handler>();
+  private inflight = new Map<string, Promise<Handler>>();
+  private generationTimes: number[] = [];
+  private slots: number;
+  private waiting: (() => void)[] = [];
+
+  private constructor(
+    private readonly connector: Connector,
+    readonly schema: SchemaInfo,
+    private readonly schemaHash: string,
+    private readonly promptHash: string,
+    private readonly generator: Generator | null,
+  ) {
+    this.slots = config.maxConcurrentGenerations;
+  }
+
+  static async create(connector: Connector): Promise<Engine> {
+    const safety = await connector.safetyCheck();
+    if (!safety.ok) {
+      throw new Error(`Refusing to start: the database user is not read-only.\n - ${safety.problems.join('\n - ')}`);
+    }
+    const schema = await connector.describe();
+    const schemaHash = sha256(canonicalJSON(schema)).slice(0, 16);
+    await warmSandbox();
+    if (config.mode === 'locked') {
+      // Locked mode never loads the generator module, so no model call is possible.
+      return new Engine(connector, schema, schemaHash, 'locked', null);
+    }
+    const { createGenerator } = await import('./generators.js');
+    const { generator, promptHash } = await createGenerator(schema);
+    return new Engine(connector, schema, schemaHash, promptHash, generator);
+  }
+
+  async query(raw: unknown): Promise<{ data: unknown; meta: QueryMeta }> {
+    const started = performance.now();
+    const req = parseRequest(raw);
+    const inputSig = inputSignature(req.input);
+    const fingerprint = requestFingerprint(req.intent, inputSig, req.output);
+    const key = artifactKey({ fingerprint, schemaHash: this.schemaHash, promptHash: this.promptHash, model: config.model });
+    const warnings = literalWarnings(req.intent);
+
+    let handler = this.lookup(key);
+    let cache: QueryMeta['cache'] = 'hit';
+    let firstRun: Execution | undefined;
+
+    if (handler) {
+      this.recordHit(handler);
+    } else {
+      if (!this.generator) {
+        throw new SlimeError('HANDLER_NOT_FOUND', 'Slime is locked: only handlers generated before locking are served.');
+      }
+      const pending = this.inflight.get(key);
+      if (pending) {
+        cache = 'coalesced';
+        handler = await pending;
+        this.recordHit(handler);
+      } else {
+        cache = 'miss';
+        const generation = this.generate(key, fingerprint, req, inputSig);
+        const shared = generation.then((g) => g.handler);
+        // Coalesced followers await `shared` and still get the error; this no-op
+        // handler only stops a failed generation with no followers from being an
+        // unhandled rejection, which would crash the process.
+        shared.catch(() => {});
+        this.inflight.set(key, shared);
+        try {
+          const g = await generation;
+          handler = g.handler;
+          firstRun = g.execution;
+        } finally {
+          this.inflight.delete(key);
+        }
+      }
+    }
+
+    let execution = firstRun;
+    if (!execution) {
+      try {
+        execution = await this.execute(handler.artifact, handler.output, req.input);
+      } catch (err) {
+        handler.errors++;
+        throw err;
+      }
+    }
+
+    const total = performance.now() - started;
+    return {
+      data: execution.data,
+      meta: {
+        handlerId: handler.id,
+        tier: handler.tier,
+        cache,
+        timingsMs: round({ generate: cache === 'miss' ? handler.generation.ms : 0, ...execution.timings, total }),
+        rowCount: execution.rowCount,
+        truncated: execution.truncated,
+        sql: handler.artifact.sql,
+        shapeJs: handler.artifact.shapeJs,
+        assumptions: handler.artifact.assumptions,
+        warnings,
+        ...(cache === 'miss' ? { generation: round(handler.generation) } : {}),
+      },
+    };
+  }
+
+  listHandlers() {
+    return [...this.handlers.values()].map((h) => ({
+      id: h.id,
+      tier: h.tier,
+      intent: h.intent,
+      hits: h.hits,
+      errors: h.errors,
+      createdAt: new Date(h.createdAt).toISOString(),
+      lastUsedAt: new Date(h.lastUsedAt).toISOString(),
+      expiresAt: h.expiresAt ? new Date(h.expiresAt).toISOString() : null,
+      sql: h.artifact.sql,
+      shapeJs: h.artifact.shapeJs,
+      assumptions: h.artifact.assumptions,
+      generation: round(h.generation),
+    }));
+  }
+
+  evict(id: string): boolean {
+    for (const [key, h] of this.handlers) {
+      if (h.id === id) return this.handlers.delete(key);
+    }
+    return false;
+  }
+
+  stats() {
+    const byTier = { gas: 0, liquid: 0, crystal: 0 };
+    for (const h of this.handlers.values()) byTier[h.tier]++;
+    return {
+      mode: config.mode,
+      provider: this.generator ? config.provider : null,
+      model: this.generator ? config.model : null,
+      schemaHash: this.schemaHash,
+      tables: this.schema.tables.map((t) => t.name),
+      handlers: byTier,
+      generationsLastHour: this.recentGenerations(),
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+
+  private lookup(key: string): Handler | undefined {
+    const handler = this.handlers.get(key);
+    if (handler?.tier === 'gas' && handler.expiresAt !== null && Date.now() > handler.expiresAt) {
+      this.handlers.delete(key); // Gas that never became Liquid evaporates.
+      return undefined;
+    }
+    return handler;
+  }
+
+  private recordHit(handler: Handler) {
+    handler.hits++;
+    handler.lastUsedAt = Date.now();
+    if (handler.tier === 'gas' && handler.hits >= config.gasToLiquidHits) {
+      handler.tier = 'liquid';
+      handler.expiresAt = null;
+    }
+  }
+
+  private async generate(
+    key: string,
+    fingerprint: string,
+    req: QueryRequest,
+    inputSig: Record<string, string>,
+  ): Promise<{ handler: Handler; execution: Execution }> {
+    if (this.recentGenerations() >= config.maxGenerationsPerHour) {
+      throw new SlimeError('GENERATION_RATE_LIMITED', `Generation cap of ${config.maxGenerationsPerHour}/hour reached.`, true);
+    }
+    await this.acquireSlot();
+    try {
+      this.generationTimes.push(Date.now());
+      let deadline = Date.now() + config.generationBudgetMs;
+      const stats: GenerationStats = { ms: 0, waitMs: 0, attempts: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0 };
+      let previous: { artifact: Artifact; error: string } | undefined;
+      let lastError: SlimeError | undefined;
+
+      for (let attempt = 1; attempt <= 1 + config.maxRepairs; attempt++) {
+        const remaining = deadline - Date.now();
+        if (remaining < 1_000) break;
+        const gen = await this.generator!.generate({ intent: req.intent, inputSig, output: req.output, previous }, remaining);
+        stats.ms += gen.ms;
+        stats.waitMs += gen.waitMs;
+        deadline += gen.waitMs; // rate-limit waits don't count against the generation budget
+        stats.attempts = attempt;
+        stats.inputTokens += gen.inputTokens;
+        stats.outputTokens += gen.outputTokens;
+        stats.cacheReadTokens += gen.cacheReadTokens;
+        const artifact = gen.artifact;
+
+        if (artifact.unsatisfiable) {
+          const writeLike = /\b(writ|delet|updat|insert|modif|chang|remov|creat)/i.test(artifact.unsatisfiable);
+          throw new SlimeError(writeLike ? 'WRITE_REFUSED' : 'INTENT_UNSATISFIABLE', artifact.unsatisfiable, false, {
+            enforcedBy: 'model',
+          });
+        }
+
+        try {
+          lintArtifact(artifact, req.input);
+          const params = bindParams(artifact, req.input);
+          const check = await this.connector.check(artifact.sql, params);
+          const execution = await this.execute(artifact, req.output, req.input);
+          execution.timings.check = check.ms;
+          const now = Date.now();
+          const handler: Handler = {
+            id: key,
+            fingerprint,
+            intent: req.intent,
+            output: req.output,
+            artifact,
+            tier: 'gas',
+            hits: 1,
+            errors: 0,
+            createdAt: now,
+            lastUsedAt: now,
+            expiresAt: now + config.gasWindowMs,
+            generation: stats,
+          };
+          // Cached only after it ran successfully and matched the requested shape.
+          if (config.gasToLiquidHits <= 1) {
+            handler.tier = 'liquid';
+            handler.expiresAt = null;
+          }
+          this.handlers.set(key, handler);
+          return { handler, execution };
+        } catch (err) {
+          const e = err instanceof SlimeError ? err : new SlimeError('QUERY_ERROR', String(err));
+          // The database or lint refusing access/writes is final: retrying won't make it allowed.
+          if (e.code === 'FIELD_NOT_EXPOSED' || e.code === 'WRITE_REFUSED') throw e;
+          lastError = e;
+          previous = { artifact, error: `${e.code}: ${e.message}` };
+        }
+      }
+      throw lastError ?? new SlimeError('GENERATION_TIMEOUT', 'Ran out of generation time budget.', true);
+    } finally {
+      this.releaseSlot();
+    }
+  }
+
+  private async execute(artifact: Artifact, output: Shape, input: Record<string, unknown>): Promise<Execution> {
+    const run = await this.connector.run(artifact.sql, bindParams(artifact, input));
+    let data: unknown = run.rows;
+    let shapeMs = 0;
+    if (artifact.shapeJs) {
+      const shaped = await runShape(artifact.shapeJs, run.rows, input);
+      data = shaped.data;
+      shapeMs = shaped.ms;
+    }
+    const mismatches = validateAgainstShape(output, data);
+    if (mismatches.length) {
+      throw new SlimeError('SHAPE_MISMATCH', `Result does not match the requested output: ${mismatches.join('; ')}`, false, {
+        mismatches,
+      });
+    }
+    return { data, rowCount: run.rows.length, truncated: run.truncated, timings: { check: 0, execute: run.ms, shape: shapeMs } };
+  }
+
+  private recentGenerations(): number {
+    const cutoff = Date.now() - 60 * 60 * 1000;
+    this.generationTimes = this.generationTimes.filter((t) => t > cutoff);
+    return this.generationTimes.length;
+  }
+
+  private async acquireSlot() {
+    if (this.slots > 0) {
+      this.slots--;
+      return;
+    }
+    await new Promise<void>((resolve) => this.waiting.push(resolve));
+  }
+
+  private releaseSlot() {
+    const next = this.waiting.shift();
+    if (next) next();
+    else this.slots++;
+  }
+}
+
+// -----------------------------------------------------------------------------
+
+function parseRequest(raw: unknown): QueryRequest {
+  if (!raw || typeof raw !== 'object') throw new SlimeError('INVALID_REQUEST', 'Body must be a JSON object.');
+  const { intent, input = {}, output } = raw as Record<string, unknown>;
+  if (typeof intent !== 'string' || !intent.trim()) throw new SlimeError('INVALID_REQUEST', '"intent" must be a non-empty string.');
+  if (intent.length > 500) throw new SlimeError('INVALID_REQUEST', '"intent" must be at most 500 characters.');
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new SlimeError('INVALID_REQUEST', '"input" must be an object of parameter values.');
+  }
+  const entries = Object.entries(input as Record<string, unknown>);
+  if (entries.length > 20) throw new SlimeError('INVALID_REQUEST', '"input" may have at most 20 keys.');
+  for (const [k, v] of entries) {
+    if (!/^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(k)) throw new SlimeError('INVALID_REQUEST', `Input key "${k}" is not a valid name.`);
+    const scalar = (x: unknown) => x === null || ['string', 'number', 'boolean'].includes(typeof x);
+    if (!(scalar(v) || (Array.isArray(v) && v.every(scalar)))) {
+      throw new SlimeError('INVALID_REQUEST', `Input "${k}" must be a string, number, boolean, null, or a list of those.`);
+    }
+  }
+  if (output === undefined) throw new SlimeError('INVALID_REQUEST', '"output" (the JSON shape you want back) is required.');
+  assertValidShape(output);
+  return { intent, input: input as Record<string, unknown>, output };
+}
+
+/** Static checks on generated code before it touches the database. */
+function lintArtifact(artifact: Artifact, input: Record<string, unknown>) {
+  if (WRITE_SQL.test(artifact.sql)) {
+    throw new SlimeError('WRITE_REFUSED', 'Generated SQL contains a write or a forbidden function; refused.', false, {
+      enforcedBy: 'lint',
+    });
+  }
+  const used = new Set([...artifact.sql.matchAll(/\$(\d+)/g)].map((m) => Number(m[1])));
+  const highest = Math.max(0, ...used);
+  if (highest > artifact.params.length) {
+    throw new SlimeError('INVALID_HANDLER', `SQL uses $${highest} but only ${artifact.params.length} params are mapped.`);
+  }
+  artifact.params.forEach((name, i) => {
+    if (!(name in input)) throw new SlimeError('INVALID_HANDLER', `Param $${i + 1} maps to "${name}", which is not an input key.`);
+    if (!used.has(i + 1)) throw new SlimeError('INVALID_HANDLER', `Param $${i + 1} ("${name}") is mapped but never used in the SQL.`);
+  });
+  // The model never sees input values, so a value appearing in the code means it
+  // was copied from the intent: the handler would return wrong data for other values.
+  for (const [name, value] of Object.entries(input)) {
+    if (typeof value === 'string' && value.length > 2) {
+      if (artifact.sql.includes(value) || artifact.shapeJs?.includes(value)) {
+        throw new SlimeError('INVALID_HANDLER', `The value of input "${name}" is hardcoded in the handler; use $n / input.${name}.`);
+      }
+    }
+  }
+}
+
+function bindParams(artifact: Artifact, input: Record<string, unknown>): unknown[] {
+  return artifact.params.map((name) => input[name] ?? null);
+}
+
+function round<T extends object>(obj: T): T {
+  return Object.fromEntries(
+    Object.entries(obj).map(([k, v]) => [k, typeof v === 'number' && !Number.isInteger(v) ? Math.round(v * 100) / 100 : v]),
+  ) as T;
+}
