@@ -6,7 +6,7 @@
 
 Liquid Engine is a single Bun process that serves business intents through sandboxed, agent-generated handlers. On a handler-cache miss the handler is generated just-in-time on the request path; every handler — fresh or cached — runs through the same harness before anything commits.
 
-- **Source of truth:** human-written intent specs (`intents/*.md`) and human-accepted fixtures. Handler code is a regenerable cache.
+- **Source of truth:** human-written intent specs (`intents/*.md`). Handler code is a regenerable cache; Liquid fixtures are recorded from harness-passing live runs, and only Crystal pins are human-committed.
 - **Core rule:** handlers can only read through `db.read` and propose writes through `db.emit`; the kernel decides what commits.
 - **Scope:** meetup ticketing hackathon build for 1–3 people over 24–48 hours (assumed, not confirmed).
 
