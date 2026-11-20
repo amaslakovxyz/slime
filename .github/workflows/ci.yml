@@ -57,3 +57,44 @@ jobs:
       - run: npm test
         env:
           REQUIRE_DB: "1"
+
+  runtime:
+    name: Slime Cloud runtime
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: slime-cloud/runtime
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            sandbox/package-lock.json
+            slime-cloud/runtime/package-lock.json
+      # Boundary: the open-source core never depends on Slime Cloud or AWS.
+      - name: Core does not import the platform
+        working-directory: .
+        run: "! grep -rnE \"slime-cloud|@aws-sdk/\" sandbox/src"
+      # The runtime compiles @slime-cloud/core from sandbox/src, whose imports
+      # resolve against sandbox/node_modules.
+      - run: npm ci
+        working-directory: sandbox
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      # The Lambda bundle deployed by terraform.yml (infra/aws/platform).
+      - run: npm run build
+
+  landing:
+    name: Landing function tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test infra/aws/landing/function/index.test.mjs

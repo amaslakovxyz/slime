@@ -4,7 +4,11 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 5.0"
+      version = "~> 6.0" # invoked_via_function_url on aws_lambda_permission
+    }
+    archive = {
+      source  = "hashicorp/archive"
+      version = "~> 2.7"
     }
   }
 

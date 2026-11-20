@@ -1,5 +1,7 @@
 name: Terraform AWS
 
+# CD for every Terraform stack under infra/aws/ except bootstrap.
+#
 # Trust model (roles defined in infra/aws/bootstrap/github_oidc.tf):
 #   validate  no AWS credentials                    every PR / push
 #   plan      OIDC -> slime-gha-plan (read-only)    pull requests from this repo
@@ -11,20 +13,33 @@ name: Terraform AWS
 # NOTE: GitHub Free private repos have no branch protection, so anyone with
 # write access who pushes to main triggers apply. See infra/aws/README.md.
 #
-# Only infra/aws/platform is planned/applied here. infra/aws/bootstrap owns the
-# CI roles themselves and is applied by a human (see its README).
+# Stacks: every infra/aws/<name>/ except bootstrap (which owns the CI roles and
+# is applied by a human). A stack with a build.sh gets it run first, from the
+# repo root, so Terraform can zip its artifact (platform builds the runtime).
+# Every stack is planned/applied on every run; unchanged stacks are no-ops.
 
 on:
   pull_request:
     paths:
       - infra/aws/**
+      - sandbox/**
+      - slime-cloud/**
+      - landing/**
       - .github/workflows/terraform.yml
   push:
     branches: [main]
     paths:
       - infra/aws/**
+      - sandbox/**
+      - slime-cloud/**
+      - landing/**
       - .github/workflows/terraform.yml
   workflow_dispatch:
+    inputs:
+      allow_destroy:
+        description: Let apply delete resources (pure deletes are refused by default)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -34,7 +49,6 @@ env:
   TF_IN_AUTOMATION: "1"
   TF_INPUT: "0"
   AWS_REGION: eu-central-1
-  STACK_DIR: infra/aws/platform
   PLAN_ROLE_ARN: arn:aws:iam::025772230981:role/slime-gha-plan
   APPLY_ROLE_ARN: arn:aws:iam::025772230981:role/slime-gha-apply
 
@@ -43,6 +57,8 @@ jobs:
     name: Validate
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      stacks: ${{ steps.stacks.outputs.stacks }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
@@ -53,29 +69,49 @@ jobs:
         run: terraform fmt -check -recursive infra/aws
       - name: Validate stacks (no backend, no credentials)
         run: |
-          for dir in infra/aws/bootstrap infra/aws/platform; do
+          for dir in infra/aws/*/; do
             echo "::group::$dir"
             terraform -chdir="$dir" init -backend=false
             terraform -chdir="$dir" validate
             echo "::endgroup::"
           done
+      - name: List deployable stacks
+        id: stacks
+        run: |
+          stacks=$(find infra/aws -mindepth 1 -maxdepth 1 -type d ! -name bootstrap -exec basename {} \; | sort | jq -R . | jq -sc .)
+          echo "stacks=$stacks" >> "$GITHUB_OUTPUT"
+          echo "Stacks: $stacks"
 
   plan:
-    name: Plan (platform)
+    name: Plan (${{ matrix.stack }})
     needs: validate
     # Fork PRs get no OIDC token; skip instead of failing.
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        stack: ${{ fromJSON(needs.validate.outputs.stacks) }}
     permissions:
       contents: read
       id-token: write
     # No cancel: an interrupted plan can leave the S3 lockfile behind.
     concurrency:
-      group: terraform-plan-${{ github.event.pull_request.number }}
+      group: terraform-plan-${{ github.event.pull_request.number }}-${{ matrix.stack }}
       cancel-in-progress: false
+    env:
+      STACK_DIR: infra/aws/${{ matrix.stack }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: hashFiles(format('infra/aws/{0}/build.sh', matrix.stack)) != ''
+        with:
+          node-version: 22
+      # Before credentials on purpose: npm install scripts never see AWS tokens.
+      - name: Build artifacts
+        if: hashFiles(format('infra/aws/{0}/build.sh', matrix.stack)) != ''
+        run: bash "$STACK_DIR/build.sh"
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: ${{ env.TF_VERSION }}
@@ -105,20 +141,34 @@ jobs:
           [ "$code" -eq 0 ] || [ "$code" -eq 2 ]
 
   apply:
-    name: Apply (platform)
+    name: Apply (${{ matrix.stack }})
     needs: validate
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        stack: ${{ fromJSON(needs.validate.outputs.stacks) }}
     permissions:
       contents: read
       id-token: write
-    # Serialize applies and never cancel one mid-flight.
+    # Serialize applies per stack and never cancel one mid-flight.
     concurrency:
-      group: terraform-apply-platform
+      group: terraform-apply-${{ matrix.stack }}
       cancel-in-progress: false
+    env:
+      STACK_DIR: infra/aws/${{ matrix.stack }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: hashFiles(format('infra/aws/{0}/build.sh', matrix.stack)) != ''
+        with:
+          node-version: 22
+      # Before credentials on purpose: npm install scripts never see AWS tokens.
+      - name: Build artifacts
+        if: hashFiles(format('infra/aws/{0}/build.sh', matrix.stack)) != ''
+        run: bash "$STACK_DIR/build.sh"
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: ${{ env.TF_VERSION }}
@@ -132,7 +182,34 @@ jobs:
         run: terraform -chdir="$STACK_DIR" init
       - name: Plan
         run: terraform -chdir="$STACK_DIR" plan -lock-timeout=5m -no-color -out=tfplan
+      # Without branch protection, main can receive a stack that lost resources
+      # someone applied by hand from a branch. Replacements are fine; pure
+      # deletes need a manual run with allow_destroy.
+      - name: Refuse pure deletes
+        if: ${{ !inputs.allow_destroy }}
+        run: |
+          deletes=$(terraform -chdir="$STACK_DIR" show -json tfplan \
+            | jq -r '[.resource_changes[]? | select(.change.actions == ["delete"]) | .address] | join(", ")')
+          if [ -n "$deletes" ]; then
+            echo "::error::Plan deletes: $deletes. Re-run manually with allow_destroy if intended."
+            exit 1
+          fi
       - name: Apply
         run: terraform -chdir="$STACK_DIR" apply -lock-timeout=5m -no-color tfplan
       - name: Verify convergence
         run: terraform -chdir="$STACK_DIR" plan -lock-timeout=5m -no-color -detailed-exitcode
+      # Post-deploy steps keyed on stack outputs, so any stack can opt in.
+      - name: Post-deploy
+        run: |
+          outputs=$(terraform -chdir="$STACK_DIR" output -json)
+          dist=$(jq -r '.cloudfront_distribution_id.value // empty' <<<"$outputs")
+          if [ -n "$dist" ]; then
+            aws cloudfront create-invalidation --distribution-id "$dist" --paths '/*' --query Invalidation.Id --output text
+          fi
+          url=$(jq -r '.runtime_url.value // empty' <<<"$outputs")
+          if [ -n "$url" ]; then
+            # The function answers 401 without x-api-key once it has started.
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "${url%/}/healthz")
+            echo "runtime /healthz without key -> $code"
+            [ "$code" = 401 ]
+          fi

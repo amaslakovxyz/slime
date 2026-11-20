@@ -24,6 +24,8 @@ Or open `index.html` directly in a browser.
 Served at https://amaslakov.com/ by CloudFront in front of AWS Lambda; see
 [`infra/aws/landing/`](../infra/aws/landing/README.md). (GitHub Pages was
 dropped: it is unavailable for private repositories on GitHub Free.)
+[`.github/workflows/terraform.yml`](../.github/workflows/terraform.yml) applies
+it on every push to `main` that touches `landing/` or `infra/aws/`.
 
 ## Where things come from
 

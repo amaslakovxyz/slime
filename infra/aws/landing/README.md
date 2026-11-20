@@ -15,6 +15,10 @@ State: `s3://slime-tfstate-025772230981/landing/terraform.tfstate` (bucket from
 
 ## Deploy
 
+[`terraform.yml`](../../../.github/workflows/terraform.yml) plans this stack on
+pull requests and applies it on merge to `main` (then invalidates CloudFront).
+Apply by hand only for recovery:
+
 ```sh
 cd infra/aws/landing
 AWS_PROFILE=slime terraform init

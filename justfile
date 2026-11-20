@@ -13,10 +13,11 @@ hooks:
 landing:
     python3 -m http.server 8000 --directory landing
 
-# --- Stack recipes ---
-# Add install / dev / test recipes here once the project stack is chosen.
-# e.g.
-#   install:
-#       uv sync
-#   test:
-#       uv run pytest -q
+# Build the Slime Cloud runtime Lambda bundle (slime-cloud/runtime/dist/lambda).
+runtime-build:
+    bash infra/aws/platform/build.sh
+
+# Plan an infra/aws stack with the slime deployer role (e.g. `just tf-plan platform`).
+tf-plan stack: (runtime-build)
+    AWS_PROFILE=slime terraform -chdir=infra/aws/{{stack}} init -input=false >/dev/null
+    AWS_PROFILE=slime terraform -chdir=infra/aws/{{stack}} plan

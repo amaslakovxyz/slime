@@ -37,8 +37,18 @@ Backend -- Slime runtime:
     - [slime_master_brand_book_design_system.html](./docs/brand/slime_master_brand_book_design_system.html) - Interactive brand book and component kit.
     - [slime_marketing_positioning_tone_of_voice_use_cases.md](./docs/brand/slime_marketing_positioning_tone_of_voice_use_cases.md) - Positioning, tone of voice, use cases, and messaging.
 - `.github/workflows/` (no contract file) - [ci.yml](./.github/workflows/ci.yml)
-  runs the pre-commit job on every push and pull request. The landing page is
-  deployed with Terraform from [infra/aws/landing](./infra/aws/landing/README.md).
+  runs pre-commit, sandbox tests and the Lambda bundle build on every push and
+  pull request; [terraform.yml](./.github/workflows/terraform.yml) plans every
+  `infra/aws/` stack on pull requests and applies them on `main` (the landing
+  page included); [terraform-quality.yml](./.github/workflows/terraform-quality.yml)
+  runs tflint and trivy.
+- [infra/aws/](./infra/aws/README.md) - Terraform: `bootstrap/` (human-applied
+  roles, state bucket, budgets) and the CI-applied stacks (`platform/`: Slime
+  runtime on Lambda + DynamoDB).
+- [slime-cloud/runtime/](./slime-cloud/runtime/README.md) - `@slime-cloud/runtime`:
+  the Lambda entry and DynamoDB handler store around the core. Imports
+  `sandbox/` (the future open-source `@slime-cloud/core`); `sandbox/` never
+  imports it.
 
 Root files: [AGENTS.md](./AGENTS.md) (repository contract for agents),
 [justfile](./justfile) (task runner), and
@@ -59,8 +69,10 @@ Root files: [AGENTS.md](./AGENTS.md) (repository contract for agents),
 - No runtime side effects in code yet (`None`).
 - CI: [ci.yml](./.github/workflows/ci.yml) job `pre-commit` runs
   `pre-commit/action@v3.0.1` on `push` and `pull_request`.
-- Deploy: `landing/` is served by CloudFront + Lambda, applied with Terraform
-  from [infra/aws/landing](./infra/aws/landing/README.md).
+- Deploy: [terraform.yml](./.github/workflows/terraform.yml) applies every
+  `infra/aws/` stack except `bootstrap/` on each push to `main` that touches
+  `infra/aws/`, `sandbox/`, `slime-cloud/` or `landing/` (AWS account `025772230981`,
+  `eu-central-1`); `landing/` is served by CloudFront + Lambda.
 
 ## System Verification
 
