@@ -13,27 +13,49 @@ function num(name: string, fallback: number): number {
   return value;
 }
 
+export type Provider = 'claude' | 'groq' | 'offline';
+
+function provider(): Provider {
+  const p = process.env.SLIME_PROVIDER;
+  return p === 'groq' || p === 'offline' ? p : 'claude';
+}
+
+const DEFAULT_MODEL: Record<Provider, string> = {
+  claude: 'claude-haiku-5-5',
+  groq: 'openai/gpt-oss-120b',
+  offline: 'offline',
+};
+const DEFAULT_REVIEW_MODEL: Record<Provider, string> = {
+  claude: 'claude-opus-5-5',
+  groq: 'openai/gpt-oss-120b',
+  offline: 'offline',
+};
+
+// Mutable on purpose: tests adjust thresholds and limits per case.
 export const config = {
   port: num('PORT', 3000),
+  // Generated SQL runs as this read-only user.
   databaseUrl:
     process.env.DATABASE_URL ?? 'postgres://slime_reader:slime_reader@localhost:54329/slime',
+  // Slime's own storage (Liquid handlers) uses a separate user that owns only the
+  // slime_meta schema. Set to "" to keep everything in memory.
+  metaDatabaseUrl:
+    process.env.META_DATABASE_URL ?? 'postgres://slime_writer:slime_writer@localhost:54329/slime',
   // SLIME_MODE is read only from the environment, never from a request.
   // "locked": cache misses get 404 and the generator is never loaded.
   mode: (process.env.SLIME_MODE === 'locked' ? 'locked' : 'explore') as 'explore' | 'locked',
-  // Which model provider writes handlers: "claude" (Anthropic API) or "groq" (free tier available).
-  provider: (process.env.SLIME_PROVIDER === 'groq' ? 'groq' : 'claude') as 'claude' | 'groq',
-  model:
-    process.env.SLIME_MODEL ||
-    (process.env.SLIME_PROVIDER === 'groq' ? 'openai/gpt-oss-120b' : 'claude-haiku-5-5'),
+  // Which model provider writes handlers: "claude" (Anthropic API), "groq" (free tier
+  // available) or "offline" (canned handlers from a file; no API key, used by tests).
+  provider: provider(),
+  model: process.env.SLIME_MODEL || DEFAULT_MODEL[provider()],
+  offlineHandlersFile: process.env.SLIME_OFFLINE_FILE ?? 'offline/handlers.json',
   effort: (process.env.SLIME_EFFORT ?? 'low') as 'low' | 'medium' | 'high',
   // Thinking adds latency; off by default for Gas speed. Set SLIME_THINKING=on to compare.
   thinking: process.env.SLIME_THINKING === 'on',
 
   // Background review before Gas may become Liquid (SLIME_REVIEW=off to skip).
   review: process.env.SLIME_REVIEW !== 'off',
-  reviewModel:
-    process.env.SLIME_REVIEW_MODEL ||
-    (process.env.SLIME_PROVIDER === 'groq' ? 'openai/gpt-oss-120b' : 'claude-opus-5-5'),
+  reviewModel: process.env.SLIME_REVIEW_MODEL || DEFAULT_REVIEW_MODEL[provider()],
   reviewEffort: (process.env.SLIME_REVIEW_EFFORT ?? 'high') as 'low' | 'medium' | 'high',
   // A rejected handler is regenerated with the reviewer's notes and reviewed again,
   // up to this many reviews in total.
@@ -41,8 +63,13 @@ export const config = {
   reviewTimeoutMs: num('REVIEW_TIMEOUT_MS', 60_000),
 
   // Tier rules (thresholds are TBD in the brief; these are starting values).
+  // Promotion counts successful runs, not lookups: a handler that keeps failing
+  // for some inputs doesn't earn Liquid by being asked often.
   gasToLiquidHits: num('GAS_TO_LIQUID_HITS', 3),
   gasWindowMs: num('GAS_WINDOW_MS', 60 * 60 * 1000),
+  // Successful runs recorded per handler (distinct inputs). They are stored with
+  // Liquid handlers and are what Crystal's equivalence test replays.
+  fixturesPerHandler: num('FIXTURES_PER_HANDLER', 5),
 
   // Generation limits.
   maxRepairs: num('MAX_REPAIRS', 1),
@@ -58,4 +85,4 @@ export const config = {
   // Sandbox limits for the shaping function.
   shapeTimeoutMs: num('SHAPE_TIMEOUT_MS', 200),
   shapeMemoryBytes: num('SHAPE_MEMORY_MB', 32) * 1024 * 1024,
-} as const;
+};

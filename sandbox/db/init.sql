@@ -124,3 +124,15 @@ GRANT SELECT (id, name, email, country, plan_id, created_at) ON accounts TO slim
 ALTER ROLE slime_reader SET default_transaction_read_only = on;
 ALTER ROLE slime_reader SET statement_timeout = '2s';
 ALTER ROLE slime_reader SET idle_in_transaction_session_timeout = '5s';
+
+-- ---------------------------------------------------------------------------
+-- Slime's own storage (Liquid handlers and their recorded runs). A separate
+-- user owns a separate schema: generated SQL runs as slime_reader, which has
+-- no access to it, so generated code can never read or change stored handlers.
+-- Slime creates its tables itself on startup.
+-- ---------------------------------------------------------------------------
+CREATE ROLE slime_writer LOGIN PASSWORD 'slime_writer'
+  NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION;
+GRANT CONNECT ON DATABASE slime TO slime_writer;
+CREATE SCHEMA slime_meta AUTHORIZATION slime_writer;
+REVOKE ALL ON SCHEMA slime_meta FROM PUBLIC;

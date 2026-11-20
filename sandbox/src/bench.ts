@@ -5,10 +5,11 @@ import { config } from './config.js';
 import { PostgresConnector } from './connectors/postgres.js';
 import { Engine, type QueryMeta } from './engine.js';
 import { SlimeError } from './errors.js';
+import { MemoryHandlerStore } from './store.js';
 import { canonicalJSON } from './fingerprint.js';
 
-const keyVar = config.provider === 'groq' ? 'GROQ_API_KEY' : 'ANTHROPIC_API_KEY';
-if (!process.env[keyVar]) {
+const keyVar = { groq: 'GROQ_API_KEY', claude: 'ANTHROPIC_API_KEY', offline: null }[config.provider];
+if (keyVar && !process.env[keyVar]) {
   console.error(`${keyVar} is not set (SLIME_PROVIDER=${config.provider}). Copy .env.example to .env and add your key (see README).`);
   process.exit(1);
 }
@@ -17,7 +18,9 @@ const only = process.argv.slice(2);
 const selected = only.length ? cases.filter((c) => only.includes(c.name)) : cases;
 
 const connector = new PostgresConnector(config.databaseUrl);
-const engine = await Engine.create(connector);
+// A fresh in-memory store: Liquid handlers saved by earlier runs would turn every
+// "new request" here into a cache hit and hide generation time.
+const engine = await Engine.create(connector, { store: new MemoryHandlerStore() });
 const runSql = async (sql: string, params: unknown[]) => (await connector.run(sql, params)).rows;
 
 console.log(
@@ -49,6 +52,7 @@ summarize(rows);
 if (failures.length) console.log(`\nDetails:\n${failures.join('\n\n')}`);
 
 await reviewPhase();
+await engine.close();
 await connector.close();
 process.exit(0); // sandbox worker threads are unref'd, but don't wait on idle pg sockets
 

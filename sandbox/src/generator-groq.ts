@@ -3,27 +3,11 @@
 import type { z } from 'zod';
 import { config } from './config.js';
 import { SlimeError } from './errors.js';
-import { sha256 } from './fingerprint.js';
-import {
-  ArtifactSchema,
-  INSTRUCTIONS,
-  buildUserMessage,
-  type GenerationRequest,
-  type GenerationResult,
-  type Generator,
-} from './generator.js';
+import { buildUserMessage, type GenerationRequest, type GenerationResult, type Generator } from './generator.js';
+import { ARTIFACT_FORMAT, ArtifactSchema, INSTRUCTIONS, REVIEW_FORMAT } from './prompts.js';
 import { REVIEW_INSTRUCTIONS, ReviewSchema, buildReviewMessage, type ReviewRequest, type ReviewResult, type Reviewer } from './review.js';
 
 const BASE_URL = 'https://api.groq.com/openai/v1';
-
-// JSON mode only guarantees valid JSON, so the expected keys are spelled out here
-// and replies are validated with the same zod schemas the Claude path uses.
-const ARTIFACT_FORMAT = `Reply with ONLY a JSON object with exactly these keys:
-{"unsatisfiable": string or null, "sql": string, "params": string[], "shapeJs": string or null, "assumptions": string[]}`;
-const REVIEW_FORMAT = `Reply with ONLY a JSON object with exactly these keys:
-{"verdict": "approve" or "reject", "problems": string[]}`;
-
-export const GROQ_PROMPT_HASH = sha256(`groq\n${INSTRUCTIONS}\n${ARTIFACT_FORMAT}`).slice(0, 16);
 
 const MAX_RATE_LIMIT_RETRIES = 6;
 const MAX_WAIT_MS = 65_000;

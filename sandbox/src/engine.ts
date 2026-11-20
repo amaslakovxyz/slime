@@ -10,7 +10,16 @@ import {
   canonicalJSON,
 } from './fingerprint.js';
 import type { Artifact, Generator } from './generator.js';
+import { promptHashFor } from './prompts.js';
 import type { Reviewer } from './review.js';
+import {
+  MemoryHandlerStore,
+  PostgresHandlerStore,
+  codeHash,
+  type Fixture,
+  type HandlerStore,
+  type StoredHandler,
+} from './store.js';
 import { runShape, warmSandbox } from './sandbox.js';
 import { assertValidShape, validateAgainstShape, type Shape } from './shape.js';
 
@@ -63,12 +72,22 @@ export interface Handler {
   history: { artifact: Artifact; rejectedFor: string[] }[];
   review: ReviewState;
   tier: Tier;
-  hits: number;
+  hits: number; // lookups, including ones that later failed
+  runs: number; // successful executions with the current code; drives promotion
   errors: number;
+  fixtures: Fixture[]; // successful runs on distinct inputs, capped
+  persisted: boolean;
   createdAt: number;
   lastUsedAt: number;
   expiresAt: number | null;
   generation: GenerationStats;
+}
+
+/** Injection points for tests; production uses config. */
+export interface EngineDeps {
+  generator?: Generator;
+  reviewer?: Reviewer | null;
+  store?: HandlerStore;
 }
 
 export interface Timings {
@@ -112,6 +131,9 @@ export class Engine {
   // Reviews run one at a time, off the request path, in arrival order.
   private reviewChain: Promise<void> = Promise.resolve();
   private reviewing = new Set<string>();
+  // Store writes happen off the request path; tracked so tests and shutdown can await them.
+  private pendingWrites = new Set<Promise<void>>();
+  private loaded = { liquid: 0, refused: 0 };
 
   private constructor(
     private readonly connector: Connector,
@@ -120,11 +142,12 @@ export class Engine {
     private readonly promptHash: string,
     private readonly generator: Generator | null,
     private readonly reviewer: Reviewer | null,
+    private readonly store: HandlerStore,
   ) {
     this.slots = config.maxConcurrentGenerations;
   }
 
-  static async create(connector: Connector): Promise<Engine> {
+  static async create(connector: Connector, deps: EngineDeps = {}): Promise<Engine> {
     const safety = await connector.safetyCheck();
     if (!safety.ok) {
       throw new Error(`Refusing to start: the database user is not read-only.\n - ${safety.problems.join('\n - ')}`);
@@ -132,13 +155,39 @@ export class Engine {
     const schema = await connector.describe();
     const schemaHash = sha256(canonicalJSON(schema)).slice(0, 16);
     await warmSandbox();
-    if (config.mode === 'locked') {
-      // Locked mode never loads the generator module, so no model call is possible.
-      return new Engine(connector, schema, schemaHash, 'locked', null, null);
+
+    const store =
+      deps.store ?? (config.metaDatabaseUrl ? new PostgresHandlerStore(config.metaDatabaseUrl) : new MemoryHandlerStore());
+    await store.init();
+    // Computed the same way in every mode, so a locked server finds the handlers
+    // an explore-mode server saved.
+    const promptHash = promptHashFor(config.provider);
+
+    let generator: Generator | null = null;
+    let reviewer: Reviewer | null = null;
+    // Locked mode never loads a model client, so no model call is possible.
+    if (config.mode !== 'locked') {
+      if (deps.generator) {
+        generator = deps.generator;
+        reviewer = deps.reviewer ?? null;
+      } else {
+        const { createGenerator } = await import('./generators.js');
+        ({ generator, reviewer } = await createGenerator(schema));
+      }
     }
-    const { createGenerator } = await import('./generators.js');
-    const { generator, reviewer, promptHash } = await createGenerator(schema);
-    return new Engine(connector, schema, schemaHash, promptHash, generator, reviewer);
+    const engine = new Engine(connector, schema, schemaHash, promptHash, generator, reviewer, store);
+    await engine.loadPersisted();
+    return engine;
+  }
+
+  /** Waits for queued store writes (used by tests and shutdown). */
+  async flush(): Promise<void> {
+    while (this.pendingWrites.size) await Promise.all([...this.pendingWrites]);
+  }
+
+  async close(): Promise<void> {
+    await this.flush();
+    await this.store.close();
   }
 
   async query(raw: unknown): Promise<{ data: unknown; meta: QueryMeta }> {
@@ -191,6 +240,7 @@ export class Engine {
         handler.errors++;
         throw err;
       }
+      this.recordSuccess(handler, req.input, execution.data);
     }
 
     if (handler.review.status === 'rejected') {
@@ -223,7 +273,10 @@ export class Engine {
       tier: h.tier,
       intent: h.intent,
       hits: h.hits,
+      runs: h.runs,
       errors: h.errors,
+      recordedRuns: h.fixtures.length,
+      saved: h.persisted,
       createdAt: new Date(h.createdAt).toISOString(),
       lastUsedAt: new Date(h.lastUsedAt).toISOString(),
       expiresAt: h.expiresAt ? new Date(h.expiresAt).toISOString() : null,
@@ -268,8 +321,10 @@ export class Engine {
       reviewModel: this.reviewer?.model ?? null,
       reviews: byReview,
       schemaHash: this.schemaHash,
+      promptHash: this.promptHash,
       tables: this.schema.tables.map((t) => t.name),
       handlers: byTier,
+      store: { kind: this.store.kind, loadedOnStart: this.loaded.liquid, refusedOnStart: this.loaded.refused },
       generationsLastHour: this.recentGenerations(),
     };
   }
@@ -289,15 +344,114 @@ export class Engine {
     handler.hits++;
     handler.lastUsedAt = Date.now();
     if (handler.review.status === 'failed') this.scheduleReview(handler); // retry a review that errored
-    this.promoteIfReady(handler);
   }
 
-  /** Gas becomes Liquid only when it is popular enough AND the review approved it. */
+  /** A run that passed every check: counts toward promotion and may be recorded. */
+  private recordSuccess(handler: Handler, input: Record<string, unknown>, output: unknown) {
+    handler.runs++;
+    const added = this.recordFixture(handler, input, output);
+    this.promoteIfReady(handler);
+    // Liquid rows are kept up to date when a new distinct run is recorded, and
+    // occasionally otherwise, rather than on every request.
+    if (handler.tier === 'liquid' && handler.persisted && (added || handler.runs % 50 === 0)) {
+      this.track(
+        this.store.updateRuns(handler.id, handler.fixtures, handler.runs, new Date(handler.lastUsedAt).toISOString()),
+      );
+    }
+  }
+
+  private recordFixture(handler: Handler, input: Record<string, unknown>, output: unknown): boolean {
+    if (handler.fixtures.length >= config.fixturesPerHandler) return false;
+    const key = canonicalJSON(input);
+    if (handler.fixtures.some((f) => canonicalJSON(f.input) === key)) return false;
+    handler.fixtures.push({ input: structuredClone(input), output: structuredClone(output), at: new Date().toISOString() });
+    return true;
+  }
+
+  /**
+   * Gas becomes Liquid only after enough successful runs AND an approved review.
+   * Promotion saves the handler, so it survives restarts.
+   */
   private promoteIfReady(handler: Handler) {
     const reviewed = handler.review.status === 'approved' || handler.review.status === 'skipped';
-    if (handler.tier === 'gas' && reviewed && handler.hits >= config.gasToLiquidHits) {
+    if (handler.tier === 'gas' && reviewed && handler.runs >= config.gasToLiquidHits) {
       handler.tier = 'liquid';
       handler.expiresAt = null;
+      this.persist(handler);
+    }
+  }
+
+  private persist(handler: Handler) {
+    const stored: StoredHandler = {
+      artifactKey: handler.id,
+      fingerprint: handler.fingerprint,
+      intent: handler.intent,
+      inputSig: handler.inputSig,
+      output: handler.output,
+      artifact: handler.artifact,
+      codeHash: codeHash(handler.artifact),
+      schemaHash: this.schemaHash,
+      promptHash: this.promptHash,
+      model: config.model,
+      revision: handler.revision,
+      review: { status: handler.review.status, reviews: handler.review.reviews, problems: handler.review.problems },
+      history: handler.history,
+      fixtures: handler.fixtures,
+      runs: handler.runs,
+      createdAt: new Date(handler.createdAt).toISOString(),
+      promotedAt: new Date().toISOString(),
+      lastUsedAt: new Date(handler.lastUsedAt).toISOString(),
+    };
+    this.track(this.store.saveLiquid(stored).then(() => void (handler.persisted = true)));
+  }
+
+  private track(write: Promise<void>) {
+    const tracked = write
+      .catch((err) => console.error(`[slime] store write failed: ${(err as Error).message}`))
+      .finally(() => this.pendingWrites.delete(tracked));
+    this.pendingWrites.add(tracked);
+  }
+
+  /** Loads saved Liquid handlers for the current schema, prompt and model. */
+  private async loadPersisted() {
+    const rows = await this.store.loadLiquid({ schemaHash: this.schemaHash, promptHash: this.promptHash, model: config.model });
+    for (const row of rows) {
+      // The stored code must be exactly the code that was reviewed and promoted.
+      if (codeHash(row.artifact) !== row.codeHash) {
+        this.loaded.refused++;
+        console.error(`[slime] refusing saved handler ${row.artifactKey}: its code does not match the recorded hash`);
+        continue;
+      }
+      this.handlers.set(row.artifactKey, {
+        id: row.artifactKey,
+        fingerprint: row.fingerprint,
+        intent: row.intent,
+        inputSig: row.inputSig,
+        sampleInput: row.fixtures[0]?.input ?? {},
+        output: row.output,
+        artifact: row.artifact,
+        revision: row.revision,
+        history: row.history,
+        review: {
+          status: row.review.status as ReviewStatus,
+          reviews: row.review.reviews,
+          problems: row.review.problems,
+          ms: 0,
+          waitMs: 0,
+          reviewedAt: null,
+        },
+        tier: 'liquid',
+        hits: row.runs,
+        runs: row.runs,
+        errors: 0,
+        fixtures: row.fixtures,
+        persisted: true,
+        createdAt: Date.parse(row.createdAt),
+        lastUsedAt: Date.parse(row.lastUsedAt),
+        expiresAt: null,
+        generation: { ms: 0, waitMs: 0, attempts: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0 },
+      });
+      this.loaded.liquid++;
     }
   }
 
@@ -359,10 +513,11 @@ export class Engine {
         handler.review.problems = [...problems, `revision gave up: ${candidate.unsatisfiable}`];
         return false;
       }
+      let checkRun: Execution;
       try {
         lintArtifact(candidate, handler.sampleInput);
         await this.connector.check(candidate.sql, bindParams(candidate, handler.sampleInput));
-        await this.execute(candidate, handler.output, handler.sampleInput);
+        checkRun = await this.execute(candidate, handler.output, handler.sampleInput);
       } catch (err) {
         const message = (err as Error).message;
         handler.review.problems = [...problems, `revision failed checks: ${message}`];
@@ -375,6 +530,11 @@ export class Engine {
       handler.history.push({ artifact: handler.artifact, rejectedFor: problems });
       handler.artifact = candidate;
       handler.revision++;
+      // Runs and recorded runs belonged to the old code; the new code starts over
+      // from its own check run.
+      handler.runs = 1;
+      handler.fixtures = [];
+      this.recordFixture(handler, handler.sampleInput, checkRun.data);
       return true;
     }
     return false;
@@ -444,7 +604,10 @@ export class Engine {
             },
             tier: 'gas',
             hits: 1,
+            runs: 1, // the generating request's own run passed every check
             errors: 0,
+            fixtures: [{ input: structuredClone(req.input), output: structuredClone(execution.data), at: new Date(now).toISOString() }],
+            persisted: false,
             createdAt: now,
             lastUsedAt: now,
             expiresAt: now + config.gasWindowMs,
@@ -533,7 +696,7 @@ function parseRequest(raw: unknown): QueryRequest {
 }
 
 /** Static checks on generated code before it touches the database. */
-function lintArtifact(artifact: Artifact, input: Record<string, unknown>) {
+export function lintArtifact(artifact: Artifact, input: Record<string, unknown>) {
   if (WRITE_SQL.test(artifact.sql)) {
     throw new SlimeError('WRITE_REFUSED', 'Generated SQL contains a write or a forbidden function; refused.', false, {
       enforcedBy: 'lint',
