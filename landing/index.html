@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Slime — the living backend</title>
-  <meta name="description" content="One backend. Any shape. Feed Slime your databases, old endpoints and files; it reshapes itself into whatever data your product or agents ask for, safely, without writing a single route.">
-  <meta property="og:title" content="Slime — the living backend">
-  <meta property="og:description" content="One backend. Any shape.">
+  <title>Slime — the backend that builds itself</title>
+  <meta name="description" content="Slime is the backend that builds itself. Your app asks for data; Slime writes the endpoint and remembers it. No tickets, no PRs, no deploys.">
+  <meta property="og:title" content="Slime — the backend that builds itself">
+  <meta property="og:description" content="Your app asks for data; Slime writes the endpoint and remembers it.">
   <meta property="og:type" content="website">
   <meta name="theme-color" content="#0B070C">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3CradialGradient id='g' cx='35%25' cy='30%25' r='75%25'%3E%3Cstop offset='0' stop-color='%23FF85C0'/%3E%3Cstop offset='.5' stop-color='%23FF1476'/%3E%3Cstop offset='1' stop-color='%238F0043'/%3E%3C/radialGradient%3E%3C/defs%3E%3Cpath fill='url(%23g)' d='M32 6c14 0 26 9 26 24 0 10-5 14-5 20 0 5-4 8-9 8-4 0-5-3-8-3s-4 3-9 3c-6 0-9-4-9-9 0-6-6-9-6-19C12 15 18 6 32 6z'/%3E%3C/svg%3E">
@@ -340,7 +340,8 @@
       box-shadow: 0 6px 22px var(--glow-primary); animation: morph 8s ease-in-out infinite;
     }
     .ico-crystal { filter: drop-shadow(0 6px 16px rgba(196,181,253,.45)); }
-    .hero-sub { max-width: 640px; margin: 26px auto 0; color: var(--text-muted); font-size: 1.15rem; }
+    .hero-sub { max-width: 560px; margin: 26px auto 0; color: var(--text-muted); font-size: 1.2rem; }
+    .hero-sub strong { color: var(--text-pure); font-weight: 600; }
     .hero-ctas { display: flex; gap: 12px; justify-content: center; margin-top: 34px; flex-wrap: wrap; }
     .btn-soft { color: var(--text-pure); background: var(--bg-surface-hover); border-color: var(--border-color); }
     .btn-soft:hover { border-color: var(--border-bright); }
@@ -368,6 +369,9 @@
     .sec-label .ic.crystal { background: var(--crystal-bg); color: var(--crystal-glow); }
     .sec-lead { color: var(--text-muted); font-size: 1.08rem; max-width: 440px; justify-self: end; }
     .sec-lead p { margin: 0; }
+    /* Use cases: the heading is a three-beat line, so give it the full width. */
+    #use-cases .sec-head { grid-template-columns: 1fr; gap: 18px; }
+    #use-cases .sec-lead { justify-self: start; max-width: 620px; }
 
     /* ---------- Use cases: a row where the active card is wide. Click a card
        (or wait for the progress bar) and it expands while the others shrink;
@@ -397,6 +401,7 @@
     .uc-row.hold .uc.is-active .uc-bar i { animation-play-state: paused; }
     @keyframes uc-progress { to { transform: scaleX(1); } }
     .uc h3 { font-family: var(--font-body); font-weight: 700; font-size: 1.05rem; }
+    .soon { margin-left: 6px; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--crystal-border); color: var(--crystal-glow); font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; vertical-align: 2px; }
     .uc p { color: var(--text-muted); font-size: 15px; margin-top: 6px; }
     .uc .punch { color: var(--plasma-highlight); font-weight: 600; font-size: 14px; margin-top: 10px; max-height: 0; opacity: 0; overflow: hidden; transition: max-height .5s ease, opacity .4s ease; }
     .uc.is-active .punch { max-height: 60px; opacity: 1; }
@@ -506,6 +511,7 @@
     .cta { text-align: center; padding: 120px 0 130px; }
     .cta p { color: var(--text-muted); max-width: 540px; margin: 22px auto 0; font-size: 1.1rem; }
     .cta p.wordmark { font-size: clamp(2.6rem, 7vw, 5.4rem); max-width: none; margin: 0 auto; }
+    .cta-answer { display: block; margin-top: 18px; font-family: var(--font-title); font-size: clamp(1.6rem, 3vw, 2.4rem); color: var(--text-pure); }
 
     /* ---------- Footer ---------- */
     footer { border-top: 1px solid var(--border-color); padding: 52px 0 36px; }
@@ -591,7 +597,7 @@
     <section class="hero">
       <div class="container">
         <h1 class="hero-title">One <span class="ico ico-blob" aria-hidden="true"></span> backend.<span class="line2 slime-text">Any <svg class="ico ico-crystal" viewBox="0 0 40 40" aria-hidden="true"><defs><linearGradient id="cg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F2EAFF"/><stop offset=".55" stop-color="#C4B5FD"/><stop offset="1" stop-color="#6E5C77"/></linearGradient></defs><path d="M20 2 L33 15 L20 38 L7 15 Z" fill="url(#cg)"/><path d="M7 15 H33 M20 2 L15 15 L20 38 L25 15 Z" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="1"/></svg> shape.</span></h1>
-        <p class="hero-sub">Feed Slime your databases, old endpoints and files. Then ask for whatever data your product or agents need, in whatever shape. Slime writes the logic, runs it safely, and remembers it.</p>
+        <p class="hero-sub"><strong>The backend that builds itself.</strong> Your app asks for data; Slime writes the endpoint and remembers it.</p>
       </div>
 
       <div class="container">
@@ -614,7 +620,7 @@
         </div>
 
         <div class="feeds">
-          <p>Swallows whatever you feed it</p>
+          <p>Feeds on anything</p>
           <ul>
             <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>Databases</li>
             <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3H7a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1M16 3h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-1"/></svg>REST APIs</li>
@@ -631,9 +637,9 @@
         <div class="sec-head reveal">
           <div>
             <p class="sec-label"><span class="ic" aria-hidden="true">✦</span>Use cases</p>
-            <h2>Everything moves at AI speed.<br><span class="muted-line">Backends are petrified clay.</span></h2>
+            <h2>No tickets. No PRs. No deploys.<br><span class="muted-line">The backend grows itself.</span></h2>
           </div>
-          <p class="sec-lead">Frontends get generated in minutes. Agents reason on the fly. Then every one of them waits in line for someone to hand-write the backend it needs.</p>
+          <p class="sec-lead">Coding agents write endpoints faster, but each one is still a ticket, a review and a deploy. With Slime, the request is the spec: the endpoint grows itself at runtime.</p>
         </div>
 
         <div class="uc-row" id="uc-row">
@@ -655,8 +661,8 @@
             </div></div>
             <div class="uc-bar"><i></i></div>
             <h3>Vibecoded UIs</h3>
-            <p>Lovable, v0 and Cursor ship a screen before lunch. Wiring it to real data still means routes, models and a deploy for every widget.</p>
-            <p class="punch">→ Vibecode the UI. Let Slime be the backend.</p>
+            <p>Your UI ships before lunch. Its data still waits for a ticket, a PR and a deploy.</p>
+            <p class="punch">→ Vibecode the UI. Let Slime build the backend.</p>
           </article>
 
           <article class="uc reveal" tabindex="0" role="button" aria-pressed="false">
@@ -671,7 +677,7 @@
             </div></div>
             <div class="uc-bar"><i></i></div>
             <h3>AI agents</h3>
-            <p>Raw database access is too dangerous; an endpoint per action is too narrow.</p>
+            <p>Raw SQL is too risky. Waiting for someone to ship each new tool is too slow.</p>
             <p class="punch">→ Unleash your agents. Keep your database untouchable.</p>
           </article>
 
@@ -688,7 +694,7 @@
             </div></div>
             <div class="uc-bar"><i></i></div>
             <h3>Legacy systems</h3>
-            <p>Every new client needs another fragile layer of glue nobody wants to touch.</p>
+            <p>Every new client means another layer of glue, and another release.</p>
             <p class="punch">→ Don't rewrite legacy. Let Slime digest it.</p>
           </article>
 
@@ -702,9 +708,9 @@
               <span class="tag crystal forks">1 runtime · 0 forks</span>
             </div></div>
             <div class="uc-bar"><i></i></div>
-            <h3>SaaS customization</h3>
-            <p>Every custom report becomes a code fork that eats into margins.</p>
-            <p class="punch">→ One runtime. Every customer's view.</p>
+            <h3>SaaS customization <span class="soon">Next</span></h3>
+            <p>Every custom report becomes a code fork to maintain.</p>
+            <p class="punch">→ One runtime. Every customer's backend.</p>
           </article>
         </div>
       </div>
@@ -719,8 +725,8 @@
             <h2>Ask once.<br><span class="muted-line">Slime remembers.</span></h2>
           </div>
           <div class="sec-lead">
-            <p>Describe the data and the shape you want back. The first request is synthesized on the spot. Every repeat skips the AI entirely.</p>
-            <ol class="steps-inline"><li><b>1</b>Describe</li><li><b>2</b>Synthesize</li><li><b>3</b>Remember</li></ol>
+            <p>Describe the data and its shape. Slime builds the endpoint in about a second, then serves it from memory.</p>
+            <ol class="steps-inline"><li><b>1</b>Ask</li><li><b>2</b>Build</li><li><b>3</b>Remember</li></ol>
           </div>
         </div>
 
@@ -777,9 +783,9 @@
         <div class="sec-head reveal">
           <div>
             <p class="sec-label"><span class="ic crystal" aria-hidden="true">◆</span>Matter states</p>
-            <h2>From Gas to Liquid.<br><span class="muted-line">Then Crystal.</span></h2>
+            <h2>It grows its own API.<br><span class="muted-line">Gas, Liquid, Crystal.</span></h2>
           </div>
-          <p class="sec-lead">Your backend grows from what your product actually asks for, not from what someone guessed up front.</p>
+          <p class="sec-lead">From first guess to permanent code, shaped by real usage.</p>
         </div>
 
         <div class="state-grid">
@@ -787,17 +793,17 @@
             <div class="st-media"><img src="assets/state-gas.webp" width="960" height="720" loading="lazy" alt="Translucent mint bubbles drifting apart, Slime's Gas state"></div>
             <div class="st-body">
               <span class="tag gas"><span class="dot"></span>Tier 0 · Gas</span>
-              <h3>Born on demand</h3>
-              <p>A new request is synthesized on the spot and kept on probation. Unused logic simply evaporates.</p>
-              <span class="st-speed">first request · <b>seconds</b></span>
+              <h3>Born</h3>
+              <p>An agent writes the endpoint on the spot. Unused ones evaporate.</p>
+              <span class="st-speed">first request · <b>about a second</b></span>
             </div>
           </article>
           <article class="st st-liquid reveal">
             <div class="st-media"><img src="assets/state-liquid.webp" width="960" height="720" loading="lazy" alt="A glossy pink slime blob, Slime's Liquid state"></div>
             <div class="st-body">
               <span class="tag liquid"><span class="dot"></span>Tier 1 · Liquid</span>
-              <h3>Hardened by use</h3>
-              <p>Requests that keep coming back are verified by a second model and become a permanent, fast part of your backend.</p>
+              <h3>Learned</h3>
+              <p>Used often and reviewed by a second model, it's kept for good.</p>
               <span class="st-speed">every repeat · <b>milliseconds</b></span>
             </div>
           </article>
@@ -805,9 +811,9 @@
             <div class="st-media"><img src="assets/state-crystal.webp" width="960" height="720" loading="lazy" alt="Faceted lavender crystals, Slime's Crystal state"></div>
             <div class="st-body">
               <span class="tag crystal">Tier 2 · Crystal</span>
-              <h3>Pinned and polished</h3>
-              <p>The hottest paths get reviewed, pinned and optimized into code that ships with your app.</p>
-              <span class="st-speed">status · <b>coming next</b></span>
+              <h3>Matured</h3>
+              <p>Hot paths become optimized code in your repo.</p>
+              <span class="st-speed"><b>coming next</b></span>
             </div>
           </article>
         </div>
@@ -820,9 +826,9 @@
         <div class="sec-head reveal">
           <div>
             <p class="sec-label"><span class="ic gas" aria-hidden="true">◎</span>Why Slime</p>
-            <h2>A new category.<br><span class="muted-line">The living backend.</span></h2>
+            <h2>A new category.<br><span class="muted-line">The self-building backend.</span></h2>
           </div>
-          <p class="sec-lead">Static APIs were built for software that changed slowly. Slime turns what frontends and agents ask for directly into safe, self-optimizing execution, without writing a single route.</p>
+          <p class="sec-lead">Static APIs were built for software that changed slowly. Slime grows its API from what your product actually asks for.</p>
         </div>
 
         <div class="quotes">
@@ -835,7 +841,7 @@
             <div class="who"><span class="av av-liquid" aria-hidden="true"></span><span><b>Engineering teams</b><small>platform &amp; backend</small></span></div>
           </article>
           <article class="quote reveal">
-            <p><strong>Move at the speed of AI, safely.</strong> Products that adapt to every customer and agent, with you in control.</p>
+            <p><strong>Move at AI speed, safely.</strong> Your database, not the AI, decides what Slime can touch.</p>
             <div class="who"><span class="av av-crystal" aria-hidden="true"></span><span><b>Businesses</b><small>leaders &amp; architects</small></span></div>
           </article>
         </div>
@@ -845,8 +851,8 @@
     <!-- ================= CTA ================= -->
     <section class="cta">
       <div class="container reveal">
-        <p class="wordmark"><span class="slime-text">Stop writing endpoints.</span></p>
-        <p>Point your UI or agent at Slime and ask for the data you need. It takes the shape you ask for.</p>
+        <p class="wordmark"><span class="slime-text">Stop writing endpoints.</span><span class="cta-answer">Slime writes them.</span></p>
+        <p>Point your UI or agent at Slime. The backend builds itself.</p>
         <div class="hero-ctas">
           <a href="#top" class="btn btn-primary">Feed the Slime</a>
           <a href="#how" class="btn btn-soft">See it work <span class="arrow" aria-hidden="true">→</span></a>
@@ -860,7 +866,7 @@
       <div class="foot">
         <div>
           <p class="wordmark slime-text">Feed the Slime.</p>
-          <p class="tagline">Swallows legacy APIs. Powers vibecoded UIs.</p>
+          <p class="tagline">The backend that builds itself.</p>
         </div>
         <div>
           <p class="builders-label">Built by</p>
