@@ -134,3 +134,49 @@ resource "aws_budgets_budget" "monthly" {
     subscriber_email_addresses = var.budget_alert_emails
   }
 }
+
+# Project budget: tight limit scoped to the home region. The account already
+# carries unrelated spend (domain registration, Route 53, tax), so an
+# account-wide $15 budget would breach on day one and never alert again that
+# month. region-guard keeps every regional slime resource in var.region, which
+# makes the Region filter a working proxy for "slime spend" before the Project
+# cost-allocation tag can be activated. Global services (CloudFront, Route 53)
+# are not counted here; the account-wide budget above still covers them.
+# Budgets only alert; they do not stop spend.
+
+resource "aws_budgets_budget" "project" {
+  name         = "${var.project}-monthly"
+  budget_type  = "COST"
+  limit_amount = tostring(var.project_budget_limit_usd)
+  limit_unit   = "USD"
+  time_unit    = "MONTHLY"
+
+  cost_filter {
+    name   = "Region"
+    values = [var.region]
+  }
+
+  notification {
+    comparison_operator        = "GREATER_THAN"
+    threshold                  = var.project_budget_alert_usd
+    threshold_type             = "ABSOLUTE_VALUE"
+    notification_type          = "ACTUAL"
+    subscriber_email_addresses = var.budget_alert_emails
+  }
+
+  notification {
+    comparison_operator        = "GREATER_THAN"
+    threshold                  = var.project_budget_limit_usd
+    threshold_type             = "ABSOLUTE_VALUE"
+    notification_type          = "ACTUAL"
+    subscriber_email_addresses = var.budget_alert_emails
+  }
+
+  notification {
+    comparison_operator        = "GREATER_THAN"
+    threshold                  = var.project_budget_limit_usd
+    threshold_type             = "ABSOLUTE_VALUE"
+    notification_type          = "FORECASTED"
+    subscriber_email_addresses = var.budget_alert_emails
+  }
+}

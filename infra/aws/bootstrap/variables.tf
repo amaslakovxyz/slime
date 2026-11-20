@@ -27,6 +27,23 @@ variable "budget_limit_usd" {
   default     = 100
 }
 
+variable "project_budget_limit_usd" {
+  description = "Monthly project budget in USD (spend in var.region only)."
+  type        = number
+  default     = 15
+}
+
+variable "project_budget_alert_usd" {
+  description = "Early-warning alert on actual project spend, in USD."
+  type        = number
+  default     = 10.5
+
+  validation {
+    condition     = var.project_budget_alert_usd < var.project_budget_limit_usd
+    error_message = "project_budget_alert_usd must be below project_budget_limit_usd."
+  }
+}
+
 variable "budget_alert_emails" {
   description = "Recipients of budget alerts. Keep real addresses in the gitignored terraform.tfvars."
   type        = list(string)
