@@ -1,6 +1,6 @@
 // npm run crystallize -- [--dry-run] [--optimizer claude|groq|none] [--min-runs N] [--commit] [--push]
 //
-// Turns proven Liquid handlers (saved in slime_meta) into Crystal modules in the
+// Turns proven Liquid handlers (from the configured code storage) into Crystal modules in the
 // Crystal folder. With --commit it commits them on the current branch; with
 // --push it also pushes that branch. It never commits on main: AGENTS.md routes
 // every change through a pull request.
@@ -12,7 +12,7 @@ import { crystallize } from './crystal/crystallize.js';
 import { createOptimizer } from './crystal/optimizers.js';
 import { schemaHashOf } from './fingerprint.js';
 import { promptHashFor } from './prompts.js';
-import { PostgresHandlerStore } from './store.js';
+import { createHandlerStore } from './store.js';
 
 const args = process.argv.slice(2);
 const flag = (name: string) => args.includes(name);
@@ -26,7 +26,7 @@ function die(message: string): never {
 }
 const git = (...a: string[]) => execFileSync('git', a, { encoding: 'utf8' });
 
-if (!config.metaDatabaseUrl) die('META_DATABASE_URL is empty: Crystal is built from saved Liquid handlers.');
+if (!config.metaDatabaseUrl) die('No code storage configured (META_DATABASE_URL is empty): Crystal is built from saved Liquid handlers.');
 if (!Number.isInteger(minRuns) || minRuns < 1) die('--min-runs must be a positive integer');
 
 // Check git before spending model calls on candidates that can't be committed.
@@ -42,7 +42,7 @@ const connector = new PostgresConnector(config.databaseUrl);
 const safety = await connector.safetyCheck();
 if (!safety.ok) die(`The database user is not read-only:\n - ${safety.problems.join('\n - ')}`);
 const schemaHash = schemaHashOf(await connector.describe());
-const store = new PostgresHandlerStore(config.metaDatabaseUrl, config.metaTable);
+const store = createHandlerStore(config);
 await store.init();
 
 const optimizerArg = args.indexOf('--optimizer');

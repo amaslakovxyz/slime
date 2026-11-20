@@ -181,3 +181,14 @@ export class PostgresHandlerStore implements HandlerStore {
     return this.pool.end();
   }
 }
+
+/**
+ * The configured code storage for Liquid handlers. Callers depend only on the
+ * HandlerStore contract; Postgres is today's implementation (a key-value store
+ * is the Slime Cloud target), and an empty META_DATABASE_URL keeps it in memory.
+ */
+export function createHandlerStore(settings: { metaDatabaseUrl: string; metaTable: string }): HandlerStore {
+  return settings.metaDatabaseUrl
+    ? new PostgresHandlerStore(settings.metaDatabaseUrl, settings.metaTable)
+    : new MemoryHandlerStore();
+}

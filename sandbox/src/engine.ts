@@ -14,8 +14,7 @@ import type { Artifact, Generator } from './generator.js';
 import { promptHashFor } from './prompts.js';
 import type { Reviewer } from './review.js';
 import {
-  MemoryHandlerStore,
-  PostgresHandlerStore,
+  createHandlerStore,
   codeHash,
   type Fixture,
   type HandlerStore,
@@ -165,7 +164,7 @@ export class Engine {
 
     const store =
       deps.store ??
-      (config.metaDatabaseUrl ? new PostgresHandlerStore(config.metaDatabaseUrl, config.metaTable) : new MemoryHandlerStore());
+      createHandlerStore(config);
     await store.init();
     // Computed the same way in every mode, so a locked server finds the handlers
     // an explore-mode server saved.
