@@ -36,8 +36,11 @@ input values. Handlers move up through three tiers:
 
 **In core:** the engine and tiers, the request format, safety checks, the
 QuickJS shaping sandbox, the background review, Crystal loading, and the
-contracts (Ports) for connectors, generators, reviewers and handler stores,
-with their first implementations (Postgres, Claude, Groq, offline).
+contracts (Ports) for connectors, generators, reviewers and stores, with
+their first implementations: the Postgres connector; Claude, Groq and offline
+generators; and stores with no dependencies (files by default, memory),
+plus Postgres. Slime's own storage needs no database: a DynamoDB store for
+Slime Cloud plugs into the same key-value contract.
 
 **Not in core:**
 
