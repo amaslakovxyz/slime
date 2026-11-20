@@ -163,66 +163,59 @@
     .hero .lead { max-width: 540px; font-size: 1.2rem; margin-top: 26px; }
     .hero-ctas { display: flex; gap: 14px; margin-top: 38px; flex-wrap: wrap; }
 
-    /* Hero card: the 3D slime on top, the feed menu below, one surface. */
+    /* Hero: the slime floats free; a compact menu card overlaps its base. */
     .hero-right { position: relative; min-width: 0; }
-    .slime-card {
-      position: relative; border-radius: 28px; overflow: hidden;
-      background: radial-gradient(120% 70% at 50% 0%, rgba(255,20,118,.10), transparent 60%), var(--bg-surface);
-      border: 1px solid var(--border-color);
-      box-shadow: 0 30px 80px rgba(0,0,0,.45);
-    }
-    .stage { position: relative; height: 340px; cursor: grab; touch-action: pan-y; }
+    .stage { position: relative; height: 430px; cursor: grab; touch-action: pan-y; }
     .stage:active { cursor: grabbing; }
     .stage::before { /* plasma halo behind the slime */
-      content: ""; position: absolute; left: 50%; top: 50%; width: 64%; aspect-ratio: 1; transform: translate(-50%, -50%);
-      background: radial-gradient(closest-side, rgba(255,20,118,.32), rgba(143,0,67,.12) 60%, transparent);
-      filter: blur(26px); pointer-events: none;
+      content: ""; position: absolute; left: 50%; top: 48%; width: 78%; max-width: 420px; aspect-ratio: 1; transform: translate(-50%, -50%);
+      background: radial-gradient(closest-side, rgba(255,20,118,.30), rgba(143,0,67,.10) 60%, transparent);
+      filter: blur(28px); pointer-events: none;
     }
     .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
     .stage-fallback { /* shown until WebGL is ready, or if it never is */
-      position: absolute; left: 50%; top: 50%; width: 150px; height: 150px; margin: -75px 0 0 -75px;
-      border-radius: 42% 58% 70% 30% / 45% 45% 55% 55%;
-      background: radial-gradient(circle at 32% 28%, var(--plasma-highlight), var(--plasma-primary) 45%, var(--plasma-shadow));
-      box-shadow: 0 20px 60px var(--glow-primary);
-      animation: morph 9s ease-in-out infinite; transition: opacity .6s ease;
+      position: absolute; left: 50%; top: 46%; width: 200px; height: 200px; margin: -100px 0 0 -100px; border-radius: 50%;
+      background: radial-gradient(circle at 34% 28%, var(--plasma-highlight), var(--plasma-primary) 45%, var(--plasma-shadow));
+      box-shadow: 0 20px 60px var(--glow-primary); transition: opacity .6s ease;
     }
     .stage.ready .stage-fallback { opacity: 0; }
-    .stage-status { position: absolute; top: 18px; left: 18px; z-index: 2; }
+    .stage-status { position: absolute; top: 10px; left: 0; z-index: 2; }
     .stage-hint {
-      position: absolute; top: 24px; right: 20px; z-index: 2; pointer-events: none;
+      position: absolute; top: 16px; right: 0; z-index: 2; pointer-events: none;
       font-family: var(--font-mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--wireframe-grey);
     }
 
-    /* The menu: minimal, but reads like one. */
-    .menu { padding: 22px 30px 20px; border-top: 1px dashed var(--border-bright); }
-    .menu-head { text-align: center; margin-bottom: 10px; }
-    .menu-kicker { font-family: var(--font-mono); font-size: 11px; letter-spacing: .24em; text-transform: uppercase; color: var(--wireframe-grey); }
-    .menu-title { font-size: 30px; margin: 6px 0 0; }
+    /* Compact menu card */
+    .menu {
+      position: relative; z-index: 3; width: min(100%, 400px); margin: -70px auto 0;
+      padding: 14px 20px 6px; border-radius: 20px;
+      background: rgba(22,16,25,.84); border: 1px solid var(--border-color);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      box-shadow: 0 24px 60px rgba(0,0,0,.45);
+    }
+    .menu-head { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 8px; border-bottom: 1px dashed var(--border-bright); }
+    .menu-title { font-size: 21px; margin: 0; }
+    .menu-kicker { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .22em; text-transform: uppercase; color: var(--wireframe-grey); }
     .menu-list { list-style: none; margin: 0; padding: 0; }
     .menu-list li + li { border-top: 1px solid rgba(45,31,51,.7); }
     .dish {
-      width: 100%; display: grid; grid-template-columns: auto 1fr auto; align-items: baseline; column-gap: 10px;
-      padding: 10px 2px; background: none; border: 0; cursor: pointer; text-align: left; color: var(--text-pure); font: inherit;
+      width: 100%; display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; column-gap: 10px;
+      padding: 9px 0; background: none; border: 0; cursor: pointer; text-align: left; color: var(--text-pure); font: inherit;
     }
-    .dish-name { font-family: var(--font-mono); font-size: 14px; font-weight: 500; transition: color .2s ease; }
-    .dish-leader { border-bottom: 1.5px dotted var(--border-bright); transform: translateY(-4px); transition: border-color .2s ease; }
-    .dish-kind { font-size: 11.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--text-muted); white-space: nowrap; }
-    .dish-out {
-      grid-column: 1 / -1; font-family: var(--font-mono); font-size: 12px; color: var(--gas-accent);
-      max-height: 0; opacity: 0; overflow: hidden; transition: max-height .4s ease, opacity .4s ease, margin .4s ease;
+    .dish-name { font-family: var(--font-mono); font-size: 13px; font-weight: 500; transition: color .2s ease; white-space: nowrap; }
+    .dish-leader { border-bottom: 1.5px dotted var(--border-bright); transform: translateY(3px); transition: border-color .2s ease; }
+    .dish-kind { font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--text-muted); white-space: nowrap; }
+    .dish-count {
+      min-width: 28px; height: 22px; padding: 0 7px; border-radius: 999px; display: inline-grid; place-items: center;
+      font-family: var(--font-mono); font-size: 11.5px; font-weight: 700; color: var(--wireframe-grey);
+      border: 1px solid var(--border-bright); transition: color .2s ease, border-color .2s ease, background .2s ease;
     }
-    .dish:hover:not(:disabled) .dish-name { color: var(--plasma-highlight); }
-    .dish:hover:not(:disabled) .dish-leader { border-color: var(--plasma-primary); }
-    .dish:disabled { cursor: default; }
-    .dish:disabled .dish-name { color: var(--wireframe-grey); text-decoration: line-through; text-decoration-color: var(--plasma-primary); }
-    .dish:disabled .dish-kind { color: var(--plasma-highlight); }
-    .dish.eaten .dish-out { max-height: 40px; opacity: 1; margin-top: 4px; }
-    .menu-foot {
-      display: flex; justify-content: center; align-items: center; gap: 12px; margin-top: 8px; padding-top: 12px;
-      border-top: 1px dashed var(--border-bright);
-      font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); letter-spacing: .06em;
-    }
-    .feed-reset { font: inherit; color: var(--plasma-highlight); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+    .dish-count.has { color: #fff; border-color: var(--plasma-primary); background: rgba(255,20,118,.16); }
+    .dish-count.bump { animation: bump .4s ease; }
+    @keyframes bump { 0% { transform: scale(1); } 40% { transform: scale(1.35); } 100% { transform: scale(1); } }
+    .dish:hover .dish-name { color: var(--plasma-highlight); }
+    .dish:hover .dish-leader { border-color: var(--plasma-primary); }
+    .dish:active .dish-count { transform: scale(.9); }
 
     @keyframes drift {
       0%, 100% { transform: translate(0, 0); }
@@ -425,7 +418,7 @@
     @media (max-width: 960px) {
       section { padding: 96px 0; }
       .hero-grid, .trust-grid { grid-template-columns: 1fr; gap: 40px; }
-      .stage { height: 320px; }
+      .stage { height: 400px; }
       .demo-body { grid-template-columns: 1fr; }
       .demo-col + .demo-col { border-left: 0; border-top: 1px solid var(--border-color); }
       .states, .audiences { grid-template-columns: 1fr; }
@@ -439,12 +432,11 @@
       section { padding: 76px 0; }
       .section-head { margin-bottom: 40px; }
       .hero { padding: 24px 0 76px; }
-      .stage { height: 280px; }
+      .stage { height: 330px; }
       .stage-hint { display: none; }
-      .menu { padding: 20px 18px 18px; }
-      .menu-title { font-size: 26px; }
-      .dish-name { font-size: 13px; }
-      .dish-kind { font-size: 10.5px; }
+      .menu { margin-top: -50px; padding: 12px 14px 4px; }
+      .dish-name { font-size: 12px; }
+      .dish-kind { font-size: 9.5px; letter-spacing: .08em; }
       .cases { grid-template-columns: 1fr; }
       .case { padding: 26px 22px; }
       .cage { display: none; }
@@ -491,26 +483,23 @@
         </div>
 
         <div class="hero-right">
-          <div class="slime-card">
-            <div class="stage" id="slime-stage">
-              <div class="stage-fallback" aria-hidden="true"></div>
-              <span class="tag gas stage-status" id="slime-status" role="status" aria-live="polite"><span class="dot"></span>Hungry</span>
-              <span class="stage-hint" aria-hidden="true">poke it</span>
+          <div class="stage" id="slime-stage">
+            <div class="stage-fallback" aria-hidden="true"></div>
+            <span class="tag gas stage-status" id="slime-status" role="status" aria-live="polite"><span class="dot"></span>Hungry</span>
+            <span class="stage-hint" aria-hidden="true">poke it</span>
+          </div>
+          <div class="menu">
+            <div class="menu-head">
+              <p class="wordmark slime-text menu-title">Feed the Slime</p>
+              <span class="menu-kicker">menu</span>
             </div>
-            <div class="menu">
-              <div class="menu-head">
-                <span class="menu-kicker">Today's menu</span>
-                <p class="wordmark slime-text menu-title">Feed the Slime</p>
-              </div>
-              <ul class="menu-list" id="menu-list">
-                <li><button class="dish" type="button" data-kind="old endpoint"><span class="dish-name">GET /api/v1/orders</span><span class="dish-leader" aria-hidden="true"></span><span class="dish-kind">old endpoint</span><span class="dish-out">→ now serves: orders by region, last 30 days · 12 ms</span></button></li>
-                <li><button class="dish" type="button" data-kind="database"><span class="dish-name">postgres://billing</span><span class="dish-leader" aria-hidden="true"></span><span class="dish-kind">database</span><span class="dish-out">→ now serves: top accounts by revenue · 14 ms</span></button></li>
-                <li><button class="dish" type="button" data-kind="file"><span class="dish-name">customers.csv</span><span class="dish-leader" aria-hidden="true"></span><span class="dish-kind">file</span><span class="dish-out">→ now serves: churn risk by plan · 9 ms</span></button></li>
-                <li><button class="dish" type="button" data-kind="legacy API"><span class="dish-name">SOAP InvoiceService</span><span class="dish-leader" aria-hidden="true"></span><span class="dish-kind">legacy API</span><span class="dish-out">→ now serves: unpaid invoices this month · 17 ms</span></button></li>
-                <li><button class="dish" type="button" data-kind="event data"><span class="dish-name">{ webhook }</span><span class="dish-leader" aria-hidden="true"></span><span class="dish-kind">event data</span><span class="dish-out">→ now serves: signups per day, by channel · 11 ms</span></button></li>
-              </ul>
-              <div class="menu-foot"><span id="feed-count">0 of 5 served</span><button class="feed-reset" id="feed-reset" type="button" hidden>feed again</button></div>
-            </div>
+            <ul class="menu-list" id="menu-list">
+              <li><button class="dish" type="button"><span class="dish-name">GET /api/v1/orders</span><span class="dish-leader" aria-hidden="true"></span><span class="dish-kind">old endpoint</span><span class="dish-count" aria-label="fed 0 times">0</span></button></li>
+              <li><button class="dish" type="button"><span class="dish-name">postgres://billing</span><span class="dish-leader" aria-hidden="true"></span><span class="dish-kind">database</span><span class="dish-count" aria-label="fed 0 times">0</span></button></li>
+              <li><button class="dish" type="button"><span class="dish-name">customers.csv</span><span class="dish-leader" aria-hidden="true"></span><span class="dish-kind">file</span><span class="dish-count" aria-label="fed 0 times">0</span></button></li>
+              <li><button class="dish" type="button"><span class="dish-name">SOAP InvoiceService</span><span class="dish-leader" aria-hidden="true"></span><span class="dish-kind">legacy API</span><span class="dish-count" aria-label="fed 0 times">0</span></button></li>
+              <li><button class="dish" type="button"><span class="dish-name">{ webhook }</span><span class="dish-leader" aria-hidden="true"></span><span class="dish-kind">event data</span><span class="dish-count" aria-label="fed 0 times">0</span></button></li>
+            </ul>
           </div>
         </div>
       </div>
@@ -775,14 +764,12 @@
       }
 
       /* ---------- Feed the Slime (hero menu) ----------
-         The menu updates its own UI and fires 'slime:feed' / 'slime:reset'.
-         The 3D module below listens and drops a droplet into the slime, so the
-         menu still works when WebGL or the CDN is unavailable. */
+         Each click bumps that line's counter and fires 'slime:feed'. The 3D
+         module below listens and drops a droplet into the slime, so the menu
+         still works when WebGL or the CDN is unavailable. */
       var dishes = document.querySelectorAll('#menu-list .dish');
-      var countEl = document.getElementById('feed-count');
-      var resetBtn = document.getElementById('feed-reset');
       var statusTag = document.getElementById('slime-status');
-      var served = 0;
+      var digestTimer = null;
 
       function setSlimeStatus(cls, text) {
         statusTag.className = 'tag stage-status ' + cls;
@@ -790,35 +777,20 @@
       }
 
       dishes.forEach(function (d) {
+        var counter = d.querySelector('.dish-count');
+        var n = 0;
         d.addEventListener('click', function () {
-          if (d.disabled) return;
-          d.disabled = true;
-          served += 1;
-          var n = served;
+          n += 1;
+          counter.textContent = n;
+          counter.setAttribute('aria-label', 'fed ' + n + (n === 1 ? ' time' : ' times'));
+          counter.classList.add('has');
+          counter.classList.remove('bump'); void counter.offsetWidth; counter.classList.add('bump');
           setSlimeStatus('gas', 'Gas · digesting');
           document.dispatchEvent(new CustomEvent('slime:feed'));
           // Matches the droplet's travel time in the 3D module.
-          setTimeout(function () {
-            d.classList.add('eaten');
-            d.querySelector('.dish-kind').textContent = '✓ served';
-            countEl.textContent = n + ' of ' + dishes.length + ' served';
-            if (n === dishes.length) { setSlimeStatus('liquid', 'Full · any shape'); resetBtn.hidden = false; }
-            else { setSlimeStatus('liquid', 'Liquid · new shape'); }
-          }, reduceMotion ? 0 : 1100);
+          clearTimeout(digestTimer);
+          digestTimer = setTimeout(function () { setSlimeStatus('liquid', 'Liquid · new shape'); }, reduceMotion ? 0 : 1100);
         });
-      });
-
-      resetBtn.addEventListener('click', function () {
-        served = 0;
-        dishes.forEach(function (d) {
-          d.disabled = false;
-          d.classList.remove('eaten');
-          d.querySelector('.dish-kind').textContent = d.dataset.kind;
-        });
-        countEl.textContent = '0 of ' + dishes.length + ' served';
-        setSlimeStatus('gas', 'Hungry');
-        resetBtn.hidden = true;
-        document.dispatchEvent(new CustomEvent('slime:reset'));
       });
 
       /* ---------- Scripted demo ----------
@@ -963,7 +935,7 @@
     })();
   </script>
 
-  <!-- Hero slime: marching-cubes metaballs in a glossy physical material. -->
+  <!-- Hero slime: a round metaball body (big core + surface lumps) in a glossy physical material. -->
   <script type="module">
     import * as THREE from 'three';
     import { MarchingCubes } from 'three/addons/objects/MarchingCubes.js';
@@ -971,6 +943,7 @@
 
     const stage = document.getElementById('slime-stage');
     const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const small = matchMedia('(max-width: 720px)').matches;
 
     // If WebGL is unavailable this throws, the module stops, and the CSS fallback blob stays.
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
@@ -1005,12 +978,15 @@
       envMapIntensity: 0.65,
     });
 
-    const RES = 56;
-    const blob = new MarchingCubes(RES, material, false, false, 60000);
+    // MarchingCubes surface sits where strength / d^2 - subtract = isolation, i.e. radius = sqrt(strength / 92).
+    const RES = small ? 48 : 64;
+    const SUB = 12;
+    const radiusOf = (strength) => Math.sqrt(strength / (80 + SUB));
+    const blob = new MarchingCubes(RES, material, false, false, 90000);
     blob.isolation = 80;
-    const SCALE = 2.8;
+    const SCALE = 2.6;
     blob.scale.setScalar(SCALE);
-    blob.position.y = -0.12; // a little low, so a fully fed slime clears the status tag
+    blob.position.y = 0.15;
     scene.add(blob);
 
     const key = new THREE.DirectionalLight(0xffffff, 2.4);
@@ -1021,13 +997,19 @@
     fill.position.set(2.5, 1.5, 3);
     scene.add(key, rim, fill);
 
-    // --- living motion -------------------------------------------------------
-    const BALLS = 7;
-    const seeds = Array.from({ length: BALLS }, (_, i) => ({
-      phase: i * 2.399,                     // golden angle spreads them out
-      speed: 0.32 + 0.11 * ((i * 7) % 5) / 4,
-      radius: 0.09 + 0.06 * ((i * 3) % 4) / 3,
+    // --- shape: a round core with lumps that drift over its surface ----------
+    const CORE = 3.4;          // core strength -> radius ~0.19 of the field
+    const GROW = 0.32;         // extra core strength per feed
+    const MAX_GROWTH = 8;      // after this, feeding only makes it wobble
+    const LUMPS = 7;
+    const lumps = Array.from({ length: LUMPS }, (_, i) => ({
+      theta: i * 2.399,                         // golden angle around the equator
+      phi: Math.acos(1 - (2 * (i + 0.5)) / LUMPS), // spread from pole to pole
+      speed: 0.18 + 0.1 * ((i * 5) % 7) / 6,
+      size: 0.2 + 0.12 * ((i * 3) % 4) / 3,
     }));
+    const moon = { speed: 0.5, size: 0.05, gap: 0.075 };
+
     const DROP_T = reduceMotion ? 0.01 : 1.1; // seconds a fed droplet takes to merge
     const drops = [];
     const s = { grow: 0, growTarget: 0, jiggle: 0, reach: 0, reachTarget: 0, px: 0, py: 0, tx: 0, ty: 0 };
@@ -1036,65 +1018,65 @@
     const lerp = (a, b, t) => a + (b - a) * t;
     const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
-    // Two small satellites orbit wide: they stretch into tendrils and pinch back in.
-    const satellites = [
-      { phase: 0.0, speed: 0.42, orbit: 0.2, tilt: 0.6 },
-      { phase: 2.6, speed: -0.33, orbit: 0.22, tilt: -0.9 },
-    ];
-
     function buildField(t, now) {
       blob.reset();
-      const g = s.grow;
-      const strength = 0.32 + g * 0.03;
-      // Jiggle is a fast surface wobble, never a bigger orbit, so the body stays in one piece.
-      const wob = s.jiggle * 0.035;
-      for (let i = 0; i < BALLS; i++) {
-        const b = seeds[i];
-        const a = t * b.speed + b.phase;
-        const r = b.radius + g * 0.004;
+      const core = CORE + s.grow * GROW;
+      const rc = radiusOf(core);
+      blob.addBall(0.5, 0.5, 0.5, core, SUB);
+
+      // Lumps ride just under the surface so they read as soft bumps on a sphere.
+      const wob = s.jiggle * 0.03;
+      for (let i = 0; i < LUMPS; i++) {
+        const L = lumps[i];
+        const th = L.theta + t * L.speed;
+        const ph = L.phi + Math.sin(t * 0.4 + i) * 0.35;
+        const d = rc * (0.82 + Math.sin(t * 1.3 + i * 1.7) * 0.06) + Math.sin(t * 18 + i) * wob;
         blob.addBall(
-          0.5 + Math.sin(a) * r + Math.sin(a * 0.43 + i) * 0.025 + Math.sin(t * 17 + i) * wob,
-          0.5 + Math.cos(a * 1.13) * r * 0.85 + Math.cos(t * 19 + i * 2) * wob,
-          0.5 + Math.sin(a * 0.71 + i * 1.3) * r * 0.7,
-          strength, 12
+          0.5 + Math.sin(ph) * Math.cos(th) * d,
+          0.5 + Math.cos(ph) * d,
+          0.5 + Math.sin(ph) * Math.sin(th) * d,
+          L.size, SUB
         );
       }
-      for (const sat of satellites) {
-        const a = t * sat.speed + sat.phase;
-        const o = sat.orbit + g * 0.008 + Math.sin(t * 0.9 + sat.phase) * 0.03;
-        blob.addBall(0.5 + Math.cos(a) * o, 0.5 + Math.sin(a) * o * Math.cos(sat.tilt), 0.5 + Math.sin(a) * o * Math.sin(sat.tilt), 0.07, 12);
+
+      // A small moon that orbits close enough to stretch toward the body.
+      const ma = t * moon.speed;
+      const mo = rc + moon.gap + Math.sin(t * 0.8) * 0.02;
+      blob.addBall(0.5 + Math.cos(ma) * mo, 0.5 + Math.sin(ma * 0.7) * mo * 0.5, 0.5 + Math.sin(ma) * mo, moon.size, SUB);
+
+      // A bulge that reaches toward the pointer.
+      if (s.reach > 0.01) {
+        const len = Math.hypot(s.px, s.py) || 1;
+        const dist = rc * 0.95;
+        blob.addBall(0.5 + (s.px / len) * dist, 0.5 + (s.py / len) * dist, 0.56, 0.45 * s.reach, SUB);
       }
-      // A tendril that reaches toward the pointer.
-      if (s.reach > 0.01) blob.addBall(0.5 + s.px, 0.5 + s.py, 0.56, 0.12 * s.reach, 12);
-      // Fed droplets rise from the menu side and merge into the body.
+
+      // Fed droplets rise from the menu below and merge into the body.
       for (let i = drops.length - 1; i >= 0; i--) {
         const d = drops[i];
         const e = ease(clamp01((now - d.t0) / DROP_T));
-        blob.addBall(lerp(d.x0, 0.5, e), lerp(0.2, 0.47, e), 0.5, lerp(0.09, 0.2, e), 12);
-        if (e >= 1) { drops.splice(i, 1); s.growTarget += 1; s.jiggle = 1; }
+        blob.addBall(lerp(d.x0, 0.5, e), lerp(0.08, 0.5 - rc * 0.6, e), 0.55, lerp(0.12, 0.4, e), SUB);
+        if (e >= 1) {
+          drops.splice(i, 1);
+          s.growTarget = Math.min(MAX_GROWTH, s.growTarget + 1);
+          s.jiggle = 1;
+        }
       }
       blob.update();
     }
 
     // --- interaction ---------------------------------------------------------
-    function toField(ev) {
+    function aim(ev) {
       const r = stage.getBoundingClientRect();
-      const nx = ((ev.clientX - r.left) / r.width) * 2 - 1;
-      const ny = -(((ev.clientY - r.top) / r.height) * 2 - 1);
-      const halfH = camera.position.z * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-      let fx = (nx * halfH * camera.aspect) / SCALE / 2;
-      let fy = (ny * halfH) / SCALE / 2;
-      const len = Math.hypot(fx, fy), max = 0.2; // stay attached to the body
-      if (len > max) { fx *= max / len; fy *= max / len; }
-      s.tx = fx; s.ty = fy;
+      s.tx = ((ev.clientX - r.left) / r.width) * 2 - 1;
+      s.ty = -(((ev.clientY - r.top) / r.height) * 2 - 1);
     }
-    stage.addEventListener('pointermove', (ev) => { toField(ev); s.reachTarget = 1; });
+    stage.addEventListener('pointermove', (ev) => { aim(ev); s.reachTarget = 1; });
     stage.addEventListener('pointerleave', () => { s.reachTarget = 0; });
-    stage.addEventListener('pointerdown', (ev) => { toField(ev); s.reachTarget = 1; s.jiggle = 1; });
+    stage.addEventListener('pointerdown', (ev) => { aim(ev); s.reachTarget = 1; s.jiggle = 1; });
     document.addEventListener('slime:feed', () => {
-      drops.push({ t0: performance.now() / 1000, x0: 0.5 + (Math.random() - 0.5) * 0.3 });
+      drops.push({ t0: performance.now() / 1000, x0: 0.5 + (Math.random() - 0.5) * 0.2 });
     });
-    document.addEventListener('slime:reset', () => { s.growTarget = 0; s.jiggle = 1; });
 
     // --- sizing & loop -------------------------------------------------------
     function resize() {
@@ -1124,8 +1106,9 @@
       s.px += (s.tx - s.px) * 0.08;
       s.py += (s.ty - s.py) * 0.08;
       buildField(t, nowMs / 1000);
-      blob.rotation.y = Math.sin(t * 0.25) * 0.35 + s.px * 0.6;
-      blob.rotation.x = Math.cos(t * 0.2) * 0.12 - s.py * 0.6;
+      // Keep the mesh nearly still (lumps carry the motion) so the pointer bulge stays under the cursor.
+      blob.rotation.y = Math.sin(t * 0.2) * 0.12 + s.px * 0.15;
+      blob.rotation.x = Math.cos(t * 0.17) * 0.08 - s.py * 0.12;
       renderer.render(scene, camera);
     }
     requestAnimationFrame((n) => { last = n; frame(n); stage.classList.add('ready'); });
