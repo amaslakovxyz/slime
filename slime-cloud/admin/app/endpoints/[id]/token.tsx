@@ -25,7 +25,8 @@ export function TokenReveal({ endpointId, url, tokenHint }: { endpointId: string
     setTimeout(() => setCopied(false), 1500);
   };
 
-  const curl = `curl -X POST ${url ?? '<url>'}v0/query -H 'x-api-key: ${token ?? '$SLIME_TOKEN'}' -H 'content-type: application/json' -d '${QUERY_BODY}'`;
+  // Double quotes so the $SLIME_TOKEN placeholder expands when pasted into a shell.
+  const curl = `curl -X POST ${url ?? '<url>'}v0/query -H "x-api-key: ${token ?? '$SLIME_TOKEN'}" -H 'content-type: application/json' -d '${QUERY_BODY}'`;
 
   return (
     <div className="stack" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
