@@ -4,7 +4,7 @@
 // and the result is immutable. config.with({...}) returns a changed copy.
 import { SlimeConfigError } from './errors.js';
 import type { Connector, Generator, Reviewer } from './ports.js';
-import { DEFAULT_STORE, isCustomStore, type StoreOption } from './store/types.js';
+import type { SlimeStore } from './store/types.js';
 
 export interface TierOptions {
   /** Successful runs inside the Gas window before a handler may become Liquid. */
@@ -37,12 +37,13 @@ export interface LimitOptions {
 /** Crystal handlers imported from the app's own code (C10). Its exact shape arrives with M5. */
 export type CrystalRegistry = Readonly<Record<string, unknown>>;
 
-/** Something that happened inside core: generations, promotions, reviews, errors (C11). */
-export interface SlimeEvent {
-  type: string;
-  at: string;
-  [key: string]: unknown;
-}
+/** Something that happened inside core (C11, PLAN.md §5). `generated` carries the code so a dev setup can print it (R9). */
+export type SlimeEvent =
+  | { type: 'generated'; handlerKey: string; sql: string; shapeJs?: string; assumptions: string[]; tokens: number; ms: number }
+  | { type: 'reviewed'; handlerKey: string; verdict: 'approved' | 'rejected'; notes: string }
+  | { type: 'promoted'; handlerKey: string; tier: 'liquid' }
+  | { type: 'warning'; message: string }
+  | { type: 'error'; code: string; message: string };
 
 export interface SlimeOptions {
   /** Where data comes from. Required. */
@@ -51,13 +52,13 @@ export interface SlimeOptions {
   generator?: Generator;
   /** Reviews Gas handlers before they may become Liquid. Leave out to skip reviews. */
   reviewer?: Reviewer;
-  /** Where Slime keeps its own state. Default: files in ./.slime (§4.8). */
-  store?: StoreOption;
+  /** Where Slime keeps its own state: any SlimeStore. Omitted: createSlime() uses the file store in ./.slime (C14, §4.7). */
+  store?: SlimeStore;
   /** Crystal handlers, or false/omitted for none. */
   crystal?: CrystalRegistry | false;
   /** What the app's words mean, for example { revenue: "sum of paid invoices, in cents" }. */
   glossary?: Record<string, string>;
-  /** Extra rules for generated SQL; they win over the model's own notes (D2). */
+  /** Extra rules for generated SQL, added to the dictionary (D2). */
   rules?: string[];
   tiers?: Partial<TierOptions>;
   limits?: Partial<LimitOptions>;
@@ -85,7 +86,6 @@ export const DEFAULT_LIMITS: Readonly<LimitOptions> = Object.freeze({
 });
 
 const OPTION_KEYS = ['connector', 'generator', 'reviewer', 'store', 'crystal', 'glossary', 'rules', 'tiers', 'limits', 'onEvent'];
-const STORE_TYPES = ['file', 'memory', 'postgres', 'dynamodb'];
 // Smallest allowed value per numeric option; every one of them must be an integer except maxQueryCost.
 const TIER_MIN: Record<keyof TierOptions, number> = { gasToLiquidRuns: 1, gasWindowMs: 1, maxReviews: 1, fixturesPerHandler: 0 };
 const LIMIT_MIN: Record<keyof LimitOptions, number> = {
@@ -100,13 +100,13 @@ const LIMIT_MIN: Record<keyof LimitOptions, number> = {
   shapeTimeoutMs: 1,
   shapeMemoryBytes: 1024 * 1024,
 };
-const TABLE_NAME = /^[a-z_][a-z0-9_]{0,62}$/;
 
 export class SlimeConfig {
   readonly connector: Connector;
   readonly generator: Generator | undefined;
   readonly reviewer: Reviewer | undefined;
-  readonly store: StoreOption;
+  /** The app's store, or undefined for the default file store, which createSlime() builds (M2). */
+  readonly store: SlimeStore | undefined;
   readonly crystal: CrystalRegistry | false;
   readonly glossary: Readonly<Record<string, string>>;
   readonly rules: readonly string[];
@@ -126,7 +126,8 @@ export class SlimeConfig {
     this.connector = options.connector;
     this.generator = options.generator;
     this.reviewer = options.reviewer;
-    this.store = freezeStore(options.store ?? DEFAULT_STORE);
+    // A store is an object with behavior and state, so it is used as given, not copied.
+    this.store = options.store;
     this.crystal = options.crystal ? Object.freeze({ ...options.crystal }) : false;
     this.glossary = Object.freeze({ ...options.glossary });
     this.rules = Object.freeze([...(options.rules ?? [])]);
@@ -172,7 +173,7 @@ function validate(options: unknown): string[] {
     if (o.generator === undefined) problems.push('reviewer is set but generator is not: without a generator (locked mode) nothing is ever reviewed');
   }
 
-  if (o.store !== undefined) problems.push(...validateStore(o.store));
+  if (o.store !== undefined) problems.push(...missingMethods('store', o.store, ['get', 'put', 'list', 'delete']));
 
   if (o.crystal !== undefined && o.crystal !== false && !isPlainObject(o.crystal)) {
     problems.push('crystal must be the imported Crystal registry, or false');
@@ -197,50 +198,6 @@ function validate(options: unknown): string[] {
   problems.push(...validateNumbers('limits', o.limits, LIMIT_MIN, ['maxQueryCost']));
 
   if (o.onEvent !== undefined && typeof o.onEvent !== 'function') problems.push('onEvent must be a function');
-  return problems;
-}
-
-function validateStore(store: unknown): string[] {
-  if (!isPlainObject(store) && !(store && typeof store === 'object')) {
-    return [`store must be { type: ${STORE_TYPES.map((t) => `'${t}'`).join(' | ')}, ... } or an object implementing SlimeStore`];
-  }
-  if (isCustomStore(store as StoreOption)) return missingMethods('store', store, ['get', 'put', 'list', 'delete']);
-  const s = store as Record<string, unknown>;
-
-  const problems: string[] = [];
-  const text = (key: string, required: boolean) => {
-    const v = s[key];
-    if (v === undefined) {
-      if (required) problems.push(`store.${key} is required for store type '${String(s.type)}'`);
-    } else if (typeof v !== 'string' || !v.trim()) problems.push(`store.${key} must be a non-empty string`);
-  };
-  switch (s.type) {
-    case 'file':
-      text('dir', true);
-      break;
-    case 'memory':
-      break;
-    case 'postgres':
-      text('url', true);
-      text('table', false);
-      if (typeof s.table === 'string' && !TABLE_NAME.test(s.table)) {
-        problems.push('store.table must be a lowercase identifier: letters, digits and _, starting with a letter or _');
-      }
-      break;
-    case 'dynamodb':
-      text('table', true);
-      text('region', false);
-      text('prefix', false);
-      if (s.keys !== undefined) {
-        const k = s.keys as Record<string, unknown> | null;
-        if (!k || typeof k !== 'object' || ![k.partition, k.sort].every((v) => typeof v === 'string' && v.trim())) {
-          problems.push('store.keys must be { partition: string, sort: string }');
-        }
-      }
-      break;
-    default:
-      problems.push(`store.type must be one of ${STORE_TYPES.join(', ')}; got ${JSON.stringify(s.type)}`);
-  }
   return problems;
 }
 
@@ -276,13 +233,6 @@ function missingStrings(name: string, value: unknown, keys: string[]): string[] 
       return typeof v !== 'string' || !v.trim();
     })
     .map((k) => `${name}.${k} must be a non-empty string`);
-}
-
-function freezeStore(store: StoreOption): StoreOption {
-  // Built-in options are plain data and get copied; a custom store is an object
-  // with behavior and state, so it is used as given.
-  if (isCustomStore(store)) return store;
-  return Object.freeze({ ...store }) as StoreOption;
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

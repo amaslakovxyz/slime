@@ -44,14 +44,29 @@ export interface SafetyReport {
   problems: string[];
 }
 
+/**
+ * Limits for one call, passed by the engine from SlimeConfig.limits. The app
+ * builds the connector before SlimeConfig exists, so limits travel with each
+ * call instead of being connector options (§5).
+ */
+export interface QueryLimits {
+  timeoutMs: number;
+  /** Return at most this many rows and set `truncated` when there were more. */
+  rowCap: number;
+}
+
 export interface Connector {
   readonly name: string;
   /** Tables and columns these credentials can read. Nothing else is shown to the model. */
   describe(): Promise<SchemaInfo>;
-  /** Cheap pre-flight: does the query parse and plan, and how expensive is it? */
-  check(sql: string, params: unknown[]): Promise<{ cost: number; ms: number }>;
-  /** Runs one read-only query with a timeout and a row cap. */
-  run(sql: string, params: unknown[]): Promise<RunResult>;
+  /**
+   * Cheap pre-flight: does the query parse and plan, and how expensive is it?
+   * The engine compares `cost` with limits.maxQueryCost and raises
+   * QUERY_TOO_EXPENSIVE itself; the connector only reports.
+   */
+  check(sql: string, params: unknown[], limits: QueryLimits): Promise<{ cost: number; ms: number }>;
+  /** Runs one read-only query within the timeout and row cap. */
+  run(sql: string, params: unknown[], limits: QueryLimits): Promise<RunResult>;
   /** Reports whether the credentials could write or are too powerful; Slime refuses to start if not ok. */
   safetyCheck(): Promise<SafetyReport>;
   close(): Promise<void>;
@@ -95,9 +110,9 @@ export interface GenerationResult {
 }
 
 export interface Generator {
-  /** Part of every handler's scope: a different model means different handlers. */
+  /** Recorded in each handler's provenance; in explore mode a different model regenerates it. */
   readonly model: string;
-  /** Hash of this generator's prompt; editing the prompt invalidates old handlers. */
+  /** Hash of this generator's prompt text, recorded like `model`; editing the prompt regenerates handlers in explore mode. */
   readonly promptHash: string;
   generate(req: GenerationRequest, options: { timeoutMs: number; signal?: AbortSignal }): Promise<GenerationResult>;
 }
@@ -126,6 +141,8 @@ export interface Reviewer {
 
 // ---------------------------------------------------------------------------
 // SandboxRunner: where generated shaping code runs (C3: runtime-specific).
+// Exported as a type only: in v1 core always uses its own QuickJS runner, and
+// there is no option to pass another (§5).
 
 export interface SandboxLimits {
   timeoutMs: number;

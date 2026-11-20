@@ -26,9 +26,9 @@ result as a handler. Repeat requests reuse the handler, even with different
 input values. Handlers move up through three tiers:
 
 * **Gas:** newly generated, held in memory, and expires.
-* **Liquid:** has proven itself and passed a background review; saved in a
-  store.
-* **Crystal:** rewritten by an agent into TS or JS modules in the app's own
+* **Liquid:** has proven itself and passed a background review (when a
+  reviewer is configured); saved in a store.
+* **Crystal:** rewritten by an agent into JS modules (with `.d.ts`) in the app's own
   code, and passed to Slime through the config.
 
 > **Status:** M1 is done:
@@ -53,9 +53,9 @@ input values. Handlers move up through three tiers:
 * their first implementations:
   * the Postgres connector;
   * Claude, Groq and offline generators;
-  * stores for Slime's own state, chosen in the config: files (the default)
-    and memory with no dependencies, Postgres and DynamoDB as optional
-    adapters, or any custom store.
+  * stores for Slime's own state: files (the default) and memory, with no
+    extra packages. Any other backend (Postgres, DynamoDB, Redis) is a custom
+    `SlimeStore` the app passes in.
 
 **Not in core:**
 

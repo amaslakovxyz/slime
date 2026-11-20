@@ -20,7 +20,7 @@ describe('SlimeConfig (C4)', () => {
     const config = new SlimeConfig({ connector: fakeConnector() });
     assert.equal(config.mode, 'locked');
     assert.equal(config.generator, undefined);
-    assert.deepEqual(config.store, { type: 'file', dir: './.slime' });
+    assert.equal(config.store, undefined, 'createSlime() builds the default file store');
     assert.deepEqual(config.tiers, DEFAULT_TIERS);
     assert.deepEqual(config.limits, DEFAULT_LIMITS);
     assert.equal(config.crystal, false);
@@ -56,7 +56,7 @@ describe('SlimeConfig (C4)', () => {
       /generator is missing method generate/,
       /generator\.model must be a non-empty string/,
       /generator\.promptHash must be a non-empty string/,
-      /store\.type must be one of file, memory, postgres, dynamodb/,
+      /store is missing methods get, put, list, delete/,
       /glossary\.revenue must be a non-empty description/,
       /tiers\.gasToLiquidRuns must be an integer of at least 1/,
       /limits\.rowCap must be an integer of at least 1/,
@@ -110,33 +110,19 @@ describe('SlimeConfig (C4)', () => {
   });
 });
 
-describe('store option (C14, §4.8)', () => {
+describe('store option (C14, §4.7)', () => {
   const connector = fakeConnector();
 
-  test('accepts each built-in type with its required fields', () => {
-    for (const store of [
-      { type: 'file', dir: '.slime' },
-      { type: 'memory' },
-      { type: 'postgres', url: 'postgres://w@db/app', table: 'slime_store' },
-      { type: 'dynamodb', table: 'slime-handlers', region: 'eu-central-1', prefix: 't1', keys: { partition: 'tenantId', sort: 'artifactKey' } },
-    ] as const) {
-      assert.deepEqual(new SlimeConfig({ connector, store }).store, store);
-    }
-  });
-
-  test('reports missing or malformed fields per type', () => {
-    assert.deepEqual(problems({ connector, store: { type: 'file' } }), ["store.dir is required for store type 'file'"]);
-    assert.deepEqual(problems({ connector, store: { type: 'postgres' } }), ["store.url is required for store type 'postgres'"]);
-    assert.match(problems({ connector, store: { type: 'postgres', url: 'x', table: 'Bad-Name' } }).join(), /lowercase identifier/);
-    assert.match(problems({ connector, store: { type: 'dynamodb', table: 't', keys: { partition: 'pk' } } }).join(), /store\.keys/);
-  });
-
-  test('accepts a custom store and uses that same object', () => {
+  test('accepts any SlimeStore and uses that same object', () => {
     const custom: SlimeStore = { get: async () => undefined, put: async () => {}, list: async () => [], delete: async () => {} };
     assert.equal(new SlimeConfig({ connector, store: custom }).store, custom);
   });
 
-  test('a custom store must implement get, put, list and delete', () => {
+  test('a store must implement get, put, list and delete', () => {
     assert.deepEqual(problems({ connector, store: { get: async () => undefined } }), ['store is missing methods put, list, delete']);
+  });
+
+  test('a { type } option is not a store: stores are passed as objects', () => {
+    assert.deepEqual(problems({ connector, store: { type: 'file', dir: '.slime' } }), ['store is missing methods get, put, list, delete']);
   });
 });

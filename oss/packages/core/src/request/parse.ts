@@ -69,14 +69,15 @@ export function parseRequest(raw: unknown): ParsedRequest {
 /**
  * Literal values written into the intent ("orders for customer 4242"). They
  * split the cache by value, and the handler can't be reused for other values.
- * The engine turns these into an error in explore mode (R7).
+ * The engine adds a warning to meta.warnings for each (R7). A warning, not an
+ * error: "top 10 accounts" and possessives ("the plan's accounts") match too.
  */
 export function literalsInIntent(intent: string): string[] {
   const found: string[] = [];
   if (/["'][^"']+["']/.test(intent)) found.push('quoted text');
   if (/\b\d{2,}\b/.test(intent)) found.push('a number');
   if (/[\w.+-]+@[\w-]+\.[\w.]+/.test(intent)) found.push('an email address');
-  if (/\b[0-9a-f]{8}-[0-9a-f]{4}-/i.test(intent)) found.push('an id');
+  if (/\b[0-9a-f]{8}-[0-9a-f]{4}-/i.test(intent)) found.push('a UUID');
   return found;
 }
 

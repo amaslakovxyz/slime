@@ -4,9 +4,10 @@
 // input NAMES and the output shape. Never input values (they are bound as
 // parameters) and never input types (the handler records those, R4).
 //
-// A handler is reusable only under the same scope: the same schema, dictionary,
-// prompt and model. The store key is `${scope}#${requestKey}`, so "every handler
-// of this scope" is one list() by prefix (C13).
+// The request key alone is the handler's store key (§4.7). Where a handler came
+// from (schema, dictionary, prompt, model) is stored inside it as provenance,
+// not hashed into the key, so locked mode, which has no generator and may run
+// against a slightly different schema, can still find what explore mode saved.
 import { createHash } from 'node:crypto';
 import type { ParsedRequest } from './parse.js';
 
@@ -54,21 +55,24 @@ export function requestKey(req: ParsedRequest): string {
   );
 }
 
-/** Everything besides the request that changes what code would be generated. */
-export interface HandlerScope {
+/** What a handler was generated against. Stored with the handler, never part of its key. */
+export interface HandlerProvenance {
   schemaHash: string;
-  /** Hash of the startup dictionary (§4.4), including the glossary and rules. */
+  /** Hash of the dictionary (§4.4), which includes the glossary and rules. */
   dictionaryHash: string;
   promptHash: string;
+  /** The model's name, as the generator reports it. */
   model: string;
 }
 
-/** 16 hex characters; a schema, dictionary, prompt or model change gives a new scope. */
-export function scopeKey(scope: HandlerScope): string {
-  return sha256(canonicalJSON({ v: 1, ...scope })).slice(0, 16);
-}
+const PROVENANCE_FIELDS: readonly (keyof HandlerProvenance)[] = ['schemaHash', 'dictionaryHash', 'promptHash', 'model'];
 
-/** Store key of a Gas or Liquid handler: list(ns, `${scope}#`) loads a whole scope. */
-export function handlerKey(scope: string, request: string): string {
-  return `${scope}#${request}`;
+/**
+ * The provenance fields that differ between a saved handler and the current
+ * setup, in a fixed order. Explore mode treats any difference as a miss and
+ * regenerates; locked mode serves the handler anyway and warns when
+ * `schemaHash` is among them (§4.7).
+ */
+export function changedProvenance(saved: HandlerProvenance, current: HandlerProvenance): (keyof HandlerProvenance)[] {
+  return PROVENANCE_FIELDS.filter((field) => saved[field] !== current[field]);
 }

@@ -67,11 +67,11 @@ describe('request fields (§4.1)', () => {
 });
 
 describe('literal values in the intent (R7)', () => {
-  test('finds numbers, quoted text, emails and ids', () => {
+  test('finds numbers, quoted text, emails and UUIDs', () => {
     assert.deepEqual(literalsInIntent('orders for customer 4242'), ['a number']);
     assert.deepEqual(literalsInIntent("accounts in 'Germany'"), ['quoted text']);
     assert.deepEqual(literalsInIntent('invoices of bob@example.com'), ['an email address']);
-    assert.deepEqual(literalsInIntent('account 123e4567-e89b-12d3-a456-426614174000'), ['a number', 'an id']);
+    assert.deepEqual(literalsInIntent('account 123e4567-e89b-12d3-a456-426614174000'), ['a number', 'a UUID']);
   });
 
   test('a plain description has none', () => {

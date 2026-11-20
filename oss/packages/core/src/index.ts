@@ -20,6 +20,7 @@ export type {
   GenerationRequest,
   GenerationResult,
   Generator,
+  QueryLimits,
   ReviewRequest,
   ReviewResult,
   Reviewer,
@@ -33,4 +34,4 @@ export type {
 export type { InputScalar, InputValue, SlimeRequest } from './request/parse.js';
 export type { ParamType } from './request/params.js';
 export type { Shape } from './request/shape.js';
-export type { BuiltInStore, SlimeStore, StoreEntry, StoreOption } from './store/types.js';
+export type { SlimeStore, StoreEntry } from './store/types.js';

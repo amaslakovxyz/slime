@@ -29,8 +29,7 @@ here. Deep imports are not part of the API (`package.json` `exports` only has
   - every interface in `ports.ts`;
   - `SlimeRequest`, `InputScalar` and `InputValue` (`request/parse.ts`),
     `ParamType` (`request/params.ts`) and `Shape` (`request/shape.ts`);
-  - `BuiltInStore`, `SlimeStore`, `StoreEntry` and `StoreOption`
-    (`store/types.ts`).
+  - `SlimeStore` and `StoreEntry` (`store/types.ts`).
 
 **`config.ts`**
 
@@ -42,7 +41,8 @@ here. Deep imports are not part of the API (`package.json` `exports` only has
 - `SlimeOptions`:
   - `connector` (required);
   - `generator?` and `reviewer?`;
-  - `store?: StoreOption`;
+  - `store?: SlimeStore` (omitted: `createSlime()` builds the default file
+    store in `./.slime`, M2);
   - `crystal?: CrystalRegistry | false`;
   - `glossary?: Record<string, string>` and `rules?: string[]`;
   - `tiers?: Partial<TierOptions>` and `limits?: Partial<LimitOptions>`;
@@ -66,7 +66,7 @@ here. Deep imports are not part of the API (`package.json` `exports` only has
 
 | Port | Methods |
 |---|---|
-| `Connector` | `name`, `describe()`, `check(sql, params)`, `run(sql, params)`, `safetyCheck()`, `close()` |
+| `Connector` | `name`, `describe()`, `check(sql, params, limits)`, `run(sql, params, limits)`, `safetyCheck()`, `close()` |
 | `Generator` | `model`, `promptHash`, `generate(req, { timeoutMs, signal? })` |
 | `Reviewer` | `model`, `review(req, { timeoutMs, signal? })` |
 | `SandboxRunner` | `run(code, rows, input, limits)`, `close()` |
@@ -74,17 +74,20 @@ here. Deep imports are not part of the API (`package.json` `exports` only has
 Supporting types: `SchemaInfo`, `TableInfo`, `ColumnInfo` (with
 `values?: string[]` for enum-like columns), `RunResult`, `SafetyReport`,
 `Artifact`, `GenerationRequest`, `GenerationResult`, `ReviewRequest`,
-`ReviewResult` and `SandboxLimits`.
+`ReviewResult`, `SandboxLimits` and `QueryLimits` (`{ timeoutMs, rowCap }`,
+passed with each `check` and `run`; the engine compares the cost with
+`limits.maxQueryCost` itself). `SandboxRunner` is a type only: in v1 core
+always uses its own QuickJS runner.
 
 **Subfolders** (internal: only the types listed above are re-exported):
 
 - [request/](./request/README.md): parsing of `{ intent, input?, output }`,
   the output notation, per-handler parameter types, and the cache keys
-  (`requestKey`, `scopeKey`, `handlerKey`).
+  (`requestKey`) and handler provenance (`changedProvenance`).
 - [checks/](./checks/README.md): static SQL checks on generated code
   (`assertReadOnlySql`, `lintArtifact`).
-- [store/](./store/README.md): the key-value `SlimeStore` Port and the
-  built-in store options. It holds no implementation yet.
+- [store/](./store/README.md): the key-value `SlimeStore` Port. It holds no
+  implementation yet.
 
 ## Invariants
 
@@ -105,15 +108,9 @@ Supporting types: `SchemaInfo`, `TableInfo`, `ColumnInfo` (with
 - **Numbers are checked against minimums.** `tiers` and `limits` values must
   be integers at or above `TIER_MIN` and `LIMIT_MIN`. The one exception is
   `limits.maxQueryCost`, which may be fractional.
-- **Store options** (`validateStore`):
-  - a store without `type` is a custom `SlimeStore` (`isCustomStore`) and
-    must have `get`, `put`, `list` and `delete`;
-  - `file` needs `dir`, and `postgres` needs `url`;
-  - `postgres.table`, when given, must match `TABLE_NAME`;
-  - `dynamodb` needs `table`, and `keys`, when given, must be
-    `{ partition, sort }` strings;
-  - every string field (`dir`, `url`, `table`, `region`, `prefix`) must be
-    a non-empty string when given.
+- **`store`, when set,** is any object with `get`, `put`, `list` and
+  `delete`. It is kept as given (not copied or frozen), because a store has
+  behavior and state. There are no `{ type: ... }` store options (C14).
 - **`crystal`** must be `undefined`, `false` or a plain object.
 - **`glossary`** must be a plain object whose keys and values are non-empty
   strings.

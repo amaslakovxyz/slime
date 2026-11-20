@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { canonicalJSON, handlerKey, normalizeIntent, requestKey, scopeKey } from '../src/request/key.js';
+import { canonicalJSON, changedProvenance, normalizeIntent, requestKey } from '../src/request/key.js';
 import { parseRequest } from '../src/request/parse.js';
 
 const output = [{ name: 'string', totalPaid: 'integer' }];
@@ -44,19 +44,17 @@ describe('request key (R2–R4)', () => {
   });
 });
 
-describe('handler scope and store key', () => {
-  const base = { schemaHash: 's', dictionaryHash: 'd', promptHash: 'p', model: 'm' };
+describe('handler provenance (§4.7)', () => {
+  const saved = { schemaHash: 's', dictionaryHash: 'd', promptHash: 'p', model: 'm' };
 
-  test('a schema, dictionary, prompt or model change gives a new scope', () => {
-    const scope = scopeKey(base);
-    for (const change of [{ schemaHash: 's2' }, { dictionaryHash: 'd2' }, { promptHash: 'p2' }, { model: 'm2' }]) {
-      assert.notEqual(scopeKey({ ...base, ...change }), scope, JSON.stringify(change));
-    }
+  test('nothing changed: the handler is reused as it is', () => {
+    assert.deepEqual(changedProvenance(saved, { ...saved }), []);
   });
 
-  test('the store key starts with the scope, so one prefix lists a whole scope', () => {
-    const scope = scopeKey(base);
-    assert.match(scope, /^[0-9a-f]{16}$/);
-    assert.ok(handlerKey(scope, 'abc').startsWith(`${scope}#`));
+  test('names each part that changed, in a fixed order', () => {
+    assert.deepEqual(changedProvenance(saved, { ...saved, model: 'm2', schemaHash: 's2' }), ['schemaHash', 'model']);
+    for (const field of ['schemaHash', 'dictionaryHash', 'promptHash', 'model'] as const) {
+      assert.deepEqual(changedProvenance(saved, { ...saved, [field]: 'x' }), [field]);
+    }
   });
 });

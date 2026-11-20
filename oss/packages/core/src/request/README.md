@@ -30,9 +30,9 @@ and `Shape`.
 - `parseRequest(raw: unknown): ParsedRequest`: validates a raw request or throws
   `INVALID_REQUEST` with an actionable message.
 - `literalsInIntent(intent: string): string[]`: labels literal values found in
-  the intent (`'quoted text'`, `'a number'`, `'an email address'`, `'an id'`).
-  It only detects. R7 (turning these into an error in explore mode) is the
-  engine's job and is not enforced anywhere until M2.
+  the intent (`'quoted text'`, `'a number'`, `'an email address'`, `'a UUID'`).
+  It only detects. R7 (adding a warning to `meta.warnings`, not an error,
+  because "top 10" and possessives match too) is the engine's job from M2.
 
 ### `shape.ts`: output shape notation (§4.2)
 
@@ -62,9 +62,10 @@ and `Shape`.
 - `canonicalJSON(value: unknown): string`: JSON with object keys sorted at every level.
 - `normalizeIntent(intent: string): string`
 - `requestKey(req: ParsedRequest): string`: 64 hex characters.
-- `interface HandlerScope { schemaHash; dictionaryHash; promptHash; model }`
-- `scopeKey(scope: HandlerScope): string`: 16 hex characters.
-- `handlerKey(scope: string, request: string): string`: returns `${scope}#${request}`.
+- `interface HandlerProvenance { schemaHash; dictionaryHash; promptHash; model }`:
+  what a handler was generated against, stored inside the handler.
+- `changedProvenance(saved, current): (keyof HandlerProvenance)[]`: the fields
+  that differ, in a fixed order.
 
 ## Invariants
 
@@ -109,10 +110,12 @@ and `Shape`.
   trailing `.!?;:,` removed. No synonyms and no model (R3).
 - `requestKey` hashes `{ v: 1, normalized intent, sorted input NAMES, output }`.
   Input values and input types are never part of the key.
-- `scopeKey` hashes `{ v: 1, schemaHash, dictionaryHash, promptHash, model }`; a
-  change to any of them gives a new scope.
-- The store key is `${scope}#${requestKey}`, so listing by the prefix `${scope}#`
-  loads every handler of a scope (C13).
+- The request key alone is a handler's store key (§4.7). Provenance is stored
+  inside the handler, never hashed into the key, so locked mode (no generator,
+  possibly a slightly different schema) finds what explore mode saved.
+- Explore mode treats any `changedProvenance` result as a miss and
+  regenerates; locked mode serves the handler and warns once if `schemaHash`
+  changed. The engine applies this from M2.
 - Bumping the `v: 1` field invalidates every existing key; change it only on purpose.
 
 ## Side Effects
