@@ -6,8 +6,8 @@ import { describe, test } from 'node:test';
 import { PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { app, envNameFor, keyMatches } from '../src/lambda.js';
 import { DynamoHandlerStore, type DocClient } from '../src/store-dynamodb.js';
-import type { Artifact } from '@slime-kit/core/generator.js';
-import { codeHash, type StoredHandler } from '@slime-kit/core/store.js';
+import type { Artifact } from '@slime-cloud/core/generator.js';
+import { codeHash, type StoredHandler } from '@slime-cloud/core/store.js';
 
 /** Just enough DynamoDB: one table keyed by tenantId + artifactKey, pages of `pageSize`. */
 class FakeDynamo implements DocClient {

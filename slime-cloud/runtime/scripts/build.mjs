@@ -1,5 +1,5 @@
 // Bundles the runtime for AWS Lambda into dist/lambda/ (zipped by Terraform,
-// infra/aws/platform/runtime.tf). @slime-kit/core is compiled from sandbox/src
+// infra/aws/platform/runtime.tf). @slime-cloud/core is compiled from sandbox/src
 // through the tsconfig `paths` mapping, which esbuild applies itself. Output must be deterministic: the same source
 // gives the same zip hash, so Terraform plans show no change for no change.
 //

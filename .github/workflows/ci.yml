@@ -75,7 +75,7 @@ jobs:
       - name: Core does not import the platform
         working-directory: .
         run: "! grep -rnE \"slime-cloud|@aws-sdk/\" sandbox/src"
-      # The runtime compiles @slime-kit/core from sandbox/src, whose imports
+      # The runtime compiles @slime-cloud/core from sandbox/src, whose imports
       # resolve against sandbox/node_modules.
       - run: npm ci
         working-directory: sandbox

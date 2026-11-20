@@ -47,7 +47,7 @@ Backend -- Slime runtime:
   runtime on Lambda + DynamoDB).
 - [slime-cloud/runtime/](./slime-cloud/runtime/README.md) - `@slime-cloud/runtime`:
   the Lambda entry and DynamoDB handler store around the core. Imports
-  `sandbox/` (the future open-source `@slime-kit/core`); `sandbox/` never
+  `sandbox/` (the future open-source `@slime-cloud/core`); `sandbox/` never
   imports it.
 
 Root files: [AGENTS.md](./AGENTS.md) (repository contract for agents),

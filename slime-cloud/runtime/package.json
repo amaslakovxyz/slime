@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Slime Cloud runtime: @slime-kit/core (sandbox/) on AWS Lambda with a DynamoDB handler store.",
+  "description": "Slime Cloud runtime: @slime-cloud/core (sandbox/) on AWS Lambda with a DynamoDB handler store.",
   "scripts": {
     "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",

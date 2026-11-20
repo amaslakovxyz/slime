@@ -1,7 +1,7 @@
 # @slime-cloud/runtime
 
 Slime Cloud's hosted runtime: the open-source core (`sandbox/`, future
-`@slime-kit/core`) running on AWS Lambda, with reviewed Liquid handlers in
+`@slime-cloud/core`) running on AWS Lambda, with reviewed Liquid handlers in
 DynamoDB. Deployed by [`infra/aws/platform`](../../infra/aws/README.md#platform-slime-runtime)
 as the `slime-runtime` function.
 
@@ -10,23 +10,23 @@ package or anything AWS-specific. `sandbox/` stays exactly what gets published.
 
 ## How the core is consumed
 
-Until `sandbox/` is published as `@slime-kit/core`, the core is compiled from
+Until `sandbox/` is published as `@slime-cloud/core`, the core is compiled from
 source through one mapping in [tsconfig.json](tsconfig.json):
 
 ```json
-"paths": { "@slime-kit/core/*": ["../../sandbox/src/*"] }
+"paths": { "@slime-cloud/core/*": ["../../sandbox/src/*"] }
 ```
 
 TypeScript, tsx (tests) and esbuild (bundle) all read it, so code here already
-imports `@slime-kit/core/engine.js` etc. When the package exists: delete the
-mapping, add `"@slime-kit/core"` to `dependencies`, and nothing else changes.
+imports `@slime-cloud/core/engine.js` etc. When the package exists: delete the
+mapping, add `"@slime-cloud/core"` to `dependencies`, and nothing else changes.
 The core's own dependencies resolve from `sandbox/node_modules`, so run
 `npm ci` there too.
 
 | File | Role |
 |---|---|
 | [src/lambda.ts](src/lambda.ts) | Lambda entry: SSM settings at cold start, `x-api-key` auth, lazy engine boot (503 `NOT_READY` and retry), store flush before each response |
-| [src/app.ts](src/app.ts) | HTTP routes (mirror `sandbox/src/index.ts` until `@slime-kit/server` exists) |
+| [src/app.ts](src/app.ts) | HTTP routes (mirror `sandbox/src/index.ts` until `@slime-cloud/server` exists) |
 | [src/store-dynamodb.ts](src/store-dynamodb.ts) | Core `HandlerStore` port on DynamoDB, one partition per tenant |
 | [scripts/build.mjs](scripts/build.mjs) | Deterministic bundle into `dist/lambda/` (same source, same zip hash) |
 
