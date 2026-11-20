@@ -44,6 +44,8 @@ export const config = {
   // slime_meta schema. Set to "" to keep everything in memory.
   metaDatabaseUrl:
     process.env.META_DATABASE_URL ?? 'postgres://slime_writer:slime_writer@localhost:54329/slime',
+  // Table inside slime_meta. The demo script uses its own so it never touches dev data.
+  metaTable: process.env.SLIME_META_TABLE || 'handlers',
   // SLIME_MODE is read only from the environment, never from a request.
   // "locked": cache misses get 404 and the generator is never loaded.
   mode: (process.env.SLIME_MODE === 'locked' ? 'locked' : 'explore') as 'explore' | 'locked',

@@ -32,6 +32,29 @@ the data. Repeat requests skip Claude.
 
    `.env` is git-ignored; never commit a key.
 
+## See it work
+
+```bash
+npm run db:up
+npm run demo                          # uses SLIME_PROVIDER from .env
+SLIME_PROVIDER=offline npm run demo   # no model: hand-written handlers
+```
+
+`scripts/demo.sh` sends one question through every tier on the real server.
+Each step prints the tier, whether it was a cache hit, timings and the review
+status:
+
+1. A new request, where the model writes the SQL (Gas).
+2. The same question with another value, which reuses the code.
+3. The background review.
+4. More runs, until the handler becomes Liquid.
+5. A restart, after which the handler is loaded from the database.
+6. `crystallize`.
+7. Another restart, after which the handler is served as Crystal.
+
+It uses its own table (`slime_meta.handlers_demo`) and a temporary Crystal
+folder, so dev data and the repo are untouched.
+
 ## Run the tests
 
 ```bash

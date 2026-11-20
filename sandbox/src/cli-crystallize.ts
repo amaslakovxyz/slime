@@ -42,7 +42,7 @@ const connector = new PostgresConnector(config.databaseUrl);
 const safety = await connector.safetyCheck();
 if (!safety.ok) die(`The database user is not read-only:\n - ${safety.problems.join('\n - ')}`);
 const schemaHash = schemaHashOf(await connector.describe());
-const store = new PostgresHandlerStore(config.metaDatabaseUrl);
+const store = new PostgresHandlerStore(config.metaDatabaseUrl, config.metaTable);
 await store.init();
 
 const optimizerArg = args.indexOf('--optimizer');

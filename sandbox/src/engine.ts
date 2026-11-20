@@ -164,7 +164,8 @@ export class Engine {
     await warmSandbox();
 
     const store =
-      deps.store ?? (config.metaDatabaseUrl ? new PostgresHandlerStore(config.metaDatabaseUrl) : new MemoryHandlerStore());
+      deps.store ??
+      (config.metaDatabaseUrl ? new PostgresHandlerStore(config.metaDatabaseUrl, config.metaTable) : new MemoryHandlerStore());
     await store.init();
     // Computed the same way in every mode, so a locked server finds the handlers
     // an explore-mode server saved.
