@@ -96,17 +96,17 @@ The request path never reaches the agent. The build path never touches the real 
 3. The kernel copies the seed DB and runs each try input through request-path steps 3–6, always rolling back.
 4. Failure returns a reason code to the agent for up to three rounds; then the build fails.
 5. Success shows the effects diff; `lee accept` stores `{seed, input, ctx.now, effects}` as a fixture (Liquid).
-6. `lee freeze` pins the exact bytes (Bone).
+6. `lee freeze` pins the exact bytes (Crystal).
 
 ## Trust levels and modes
 
-Production runs only **Bone**; all other levels remain in development.
+Production runs only **Crystal**; all other levels remain in development.
 
 | Level | Meaning | Runs against | Serves |
 |---|---|---|---|
 | Gas | Generated, unchecked | Seed DB copy, always rolled back | Nothing |
 | Liquid | Passed Gatekeeper, invariants and accepted fixtures | Dev DB | Dev requests |
-| Bone | Exact bytes pinned in `lee.lock` by a human commit | Prod DB | Real traffic |
+| Crystal | Exact bytes pinned in `lee.lock` by a human commit | Prod DB | Real traffic |
 
 A spec edit marks that intent's fixtures stale and drops its handler to Gas. Regenerated code remains Liquid until re-frozen. `LEE_MODE` is read only from the environment, never from a request. In production the agent module is not loaded, making LLM calls impossible.
 
@@ -133,7 +133,7 @@ All tables carry `tenant_id`; money is stored as integer cents.
 
 ## Non-goals and open questions
 
-**Non-goals:** external DB side effects (payments, email, webhooks), joins or raw SQL in `db.read`, multi-instance deployment, and automatic promotion to Bone.
+**Non-goals:** external DB side effects (payments, email, webhooks), joins or raw SQL in `db.read`, multi-instance deployment, and automatic promotion to Crystal.
 
 - [ ] Team size, hours and judging criteria?
 - [ ] Should `db.read` support `in` and range filters, or equality only?
