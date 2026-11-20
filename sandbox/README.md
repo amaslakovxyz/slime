@@ -90,8 +90,34 @@ intent does not.
 
 * **Gas:** newly generated. It stays in a holding area for `GAS_WINDOW_MS`.
 * **Liquid:** a Gas handler that reached `GAS_TO_LIQUID_HITS` requests within
-  the window. It is kept.
+  the window **and** passed the background review. It is kept.
 * **Crystal:** (not built yet) optimized code that ships as part of the app.
+
+### Background review
+
+A new handler can pass every automatic check and still mean the wrong thing.
+For example, it might rank the most *active* accounts as the highest churn
+risk. So each new Gas handler gets a background review. The review is queued
+off the request path, so the response never waits for it.
+
+1. A second model pass reads the request and the generated SQL and shaping
+   code. It never sees row data. It returns `approve`, or `reject` with
+   concrete problems.
+2. **On reject,** Slime regenerates the handler with the reviewer's notes.
+   The revision replaces the old code only if it passes the same database and
+   shape checks. The old version is kept in the handler's history, and
+   responses show the revision number in `meta.review`.
+3. **Still rejected after `MAX_REVIEWS` reviews:** the handler stays Gas, so it
+   never becomes Liquid and expires with the window. Every response it serves
+   carries a warning.
+
+`GET /v0/handlers` shows each handler's review status, the reviewer's notes and
+any previous versions. The schema's table and column comments are shown to
+both models, so documenting what columns mean helps both of them.
+
+On Groq's free tier, reviews share the rate limit with live generations. While
+reviews are running, new requests can wait. Use a separate key or a paid tier
+for demos.
 
 ## Safety
 

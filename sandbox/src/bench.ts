@@ -38,6 +38,7 @@ interface Row {
 }
 const rows: Row[] = [];
 const failures: string[] = [];
+const handlerIds = new Map<string, string>(); // case name -> handler id
 
 for (const c of selected) {
   rows.push(await runCase(c));
@@ -46,7 +47,68 @@ for (const c of selected) {
 console.table(rows);
 summarize(rows);
 if (failures.length) console.log(`\nDetails:\n${failures.join('\n\n')}`);
+
+await reviewPhase();
 await connector.close();
+process.exit(0); // sandbox worker threads are unref'd, but don't wait on idle pg sockets
+
+/**
+ * Background reviews run off the request path. Wait for them, show each verdict,
+ * and re-check correctness: a reviewer "fix" that breaks a right answer must show up.
+ */
+async function reviewPhase() {
+  if (!config.review) return;
+  console.log(`\nWaiting for background reviews (model=${config.reviewModel}, effort=${config.reviewEffort})...`);
+  const started = performance.now();
+  await engine.reviewsSettled();
+  console.log(`Reviews finished in ${Math.round((performance.now() - started) / 1000)}s.\n`);
+
+  // Re-check answers with the reviewed (possibly revised) handlers. These are cache
+  // hits; a hit on a handler whose review call errored queues a retry, so settle again after.
+  const afterReview = new Map<string, string>();
+  for (const c of selected) {
+    if (c.kind !== 'checked' || !handlerIds.has(c.name)) continue;
+    const ok = await Promise.all(
+      [c.input, c.altInput].map(async (input) => {
+        const r = await engine.query({ intent: c.intent, input, output: c.output });
+        return matches(c, r.data, input);
+      }),
+    );
+    afterReview.set(c.name, ok.every(Boolean) ? 'correct' : 'WRONG');
+  }
+  await engine.reviewsSettled();
+
+  const reviewRows = [];
+  const notes: string[] = [];
+  for (const c of selected) {
+    const id = handlerIds.get(c.name);
+    const h = id ? engine.getHandler(id) : undefined;
+    if (!h || c.kind === 'refusal') continue;
+    reviewRows.push({
+      case: c.name,
+      review: h.review.status,
+      reviews: h.review.reviews,
+      revised: h.revision > 0 ? `yes (v${h.revision})` : 'no',
+      'after review': afterReview.get(c.name) ?? '-',
+      tier: h.tier,
+      'review model s': Math.round(h.review.ms / 100) / 10,
+    });
+    if (h.review.problems.length || h.revision > 0) {
+      notes.push(
+        `${c.name}: ${h.review.status}${h.revision ? `, revised to v${h.revision}` : ''}\n` +
+          (h.history.length ? `  rejected for: ${h.history.map((v) => v.rejectedFor.join(' ')).join(' / ')}\n` : '') +
+          (h.review.problems.length ? `  open problems: ${h.review.problems.join(' ')}\n` : '') +
+          `  current assumptions: ${h.artifact.assumptions.join(' | ') || 'none'}\n  current SQL:\n${indent(h.artifact.sql)}`,
+      );
+    }
+  }
+  console.table(reviewRows);
+  if (notes.length) console.log(`\nReview details:\n${notes.join('\n\n')}`);
+}
+
+function indent(text: string) {
+  return text.split('\n').map((l) => `    ${l}`).join('\n');
+}
 
 async function runCase(c: BenchCase): Promise<Row> {
   const req = { intent: c.intent, input: c.input, output: c.output };
@@ -78,6 +140,7 @@ async function runCase(c: BenchCase): Promise<Row> {
     return row;
   }
 
+  handlerIds.set(c.name, first.meta.handlerId);
   const gen = first.meta.generation;
   row.attempts = gen?.attempts ?? '-';
   // Gas time excludes free-tier rate-limit waits, which are shown in their own column.

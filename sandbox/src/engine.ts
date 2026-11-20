@@ -10,13 +10,29 @@ import {
   canonicalJSON,
 } from './fingerprint.js';
 import type { Artifact, Generator } from './generator.js';
+import type { Reviewer } from './review.js';
 import { runShape, warmSandbox } from './sandbox.js';
 import { assertValidShape, validateAgainstShape, type Shape } from './shape.js';
 
 // Gas: generated recently, kept in a holding area that expires after GAS_WINDOW_MS.
-// Liquid: reached GAS_TO_LIQUID_HITS requests inside the window; kept.
+// Liquid: reached GAS_TO_LIQUID_HITS requests inside the window AND passed the
+//         background review; kept.
 // Crystal: (built last) optimized code shipped as part of the app. Not in this sandbox.
 export type Tier = 'gas' | 'liquid' | 'crystal';
+
+// pending: queued or running. approved: may be promoted. rejected: stays Gas (and
+// expires) even if popular. failed: the review call itself failed; retried on the
+// next hit. skipped: reviews are off (SLIME_REVIEW=off).
+export type ReviewStatus = 'pending' | 'approved' | 'rejected' | 'failed' | 'skipped';
+
+interface ReviewState {
+  status: ReviewStatus;
+  reviews: number;
+  problems: string[];
+  ms: number;
+  waitMs: number;
+  reviewedAt: number | null;
+}
 
 export interface QueryRequest {
   intent: string;
@@ -37,8 +53,15 @@ export interface Handler {
   id: string;
   fingerprint: string;
   intent: string;
+  inputSig: Record<string, string>;
+  // Input values of the request that created the handler. Used only to re-run a
+  // revised handler against the database; never sent to a model.
+  sampleInput: Record<string, unknown>;
   output: Shape;
   artifact: Artifact;
+  revision: number;
+  history: { artifact: Artifact; rejectedFor: string[] }[];
+  review: ReviewState;
   tier: Tier;
   hits: number;
   errors: number;
@@ -67,6 +90,7 @@ export interface QueryMeta {
   shapeJs: string | null;
   assumptions: string[];
   warnings: string[];
+  review: { status: ReviewStatus; revision: number };
   generation?: GenerationStats;
 }
 
@@ -85,6 +109,9 @@ export class Engine {
   private generationTimes: number[] = [];
   private slots: number;
   private waiting: (() => void)[] = [];
+  // Reviews run one at a time, off the request path, in arrival order.
+  private reviewChain: Promise<void> = Promise.resolve();
+  private reviewing = new Set<string>();
 
   private constructor(
     private readonly connector: Connector,
@@ -92,6 +119,7 @@ export class Engine {
     private readonly schemaHash: string,
     private readonly promptHash: string,
     private readonly generator: Generator | null,
+    private readonly reviewer: Reviewer | null,
   ) {
     this.slots = config.maxConcurrentGenerations;
   }
@@ -106,11 +134,11 @@ export class Engine {
     await warmSandbox();
     if (config.mode === 'locked') {
       // Locked mode never loads the generator module, so no model call is possible.
-      return new Engine(connector, schema, schemaHash, 'locked', null);
+      return new Engine(connector, schema, schemaHash, 'locked', null, null);
     }
     const { createGenerator } = await import('./generators.js');
-    const { generator, promptHash } = await createGenerator(schema);
-    return new Engine(connector, schema, schemaHash, promptHash, generator);
+    const { generator, reviewer, promptHash } = await createGenerator(schema);
+    return new Engine(connector, schema, schemaHash, promptHash, generator, reviewer);
   }
 
   async query(raw: unknown): Promise<{ data: unknown; meta: QueryMeta }> {
@@ -165,6 +193,10 @@ export class Engine {
       }
     }
 
+    if (handler.review.status === 'rejected') {
+      warnings.push(`A background review found problems with this handler: ${handler.review.problems.join(' ')}`);
+    }
+
     const total = performance.now() - started;
     return {
       data: execution.data,
@@ -179,6 +211,7 @@ export class Engine {
         shapeJs: handler.artifact.shapeJs,
         assumptions: handler.artifact.assumptions,
         warnings,
+        review: { status: handler.review.status, revision: handler.revision },
         ...(cache === 'miss' ? { generation: round(handler.generation) } : {}),
       },
     };
@@ -197,8 +230,21 @@ export class Engine {
       sql: h.artifact.sql,
       shapeJs: h.artifact.shapeJs,
       assumptions: h.artifact.assumptions,
+      revision: h.revision,
+      review: { ...round(h.review), reviewedAt: h.review.reviewedAt ? new Date(h.review.reviewedAt).toISOString() : null },
+      previousVersions: h.history,
       generation: round(h.generation),
     }));
+  }
+
+  getHandler(id: string): Handler | undefined {
+    for (const h of this.handlers.values()) if (h.id === id) return h;
+    return undefined;
+  }
+
+  /** Resolves once no review is queued or running (used by the bench). */
+  async reviewsSettled(): Promise<void> {
+    while (this.reviewing.size) await this.reviewChain;
   }
 
   evict(id: string): boolean {
@@ -210,11 +256,17 @@ export class Engine {
 
   stats() {
     const byTier = { gas: 0, liquid: 0, crystal: 0 };
-    for (const h of this.handlers.values()) byTier[h.tier]++;
+    const byReview: Record<ReviewStatus, number> = { pending: 0, approved: 0, rejected: 0, failed: 0, skipped: 0 };
+    for (const h of this.handlers.values()) {
+      byTier[h.tier]++;
+      byReview[h.review.status]++;
+    }
     return {
       mode: config.mode,
       provider: this.generator ? config.provider : null,
       model: this.generator ? config.model : null,
+      reviewModel: this.reviewer?.model ?? null,
+      reviews: byReview,
       schemaHash: this.schemaHash,
       tables: this.schema.tables.map((t) => t.name),
       handlers: byTier,
@@ -236,10 +288,96 @@ export class Engine {
   private recordHit(handler: Handler) {
     handler.hits++;
     handler.lastUsedAt = Date.now();
-    if (handler.tier === 'gas' && handler.hits >= config.gasToLiquidHits) {
+    if (handler.review.status === 'failed') this.scheduleReview(handler); // retry a review that errored
+    this.promoteIfReady(handler);
+  }
+
+  /** Gas becomes Liquid only when it is popular enough AND the review approved it. */
+  private promoteIfReady(handler: Handler) {
+    const reviewed = handler.review.status === 'approved' || handler.review.status === 'skipped';
+    if (handler.tier === 'gas' && reviewed && handler.hits >= config.gasToLiquidHits) {
       handler.tier = 'liquid';
       handler.expiresAt = null;
     }
+  }
+
+  private scheduleReview(handler: Handler) {
+    if (!this.reviewer || this.reviewing.has(handler.id)) return;
+    this.reviewing.add(handler.id);
+    handler.review.status = 'pending';
+    this.reviewChain = this.reviewChain.then(() => this.runReview(handler));
+  }
+
+  // Never throws: the outcome is recorded on the handler.
+  private async runReview(handler: Handler): Promise<void> {
+    try {
+      for (;;) {
+        handler.review.reviews++;
+        const r = await this.reviewer!.review(
+          { intent: handler.intent, inputSig: handler.inputSig, output: handler.output, artifact: handler.artifact },
+          config.reviewTimeoutMs,
+        );
+        handler.review.ms += r.ms;
+        handler.review.waitMs += r.waitMs;
+        handler.review.reviewedAt = Date.now();
+        handler.review.problems = r.problems;
+        if (r.verdict === 'approve') {
+          handler.review.status = 'approved';
+          this.promoteIfReady(handler);
+          return;
+        }
+        if (handler.review.reviews >= config.maxReviews || !(await this.revise(handler, r.problems))) {
+          handler.review.status = 'rejected';
+          return;
+        }
+      }
+    } catch (err) {
+      handler.review.status = 'failed';
+      handler.review.problems = [`review failed: ${(err as Error).message}`];
+    } finally {
+      this.reviewing.delete(handler.id);
+    }
+  }
+
+  /**
+   * Regenerates a rejected handler with the reviewer's notes. The revision replaces
+   * the old code only if it passes the same checks against the database; the old
+   * version is kept in `history`, and responses expose the revision number.
+   */
+  private async revise(handler: Handler, problems: string[]): Promise<boolean> {
+    let previous = { artifact: handler.artifact, error: `A reviewer rejected this handler: ${problems.join(' ')}` };
+    // Same repair budget as a normal generation: a revision that fails a check gets
+    // the error back once, so a small slip (e.g. an unquoted alias) doesn't sink it.
+    for (let attempt = 1; attempt <= 1 + config.maxRepairs; attempt++) {
+      this.generationTimes.push(Date.now());
+      const gen = await this.generator!.generate(
+        { intent: handler.intent, inputSig: handler.inputSig, output: handler.output, previous },
+        config.generationBudgetMs,
+      );
+      const candidate = gen.artifact;
+      if (candidate.unsatisfiable) {
+        handler.review.problems = [...problems, `revision gave up: ${candidate.unsatisfiable}`];
+        return false;
+      }
+      try {
+        lintArtifact(candidate, handler.sampleInput);
+        await this.connector.check(candidate.sql, bindParams(candidate, handler.sampleInput));
+        await this.execute(candidate, handler.output, handler.sampleInput);
+      } catch (err) {
+        const message = (err as Error).message;
+        handler.review.problems = [...problems, `revision failed checks: ${message}`];
+        previous = {
+          artifact: candidate,
+          error: `${previous.error} Your revision then failed a check: ${message}`,
+        };
+        continue;
+      }
+      handler.history.push({ artifact: handler.artifact, rejectedFor: problems });
+      handler.artifact = candidate;
+      handler.revision++;
+      return true;
+    }
+    return false;
   }
 
   private async generate(
@@ -290,8 +428,20 @@ export class Engine {
             id: key,
             fingerprint,
             intent: req.intent,
+            inputSig,
+            sampleInput: req.input,
             output: req.output,
             artifact,
+            revision: 0,
+            history: [],
+            review: {
+              status: this.reviewer ? 'pending' : 'skipped',
+              reviews: 0,
+              problems: [],
+              ms: 0,
+              waitMs: 0,
+              reviewedAt: null,
+            },
             tier: 'gas',
             hits: 1,
             errors: 0,
@@ -301,11 +451,9 @@ export class Engine {
             generation: stats,
           };
           // Cached only after it ran successfully and matched the requested shape.
-          if (config.gasToLiquidHits <= 1) {
-            handler.tier = 'liquid';
-            handler.expiresAt = null;
-          }
           this.handlers.set(key, handler);
+          this.promoteIfReady(handler);
+          this.scheduleReview(handler); // runs in the background; this response doesn't wait
           return { handler, execution };
         } catch (err) {
           const e = err instanceof SlimeError ? err : new SlimeError('QUERY_ERROR', String(err));

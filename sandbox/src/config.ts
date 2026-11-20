@@ -29,6 +29,17 @@ export const config = {
   // Thinking adds latency; off by default for Gas speed. Set SLIME_THINKING=on to compare.
   thinking: process.env.SLIME_THINKING === 'on',
 
+  // Background review before Gas may become Liquid (SLIME_REVIEW=off to skip).
+  review: process.env.SLIME_REVIEW !== 'off',
+  reviewModel:
+    process.env.SLIME_REVIEW_MODEL ||
+    (process.env.SLIME_PROVIDER === 'groq' ? 'openai/gpt-oss-120b' : 'claude-opus-5-5'),
+  reviewEffort: (process.env.SLIME_REVIEW_EFFORT ?? 'high') as 'low' | 'medium' | 'high',
+  // A rejected handler is regenerated with the reviewer's notes and reviewed again,
+  // up to this many reviews in total.
+  maxReviews: num('MAX_REVIEWS', 2),
+  reviewTimeoutMs: num('REVIEW_TIMEOUT_MS', 60_000),
+
   // Tier rules (thresholds are TBD in the brief; these are starting values).
   gasToLiquidHits: num('GAS_TO_LIQUID_HITS', 3),
   gasWindowMs: num('GAS_WINDOW_MS', 60 * 60 * 1000),
