@@ -4,7 +4,7 @@
 // and the result is immutable. config.with({...}) returns a changed copy.
 import { SlimeConfigError } from './errors.js';
 import type { Connector, Generator, Reviewer } from './ports.js';
-import { DEFAULT_STORE, type StoreOption } from './store/types.js';
+import { DEFAULT_STORE, isCustomStore, type StoreOption } from './store/types.js';
 
 export interface TierOptions {
   /** Successful runs inside the Gas window before a handler may become Liquid. */
@@ -204,8 +204,8 @@ function validateStore(store: unknown): string[] {
   if (!isPlainObject(store) && !(store && typeof store === 'object')) {
     return [`store must be { type: ${STORE_TYPES.map((t) => `'${t}'`).join(' | ')}, ... } or an object implementing SlimeStore`];
   }
+  if (isCustomStore(store as StoreOption)) return missingMethods('store', store, ['get', 'put', 'list', 'delete']);
   const s = store as Record<string, unknown>;
-  if (!('type' in s)) return missingMethods('store', s, ['get', 'put', 'list', 'delete']);
 
   const problems: string[] = [];
   const text = (key: string, required: boolean) => {
@@ -281,8 +281,8 @@ function missingStrings(name: string, value: unknown, keys: string[]): string[] 
 function freezeStore(store: StoreOption): StoreOption {
   // Built-in options are plain data and get copied; a custom store is an object
   // with behavior and state, so it is used as given.
-  if ('type' in store) return Object.freeze({ ...store }) as StoreOption;
-  return store;
+  if (isCustomStore(store)) return store;
+  return Object.freeze({ ...store }) as StoreOption;
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
