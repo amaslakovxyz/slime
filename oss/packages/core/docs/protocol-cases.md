@@ -130,7 +130,7 @@ Yes, this is a typed protocol: free in its names, strict in its structure.
 Ship it in three forms, all generated from one definition in core:
 
 1. **TypeScript types** (`SlimeRequest`, `Shape`) exported from
-   `@slime-kit/core`. `slime.query()` also infers the type of `data` from a
+   `@slime-cloud/core`. `slime.query()` also infers the type of `data` from a
    literal `output`:
 
    ```ts
@@ -141,7 +141,7 @@ Ship it in three forms, all generated from one definition in core:
    // data: { name: string; totalPaid: number }[]
    ```
 
-2. **JSON Schema** (`@slime-kit/core/request.schema.json`). Validates
+2. **JSON Schema** (`@slime-cloud/core/request.schema.json`). Validates
    requests in any language, and gives editors autocomplete. Agents can use
    it as a tool input schema.
 3. **`PROTOCOL.md`**: the rules plus the examples from §1, written so a

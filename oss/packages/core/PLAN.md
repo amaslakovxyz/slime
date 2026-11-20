@@ -1,4 +1,4 @@
-# @slime-kit/core: library plan
+# @slime-cloud/core: library plan
 
 * **Status:** draft, being decided step by step
 * **Date:** 2026-11-20
@@ -9,7 +9,7 @@
 Turn the sandbox prototype into a library that can be packaged, installed
 and used:
 
-* `npm install @slime-kit/core`;
+* `npm install @slime-cloud/core`;
 * configure it in code;
 * call `slime.query()` inside any Node app.
 
@@ -23,7 +23,7 @@ library: options in, no global state, no `.env` reading.
 |---|---|
 | `concepts_brief.md` | Library first (`@slime/core`), standalone server later. Read-only, Postgres, `{ intent, input, output }`, Gas → Liquid → Crystal. First next step: "turn the sandbox into the library plus an example app". |
 | `sandbox/` on `main` | Working engine, about 88 tests. Gas, Liquid in Postgres, background review, Crystal (PR #6), offline/Groq/Claude providers. Configured through a global `config` that reads env and `.env`. |
-| PR #7 (open) | Layers: core → server → platform. Name `@slime-kit/core` at `oss/packages/core`. Its plan moves `sandbox/` there with `git mv`, and adds `SLIME_META_TABLE`. Lists "config injection instead of the module singleton" as later work. |
+| PR #7 (open) | Layers: core → server → platform. Name `@slime-cloud/core` at `oss/packages/core`. Its plan moves `sandbox/` there with `git mv`, and adds `SLIME_META_TABLE`. Lists "config injection instead of the module singleton" as later work. |
 | `chore/gas-v0-plan`, `onboarding` | The other direction (Bun, SQLite, named intents, writes). Not the base for core. Useful later for the write path (`EffectSink`). |
 
 Where this plan differs from PR #7: PR #7's Tasks 1–3 move the sandbox as is.
@@ -38,16 +38,16 @@ Status: **Decided**, **Proposed** (default unless someone objects) or
 
 | # | Question | Proposal | Status |
 |---|---|---|---|
-| C1 | Name and location | `@slime-kit/core` in `oss/packages/core/`, inside npm workspaces at the repo root (PR #7 D10). | Decided |
+| C1 | Name and location | `@slime-cloud/core` in `oss/packages/core/`, inside npm workspaces at the repo root (PR #7 D10). | Decided |
 | C2 | Start from scratch or move the sandbox? | New package. Port modules one at a time, each with its tests. The sandbox isn't touched until core reaches parity, then it's retired (M6). | Decided |
 | C3 | Runtime | v1: Node ≥ 22, ESM only. Built so that other runtimes (Bun, Deno, edge) can be added later without touching the engine. Runtime-specific code stays behind Ports: the shaping sandbox goes behind a new `SandboxRunner` Port (today a QuickJS worker thread), and database drivers stay behind `Connector`. The engine uses only `node:*` modules that Bun and Deno also provide. | Decided |
 | C4 | Configuration | A `SlimeConfig` class. The app creates it and adds the parts it needs: connector, generator, store, limits. Each part can come from env, a secrets store or anywhere else in the app. The class fills defaults, validates everything at once (reporting every problem, not just the first), and is immutable; `config.with({...})` returns a changed copy for tests. Core never reads `process.env` or `.env`. | Decided (class shape: Proposed) |
 | C5 | Entry point | Three steps in the app: create a connector (where data comes from), create a Slime instance with `createSlime(config)`, then call `slime.query()` inside any endpoint. The instance also has `handlers()`, `stats()`, `evict(id)`, `flush()` and `close()`. | Decided |
 | C6 | Locked mode | Locked means no `generator` is passed. Then no model client is ever imported, by construction. An explicit `mode` setting can be added later without breaking this. | Decided |
-| C7 | Packaging of adapters | Subpath exports from one package: `@slime-kit/core/postgres`, `/claude`, `/groq`, `/offline`. Model SDKs are optional peer dependencies. | Decided |
+| C7 | Packaging of adapters | Subpath exports from one package: `@slime-cloud/core/postgres`, `/claude`, `/groq`, `/offline`. Model SDKs are optional peer dependencies. | Decided |
 | C8 | What ships | Compiled JS and `.d.ts` in `dist/` (built with `tsc`), plus the shape worker file. Not TS source. | Decided |
-| C9 | HTTP | No HTTP in core. The app calls `slime.query()` from its own endpoint in any framework. A thrown `SlimeError` carries `status` and `toJSON()`, so the endpoint can return it directly. Admin data comes from methods only (`handlers()`, `stats()`, `evict()`); exposing and protecting them over HTTP is up to the app or `@slime-kit/server`. | Decided |
-| C10 | Crystal | Crystal handlers are ordinary modules in the app's own code. The crystallize job writes TS or JS (a config setting) plus a generated `index` and a manifest. The app imports the index and passes it as `crystal` in `SlimeConfig`; leaving it out (or `false`) turns Crystal off. Because the code is compiled with the app, safety is checked when the job writes it (allowlist, SQL lint, equivalence test on recorded runs) and by a `check` command in the app's CI, which re-parses the sources and compares manifest hashes. Core doesn't re-check at startup. The job and `check` are a separate entry (`@slime-kit/core/crystallize`, plus a bin), so the runtime never imports them. | Decided |
+| C9 | HTTP | No HTTP in core. The app calls `slime.query()` from its own endpoint in any framework. A thrown `SlimeError` carries `status` and `toJSON()`, so the endpoint can return it directly. Admin data comes from methods only (`handlers()`, `stats()`, `evict()`); exposing and protecting them over HTTP is up to the app or `@slime-cloud/server`. | Decided |
+| C10 | Crystal | Crystal handlers are ordinary modules in the app's own code. The crystallize job writes TS or JS (a config setting) plus a generated `index` and a manifest. The app imports the index and passes it as `crystal` in `SlimeConfig`; leaving it out (or `false`) turns Crystal off. Because the code is compiled with the app, safety is checked when the job writes it (allowlist, SQL lint, equivalence test on recorded runs) and by a `check` command in the app's CI, which re-parses the sources and compares manifest hashes. Core doesn't re-check at startup. The job and `check` are a separate entry (`@slime-cloud/core/crystallize`, plus a bin), so the runtime never imports them. | Decided |
 | C11 | Observability | An `onEvent(event)` option (generated, promoted, reviewed, error, timings, tokens). Core doesn't log on its own. Metering builds on this later. | Decided |
 | C12 | Out of scope for core v1 | Writes, tenancy, connectors other than Postgres, Redis, semantic matching. | Proposed |
 
@@ -171,9 +171,9 @@ It never sees input values or rows.
 This is the target for C4–C10, and it changes as we decide them.
 
 ```ts
-import { createSlime, SlimeConfig } from '@slime-kit/core';
-import { postgresConnector, postgresStore } from '@slime-kit/core/postgres';
-import { claude } from '@slime-kit/core/claude';
+import { createSlime, SlimeConfig } from '@slime-cloud/core';
+import { postgresConnector, postgresStore } from '@slime-cloud/core/postgres';
+import { claude } from '@slime-cloud/core/claude';
 
 // The app decides where values come from: env here, but any source works.
 const config = new SlimeConfig({
@@ -218,7 +218,7 @@ Contracts (Ports) that core exports, unchanged from the sandbox unless noted:
 
 ```
 oss/packages/core/
-├── package.json        # @slime-kit/core, "exports" per subpath, peerDeps optional
+├── package.json        # @slime-cloud/core, "exports" per subpath, peerDeps optional
 ├── tsconfig.json       # build → dist/, declarations on
 ├── src/
 │   ├── index.ts        # createSlime, SlimeConfig, types, SlimeError
@@ -229,11 +229,11 @@ oss/packages/core/
 │   ├── checks/         # shape, sql guard, lint, limit check (R6)
 │   ├── sandbox/        # SandboxRunner Port + QuickJS worker (shape-worker.mjs)
 │   ├── crystal/        # Crystal registry types; serving crystal handlers
-│   ├── postgres/       # connector + store   → @slime-kit/core/postgres
-│   ├── claude/         # generator + reviewer → @slime-kit/core/claude
-│   ├── groq/           #                      → @slime-kit/core/groq
-│   ├── offline/        #                      → @slime-kit/core/offline
-│   └── crystallize/    # job, allowlist, check → @slime-kit/core/crystallize (+ bin)
+│   ├── postgres/       # connector + store   → @slime-cloud/core/postgres
+│   ├── claude/         # generator + reviewer → @slime-cloud/core/claude
+│   ├── groq/           #                      → @slime-cloud/core/groq
+│   ├── offline/        #                      → @slime-cloud/core/offline
+│   └── crystallize/    # job, allowlist, check → @slime-cloud/core/crystallize (+ bin)
 └── test/
 ```
 
@@ -244,7 +244,7 @@ one ports is named, so parity can be checked.
 
 | # | Milestone | Done when |
 |---|---|---|
-| M0 | **Skeleton.** Root `package.json` with workspaces, core `package.json` with an exports map, `tsconfig`, `node:test`, a CI job "Core tests". | `npm test -w @slime-kit/core` runs; `npm pack` builds a tarball; CI is green. |
+| M0 | **Skeleton.** Root `package.json` with workspaces, core `package.json` with an exports map, `tsconfig`, `node:test`, a CI job "Core tests". | `npm test -w @slime-cloud/core` runs; `npm pack` builds a tarball; CI is green. |
 | M1 | **Request, contracts and pure parts.** Request parsing, intent normalization and the request key (§4); output notation with `date`/`datetime`; Ports and `SlimeError`; SQL guard and lint; `SlimeConfig` with defaults, validation and `glossary`. | `units.test.ts` ported and adjusted for §4.7. |
 | M2 | **Engine, Gas path.** `createSlime`, `query`, memory store, offline generator, `SandboxRunner` with the QuickJS worker, coalescing, rate limits, locked mode, typed and nullable parameters (R4, R5), the limit check (R6). | `engine.test.ts` and `sandbox.test.ts` ported; one handler serves every combination of `null` filters; no `config` singleton anywhere. |
 | M3 | **Postgres and the dictionary.** Connector with the start-up safety check and enum values from the catalog; store with a configurable table and dictionary storage; the background dictionary build (§4.4). | `postgres.test.ts` and `persistence.test.ts` ported; a restart loads the dictionary instead of rebuilding it; changing `rules` rebuilds it. |
