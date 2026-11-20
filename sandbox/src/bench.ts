@@ -212,8 +212,9 @@ function summarize(all: Row[]) {
     const s = [...xs].sort((a, b) => a - b);
     return s[Math.floor(s.length / 2)];
   };
-  const nums = (key: keyof Row) => all.map((r) => r[key]).filter((v): v is number => typeof v === 'number');
   const generated = all.filter((r) => typeof r.attempts === 'number');
+  // Speed figures cover only requests that generated code; refusals are excluded.
+  const nums = (key: keyof Row) => generated.map((r) => r[key]).filter((v): v is number => typeof v === 'number');
   const ok = all.filter((r) => r.result.startsWith('ok')).length;
   const firstTry = generated.filter((r) => r.attempts === 1 && r.result.startsWith('ok')).length;
   console.log(
