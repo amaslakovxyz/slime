@@ -4,7 +4,7 @@
 
 ## Overview
 
-Liquid Engine is a single Bun process that serves business intents through sandboxed, agent-generated handlers and never calls an LLM on the request path.
+Liquid Engine is a single Bun process that serves business intents through sandboxed, agent-generated handlers. On a handler-cache miss the handler is generated just-in-time on the request path; every handler — fresh or cached — runs through the same harness before anything commits.
 
 - **Source of truth:** human-written intent specs (`intents/*.md`) and human-accepted fixtures. Handler code is a regenerable cache.
 - **Core rule:** handlers can only read through `db.read` and propose writes through `db.emit`; the kernel decides what commits.
@@ -12,21 +12,21 @@ Liquid Engine is a single Bun process that serves business intents through sandb
 
 ## Architecture
 
-Everything except the agent runs in one Bun process. In production, a request flows through `Dispatcher → Registry → Sandbox → Gatekeeper → Invariant runner → SQLite`, inside one transaction. Dashed/dev-only components are absent from the production request path.
+Everything runs in one Bun process; the agent is called only on a handler-cache miss. A request flows through `Dispatcher → Registry (Crystal → Liquid → Gas cache; miss → Agent) → Sandbox → Gatekeeper → Invariant runner → SQLite`, inside one transaction.
 
 ### Components
 
 | Module | Responsibility | Technology | Mode |
 |---|---|---|---|
 | Dispatcher | `POST /dispatch`; builds `ctx {tenantId, userId, role, now}` from the session; returns 404 for unknown intents | Bun HTTP server | dev + prod |
-| Registry | Maps intent to the pinned handler hash from `lee.lock`; refuses unpinned code in prod | TypeScript | dev + prod |
-| Sandbox runner | Runs one handler per call with memory limit and deadline; no host I/O | quickjs-emscripten (sync build) | dev + prod |
+| Registry | Resolves intent to a handler: Crystal (`lee.lock`) → Liquid (`state/`, `handlers/`) → Gas (in-memory, sliding TTL); owns tier transitions | TypeScript | dev + prod |
+| Sandbox runner | Runs one handler per call with memory limit and deadline; no host I/O. Isolated sandboxes for prod are planned. | quickjs-emscripten (sync build) | dev + prod |
 | DB API | `db.read` (declarative, tenant filter added) and `db.emit` (collects effects) | TypeScript over `bun:sqlite` | dev + prod |
 | Gatekeeper | Validates every effect against the intent spec; rejects the whole set on any failure | TypeScript | dev + prod |
 | Invariant runner | Applies effects in the open transaction; runs invariant `SELECT`s; commits only when all return zero rows | `bun:sqlite` | dev + prod |
-| Build loop | Parses specs, builds prompts, calls the agent, dry-runs, records fixtures, writes `lee.lock` | TypeScript CLI (`lee`) | dev only |
-| Agent | Writes handler source from spec and schema | Current Claude model via Anthropic API | dev only |
-| Storage | Specs, fixtures, handlers and `lee.lock` in git; application data in one SQLite file | git + SQLite | — |
+| Build loop | Manual path: parses specs, builds prompts, calls the agent, dry-runs `try` inputs on a seed copy, shows effect diffs; caches nothing | TypeScript CLI (`lee`) | dev |
+| Agent | Writes handler source from spec, schema and DB API contract; called on a Registry miss (JIT) or by `lee build` | Current Claude model via Anthropic API | dev + prod |
+| Storage | Specs, Liquid/Crystal handlers, fixtures, `state/` and `lee.lock` in git; Gas only in process memory; application data in one SQLite file | git + SQLite | — |
 
 ## Contracts
 
@@ -70,45 +70,43 @@ db.emit({
 
 ### Development CLI
 
-- `lee build [intent]` — generate, dry-run, and show effect diffs.
-- `lee accept <intent>` — save shown diffs as fixtures.
-- `lee test` — replay all fixtures against current handlers.
-- `lee freeze` — write handler hashes to `lee.lock` and create a git commit.
+- `lee serve` — run the Dispatcher (`POST /dispatch`) with JIT generation.
+- `lee build [intent]` — manual path: generate, dry-run, and show effect diffs; caches nothing.
+- `lee accept <intent>` — save shown diffs as fixtures (planned).
+- `lee test` — replay all fixtures against current handlers (planned).
+- `lee freeze` — write handler hashes to `lee.lock` and create a git commit (planned).
 
 ## Flows
 
 ### Request path (dev and prod)
 
-1. Dispatcher receives `{intent, payload}` and builds `ctx` from the server session.
-2. Registry looks up the pinned hash; no match returns 404.
-3. Kernel opens `BEGIN IMMEDIATE` on the real database.
-4. Sandbox runs the handler; `db.read` uses the DB API inside the same transaction.
-5. Gatekeeper validates collected effects; failure causes rollback and `403/422` with a reason code.
-6. Invariant runner applies effects and runs invariants; any returned row causes rollback and `422`.
-7. Commit and return the response with `{intent, handlerHash, effectsApplied}`.
+1. Dispatcher receives `POST /dispatch {intent, payload}`, builds `ctx` from the dev session.
+2. Load intent (unknown → 404). Registry resolves Crystal → Liquid → Gas (a Gas hit bumps hits and slides the TTL).
+3. **Hit** → harness on the real DB with commit. If the tier is Gas, a passing run is recorded as a fixture and may promote the handler. Return the result.
+4. **Miss** → the build path's generate-with-repair (≤ 3 rounds, judged on the spec's `try` inputs against seed copies, reason codes fed back). Exhausted → 502, nothing cached. Success → harness on the real DB with commit for the live payload → pass: COMMIT, admit to Gas, 200; fail: rollback, 4xx, nothing cached.
+   - Repair is judged on `try` inputs, never on the live payload: a live rejection (sold out, `BAD_QTY`) is business logic, not a code defect, and must not trigger regeneration.
+   - The payload is never put into the prompt (no prompt injection from requests).
+   - No transaction is held during the LLM call: generation finishes before the harness opens `BEGIN IMMEDIATE`.
 
-The request path never reaches the agent. The build path never touches the real database.
+The agent is reached only on a cache miss, and its output is verified on the spec's `try` inputs against a seed copy before it touches the real database.
 
-### Build path (dev only)
+### Build path (manual, dev)
 
-1. `lee build` hashes the spec, schema, prompt version and model ID; an existing key skips generation.
-2. The agent receives the spec, declared table schema and DB API contract and returns handler source (Gas).
-3. The kernel copies the seed DB and runs each try input through request-path steps 3–6, always rolling back.
-4. Failure returns a reason code to the agent for up to three rounds; then the build fails.
-5. Success shows the effects diff; `lee accept` stores `{seed, input, ctx.now, effects}` as a fixture (Liquid).
-6. `lee freeze` pins the exact bytes (Crystal).
+1. The agent receives the spec, declared table schema and DB API contract and returns handler source (Gas).
+2. The kernel copies the seed DB and runs each try input through the harness (role → sandbox → gatekeeper → invariants), always rolling back.
+3. Failure returns a reason code to the agent for up to three rounds; then the build fails.
+4. Success shows the effects diff; nothing is cached or committed.
+5. `lee accept` / `lee freeze` (planned) record fixtures and pin bytes.
 
-## Trust levels and modes
+## Trust tiers
 
-Production runs only **Crystal**; all other levels remain in development.
-
-| Level | Meaning | Runs against | Serves |
+| Tier | Meaning | Lifetime | Serves |
 |---|---|---|---|
-| Gas | Generated, unchecked | Seed DB copy, always rolled back | Nothing |
-| Liquid | Passed Gatekeeper, invariants and accepted fixtures | Dev DB | Dev requests |
-| Crystal | Exact bytes pinned in `lee.lock` by a human commit | Prod DB | Real traffic |
+| Gas | Generated just-in-time on a cache miss; passed the harness on the spec's `try` inputs and on the triggering request | In-memory, sliding TTL (default 10 min); evicted if not reused | Live traffic |
+| Liquid | Gas handler reused ≥ 3 times with ≥ 3 harness-passing runs; those runs are recorded as fixtures | Persistent (`handlers/`, `fixtures/`, `state/`), no TTL | Live traffic |
+| Crystal | Exact bytes pinned in `lee.lock` by a human commit | Persistent, pinned | Live traffic (highest precedence) |
 
-A spec edit marks that intent's fixtures stale and drops its handler to Gas. Regenerated code remains Liquid until re-frozen. `LEE_MODE` is read only from the environment, never from a request. In production the agent module is not loaded, making LLM calls impossible.
+Lookup order is Crystal → Liquid → Gas. A spec edit changes the spec hash: every tier recorded under the old hash is ignored (its fixtures are stale) and the next request regenerates into Gas. JIT generation is enabled in dev and prod. Promotion to Crystal is never automatic.
 
 ## Gatekeeper rules
 
