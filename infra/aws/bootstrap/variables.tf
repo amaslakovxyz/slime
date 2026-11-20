@@ -16,6 +16,23 @@ variable "bootstrap_profile" {
   default     = "default"
 }
 
+variable "github_repository" {
+  description = "owner/name of the repository whose Actions may assume the CI roles."
+  type        = string
+  default     = "amaslakovxyz/slime"
+}
+
+variable "github_oidc_sub_prefix" {
+  description = "OIDC subject prefix for github_repository (immutable form, includes owner/repo IDs)."
+  type        = string
+  default     = "repo:amaslakovxyz@29117334/slime@1465448238"
+
+  validation {
+    condition     = startswith(var.github_oidc_sub_prefix, "repo:")
+    error_message = "Must look like repo:owner@<id>/name@<id> (see sub_claim_prefix)."
+  }
+}
+
 variable "trusted_principal_arns" {
   description = "IAM principals allowed to assume the deployer role."
   type        = list(string)

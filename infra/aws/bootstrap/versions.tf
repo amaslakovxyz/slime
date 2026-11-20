@@ -8,11 +8,17 @@ terraform {
     }
   }
 
-  # Bootstrap layer keeps local state on purpose: it creates the identity that
-  # every later stack (and any remote state backend) depends on. The path is
-  # supplied at init time and lives OUTSIDE the repo, so removing a git
-  # worktree cannot delete it. See README.md.
-  backend "local" {}
+  # This stack creates the state bucket it is stored in. It was first applied
+  # with local state and then migrated (`terraform init -migrate-state`).
+  # Locking: native S3 lockfile, no DynamoDB. Applied by a human only; CI
+  # never applies bootstrap because it owns the CI roles themselves.
+  backend "s3" {
+    bucket       = "slime-tfstate-025772230981"
+    key          = "bootstrap/terraform.tfstate"
+    region       = "eu-central-1"
+    encrypt      = true
+    use_lockfile = true
+  }
 }
 
 provider "aws" {

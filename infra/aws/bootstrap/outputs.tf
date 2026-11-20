@@ -3,6 +3,15 @@ output "deployer_role_arn" {
   value       = aws_iam_role.deployer.arn
 }
 
+output "state_bucket" {
+  value = aws_s3_bucket.state.bucket
+}
+
+output "gha_role_arns" {
+  description = "Roles referenced by .github/workflows/terraform.yml."
+  value       = { for k, r in aws_iam_role.gha : k => r.arn }
+}
+
 output "region" {
   value = var.region
 }
