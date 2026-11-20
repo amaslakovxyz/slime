@@ -6,9 +6,15 @@ over ceremony, but keep the few rules below that prevent lost work.
 
 ## Git workflow
 
-- Direct commits to `main` are allowed (hackathon pace).
-- When a change is risky or exploratory, use a short-lived branch
-  (`feat/<short-name>` / `fix/<short-name>`) so `main` stays runnable.
+- All work must happen in a dedicated Git worktree under the repository's
+  `.worktrees/<branch-slug>/` directory. Do not modify the primary checkout.
+- Every change starts on a separate branch (`feat/<short-name>`,
+  `fix/<short-name>`, or `chore/<short-name>`).
+- Direct commits and pushes to `main`/`master` are forbidden.
+- The mandatory integration endpoint is a pull request targeting the default
+  branch. Do not merge locally; the PR is the handoff for merging to the
+  default branch.
+- Push feature branches normally; force-pushes are forbidden.
 - Keep one concern per commit where practical; write messages that say *why*.
 
 ## Pre-commit

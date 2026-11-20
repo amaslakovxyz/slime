@@ -1,0 +1,1587 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Slime — the backend that builds itself</title>
+  <meta name="description" content="Slime is the backend that builds itself. Your app asks for data; Slime writes the endpoint and remembers it. No tickets, no PRs, no deploys.">
+  <meta property="og:title" content="Slime — the backend that builds itself">
+  <meta property="og:description" content="Your app asks for data; Slime writes the endpoint and remembers it.">
+  <meta property="og:type" content="website">
+  <meta name="theme-color" content="#0B070C">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3CradialGradient id='g' cx='35%25' cy='30%25' r='75%25'%3E%3Cstop offset='0' stop-color='%23FF85C0'/%3E%3Cstop offset='.5' stop-color='%23FF1476'/%3E%3Cstop offset='1' stop-color='%238F0043'/%3E%3C/radialGradient%3E%3C/defs%3E%3Cpath fill='url(%23g)' d='M32 6c14 0 26 9 26 24 0 10-5 14-5 20 0 5-4 8-9 8-4 0-5-3-8-3s-4 3-9 3c-6 0-9-4-9-9 0-6-6-9-6-19C12 15 18 6 32 6z'/%3E%3C/svg%3E">
+
+  <!-- Brand fonts (docs/brand/slime_master_brand_book_agent_design_system.md §3). -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Oi&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Titan+One&display=swap" rel="stylesheet">
+
+  <!-- three.js for the hero slime. Pinned version; the page works without it (CSS fallback blob). -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <style>
+    /* Tokens from the brand book (§2). Slime is dark-only by brand rule (§7.3). */
+    :root {
+      --bg-canvas: #0B070C;
+      --bg-surface: #161019;
+      --bg-surface-hover: #211825;
+      --border-color: #2D1F33;
+      --border-bright: #442D4D;
+
+      --plasma-primary: #FF1476;
+      --plasma-shadow: #8F0043;
+      --plasma-highlight: #FF85C0;
+      --glow-primary: rgba(255, 20, 118, 0.35);
+
+      --gas-accent: #38F8B8;
+      --gas-bg: rgba(56, 248, 184, 0.1);
+      --gas-border: rgba(56, 248, 184, 0.35);
+
+      --crystal-accent: #F2EAFF;
+      --crystal-glow: #C4B5FD;
+      --crystal-bg: rgba(196, 181, 253, 0.12);
+      --crystal-border: rgba(196, 181, 253, 0.35);
+
+      --wireframe-grey: #6E5C77;
+      --text-pure: #F8F6FC;
+      --text-muted: #A396AC;
+
+      --font-mark: "Oi", Georgia, serif;
+      --font-title: "Titan One", "Plus Jakarta Sans", system-ui, sans-serif;
+      --font-body: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+      --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+      --radius-lg: 24px;
+      --radius-md: 16px;
+      --radius-sm: 12px;
+      --gutter: 24px;
+      color-scheme: dark;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg-canvas);
+      color: var(--text-pure);
+      font-family: var(--font-body);
+      font-size: 17px;
+      line-height: 1.6;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; }
+    img, svg { display: block; }
+    ::selection { background: var(--plasma-primary); color: var(--text-pure); }
+    :focus-visible { outline: 2px solid var(--plasma-highlight); outline-offset: 3px; border-radius: 6px; }
+
+    .container { width: 100%; max-width: 1160px; margin: 0 auto; padding: 0 var(--gutter); }
+    section { position: relative; padding: 120px 0; }
+    .section-head { max-width: 720px; margin-bottom: 56px; }
+    .section-head.center { margin-left: auto; margin-right: auto; text-align: center; }
+
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 10px;
+      font-family: var(--font-mono); font-size: 12.5px; font-weight: 500;
+      letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--plasma-highlight); margin: 0 0 18px;
+    }
+    .eyebrow::before { content: ""; width: 22px; height: 1px; background: currentColor; opacity: .7; }
+    .section-head.center .eyebrow::after { content: ""; width: 22px; height: 1px; background: currentColor; opacity: .7; }
+
+    h1, h2, h3 { font-family: var(--font-title); font-weight: 400; margin: 0; letter-spacing: 0.005em; line-height: 1.08; }
+    h2 { font-size: clamp(2.1rem, 4.4vw, 3.4rem); }
+    h3 { font-size: 1.45rem; line-height: 1.2; }
+    p { margin: 0; }
+    .lead { color: var(--text-muted); font-size: 1.15rem; margin-top: 18px; }
+
+    .slime-text {
+      background: linear-gradient(120deg, var(--plasma-highlight) 0%, var(--plasma-primary) 48%, var(--plasma-shadow) 100%);
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent; color: var(--plasma-primary);
+    }
+    .wordmark { font-family: var(--font-mark); font-weight: 400; letter-spacing: 0.01em; line-height: 1; }
+
+    /* Buttons (brand book §5) */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+      font-family: var(--font-body); font-weight: 700; font-size: 16px;
+      padding: 15px 26px; border-radius: 999px; border: 1px solid transparent;
+      text-decoration: none; cursor: pointer; white-space: nowrap;
+      transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease, background .2s ease;
+    }
+    .btn-primary {
+      color: var(--text-pure);
+      background: linear-gradient(135deg, var(--plasma-primary), var(--plasma-shadow));
+      box-shadow: 0 4px 20px var(--glow-primary), inset 0 1px 0 rgba(255,133,192,.45);
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 34px rgba(255,20,118,.5), inset 0 1px 0 rgba(255,133,192,.55); }
+    .btn-ghost { color: #fff; background: var(--bg-canvas); border-color: var(--border-bright); }
+    .btn-ghost:hover { border-color: var(--plasma-primary); }
+    .btn:disabled { opacity: .55; cursor: progress; transform: none; }
+
+    /* Badges / state tags (mono, brand book §3.4) */
+    .tag {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-family: var(--font-mono); font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+      padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border-bright); color: var(--text-muted);
+      background: var(--bg-canvas); white-space: nowrap;
+    }
+    .tag .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+    .tag.gas { color: var(--gas-accent); background: var(--gas-bg); border: 1px dashed var(--gas-border); }
+    .tag.liquid { color: #fff; background: rgba(255,20,118,.16); border-color: var(--plasma-primary); box-shadow: 0 0 22px var(--glow-primary); }
+    .tag.liquid .dot { background: var(--plasma-primary); }
+    .tag.crystal { color: var(--crystal-accent); background: var(--crystal-bg); border-color: var(--crystal-border); border-radius: 6px; }
+
+    /* Hero slime: drawn on a fixed, full-viewport canvas BEHIND the page (low
+       z-index) and positioned over .stage each frame, so it can outgrow the
+       hero and the screen while text and cards stay on top. */
+    #slime-canvas { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+    main, footer { position: relative; z-index: 1; }
+    .hero-right { position: relative; min-width: 0; }
+    .stage { position: relative; height: 440px; }
+    .stage-fallback { /* shown until WebGL is ready, or if it never is */
+      position: absolute; left: 50%; top: 46%; width: 220px; height: 220px; margin: -110px 0 0 -110px; border-radius: 50%;
+      background: radial-gradient(circle at 34% 28%, var(--plasma-highlight), var(--plasma-primary) 45%, var(--plasma-shadow));
+      box-shadow: 0 20px 60px var(--glow-primary); transition: opacity .6s ease;
+    }
+    .stage.ready .stage-fallback { opacity: 0; }
+
+    /* Small menu card, bottom-right, so you can watch each droplet fly up. */
+    .menu {
+      position: absolute; right: -48px; bottom: -150px; z-index: 3; width: 290px;
+      padding: 10px 14px 4px; border-radius: 16px;
+      background: rgba(22,16,25,.86); border: 1px solid var(--border-color);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      box-shadow: 0 20px 50px rgba(0,0,0,.45);
+    }
+    .menu-head { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 6px; border-bottom: 1px dashed var(--border-bright); }
+    /* Titan One (the heading font), not the Oi wordmark: Oi is hard to read this small. */
+    .menu-title { font-family: var(--font-title); font-size: 17px; line-height: 1; letter-spacing: .01em; margin: 0; }
+    .menu-kicker { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .22em; text-transform: uppercase; color: var(--wireframe-grey); }
+    .menu-list { list-style: none; margin: 0; padding: 0; }
+    .menu-list li + li { border-top: 1px solid rgba(45,31,51,.7); }
+    .dish {
+      width: 100%; display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; column-gap: 10px;
+      padding: 7px 0; background: none; border: 0; cursor: pointer; text-align: left; color: var(--text-pure); font: inherit;
+    }
+    .dish-name { font-size: 13.5px; font-weight: 600; transition: color .2s ease; white-space: nowrap; }
+    .dish-ic { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; color: var(--plasma-highlight); background: rgba(255,20,118,.1); border: 1px solid rgba(255,20,118,.28); transition: transform .2s ease; }
+    .dish-ic svg { width: 14px; height: 14px; }
+    .dish:hover .dish-ic { transform: scale(1.08) rotate(-4deg); }
+    .dish-leader { border-bottom: 1.5px dotted var(--border-bright); transform: translateY(3px); transition: border-color .2s ease; }
+    .dish-count {
+      min-width: 24px; height: 19px; padding: 0 6px; border-radius: 999px; display: inline-grid; place-items: center;
+      font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; color: var(--wireframe-grey);
+      border: 1px solid var(--border-bright); transition: color .2s ease, border-color .2s ease, background .2s ease;
+    }
+    .dish-count.has { color: #fff; border-color: var(--plasma-primary); background: rgba(255,20,118,.16); }
+    .dish-count.bump { animation: bump .4s ease; }
+    @keyframes bump { 0% { transform: scale(1); } 40% { transform: scale(1.35); } 100% { transform: scale(1); } }
+    .dish:hover .dish-name { color: var(--plasma-highlight); }
+    .dish:hover .dish-leader { border-color: var(--plasma-primary); }
+    .dish:active .dish-count { transform: scale(.9); }
+    .menu.off { opacity: .4; pointer-events: none; transition: opacity .3s ease; }
+
+    /* Burst: stains land on the "glass", above everything, until cleaned up.
+       .stain (wrapper) handles the wipe transition; its svg runs the splat
+       animation, so the two transforms don't fight. */
+    .stains { position: fixed; inset: 0; z-index: 60; pointer-events: none; overflow: hidden; }
+    .stain { position: absolute; transition: transform .55s ease, opacity .55s ease; }
+    .stain svg { display: block; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 6px 14px rgba(143,0,67,.45)); animation: splat .38s cubic-bezier(.2, 1.5, .4, 1) both; }
+    .stain .drip { transform-box: fill-box; transform-origin: top; animation: drip var(--drip-t, 6s) cubic-bezier(.3, .1, .3, 1) .3s both; }
+    .stain.wipe { opacity: 0; transform: translateY(40px) scale(.85); }
+    @keyframes splat { 0% { transform: scale(.2); opacity: 0; } 60% { opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+    @keyframes drip { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+    .cleanup {
+      position: fixed; left: 50%; bottom: 28px; z-index: 70;
+      transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
+      transition: opacity .3s ease, transform .3s ease;
+    }
+    .cleanup.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+    .cleanup { box-shadow: 0 0 0 4px var(--bg-canvas), 0 10px 34px rgba(0,0,0,.55); } /* stands out on pink stains */
+    .cleanup.show:hover { transform: translate(-50%, -2px); }
+
+    /* ---------- Demo ---------- */
+    .demo-panel {
+      border-radius: var(--radius-lg); background: var(--bg-surface);
+      border: 1px solid var(--border-color); overflow: hidden;
+      box-shadow: 0 30px 80px rgba(0,0,0,.4);
+      transition: border-color .4s ease, box-shadow .4s ease;
+    }
+    .demo-panel[data-state="gas"] { border-color: var(--gas-border); }
+    .demo-panel[data-state="liquid"] { border-color: var(--plasma-primary); box-shadow: 0 8px 30px var(--glow-primary), 0 30px 80px rgba(0,0,0,.4); }
+    .demo-bar {
+      display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+      padding: 16px 22px; border-bottom: 1px solid var(--border-color); background: rgba(11,7,12,.55);
+    }
+    .endpoint { font-family: var(--font-mono); font-size: 14px; color: var(--text-muted); }
+    .endpoint b { color: var(--gas-accent); font-weight: 700; margin-right: 8px; }
+    .demo-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); }
+    .demo-col { padding: 24px 22px 26px; min-width: 0; }
+    .demo-col + .demo-col { border-left: 1px solid var(--border-color); }
+    .label {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      font-family: var(--font-mono); font-size: 11.5px; letter-spacing: .12em; text-transform: uppercase;
+      color: var(--wireframe-grey); margin-bottom: 12px;
+    }
+    pre.code {
+      margin: 0; padding: 16px 18px; border-radius: var(--radius-sm);
+      background: var(--bg-canvas); border: 1px solid var(--border-color);
+      font-family: var(--font-mono); font-size: 13px; line-height: 1.65; color: var(--text-pure);
+      overflow-x: auto; white-space: pre; tab-size: 2;
+    }
+    .k { color: var(--plasma-highlight); }       /* JSON keys */
+    .s { color: var(--gas-accent); }             /* strings */
+    .n { color: var(--crystal-glow); }           /* numbers */
+    .p { color: var(--wireframe-grey); }         /* punctuation */
+    .kw { color: var(--plasma-primary); font-weight: 700; } /* SQL keywords */
+    .prm { color: var(--crystal-glow); }         /* $1 params */
+
+    .send-row { display: flex; gap: 12px; align-items: center; margin-top: 18px; flex-wrap: wrap; }
+    .send-hint { font-size: 14px; color: var(--text-muted); }
+    .checks {
+      list-style: none; margin: 26px 0 0; padding: 20px 0 0; border-top: 1px dashed var(--border-bright);
+      display: grid; gap: 12px; font-family: var(--font-mono); font-size: 13px; color: var(--wireframe-grey);
+    }
+    .checks li { display: flex; gap: 12px; align-items: center; transition: color .3s ease; }
+    .checks li::before {
+      content: ""; flex: none; width: 18px; height: 18px; border-radius: 50%;
+      border: 1px dashed var(--wireframe-grey); display: grid; place-items: center; font-size: 11px; line-height: 1;
+    }
+    .checks li.ok { color: var(--text-pure); }
+    .checks li.ok::before { content: "✓"; border: 1px solid var(--gas-border); background: var(--gas-bg); color: var(--gas-accent); }
+    .demo-panel[data-state="liquid"] .checks li.ok::before { border-color: var(--plasma-primary); background: rgba(255,20,118,.14); color: var(--plasma-highlight); }
+
+    .sql-box { min-height: 220px; position: relative; }
+    .sql-box .placeholder { color: var(--wireframe-grey); }
+    .caret { display: inline-block; width: 8px; height: 1.1em; vertical-align: -2px; background: var(--gas-accent); animation: blink 1s steps(1) infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    .timer-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 20px 0 12px; flex-wrap: wrap; }
+    .timer { font-family: var(--font-mono); font-size: 34px; font-weight: 700; letter-spacing: -.02em; line-height: 1; }
+    .timer small { font-size: 15px; color: var(--text-muted); font-weight: 500; margin-left: 4px; }
+    .meta-line { font-family: var(--font-mono); font-size: 12.5px; color: var(--text-muted); }
+    .response { min-height: 130px; transition: opacity .35s ease; }
+    .response.flash { animation: flash .6s ease; }
+    @keyframes flash { 0% { box-shadow: 0 0 0 0 rgba(255,20,118,.6); } 100% { box-shadow: 0 0 0 14px rgba(255,20,118,0); } }
+
+    .steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin-top: 28px; }
+    .step { display: flex; gap: 14px; align-items: flex-start; }
+    .step .i {
+      flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+      font-family: var(--font-mono); font-size: 13px; font-weight: 700;
+      border: 1px solid var(--border-bright); color: var(--plasma-highlight);
+    }
+    .step b { display: block; font-weight: 700; margin-bottom: 2px; }
+    .step span { color: var(--text-muted); font-size: 15px; }
+
+
+    /* ================= Layout after heroui.com =================
+       Floating pill header, centred hero, two-tone section heads, media
+       cards, stats row. Brand colours and fonts are unchanged. */
+    :root {
+      --heading-muted: #7E6D88;
+      /* Crystal reads ice-blue on this page; the brand book's lavender looked almost white. */
+      --crystal-accent: #DDF3FF; --crystal-glow: #8FD3FF;
+      --crystal-bg: rgba(143,211,255,.12); --crystal-border: rgba(143,211,255,.4);
+    }
+    .container { max-width: 1180px; }
+    section { padding: 110px 0; }
+    h2 { font-size: clamp(2.1rem, 4.2vw, 3.3rem); line-height: 1.05; }
+    .muted-line { color: var(--heading-muted); }
+    @keyframes morph {
+      0%, 100% { border-radius: 42% 58% 70% 30% / 45% 45% 55% 55%; }
+      50% { border-radius: 58% 42% 34% 66% / 56% 38% 62% 44%; }
+    }
+
+    /* ---------- Header: a full-width bar at the top that condenses into a
+       floating, blurred pill once the page scrolls. ---------- */
+    .nav { position: sticky; top: 0; z-index: 50; display: flex; justify-content: center; padding: 16px 24px; }
+    .nav-fade {
+      position: absolute; inset: 0 0 auto 0; height: calc(100% + 28px); z-index: -1; pointer-events: none;
+      background: linear-gradient(to bottom, var(--bg-canvas), rgba(11,7,12,.8) 45%, transparent);
+      opacity: 0; transition: opacity .3s ease;
+    }
+    .nav.scrolled .nav-fade { opacity: 1; }
+    .nav-inner {
+      width: 100%; max-width: 1120px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 24px;
+      padding: 4px 0; border-radius: 999px;
+      transition: max-width .35s ease, padding .35s ease, background-color .35s ease, box-shadow .35s ease;
+    }
+    .nav.scrolled .nav-inner {
+      max-width: 800px; padding: 9px 10px 9px 26px; background: rgba(22,16,25,.78);
+      box-shadow: inset 0 0 0 1px var(--border-color), 0 12px 34px rgba(0,0,0,.35);
+      backdrop-filter: blur(16px) saturate(140%); -webkit-backdrop-filter: blur(16px) saturate(140%);
+    }
+    .nav .wordmark { font-size: 30px; text-decoration: none; justify-self: start; }
+    .nav-links { display: flex; gap: 28px; list-style: none; margin: 0; padding: 0; }
+    .nav-links a { text-decoration: none; color: var(--text-muted); font-weight: 500; font-size: 14.5px; transition: color .2s; }
+    .nav-links a:hover { color: var(--text-pure); }
+    .nav-cta { justify-self: end; padding: 10px 18px; font-size: 14px; }
+
+    /* ---------- Hero ---------- */
+    /* The hero fills at least the first screen under the sticky nav (--nav-h is
+       measured by JS; 84px is the desktop fallback). The slime stage takes up
+       whatever height the copy leaves, so the blob stays centred in it. */
+    .hero {
+      padding: 64px 0 40px; text-align: center;
+      min-height: calc(100vh - var(--nav-h, 84px)); min-height: calc(100svh - var(--nav-h, 84px));
+      display: flex; flex-direction: column;
+    }
+    .hero > .container:last-child { flex: 1; display: flex; flex-direction: column; }
+    .hero-stage { flex: 1; display: flex; flex-direction: column; width: 100%; }
+    .hero .stage { flex: 1 0 auto; }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 10px; padding: 5px 14px 5px 6px; margin-bottom: 30px;
+      border-radius: 999px; border: 1px solid var(--border-color); background: rgba(22,16,25,.6);
+      font-size: 13.5px; color: var(--text-muted);
+    }
+    .hero-badge .tag { padding: 3px 9px; font-size: 10.5px; }
+    .hero-title { font-size: clamp(2.8rem, 6.4vw, 5.1rem); line-height: 1; }
+    .hero-title .line2 { display: block; margin-top: .06em; }
+    .ico-blob {
+      border-radius: 42% 58% 60% 40% / 48% 44% 56% 52%;
+      background: radial-gradient(circle at 34% 28%, #fff 0, var(--plasma-highlight) 14%, var(--plasma-primary) 52%, var(--plasma-shadow));
+      box-shadow: 0 6px 22px var(--glow-primary); animation: morph 8s ease-in-out infinite;
+    }
+    .hero-sub { max-width: 560px; margin: 26px auto 0; color: var(--text-muted); font-size: 1.2rem; }
+    .hero-sub strong { color: var(--text-pure); font-weight: 600; }
+    .hero-ctas { display: flex; gap: 12px; justify-content: center; margin-top: 34px; flex-wrap: wrap; }
+    .btn-soft { color: var(--text-pure); background: var(--bg-surface-hover); border-color: var(--border-color); }
+    .btn-soft:hover { border-color: var(--border-bright); }
+    .btn .arrow { transition: transform .2s ease; }
+    .btn:hover .arrow { transform: translateX(3px); }
+
+    /* Slime stage, centred under the CTAs; the menu floats to its right. */
+    .hero-stage { position: relative; max-width: 1120px; margin: 4px auto 0; text-align: left; }
+    .hero .stage { height: auto; min-height: 430px; }
+    .hero .menu { position: absolute; right: 0; bottom: 34px; }
+
+
+    /* ---------- Section heads: label + two-tone heading left, lead right ---------- */
+    .sec-head { display: grid; grid-template-columns: 1.2fr .8fr; gap: 40px; align-items: end; margin-bottom: 56px; }
+    .sec-label { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; font-size: 15px; color: var(--text-pure); margin: 0 0 18px; }
+    /* Minimal line icons in the matter-state colour, no tile behind them. */
+    .sec-label .ic { width: 18px; height: 18px; display: block; flex: none; color: var(--plasma-highlight); }
+    .sec-label .ic svg { width: 100%; height: 100%; display: block; }
+    .sec-label .ic.gas { color: var(--gas-accent); }
+    .sec-label .ic.crystal { color: var(--crystal-glow); }
+    .sec-lead { color: var(--text-muted); font-size: 1.08rem; max-width: 440px; justify-self: end; }
+    .sec-lead p { margin: 0; }
+    /* Use cases: the heading is a three-beat line, so give it the full width. */
+    #use-cases .sec-head { grid-template-columns: 1fr; gap: 18px; }
+    #use-cases .sec-lead { justify-self: start; max-width: 620px; }
+
+    /* ---------- Use cases: a row where the active card is wide. Click a card
+       (or wait for the progress bar) and it expands while the others shrink;
+       its mock zooms in. Each mock lives in a fixed-width .scene centred in
+       the card, so narrow cards show a cropped middle. ---------- */
+    .uc-row { display: flex; gap: 14px; }
+    .uc { flex: 1 1 0; min-width: 0; cursor: pointer; transition: flex-grow .65s cubic-bezier(.65, 0, .35, 1); outline-offset: 6px; }
+    .uc.is-active { flex-grow: 2.7; cursor: default; }
+    .uc-media { position: relative; height: 440px; border-radius: 22px; overflow: hidden; border: 1px solid var(--border-color); isolation: isolate; transition: border-color .3s ease; }
+    .uc:not(.is-active):hover .uc-media { border-color: var(--border-bright); }
+    .scene {
+      position: absolute; top: 0; bottom: 0; left: 50%; width: 480px;
+      transform: translateX(-50%) scale(.9); opacity: .6; transition: transform .65s cubic-bezier(.65, 0, .35, 1), opacity .5s ease;
+    }
+    .uc.is-active .scene { transform: translateX(-50%) scale(1); opacity: 1; }
+    .uc.is-active .scene > * { animation: pop-in .6s cubic-bezier(.2, .9, .3, 1.2) both; }
+    .uc.is-active .scene > *:nth-child(2) { animation-delay: .12s; }
+    .uc.is-active .scene > *:nth-child(3) { animation-delay: .24s; }
+    @keyframes pop-in { from { opacity: 0; translate: 0 16px; } to { opacity: 1; translate: 0 0; } }
+    .m-plasma { background: radial-gradient(110% 90% at 15% 105%, rgba(255,20,118,.55), transparent 60%), radial-gradient(80% 70% at 95% -5%, rgba(143,0,67,.75), transparent 60%), #120a14; }
+    .m-berry { background: radial-gradient(110% 70% at 50% 110%, rgba(255,20,118,.5), transparent 60%), linear-gradient(180deg, #2a0f2b, #120a14); }
+    .m-mint { background: radial-gradient(110% 70% at 30% -10%, rgba(56,248,184,.26), transparent 60%), radial-gradient(90% 60% at 100% 110%, rgba(255,20,118,.32), transparent 60%), #0f0c12; }
+    .m-crystal { background: radial-gradient(110% 70% at 70% -10%, rgba(124,199,255,.34), transparent 60%), radial-gradient(90% 60% at 0% 110%, rgba(143,0,67,.55), transparent 60%), #110d18; }
+    .uc-bar { position: relative; height: 2px; margin: 14px 0 16px; border-radius: 2px; background: var(--border-color); overflow: hidden; }
+    .uc-bar i { position: absolute; inset: 0; transform-origin: left; transform: scaleX(0); background: var(--plasma-primary); }
+    .uc.is-active .uc-bar i { animation: uc-progress 7s linear forwards; }
+    .uc-row.hold .uc.is-active .uc-bar i { animation-play-state: paused; }
+    @keyframes uc-progress { to { transform: scaleX(1); } }
+    .uc h3 { font-family: var(--font-body); font-weight: 700; font-size: 1.1rem; color: var(--text-pure); }
+    .soon { margin-left: 6px; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--crystal-border); color: var(--crystal-glow); font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; vertical-align: 2px; }
+    /* Short summary always shows; the longer detail opens only on the expanded card. */
+    .uc .summary { color: var(--plasma-highlight); font-weight: 600; font-size: 15px; line-height: 1.45; margin-top: 6px; }
+    .uc:not(.is-active) .summary { color: var(--text-muted); font-weight: 500; } /* collapsed cards stay quiet */
+    .uc .detail { color: var(--text-muted); font-size: 15px; line-height: 1.55; margin-top: 0; max-height: 0; opacity: 0; overflow: hidden; transition: max-height .5s ease, opacity .4s ease, margin .4s ease; }
+    .uc.is-active .detail { max-height: 90px; opacity: 1; margin-top: 10px; }
+    .uc .soon { display: none; }
+    .uc.is-active .soon { display: inline-block; animation: pop-in .4s ease both; }
+
+    /* Mock UI inside the media cards (generated in HTML so it stays crisp). */
+    .mock {
+      position: absolute; border-radius: 16px; background: rgba(11,7,12,.74); border: 1px solid rgba(255,255,255,.08);
+      box-shadow: 0 20px 50px rgba(0,0,0,.45); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      font-size: 12px; color: var(--text-pure);
+    }
+    .mono { font-family: var(--font-mono); }
+    .win { left: 22px; top: 48px; width: 262px; bottom: 48px; padding: 14px 16px; display: flex; flex-direction: column; }
+    .win-dots { display: flex; gap: 6px; margin-bottom: 14px; }
+    .win-dots i { width: 9px; height: 9px; border-radius: 50%; background: var(--border-bright); }
+    .win-title { font-weight: 700; font-size: 14px; }
+    .win-sub { color: var(--text-muted); font-size: 11px; margin-top: 2px; }
+    .bars { flex: 1; display: flex; align-items: flex-end; gap: 10px; margin-top: 16px; padding-bottom: 6px; border-bottom: 1px dashed var(--border-bright); }
+    .bars i { flex: 1; border-radius: 6px 6px 2px 2px; background: linear-gradient(180deg, var(--plasma-highlight), var(--plasma-primary) 45%, var(--plasma-shadow)); }
+    .win-rows { margin-top: 10px; display: grid; gap: 6px; font-size: 11px; color: var(--text-muted); }
+    .win-rows span { display: flex; justify-content: space-between; }
+    .win-rows b { color: var(--text-pure); font-weight: 600; }
+    .req { right: 18px; top: 66px; width: 186px; padding: 14px; font-size: 11px; display: grid; gap: 8px; }
+    .req .verb { color: var(--gas-accent); font-weight: 700; }
+    .req-row { display: grid; gap: 2px; }
+    .req-row small { color: var(--wireframe-grey); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; }
+    .req-row span { color: var(--gas-accent); }
+    .req-tag { position: absolute; right: 24px; bottom: 82px; }
+    .chat { left: 90px; right: 90px; top: 36px; padding: 14px; display: grid; gap: 9px; }
+    .bubble { justify-self: start; max-width: 92%; padding: 8px 11px; border-radius: 12px 12px 12px 4px; background: rgba(255,255,255,.07); font-size: 11.5px; }
+    .bubble small { display: block; color: var(--wireframe-grey); font-family: var(--font-mono); font-size: 9.5px; margin-bottom: 2px; }
+    .reply { justify-self: end; font-family: var(--font-mono); font-size: 10px; padding: 6px 9px; border-radius: 999px; font-weight: 700; letter-spacing: .04em; }
+    .reply.no { color: #fff; border: 1px solid var(--plasma-primary); background: rgba(255,20,118,.16); }
+    .reply.ok { color: var(--gas-accent); border: 1px dashed var(--gas-border); background: var(--gas-bg); }
+    .ask { left: 90px; right: 90px; bottom: 32px; padding: 10px 12px; color: var(--wireframe-grey); font-size: 11px; display: flex; justify-content: space-between; }
+    .xml { left: 95px; right: 95px; top: 40px; padding: 12px; color: var(--wireframe-grey); font-size: 9.5px; line-height: 1.6; border-style: dashed; border-color: var(--wireframe-grey); white-space: pre; overflow: hidden; }
+    .digest { position: absolute; left: 50%; top: 47%; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 10.5px; color: var(--text-muted); white-space: nowrap; }
+    .digest .ico-blob { width: 22px; height: 22px; }
+    .json { left: 95px; right: 95px; bottom: 40px; padding: 12px; color: var(--gas-accent); font-size: 10.5px; line-height: 1.6; border-color: var(--gas-border); white-space: pre; overflow: hidden; }
+    .tenants { left: 90px; right: 90px; top: 40px; padding: 8px 12px; }
+    .tenant { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; padding: 9px 0; }
+    .tenant + .tenant { border-top: 1px solid rgba(255,255,255,.06); }
+    .tenant .av { width: 24px; height: 24px; border-radius: 7px; display: grid; place-items: center; font-weight: 700; font-size: 11px; background: rgba(143,211,255,.16); color: var(--crystal-accent); }
+    .tenant b { font-size: 11.5px; display: block; }
+    .tenant small { color: var(--wireframe-grey); font-size: 10px; }
+    .spark { width: 44px; height: 18px; }
+    .forks { position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%); white-space: nowrap; }
+
+    /* ---------- How it works: the demo inside a large gradient frame ---------- */
+    .showcase {
+      position: relative; border-radius: 30px; padding: 44px; border: 1px solid var(--border-color); overflow: hidden;
+      background: radial-gradient(70% 60% at 12% -5%, rgba(255,20,118,.34), transparent 60%), radial-gradient(60% 60% at 105% 105%, rgba(56,248,184,.12), transparent 60%), #0f0a11;
+    }
+    .showcase::before {
+      content: ""; position: absolute; inset: 0; pointer-events: none;
+      background-image: radial-gradient(rgba(255,255,255,.07) 1px, transparent 1px); background-size: 22px 22px;
+      -webkit-mask-image: linear-gradient(to bottom, #000, transparent 85%); mask-image: linear-gradient(to bottom, #000, transparent 85%);
+    }
+    .showcase .demo-panel { position: relative; }
+    /* Compact: the whole section, response included, fits one laptop screen. */
+    #how { padding: 56px 0 64px; scroll-margin-top: 64px; }
+    #how .sec-head { margin-bottom: 26px; }
+    #how .showcase { padding: 24px; }
+    #how .demo-bar { padding: 12px 20px; }
+    #how .demo-col { padding: 16px 20px 18px; }
+    #how .label { margin-bottom: 8px; }
+    #how pre.code { font-size: 12.5px; line-height: 1.55; padding: 12px 16px; }
+    #how .sql-box { min-height: calc(8 * 1.55em + 24px); }
+    #how .timer-row { margin: 12px 0 8px; }
+    #how .timer { font-size: 28px; }
+    #how .response { min-height: calc(5 * 1.55em + 24px); }
+    #how .send-row { margin-top: 14px; }
+    #how .checks { margin-top: 16px; padding-top: 14px; gap: 9px; }
+    .inline-code { font-family: var(--font-mono); font-size: .92em; color: var(--gas-accent); background: var(--gas-bg); padding: 1px 7px; border-radius: 6px; }
+    .endpoint-note { font-family: var(--font-mono); font-size: 11.5px; letter-spacing: .08em; color: var(--wireframe-grey); }
+
+    /* ---------- Matter states: image cards ---------- */
+    .state-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+    .st { border-radius: 24px; border: 1px solid var(--border-color); background: var(--bg-surface); overflow: hidden; display: flex; flex-direction: column; }
+    .st-media { position: relative; height: 300px; border-bottom: 1px solid var(--border-color); overflow: hidden; }
+    .st-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    /* Each card loops a tiny story of its state: written, found by hash, crystallized. */
+    .st-gas .st-media img { animation: drift-up 7s ease-in-out infinite; }
+    .st-liquid .st-media img { animation: breathe 4.5s ease-in-out infinite; }
+    .st-crystal .st-media img { animation: tilt 8s ease-in-out infinite; }
+    .st-crystal .st-media::after {
+      content: ""; position: absolute; inset: 0; pointer-events: none; mix-blend-mode: screen;
+      background: linear-gradient(105deg, transparent 40%, rgba(220,243,255,.35) 50%, transparent 60%);
+      transform: translateX(-100%); animation: shine 6s ease-in-out infinite;
+    }
+    @keyframes drift-up { 0%, 100% { transform: translateY(6px) scale(1); } 50% { transform: translateY(-10px) scale(1.03); } }
+    @keyframes breathe { 0%, 100% { transform: scale(.97); } 50% { transform: scale(1.03); } }
+    @keyframes tilt { 0%, 100% { transform: rotate(-3deg) scale(1); } 50% { transform: rotate(3deg) scale(1.02); } }
+    @keyframes shine { 0%, 55% { transform: translateX(-100%); } 80%, 100% { transform: translateX(100%); } }
+    .an {
+      position: absolute; z-index: 2; font-size: 11px; color: var(--text-pure); white-space: nowrap;
+      padding: 7px 10px; border-radius: 10px; background: rgba(11,7,12,.78); border: 1px solid rgba(255,255,255,.08);
+      backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    }
+    .an b { font-weight: 700; }
+    /* Gas: a miss arrives, the agent types the query, it gets checked. */
+    .an-req { left: 14px; top: 14px; animation: fade-step 6s ease infinite; }
+    .an-req b { color: var(--gas-accent); margin-right: 6px; }
+    .an-write { left: 14px; right: 14px; bottom: 14px; display: flex; justify-content: space-between; gap: 10px; overflow: hidden; }
+    .an-type { overflow: hidden; color: var(--gas-accent); border-right: 2px solid var(--gas-accent); animation: type 6s steps(34) infinite; max-width: 100%; }
+    .an-ok { color: var(--text-muted); opacity: 0; animation: ok 6s ease infinite; }
+    @keyframes fade-step { 0% { opacity: 0; translate: 0 -6px; } 8%, 92% { opacity: 1; translate: 0 0; } 100% { opacity: 0; } }
+    @keyframes type { 0%, 10% { width: 0; } 55%, 100% { width: 25ch; } }
+    @keyframes ok { 0%, 58% { opacity: 0; } 64%, 94% { opacity: 1; } 100% { opacity: 0; } }
+    /* Liquid: the request hashes to a key, the key lights up in memory, answer in ms. */
+    .an-hash { left: 14px; top: 14px; color: var(--text-muted); animation: fade-step 5s ease infinite; }
+    .an-hash b { color: var(--plasma-highlight); }
+    .an-mem { right: 14px; top: 50%; transform: translateY(-50%); display: grid; gap: 6px; padding: 8px; }
+    .an-mem span { padding: 4px 8px; border-radius: 6px; color: var(--wireframe-grey); border: 1px solid transparent; }
+    .an-mem .hit { animation: hit 5s ease infinite; }
+    .an-fast { left: 14px; bottom: 14px; color: var(--gas-accent); animation: pop-late 5s ease infinite; }
+    @keyframes hit { 0%, 30% { color: var(--wireframe-grey); border-color: transparent; box-shadow: none; } 40%, 90% { color: #fff; border-color: var(--plasma-primary); box-shadow: 0 0 16px var(--glow-primary); } 100% { color: var(--wireframe-grey); } }
+    @keyframes pop-late { 0%, 45% { opacity: 0; scale: .9; } 52%, 92% { opacity: 1; scale: 1; } 100% { opacity: 0; } }
+    /* Crystal: calls climb on a hot path until it crystallizes into a commit. */
+    @property --calls { syntax: '<integer>'; initial-value: 0; inherits: false; }
+    .an-heat { left: 14px; right: 14px; top: 14px; display: grid; gap: 7px; }
+    .an-heat-label { color: var(--text-muted); }
+    .an-count { color: var(--crystal-accent); font-weight: 700; counter-reset: calls var(--calls); animation: count 6s ease-in infinite; }
+    .an-count::after { content: counter(calls); }
+    .an-bar { height: 4px; border-radius: 4px; background: rgba(255,255,255,.08); overflow: hidden; }
+    .an-bar i { display: block; height: 100%; width: 0; border-radius: 4px; background: linear-gradient(90deg, var(--crystal-glow), #2F64E0); animation: fill 6s ease-in infinite; }
+    .an-commit { left: 14px; bottom: 14px; color: var(--crystal-accent); border-color: var(--crystal-border); animation: commit 6s ease infinite; }
+    @keyframes count { 0% { --calls: 0; } 60%, 100% { --calls: 10000; } }
+    @keyframes fill { 0% { width: 0; } 60%, 100% { width: 100%; } }
+    @keyframes commit { 0%, 62% { opacity: 0; translate: 0 8px; } 70%, 94% { opacity: 1; translate: 0 0; } 100% { opacity: 0; } }
+    .st-gas .st-media { background: radial-gradient(70% 70% at 50% 55%, rgba(56,248,184,.16), transparent 70%), #0f0c12; }
+    .st-liquid .st-media { background: radial-gradient(70% 70% at 50% 55%, rgba(255,20,118,.28), transparent 70%), #120a14; }
+    .st-crystal .st-media { background: radial-gradient(70% 70% at 50% 55%, rgba(124,199,255,.22), transparent 70%), #0d1018; }
+    .st-body { padding: 24px 26px 28px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+    .st-body .tag { align-self: flex-start; }
+    .st-body h3 { font-size: 1.35rem; margin-top: 4px; }
+    .st-body p { color: var(--text-muted); flex: 1; }
+
+    /* ---------- Why Slime: quote-style cards ---------- */
+    .quotes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+    .quote { padding: 28px 26px 24px; border-radius: 20px; background: var(--bg-surface); border: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: space-between; gap: 28px; }
+    .quote p { color: var(--text-muted); font-size: 1.08rem; line-height: 1.55; }
+    .quote p strong { color: var(--text-pure); font-weight: 600; }
+    .who { display: flex; align-items: center; gap: 12px; }
+    /* Audience icons: glossy slime objects (hammer, gear, money bag). */
+    .slime-ic {
+      width: 48px; height: 48px; flex: none; display: grid; place-items: center; color: #fff;
+      border-radius: 42% 58% 60% 40% / 48% 44% 56% 52%; animation: morph 6s ease-in-out infinite;
+    }
+    .slime-ic svg { filter: drop-shadow(0 1px 3px rgba(0,0,0,.35)); }
+    /* Builders: the slime itself is a hammer, swinging from the handle end. */
+    .sb-gas { background: none; box-shadow: none; border-radius: 0; animation: hammer 1.8s ease-in-out infinite; transform-origin: 50% 92%; filter: drop-shadow(0 6px 14px rgba(56,248,184,.35)); }
+    .sb-gas svg { filter: none; }
+    /* Engineering teams: a glossy slime gear; only the gear turns, the highlight stays put. */
+    .sb-liquid { background: none; box-shadow: none; border-radius: 0; animation: none; filter: drop-shadow(0 6px 14px var(--glow-primary)); }
+    .sb-liquid svg { filter: none; }
+    .sb-liquid .gear { transform-box: fill-box; transform-origin: center; animation: spin 9s linear infinite; }
+    /* Businesses: a glossy ice-blue money bag that bounces. */
+    .sb-crystal { background: none; box-shadow: none; border-radius: 0; animation: bounce 2.2s ease-in-out infinite; filter: drop-shadow(0 6px 14px rgba(74,168,255,.4)); }
+    .sb-crystal svg { filter: none; }
+    @keyframes hammer { 0%, 55%, 100% { transform: rotate(0); } 70% { transform: rotate(-28deg); } 82% { transform: rotate(8deg); } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes bounce { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-3px); } 60% { transform: translateY(1px); } }
+    .who b { display: block; font-size: 15px; }
+    .who small { color: var(--wireframe-grey); font-size: 13px; }
+    .av-gas { background: radial-gradient(circle at 35% 30%, #c9fff0, var(--gas-accent) 45%, #0c5c45); }
+    .av-liquid { background: radial-gradient(circle at 35% 30%, var(--plasma-highlight), var(--plasma-primary) 45%, var(--plasma-shadow)); }
+    .av-crystal { background: radial-gradient(circle at 35% 30%, #fff, var(--crystal-glow) 45%, #3a2a6b); }
+
+    /* ---------- Closing CTA ---------- */
+    .cta { text-align: center; padding: 120px 0 130px; }
+    .cta p { color: var(--text-muted); max-width: 540px; margin: 22px auto 0; font-size: 1.1rem; }
+    .cta p.wordmark { font-size: clamp(2.6rem, 7vw, 5.4rem); max-width: none; margin: 0 auto; }
+    /* Only the nav logo keeps the Oi wordmark font; these lines use Titan One so they read easily. */
+    .cta p.wordmark, .foot .wordmark { font-family: var(--font-title); }
+    .cta-answer { display: block; margin-top: 18px; font-family: var(--font-title); font-size: clamp(1.6rem, 3vw, 2.4rem); color: var(--text-pure); }
+
+    /* ---------- Footer ---------- */
+    footer { border-top: 1px solid var(--border-color); padding: 52px 0 36px; }
+    .foot { display: flex; justify-content: space-between; align-items: flex-end; gap: 32px; flex-wrap: wrap; }
+    .foot .wordmark { font-size: 40px; }
+    .foot .tagline { color: var(--text-muted); margin-top: 10px; }
+    .builders-label { font-family: var(--font-mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--wireframe-grey); margin-bottom: 12px; }
+    .builders { display: flex; gap: 12px; flex-wrap: wrap; }
+    .builder {
+      display: inline-flex; align-items: center; gap: 12px; text-decoration: none; padding: 8px 18px 8px 8px; border-radius: 999px;
+      border: 1px solid var(--border-bright); background: var(--bg-surface); transition: border-color .2s ease, transform .2s ease;
+    }
+    .builder:hover { border-color: var(--plasma-primary); transform: translateY(-2px); }
+    .b-name { display: grid; font-weight: 600; font-size: 15px; line-height: 1.25; }
+    .b-name small { font-family: var(--font-mono); font-size: 11px; font-weight: 500; color: var(--wireframe-grey); }
+    .builder:hover .b-name small { color: var(--plasma-highlight); }
+    /* Each builder is a little slime: a glossy, gently morphing blob with initials. */
+    .blob-av {
+      width: 46px; height: 46px; flex: none; display: grid; place-items: center;
+      font-family: var(--font-title); font-size: 15px; color: #fff; text-shadow: 0 1px 6px rgba(0,0,0,.35);
+      border-radius: 42% 58% 60% 40% / 48% 44% 56% 52%; animation: morph 7s ease-in-out infinite;
+      transition: transform .3s cubic-bezier(.34, 1.56, .64, 1);
+    }
+    .builder:hover .blob-av { transform: scale(1.12) rotate(-6deg); animation-duration: 1.6s; }
+    /* LinkedIn-blue slimes. */
+    .blob-in { background: radial-gradient(circle at 34% 28%, #fff 0, #8cc4ff 16%, #0a66c2 55%, #063f7a); box-shadow: 0 6px 18px rgba(10,102,194,.45); }
+    .blob-in-2 { animation-delay: -3s; }
+    .builder:hover { border-color: #0a66c2; }
+    .builder:hover .b-name small { color: #8cc4ff; }
+    .copyright { margin-top: 40px; font-size: 13.5px; color: var(--wireframe-grey); font-family: var(--font-mono); }
+
+    /* ---------- Reveal on scroll (only when JS runs) ---------- */
+    .js .reveal { opacity: 0; transform: translateY(22px); transition: opacity .7s ease, transform .7s ease; }
+    .js .reveal.in { opacity: 1; transform: none; }
+
+    /* ---------- Responsive ---------- */
+    @media (max-width: 960px) {
+      section { padding: 90px 0; }
+      .nav-links { display: none; }
+      .nav-inner { grid-template-columns: 1fr auto; }
+      .sec-head { grid-template-columns: 1fr; gap: 16px; }
+      .sec-lead { justify-self: start; }
+      .state-grid, .quotes { grid-template-columns: 1fr; }
+      .demo-body { grid-template-columns: 1fr; }
+      .demo-col + .demo-col { border-left: 0; border-top: 1px solid var(--border-color); }
+      .steps { grid-template-columns: 1fr; gap: 16px; }
+      .showcase { padding: 24px; }
+      .hero .stage { min-height: 420px; }
+    }
+    @media (max-width: 720px) {
+      :root { --gutter: 16px; }
+      body { font-size: 16px; }
+      section { padding: 72px 0; }
+      .nav { padding: 6px 12px; background: var(--bg-canvas); }
+      .nav.scrolled .nav-inner { max-width: none; padding: 4px 0; background: none; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+      .nav .wordmark { font-size: 26px; }
+      .hero { padding: 44px 0 32px; }
+      .hero .stage { min-height: 330px; }
+      .hero .menu { position: relative; right: auto; bottom: auto; width: min(100%, 300px); margin: -36px 0 0 auto; }
+      .uc-row { flex-direction: column; gap: 18px; }
+      .uc { flex: none; }
+      .uc-media { height: 120px; transition: height .5s ease; }
+      .uc.is-active .uc-media { height: 360px; }
+      .scene { width: 100%; max-width: 480px; }
+      .showcase { padding: 12px; border-radius: 22px; }
+      .demo-col { padding: 20px 16px 22px; }
+      pre.code { font-size: 12px; padding: 14px; }
+      .timer { font-size: 28px; }
+      .foot .wordmark { font-size: 34px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+      .js .reveal { opacity: 1; transform: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="nav" id="nav">
+    <div class="nav-fade" aria-hidden="true"></div>
+    <div class="nav-inner">
+      <a href="#top" class="wordmark slime-text" aria-label="Slime home">slime</a>
+      <ul class="nav-links">
+        <li><a href="#how">How it works</a></li>
+        <li><a href="#states">Matter states</a></li>
+        <li><a href="#use-cases">Use cases</a></li>
+      </ul>
+      <a href="#how" class="btn btn-primary nav-cta">See it work</a>
+    </div>
+  </header>
+
+  <main id="top">
+    <!-- ================= HERO ================= -->
+    <section class="hero">
+      <div class="container">
+        <h1 class="hero-title">The backend<span class="line2 slime-text">that builds itself.</span></h1>
+        <p class="hero-sub">Your app asks for data in plain words. Slime writes the endpoint, checks it, and returns results in the shape you want.</p>
+      </div>
+
+      <div class="container">
+        <div class="hero-stage">
+          <div class="stage" id="slime-stage">
+            <div class="stage-fallback" aria-hidden="true"></div>
+          </div>
+          <div class="menu">
+            <div class="menu-head">
+              <p class="slime-text menu-title">Feed the Slime</p>
+              <span class="menu-kicker">menu</span>
+            </div>
+            <ul class="menu-list" id="menu-list">
+                <li><button class="dish" type="button"><span class="dish-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg></span><span class="dish-name">Databases</span><span class="dish-leader" aria-hidden="true"></span><span class="dish-count" aria-label="fed 0 times">0</span></button></li>
+                <li><button class="dish" type="button"><span class="dish-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3H7a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1M16 3h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-1"/></svg></span><span class="dish-name">REST APIs</span><span class="dish-leader" aria-hidden="true"></span><span class="dish-count" aria-label="fed 0 times">0</span></button></li>
+                <li><button class="dish" type="button"><span class="dish-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M13 4l-2 16"/></svg></span><span class="dish-name">SOAP</span><span class="dish-leader" aria-hidden="true"></span><span class="dish-count" aria-label="fed 0 times">0</span></button></li>
+                <li><button class="dish" type="button"><span class="dish-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M8 13h8M8 17h5"/></svg></span><span class="dish-name">CSVs &amp; files</span><span class="dish-leader" aria-hidden="true"></span><span class="dish-count" aria-label="fed 0 times">0</span></button></li>
+            </ul>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ================= HOW IT WORKS ================= -->
+    <section id="how">
+      <div class="container">
+        <div class="sec-head reveal">
+          <div>
+            <p class="sec-label"><span class="ic gas" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></span>How it works</p>
+            <h2>Make a wish.<br><span class="muted-line">Slime builds it.</span></h2>
+          </div>
+          <p class="sec-lead">Describe the data you want in one GET to <code class="inline-code">/slurp</code>. The first wish builds the endpoint in a few seconds; every repeat comes from memory in milliseconds.</p>
+        </div>
+
+        <div class="showcase reveal">
+        <div class="demo-panel" id="demo" data-state="idle">
+          <div class="demo-bar">
+            <span class="endpoint"><b>GET</b>/slurp</span>
+            <span class="endpoint-note">one endpoint · any shape</span>
+          </div>
+          <div class="demo-body">
+            <div class="demo-col">
+              <div class="label"><span>Request · from your UI</span></div>
+<pre class="code" aria-label="Example request"><span class="kw">GET</span> /slurp
+  <span class="p">?</span><span class="k">want</span><span class="p">=</span><span class="s">top N accounts by total paid
+         invoices, highest first</span>
+  <span class="p">&amp;</span><span class="k">limit</span><span class="p">=</span><span class="n">3</span>
+  <span class="p">&amp;</span><span class="k">shape</span><span class="p">=</span><span class="s">[{ name: string,
+            totalPaidCents: integer }]</span></pre>
+              <div class="send-row">
+                <button class="btn btn-primary" id="demo-btn" type="button">Send request</button>
+                <span class="send-hint" id="demo-hint">No backend route exists for this yet.</span>
+              </div>
+              <ul class="checks" id="demo-checks" aria-label="Safety checks">
+                <li>Read-only access</li>
+                <li>Logic runs in a sandbox</li>
+                <li>Result matches your shape</li>
+              </ul>
+            </div>
+
+            <div class="demo-col">
+              <div class="label"><span id="sql-label">Handler · not generated yet</span></div>
+              <pre class="code sql-box" id="demo-sql" aria-label="Generated SQL"><span class="placeholder">-- Slime will synthesize a safe, read-only
+-- query here on the first request.</span></pre>
+
+              <div class="timer-row">
+                <span class="timer" id="demo-timer">0<small>ms</small></span>
+                <span class="meta-line" id="demo-meta">waiting for a request</span>
+              </div>
+              <pre class="code response" id="demo-res" aria-label="Response"><span class="p">// response appears here</span></pre>
+            </div>
+          </div>
+        </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ================= MATTER STATES ================= -->
+    <section id="states">
+      <div class="container">
+        <div class="sec-head reveal">
+          <div>
+            <p class="sec-label"><span class="ic crystal" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 12L2 9z"/><path d="M2 9h20"/></svg></span>Matter states</p>
+            <h2>It grows its own API.<br><span class="muted-line">Gas, Liquid, Crystal.</span></h2>
+          </div>
+          <p class="sec-lead">Every endpoint starts as a first guess and hardens into permanent code, shaped only by what your product actually asks for.</p>
+        </div>
+
+        <div class="state-grid">
+          <article class="st st-gas reveal">
+            <div class="st-media" aria-hidden="true">
+              <img src="assets/state-gas.webp" width="960" height="720" loading="lazy" alt="">
+              <span class="an an-req mono"><b>MISS</b> GET /slurp?want=churn by plan</span>
+              <div class="an an-write mono"><span class="an-type">SELECT plan, count(*) FROM accounts…</span><span class="an-ok">✓ checked · 1.1 s</span></div>
+            </div>
+            <div class="st-body">
+              <span class="tag gas"><span class="dot"></span>First request</span>
+              <h3>Gas</h3>
+              <p>The first time Slime sees a request, an agent writes its endpoint on the spot and checks it. Unused ones evaporate.</p>
+            </div>
+          </article>
+          <article class="st st-liquid reveal">
+            <div class="st-media" aria-hidden="true">
+              <img src="assets/state-liquid.webp" width="960" height="720" loading="lazy" alt="">
+              <span class="an an-hash mono">want=churn by plan → <b>#a91f3c</b></span>
+              <div class="an an-mem mono"><span>#07be21</span><span class="hit">#a91f3c</span><span>#5d0c9e</span></div>
+              <span class="an an-fast mono">⚡ 4 ms · no AI</span>
+            </div>
+            <div class="st-body">
+              <span class="tag liquid"><span class="dot"></span>Every repeat</span>
+              <h3>Liquid</h3>
+              <p>Seen it before? Slime finds the endpoint by its hash and serves it from memory, no AI involved. A second model reviews it before it's kept.</p>
+            </div>
+          </article>
+          <article class="st st-crystal reveal">
+            <div class="st-media" aria-hidden="true">
+              <img src="assets/state-crystal.webp" width="960" height="720" loading="lazy" alt="">
+              <div class="an an-heat mono"><span class="an-heat-label">hot path · <span class="an-count"></span> calls</span><span class="an-bar"><i></i></span></div>
+              <span class="an an-commit mono">✓ crystallized → src/slime/churn.ts</span>
+            </div>
+            <div class="st-body">
+              <span class="tag crystal">Hot paths</span>
+              <h3>Crystal</h3>
+              <p>Endpoints that run hot crystallize: an agent optimizes them into ordinary code, committed to your repo.</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= USE CASES ================= -->
+    <section id="use-cases">
+      <div class="container">
+        <div class="sec-head reveal">
+          <div>
+            <p class="sec-label"><span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2 7 7 2-7 2-2 7-2-7-7-2 7-2z"/></svg></span>Use cases</p>
+            <h2>No tickets. No PRs. No deploys.<br><span class="muted-line">The backend grows itself.</span></h2>
+          </div>
+          <p class="sec-lead">Coding agents write endpoints faster, but each one is still a ticket, a review and a deploy. With Slime, the request is the spec: the endpoint grows itself at runtime.</p>
+        </div>
+
+        <div class="uc-row" id="uc-row">
+          <article class="uc reveal is-active" tabindex="0" role="button" aria-pressed="true">
+            <div class="uc-media m-plasma" aria-hidden="true"><div class="scene">
+              <div class="mock win">
+                <div class="win-dots"><i></i><i></i><i></i></div>
+                <span class="win-title">Revenue dashboard</span>
+                <span class="win-sub">vibecoded in 10 minutes</span>
+                <div class="bars"><i style="height:82%"></i><i style="height:64%"></i><i style="height:55%"></i><i style="height:38%"></i><i style="height:26%"></i></div>
+                <div class="win-rows"><span>Plumtree Studio <b>$12,845</b></span><span>Kelp &amp; Co <b>$9,732</b></span></div>
+              </div>
+              <div class="mock req mono">
+                <span><span class="verb">GET</span> /slurp</span>
+                <span class="req-row"><small>want</small><span>"top accounts by revenue"</span></span>
+                <span class="req-row"><small>shape</small><span>[{ name, total }]</span></span>
+              </div>
+              <span class="tag liquid req-tag"><span class="dot"></span>Liquid · 14 ms</span>
+            </div></div>
+            <div class="uc-bar"><i></i></div>
+            <h3>Vibecoded UIs</h3>
+            <p class="summary">Vibecode the UI. Let Slime build the backend.</p>
+            <p class="detail">Point your generated UI at Slime. Every new widget gets its endpoint the moment it asks.</p>
+          </article>
+
+          <article class="uc reveal" tabindex="0" role="button" aria-pressed="false">
+            <div class="uc-media m-berry" aria-hidden="true"><div class="scene">
+              <div class="mock chat">
+                <span class="bubble"><small>agent</small>delete inactive accounts</span>
+                <span class="reply no">WRITE_REFUSED</span>
+                <span class="bubble"><small>agent</small>churn risk by plan</span>
+                <span class="reply ok">✓ 3 rows · 11 ms</span>
+              </div>
+              <div class="mock ask"><span>Ask Slime…</span><span>↵</span></div>
+            </div></div>
+            <div class="uc-bar"><i></i></div>
+            <h3>AI agents</h3>
+            <p class="summary">Unleash your agents. Keep your database untouchable.</p>
+            <p class="detail">Agents ask for the data they need and Slime builds the tool on the spot: read-only, reviewed, guarded by your database.</p>
+          </article>
+
+          <article class="uc reveal" tabindex="0" role="button" aria-pressed="false">
+            <div class="uc-media m-mint" aria-hidden="true"><div class="scene">
+              <div class="mock xml mono">&lt;soap:Envelope&gt;
+ &lt;GetInvoices&gt;
+  &lt;status&gt;unpaid&lt;/status&gt;
+ &lt;/GetInvoices&gt;
+&lt;/soap:Envelope&gt;</div>
+              <span class="digest"><span class="ico-blob"></span>digesting…</span>
+              <div class="mock json mono">[{ "invoice": 1042,
+   "due": "2026-11-30" }]</div>
+            </div></div>
+            <div class="uc-bar"><i></i></div>
+            <h3>Legacy systems</h3>
+            <p class="summary">Don't rewrite legacy. Let Slime digest it.</p>
+            <p class="detail">Slime sits in front of old databases and services and grows a modern API on top, one request at a time.</p>
+          </article>
+
+          <article class="uc reveal" tabindex="0" role="button" aria-pressed="false">
+            <div class="uc-media m-crystal" aria-hidden="true"><div class="scene">
+              <div class="mock tenants">
+                <div class="tenant"><span class="av">P</span><span><b>Plumtree</b><small>churn by plan</small></span><svg class="spark" viewBox="0 0 44 18"><path d="M1 14 L10 9 L18 11 L27 4 L35 7 L43 2" fill="none" stroke="#8FD3FF" stroke-width="1.6"/></svg></div>
+                <div class="tenant"><span class="av">K</span><span><b>Kelp &amp; Co</b><small>invoices by region</small></span><svg class="spark" viewBox="0 0 44 18"><path d="M1 6 L9 10 L17 5 L26 12 L34 8 L43 11" fill="none" stroke="#8FD3FF" stroke-width="1.6"/></svg></div>
+                <div class="tenant"><span class="av">O</span><span><b>Orbital</b><small>signups per day</small></span><svg class="spark" viewBox="0 0 44 18"><path d="M1 16 L10 13 L18 14 L26 9 L34 6 L43 3" fill="none" stroke="#8FD3FF" stroke-width="1.6"/></svg></div>
+              </div>
+              <span class="tag crystal forks">1 runtime · 0 forks</span>
+            </div></div>
+            <div class="uc-bar"><i></i></div>
+            <h3>SaaS customization <span class="soon">Next</span></h3>
+            <p class="summary">One runtime. Every customer's backend.</p>
+            <p class="detail">Each customer's custom report becomes its own self-built endpoint, on one shared runtime.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= WHY SLIME ================= -->
+    <section id="why">
+      <div class="container">
+        <div class="sec-head reveal">
+          <div>
+            <p class="sec-label"><span class="ic gas" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg></span>Why Slime</p>
+            <h2>A new category.<br><span class="muted-line">The self-building backend.</span></h2>
+          </div>
+          <p class="sec-lead">Static APIs were built for software that changed slowly. Slime grows its API from what your product actually asks for.</p>
+        </div>
+
+        <div class="quotes">
+          <article class="quote reveal">
+            <p><strong>Ship at the speed you design.</strong> New data features go live as fast as the UI that needs them.</p>
+            <div class="who"><span class="slime-ic sb-gas" aria-hidden="true"><svg width="48" height="48" viewBox="0 0 48 48" style="transform:rotate(-35deg)"><defs><linearGradient id="hg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#C9FFEC"/><stop offset=".45" stop-color="#2FE3A5"/><stop offset="1" stop-color="#0C5C45"/></linearGradient></defs><rect x="20.500" y="14" width="7" height="32" rx="3.500" fill="url(#hg)"/><rect x="6" y="3" width="36" height="17" rx="7" fill="url(#hg)"/><path d="M33 3v17" stroke="#0C5C45" stroke-opacity=".35" stroke-width="1.500"/><path d="M11 19v5a2.600 2.600 0 0 0 5.200 0v-5z" fill="url(#hg)"/><ellipse cx="15" cy="8" rx="6.500" ry="2.200" fill="#fff" opacity=".6"/><ellipse cx="22.800" cy="30" rx="1" ry="6" fill="#fff" opacity=".45"/></svg></span><span><b>Builders</b><small>vibecoders &amp; product teams</small></span></div>
+          </article>
+          <article class="quote reveal">
+            <p><strong>End the backend-for-frontend grind.</strong> No more ticket queues for one more field in one more endpoint.</p>
+            <div class="who"><span class="slime-ic sb-liquid" aria-hidden="true"><svg width="48" height="48" viewBox="0 0 48 48"><defs><linearGradient id="geg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFC9E1"/><stop offset=".45" stop-color="#FF1476"/><stop offset="1" stop-color="#8F0043"/></linearGradient></defs><path class="gear" d="M20.40 8.41 L21.08 3.20 L26.92 3.20 L27.60 8.41 A16 16 0 0 1 32.48 10.43 L32.48 10.43 L36.64 7.23 L40.77 11.36 L37.57 15.52 A16 16 0 0 1 39.59 20.40 L39.59 20.40 L44.80 21.08 L44.80 26.92 L39.59 27.60 A16 16 0 0 1 37.57 32.48 L37.57 32.48 L40.77 36.64 L36.64 40.77 L32.48 37.57 A16 16 0 0 1 27.60 39.59 L27.60 39.59 L26.92 44.80 L21.08 44.80 L20.40 39.59 A16 16 0 0 1 15.52 37.57 L15.52 37.57 L11.36 40.77 L7.23 36.64 L10.43 32.48 A16 16 0 0 1 8.41 27.60 L8.41 27.60 L3.20 26.92 L3.20 21.08 L8.41 20.40 A16 16 0 0 1 10.43 15.52 L10.43 15.52 L7.23 11.36 L11.36 7.23 L15.52 10.43 A16 16 0 0 1 20.40 8.41 Z M30 24 A6 6 0 1 0 18 24 A6 6 0 1 0 30 24 Z" fill="url(#geg)" fill-rule="evenodd" stroke="url(#geg)" stroke-width="2.4" stroke-linejoin="round"/><ellipse cx="17" cy="14" rx="6" ry="2.4" transform="rotate(-35 17 14)" fill="#fff" opacity=".6"/><circle cx="24" cy="24" r="6.6" fill="none" stroke="#5c002b" stroke-opacity=".35" stroke-width="1.2"/></svg></span><span><b>Engineering teams</b><small>platform &amp; backend</small></span></div>
+          </article>
+          <article class="quote reveal">
+            <p><strong>Move at AI speed, safely.</strong> Your database, not the AI, decides what Slime can touch.</p>
+            <div class="who"><span class="slime-ic sb-crystal" aria-hidden="true"><svg width="48" height="48" viewBox="0 0 48 48"><defs><linearGradient id="mbg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#E6F7FF"/><stop offset=".45" stop-color="#4AA8FF"/><stop offset="1" stop-color="#1E3F9E"/></linearGradient></defs><path d="M16.5 3.5 L20.5 8 L24 2.5 L27.5 8 L31.5 3.5 L30 14 H18 Z" fill="url(#mbg)" stroke="url(#mbg)" stroke-width="1.5" stroke-linejoin="round"/><path d="M18.5 15 C9 20 5 29 8 36.5 C10 42.5 16.5 45.5 24 45.5 C31.5 45.5 38 42.5 40 36.5 C43 29 39 20 29.5 15 Z" fill="url(#mbg)"/><rect x="15.5" y="12" width="17" height="4.6" rx="2.3" fill="#1E3F9E"/><ellipse cx="14.5" cy="25" rx="2.2" ry="6.5" transform="rotate(25 14.5 25)" fill="#fff" opacity=".55"/><text x="25" y="39.5" text-anchor="middle" font-size="17" style="font-family: 'Titan One', sans-serif" fill="#1E3F9E" fill-opacity=".55">$</text></svg></span><span><b>Businesses</b><small>leaders &amp; architects</small></span></div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= CTA ================= -->
+    <section class="cta">
+      <div class="container reveal">
+        <p class="wordmark"><span class="slime-text">Stop writing endpoints.</span><span class="cta-answer">Slime writes them.</span></p>
+        <p>Point your UI or agent at Slime. The backend builds itself.</p>
+        <div class="hero-ctas">
+          <a href="#top" class="btn btn-primary">Feed the Slime</a>
+          <a href="#how" class="btn btn-soft">See it work <span class="arrow" aria-hidden="true">→</span></a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      <div class="foot">
+        <div>
+          <p class="wordmark slime-text">Feed the Slime.</p>
+          <p class="tagline">The backend that builds itself.</p>
+        </div>
+        <div>
+          <p class="builders-label">Grown by</p>
+          <div class="builders">
+            <a class="builder" href="https://www.linkedin.com/in/kanstantsin-yaromenka/" target="_blank" rel="noopener noreferrer">
+              <span class="blob-av blob-in" aria-hidden="true">KY</span>
+              <span class="b-name">K. Yaromenka<small>LinkedIn ↗</small></span>
+            </a>
+            <a class="builder" href="https://www.linkedin.com/in/amaslakov/" target="_blank" rel="noopener noreferrer">
+              <span class="blob-av blob-in blob-in-2" aria-hidden="true">AM</span>
+              <span class="b-name">A. Maslakov<small>LinkedIn ↗</small></span>
+            </a>
+          </div>
+        </div>
+      </div>
+      <p class="copyright">© 2026 Slime · Built at a hackathon</p>
+    </div>
+  </footer>
+
+  <!-- Burst aftermath: stains on the glass and the button that wipes them. -->
+  <div class="stains" id="stains" aria-hidden="true"></div>
+  <button class="btn btn-primary cleanup" id="cleanup" type="button">Clean up the mess</button>
+
+  <script>
+    (function () {
+      document.documentElement.classList.add('js');
+      var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      /* Nav border once the page scrolls */
+      var nav = document.getElementById('nav');
+      function onScroll() { nav.classList.toggle('scrolled', window.scrollY > 8); }
+      window.addEventListener('scroll', onScroll, { passive: true });
+      onScroll();
+
+      /* Nav height feeds the hero's min-height (hero + nav = one screen). */
+      function setNavH() { document.documentElement.style.setProperty('--nav-h', nav.offsetHeight + 'px'); }
+      window.addEventListener('resize', setNavH);
+      setNavH();
+
+      /* Reveal sections as they enter the viewport */
+      var reveals = document.querySelectorAll('.reveal');
+      if ('IntersectionObserver' in window && !reduceMotion) {
+        var io = new IntersectionObserver(function (entries) {
+          entries.forEach(function (e) {
+            if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+          });
+        }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
+        reveals.forEach(function (el) { io.observe(el); });
+      } else {
+        reveals.forEach(function (el) { el.classList.add('in'); });
+      }
+
+      /* ---------- Use cases: click to expand, auto-advance on the progress bar ---------- */
+      var ucRow = document.getElementById('uc-row');
+      if (ucRow) {
+        var ucs = Array.prototype.slice.call(ucRow.querySelectorAll('.uc'));
+        var activate = function (i) {
+          ucs.forEach(function (u, k) {
+            u.classList.toggle('is-active', k === i);
+            u.setAttribute('aria-pressed', k === i ? 'true' : 'false');
+          });
+        };
+        ucs.forEach(function (u, i) {
+          u.addEventListener('click', function () { activate(i); });
+          u.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activate(i); }
+          });
+          // The bar's fill animation ending is the timer: no setInterval to drift.
+          u.querySelector('.uc-bar i').addEventListener('animationend', function () { activate((i + 1) % ucs.length); });
+        });
+        // Hold the timer while hovered or off-screen.
+        var hovering = false, offscreen = false;
+        var hold = function () { ucRow.classList.toggle('hold', hovering || offscreen); };
+        ucRow.addEventListener('mouseenter', function () { hovering = true; hold(); });
+        ucRow.addEventListener('mouseleave', function () { hovering = false; hold(); });
+        if ('IntersectionObserver' in window) {
+          new IntersectionObserver(function (es) { offscreen = !es[0].isIntersecting; hold(); }).observe(ucRow);
+        }
+      }
+
+      /* ---------- Feed the Slime (hero menu) ----------
+         Each click bumps that line's counter and fires 'slime:feed' with the
+         counter's screen position; the 3D module launches a droplet from
+         there. The menu still works when WebGL or the CDN is unavailable. */
+      var menuEl = document.querySelector('.hero .menu');
+      document.addEventListener('slime:burst', function () { menuEl.classList.add('off'); });
+      document.addEventListener('slime:reset', function () { menuEl.classList.remove('off'); });
+
+      document.querySelectorAll('#menu-list .dish').forEach(function (d) {
+        var counter = d.querySelector('.dish-count');
+        var n = 0;
+        document.addEventListener('slime:reset', function () {
+          n = 0;
+          counter.textContent = '0';
+          counter.setAttribute('aria-label', 'fed 0 times');
+          counter.classList.remove('has');
+        });
+        d.addEventListener('click', function () {
+          n += 1;
+          counter.textContent = n;
+          counter.setAttribute('aria-label', 'fed ' + n + (n === 1 ? ' time' : ' times'));
+          counter.classList.add('has');
+          counter.classList.remove('bump'); void counter.offsetWidth; counter.classList.add('bump');
+          // Launch from just above the card, in line with this counter, so the whole flight is visible.
+          var r = counter.getBoundingClientRect();
+          var menuTop = d.closest('.menu').getBoundingClientRect().top;
+          document.dispatchEvent(new CustomEvent('slime:feed', { detail: { x: r.left + r.width / 2, y: menuTop - 14 } }));
+        });
+      });
+
+      /* ---------- Scripted demo ----------
+         This is an illustration, not a live call. Timings are in the range the
+         sandbox prototype shows: seconds for a new (Gas) request, tens of ms for
+         a cached (Liquid) one. Keep them realistic so the live demo matches. */
+      var GAS_MS = 2840;
+      var LIQUID_MS = 14;
+      var SQL = [
+        'SELECT a.name,',
+        '       SUM(i.amount_cents)::int AS total_paid_cents',
+        'FROM accounts a',
+        'JOIN invoices i ON i.account_id = a.id',
+        "WHERE i.status = 'paid'",
+        'GROUP BY a.id, a.name',
+        'ORDER BY total_paid_cents DESC',
+        'LIMIT $1;'
+      ].join('\n');
+      var DATA = [
+        { name: 'Plumtree Studio', totalPaidCents: 1284500 },
+        { name: 'Kelp & Co', totalPaidCents: 973200 },
+        { name: 'Orbital Pantry', totalPaidCents: 811950 }
+      ];
+
+      var panel = document.getElementById('demo');
+      var btn = document.getElementById('demo-btn');
+      var hint = document.getElementById('demo-hint');
+      var statusEl = document.getElementById('demo-status');
+      var sqlEl = document.getElementById('demo-sql');
+      var sqlLabel = document.getElementById('sql-label');
+      var timerEl = document.getElementById('demo-timer');
+      var metaEl = document.getElementById('demo-meta');
+      var resEl = document.getElementById('demo-res');
+      var checks = document.querySelectorAll('#demo-checks li');
+      var state = 'idle';
+      function tickChecks(spanMs) {
+        checks.forEach(function (li, i) {
+          if (reduceMotion) { li.classList.add('ok'); return; }
+          setTimeout(function () { li.classList.add('ok'); }, spanMs * (0.35 + 0.28 * i));
+        });
+      }
+
+      function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+      function hlSql(s) {
+        return esc(s)
+          .replace(/\$\d+/g, '<span class="prm">$&</span>')
+          .replace(/'[^']*'/g, '<span class="s">$&</span>')
+          .replace(/\b(SELECT|SUM|AS|FROM|JOIN|ON|WHERE|GROUP BY|ORDER BY|DESC|LIMIT|int)\b/g, '<span class="kw">$1</span>');
+      }
+      function hlJson(rows) {
+        // One row per line keeps the response short enough to fit the screen.
+        var text = '[\n' + rows.map(function (o) {
+          return '  { ' + Object.keys(o).map(function (k) { return JSON.stringify(k) + ': ' + JSON.stringify(o[k]); }).join(', ') + ' }';
+        }).join(',\n') + '\n]';
+        return esc(text)
+          .replace(/"([^"]+)":/g, '<span class="k">"$1"</span><span class="p">:</span>')
+          .replace(/: "([^"]*)"/g, ': <span class="s">"$1"</span>')
+          .replace(/: (\d+)/g, ': <span class="n">$1</span>');
+      }
+      function fmt(n) { return Math.round(n).toLocaleString('en-US'); }
+      function setTimer(ms) { timerEl.innerHTML = fmt(ms) + '<small>ms</small>'; }
+      function setStatus(cls, text) {
+        if (!statusEl) return; // the status tag was removed for a calmer demo bar
+        statusEl.className = 'tag' + (cls ? ' ' + cls : '');
+        statusEl.innerHTML = '<span class="dot"></span>' + text;
+      }
+      function countTo(target, duration, done) {
+        if (reduceMotion || duration <= 0) { setTimer(target); done(); return; }
+        var start = performance.now();
+        (function tick(now) {
+          var t = Math.min(1, (now - start) / duration);
+          setTimer(target * t);
+          if (t < 1) requestAnimationFrame(tick); else done();
+        })(start);
+      }
+      function typeSql(duration, done) {
+        if (reduceMotion) { sqlEl.innerHTML = hlSql(SQL); done(); return; }
+        var start = performance.now();
+        (function tick(now) {
+          var t = Math.min(1, (now - start) / duration);
+          var n = Math.floor(SQL.length * t);
+          sqlEl.innerHTML = hlSql(SQL.slice(0, n)) + (t < 1 ? '<span class="caret"></span>' : '');
+          if (t < 1) requestAnimationFrame(tick); else done();
+        })(start);
+      }
+      function showResponse(meta) {
+        resEl.innerHTML = '<span class="p">// data · ' + meta + '</span>\n' + hlJson(DATA);
+        resEl.classList.remove('flash'); void resEl.offsetWidth; resEl.classList.add('flash');
+      }
+
+      function runGas() {
+        state = 'busy'; btn.disabled = true;
+        panel.dataset.state = 'gas';
+        setStatus('gas', 'Gas · synthesizing');
+        sqlLabel.textContent = 'Handler · writing now';
+        hint.textContent = 'First time Slime sees this. Writing the logic…';
+        metaEl.textContent = 'cache: miss';
+        resEl.innerHTML = '<span class="p">// checking the result matches your shape…</span>';
+        var left = 2;
+        function finished() {
+          if (--left) return;
+          setStatus('gas', 'Gas · generated');
+          sqlLabel.textContent = 'Handler · read-only, saved';
+          metaEl.textContent = 'cache: miss · tier: gas · ' + fmt(GAS_MS) + ' ms';
+          showResponse('shape verified');
+          hint.textContent = 'Now send the exact same request again.';
+          btn.textContent = 'Send it again';
+          btn.disabled = false; state = 'gas';
+        }
+        tickChecks(GAS_MS);
+        typeSql(GAS_MS * 0.75, finished);
+        countTo(GAS_MS, GAS_MS, finished);
+      }
+
+      function runLiquid() {
+        state = 'busy'; btn.disabled = true;
+        panel.dataset.state = 'liquid';
+        setStatus('liquid', 'Liquid · cache hit');
+        sqlLabel.textContent = 'Handler · from memory, no AI call';
+        countTo(LIQUID_MS, 160, function () {
+          metaEl.textContent = 'cache: hit · tier: liquid · ' + LIQUID_MS + ' ms · no AI call';
+          showResponse('served from memory');
+          hint.textContent = 'Same answer, about 200× faster. No model involved.';
+          btn.textContent = 'Replay';
+          btn.disabled = false; state = 'liquid';
+        });
+      }
+
+      function reset() {
+        state = 'idle'; panel.dataset.state = 'idle';
+        setStatus('', 'Ready');
+        sqlLabel.textContent = 'Handler · not generated yet';
+        sqlEl.innerHTML = '<span class="placeholder">-- Slime will synthesize a safe, read-only\n-- query here on the first request.</span>';
+        setTimer(0);
+        metaEl.textContent = 'waiting for a request';
+        resEl.innerHTML = '<span class="p">// response appears here</span>';
+        hint.textContent = 'No backend route exists for this yet.';
+        btn.textContent = 'Send request';
+        checks.forEach(function (li) { li.classList.remove('ok'); });
+      }
+
+      btn.addEventListener('click', function () {
+        if (state === 'idle') runGas();
+        else if (state === 'gas') runLiquid();
+        else if (state === 'liquid') reset();
+      });
+
+      // Play the first (Gas) request once when the demo is mostly on screen, so
+      // visitors see a filled panel instead of placeholders; the button then
+      // invites the repeat. Skipped if they already clicked.
+      if ('IntersectionObserver' in window) {
+        var autoIo = new IntersectionObserver(function (es) {
+          if (!es[0].isIntersecting) return;
+          autoIo.disconnect();
+          if (state === 'idle') runGas();
+        }, { threshold: 0.6 });
+        autoIo.observe(panel);
+      }
+    })();
+  </script>
+
+  <!-- Hero slime: a round metaball body on a full-viewport canvas behind the page. -->
+  <script type="module">
+    import * as THREE from 'three';
+    import { MarchingCubes } from 'three/addons/objects/MarchingCubes.js';
+    import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+    const stage = document.getElementById('slime-stage');
+    const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const small = matchMedia('(max-width: 720px)').matches;
+
+    // If WebGL is unavailable this throws, the module stops, and the CSS fallback blob stays.
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5)); // full-viewport canvas: cap the cost
+    renderer.setClearColor(0x000000, 0);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 0.9;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    const canvas = renderer.domElement;
+    canvas.id = 'slime-canvas';
+    canvas.setAttribute('aria-hidden', 'true');
+    document.body.prepend(canvas);
+
+    const scene = new THREE.Scene();
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+    const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 50);
+    camera.position.set(0, 0, 6.2);
+    const HALF_H = camera.position.z * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+    let W = innerWidth, H = innerHeight, pxPerWorld = H / (2 * HALF_H);
+    // Screen pixel -> point on the z = 0 plane.
+    const toWorld = (sx, sy) => new THREE.Vector3((sx - W / 2) / pxPerWorld, -(sy - H / 2) / pxPerWorld, 0);
+
+    // Brand colours: Laser Plasma body, Bruised Berry depth, Specular Jelly sheen, Cryo Mint rim.
+    const material = new THREE.MeshPhysicalMaterial({
+      color: 0xff1476,
+      emissive: 0x8f0043,
+      emissiveIntensity: 0.22,
+      roughness: 0.14,
+      metalness: 0.0,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.04,
+      sheen: 0.35,
+      sheenColor: new THREE.Color(0xff85c0),
+      sheenRoughness: 0.4,
+      iridescence: 0.25,
+      iridescenceIOR: 1.3,
+      envMapIntensity: 0.65,
+    });
+
+    // MarchingCubes surface sits where strength / d^2 - subtract = isolation, i.e. radius = sqrt(strength / 92).
+    const RES = small ? 48 : 64;
+    const SUB = 12;
+    const radiusOf = (strength) => Math.sqrt(strength / (80 + SUB));
+    const blob = new MarchingCubes(RES, material, false, false, 90000);
+    blob.isolation = 80;
+    scene.add(blob);
+
+    const key = new THREE.DirectionalLight(0xffffff, 2.4);
+    key.position.set(-2.5, 3, 4);
+    const rim = new THREE.DirectionalLight(0x38f8b8, 2.2);
+    rim.position.set(3, -1.5, -2.5);
+    const fill = new THREE.PointLight(0xff85c0, 18, 40, 1.2);
+    fill.position.set(2.5, 1.5, 3);
+    scene.add(key, rim, fill);
+
+    // --- shape: a round core with lumps drifting over its surface -------------
+    const CORE = 3.4;
+    const RC = radiusOf(CORE);               // core radius in field units
+    const BASE_PX = small ? 100 : 135;       // on-screen radius of an unfed slime
+    const GROWTH = 1.08;                     // size multiplier per feed; no cap, it may outgrow the screen
+    const DROP_PX = small ? 13 : 17;         // on-screen radius of a flying droplet
+    const FLY_T = reduceMotion ? 0.01 : 1.0;
+    const LUMPS = 7;
+    const lumps = Array.from({ length: LUMPS }, (_, i) => ({
+      theta: i * 2.399,
+      phi: Math.acos(1 - (2 * (i + 0.5)) / LUMPS),
+      speed: 0.18 + 0.1 * ((i * 5) % 7) / 6,
+      size: 0.2 + 0.12 * ((i * 3) % 4) / 3,
+    }));
+    const moon = { speed: 0.5, size: 0.05, gap: 0.075 };
+
+    const s = { grow: 1, growTarget: 1, jiggle: 0, reach: 0, reachTarget: 0, dx: 0, dy: 0, tdx: 0, tdy: 0 };
+    const flights = [];   // droplet meshes flying from the menu
+    const shards = [];    // burst droplets flying at the screen
+    const BURST_AT = 10;  // feeds until it pops
+    let feeds = 0;
+    let phase = 'alive';  // alive -> critical -> burst -> (clean up) -> alive
+    let criticalAt = 0;
+    const stainsEl = document.getElementById('stains');
+    const cleanupBtn = document.getElementById('cleanup');
+    const bulges = [];    // merge ripples once a droplet lands
+    const dropGeo = new THREE.SphereGeometry(1, 32, 20);
+
+    const clamp01 = (v) => Math.min(1, Math.max(0, v));
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
+    // Follow .stage as the page scrolls; returns the slime's screen centre.
+    const center = new THREE.Vector3();
+    let radiusPx = BASE_PX, cx = 0, cy = 0;
+    function layout() {
+      const r = stage.getBoundingClientRect();
+      cx = r.left + r.width / 2;
+      cy = r.top + r.height * 0.46;
+      center.copy(toWorld(cx, cy));
+      radiusPx = BASE_PX * s.grow;
+      blob.position.copy(center);
+      blob.scale.setScalar((radiusPx / pxPerWorld) / (2 * RC));
+      return r;
+    }
+
+    function buildField(t, now) {
+      blob.reset();
+      blob.addBall(0.5, 0.5, 0.5, CORE, SUB);
+      const wob = s.jiggle * 0.03;
+      for (let i = 0; i < LUMPS; i++) {
+        const L = lumps[i];
+        const th = L.theta + t * L.speed;
+        const ph = L.phi + Math.sin(t * 0.4 + i) * 0.35;
+        const d = RC * (0.82 + Math.sin(t * 1.3 + i * 1.7) * 0.06) + Math.sin(t * 18 + i) * wob;
+        blob.addBall(0.5 + Math.sin(ph) * Math.cos(th) * d, 0.5 + Math.cos(ph) * d, 0.5 + Math.sin(ph) * Math.sin(th) * d, L.size, SUB);
+      }
+      const ma = t * moon.speed;
+      const mo = RC + moon.gap + Math.sin(t * 0.8) * 0.02;
+      blob.addBall(0.5 + Math.cos(ma) * mo, 0.5 + Math.sin(ma * 0.7) * mo * 0.5, 0.5 + Math.sin(ma) * mo, moon.size, SUB);
+      if (s.reach > 0.01) {
+        const len = Math.hypot(s.dx, s.dy) || 1;
+        blob.addBall(0.5 + (s.dx / len) * RC * 0.95, 0.5 + (s.dy / len) * RC * 0.95, 0.56, 0.45 * s.reach, SUB);
+      }
+      for (let i = bulges.length - 1; i >= 0; i--) {
+        const b = bulges[i];
+        const e = clamp01((now - b.t0) / 0.6);
+        const d = RC * lerp(0.98, 0.4, e);
+        blob.addBall(0.5 + b.x * d, 0.5 + b.y * d, 0.55, lerp(0.8, 0.05, e), SUB);
+        if (e >= 1) bulges.splice(i, 1);
+      }
+      blob.update();
+    }
+
+    function updateFlights(now) {
+      for (let i = flights.length - 1; i >= 0; i--) {
+        const f = flights[i];
+        const e = 0.5 - Math.cos(Math.PI * clamp01((now - f.t0) / FLY_T)) / 2; // gentle in/out, visible from the start
+        const dir = new THREE.Vector3().subVectors(f.start, center).setZ(0).normalize();
+        const target = center.clone().addScaledVector(dir, (radiusPx * 0.85) / pxPerWorld);
+        const p = f.start.clone().lerp(target, e);
+        p.y += Math.sin(Math.PI * e) * f.start.distanceTo(target) * 0.22; // an arc up to the slime
+        f.mesh.position.copy(p);
+        f.mesh.scale.setScalar((DROP_PX / pxPerWorld) * (1 - 0.25 * e));
+        if (e >= 1) {
+          scene.remove(f.mesh);
+          flights.splice(i, 1);
+          bulges.push({ t0: now, x: dir.x, y: dir.y });
+          s.growTarget *= GROWTH;
+          s.jiggle = 1;
+          feeds += 1;
+          if (feeds >= BURST_AT && phase === 'alive') {
+            phase = 'critical';
+            criticalAt = now;
+          }
+        }
+      }
+    }
+
+    // --- burst: shards fly at the camera and splat on the "glass" as stains ---
+    const SVG_NS = 'http://www.w3.org/2000/svg';
+    let stainId = 0;
+    const rand = (a, b) => a + Math.random() * (b - a);
+
+    // A closed, smoothed blob path; every few points shoots out a splat arm.
+    function splatPath(r) {
+      const n = 18, pts = [];
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2 + rand(-0.08, 0.08);
+        const arm = Math.random() < 0.28 ? rand(1.3, 1.75) : rand(0.82, 1.08);
+        pts.push([Math.cos(a) * r * arm, Math.sin(a) * r * arm]);
+      }
+      const mid = (p, q) => [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
+      let m = mid(pts[n - 1], pts[0]);
+      let d = `M${m[0].toFixed(1)},${m[1].toFixed(1)}`;
+      for (let i = 0; i < n; i++) {
+        const p = pts[i], q = mid(p, pts[(i + 1) % n]);
+        d += `Q${p[0].toFixed(1)},${p[1].toFixed(1)} ${q[0].toFixed(1)},${q[1].toFixed(1)}`;
+      }
+      return d + 'Z';
+    }
+
+    function addStain(x, y, size) {
+      const id = 'sg' + (stainId++);
+      const wrap = document.createElement('div');
+      wrap.className = 'stain';
+      wrap.style.left = (x - size / 2) + 'px';
+      wrap.style.top = (y - size / 2) + 'px';
+      wrap.style.width = wrap.style.height = size + 'px';
+      const svg = document.createElementNS(SVG_NS, 'svg');
+      svg.setAttribute('viewBox', '-100 -100 200 200');
+      let inner = `<defs><radialGradient id="${id}" cx="38%" cy="32%" r="75%">` +
+        '<stop offset="0" stop-color="#FF85C0"/><stop offset=".45" stop-color="#FF1476"/><stop offset="1" stop-color="#8F0043"/></radialGradient></defs>';
+      // Drips run straight down, so they sit outside the rotated group.
+      const drips = Math.random() < 0.75 ? Math.ceil(rand(0, 2.5)) : 0;
+      for (let i = 0; i < drips; i++) {
+        const w = rand(7, 13), dx = rand(-26, 26), len = rand(40, 110);
+        inner += `<g class="drip" style="--drip-t:${rand(4, 9).toFixed(1)}s"><rect x="${(dx - w / 2).toFixed(1)}" y="10" width="${w.toFixed(1)}" height="${len.toFixed(1)}" rx="${(w / 2).toFixed(1)}" fill="url(#${id})"/>` +
+          `<circle cx="${dx.toFixed(1)}" cy="${(10 + len).toFixed(1)}" r="${(w * 0.75).toFixed(1)}" fill="url(#${id})"/></g>`;
+      }
+      inner += `<g transform="rotate(${rand(0, 360).toFixed(0)})"><path d="${splatPath(46)}" fill="url(#${id})"/>`;
+      const dots = Math.floor(rand(3, 7));
+      for (let i = 0; i < dots; i++) {
+        const a = rand(0, Math.PI * 2), dist = rand(70, 98);
+        inner += `<circle cx="${(Math.cos(a) * dist).toFixed(1)}" cy="${(Math.sin(a) * dist).toFixed(1)}" r="${rand(2.5, 8).toFixed(1)}" fill="url(#${id})"/>`;
+      }
+      inner += '</g><ellipse cx="-16" cy="-20" rx="15" ry="7" fill="#fff" opacity=".45" transform="rotate(-28 -16 -20)"/>';
+      svg.innerHTML = inner;
+      wrap.appendChild(svg);
+      stainsEl.appendChild(wrap);
+    }
+
+    const shardGeo = new THREE.SphereGeometry(1, 20, 14);
+    function burst(now) {
+      phase = 'burst';
+      blob.visible = false;
+      bulges.length = 0;
+      const rw = radiusPx / pxPerWorld;
+      const count = small ? 16 : 24;
+      for (let i = 0; i < count; i++) {
+        // Pick where on the screen it lands first, then find the point on the
+        // "glass" plane that projects there. Flying straight at the camera with
+        // free velocities sends most shards off-screen through perspective.
+        const sx = Math.min(W - 20, Math.max(20, cx + rand(-1, 1) * W * 0.45));
+        const sy = Math.min(H - 20, Math.max(20, cy + rand(-1, 1) * H * 0.42));
+        const ray = new THREE.Vector3((sx / W) * 2 - 1, -((sy / H) * 2 - 1), 0.5).unproject(camera).sub(camera.position).normalize();
+        const glass = camera.position.clone().addScaledVector(ray, (GLASS_Z - camera.position.z) / ray.z);
+        const a = rand(0, Math.PI * 2);
+        const start = center.clone().add(new THREE.Vector3(Math.cos(a) * rw * 0.6, Math.sin(a) * rw * 0.6, 0));
+        const mesh = new THREE.Mesh(shardGeo, material);
+        mesh.position.copy(start);
+        const rPx = rand(7, 22) * Math.min(1.8, s.grow / 2.5 + 0.6);
+        mesh.scale.setScalar(rPx / pxPerWorld);
+        scene.add(mesh);
+        shards.push({ mesh, start, glass, sx, sy, rPx, age: 0, dur: rand(0.45, 1.0) });
+      }
+      // What's left of the body splats right where it was.
+      setTimeout(() => addStain(cx, cy, Math.min(Math.max(W, H) * 0.7, radiusPx * 1.3)), reduceMotion ? 0 : 120);
+      document.dispatchEvent(new CustomEvent('slime:burst'));
+      setTimeout(() => cleanupBtn.classList.add('show'), reduceMotion ? 0 : 1300);
+    }
+
+    const GLASS_Z = camera.position.z - 1.6; // a shard "hits the screen" here
+    function updateShards(now, dt) {
+      for (let i = shards.length - 1; i >= 0; i--) {
+        const sh = shards[i];
+        sh.age += reduceMotion ? 10 : dt;
+        const e = Math.pow(clamp01(sh.age / sh.dur), 1.7); // accelerates toward the glass
+        const p = sh.start.clone().lerp(sh.glass, e);
+        p.y += Math.sin(Math.PI * e) * 0.35; // a little lob
+        sh.mesh.position.copy(p);
+        if (e >= 1) {
+          scene.remove(sh.mesh);
+          shards.splice(i, 1);
+          addStain(sh.sx, sh.sy, Math.min(320, Math.max(30, sh.rPx * 5.5)));
+        }
+      }
+    }
+
+    function cleanUp() {
+      cleanupBtn.classList.remove('show');
+      const items = Array.from(stainsEl.children);
+      items.forEach((el) => {
+        const x = el.getBoundingClientRect().left / Math.max(1, W);
+        el.style.transitionDelay = (Math.max(0, x) * 0.45).toFixed(2) + 's';
+        el.classList.add('wipe');
+      });
+      setTimeout(() => {
+        stainsEl.textContent = '';
+        feeds = 0;
+        flights.forEach((f) => scene.remove(f.mesh));
+        flights.length = 0;
+        // Re-form from a speck back to the starting size.
+        s.grow = 0.05;
+        s.growTarget = 1;
+        s.jiggle = 1;
+        blob.visible = true;
+        phase = 'alive';
+        document.dispatchEvent(new CustomEvent('slime:reset'));
+      }, reduceMotion ? 0 : 1000);
+    }
+    cleanupBtn.addEventListener('click', cleanUp);
+
+    document.addEventListener('slime:feed', (ev) => {
+      if (phase !== 'alive') return;
+      const d = ev.detail || {};
+      const start = toWorld(d.x ?? W * 0.8, d.y ?? H * 0.8);
+      const mesh = new THREE.Mesh(dropGeo, material);
+      mesh.position.copy(start);
+      mesh.scale.setScalar(DROP_PX / pxPerWorld);
+      scene.add(mesh);
+      flights.push({ mesh, start, t0: performance.now() / 1000 });
+    });
+
+    // --- pointer: the slime bulges toward a nearby cursor, wobbles when poked ---
+    let pointer = null;
+    addEventListener('pointermove', (ev) => { pointer = { x: ev.clientX, y: ev.clientY }; }, { passive: true });
+    document.documentElement.addEventListener('pointerleave', () => { pointer = null; });
+    addEventListener('pointerdown', (ev) => {
+      if (Math.hypot(ev.clientX - cx, ev.clientY - cy) < radiusPx * 1.05) s.jiggle = 1;
+    }, { passive: true });
+
+    // --- sizing & loop ---------------------------------------------------------
+    function resize() {
+      W = innerWidth; H = innerHeight;
+      pxPerWorld = H / (2 * HALF_H);
+      renderer.setSize(W, H, false);
+      camera.aspect = W / H;
+      camera.updateProjectionMatrix();
+    }
+    addEventListener('resize', resize);
+    resize();
+
+    const speed = reduceMotion ? 0.15 : 1;
+    let t = 0, last = performance.now(), wasVisible = true;
+    function frame(nowMs) {
+      requestAnimationFrame(frame);
+      const dt = Math.min(0.05, (nowMs - last) / 1000);
+      last = nowMs;
+      if (document.hidden) return;
+      const now = nowMs / 1000;
+
+      s.grow += (s.growTarget - s.grow) * 0.035; // ease into the new size slowly
+      const r = layout();
+      // Skip work while the slime (whatever its size) is fully off-screen, but
+      // draw one last frame on the way out so no stale image is left behind.
+      const margin = radiusPx * 1.4;
+      const visible = (r.bottom + margin > 0 && r.top - margin < H) || flights.length > 0 || shards.length > 0;
+      if (!visible && !wasVisible) return;
+      wasVisible = visible;
+
+      t += dt * speed;
+      s.jiggle *= 0.965;
+      if (pointer) {
+        const dx = pointer.x - cx, dy = -(pointer.y - cy), dist = Math.hypot(dx, dy);
+        s.reachTarget = dist > radiusPx * 0.3 && dist < radiusPx * 2.6 ? 1 : 0;
+        s.tdx = dx; s.tdy = dy;
+      } else {
+        s.reachTarget = 0;
+      }
+      s.reach += (s.reachTarget - s.reach) * 0.06;
+      s.dx += (s.tdx - s.dx) * 0.08;
+      s.dy += (s.tdy - s.dy) * 0.08;
+
+      if (phase === 'critical') {
+        // Swell and shudder, then pop.
+        s.jiggle = 1;
+        s.growTarget *= 1 + 0.35 * dt;
+        if (now - criticalAt > (reduceMotion ? 0 : 0.9)) burst(now);
+      }
+      updateFlights(now);
+      updateShards(now, dt);
+      if (blob.visible) buildField(t, now);
+      blob.rotation.y = Math.sin(t * 0.2) * 0.12;
+      blob.rotation.x = Math.cos(t * 0.17) * 0.08;
+      renderer.render(scene, camera);
+    }
+    requestAnimationFrame((n) => { last = n; frame(n); stage.classList.add('ready'); });
+  </script>
+</body>
+</html>
