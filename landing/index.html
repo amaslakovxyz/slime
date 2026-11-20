@@ -156,58 +156,54 @@
     .nav .btn { padding: 10px 18px; font-size: 14px; }
 
     /* ---------- Hero ---------- */
-    .hero { padding: 72px 0 120px; overflow: hidden; }
+    .hero { padding: 72px 0 200px; }
     .hero-grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 48px; align-items: center; }
     .hero h1 { font-size: clamp(2.7rem, 5.6vw, 4.4rem); line-height: 1.02; }
     .hero h1 .line2 { display: block; margin-top: 6px; }
     .hero .lead { max-width: 540px; font-size: 1.2rem; margin-top: 26px; }
     .hero-ctas { display: flex; gap: 14px; margin-top: 38px; flex-wrap: wrap; }
 
-    /* Hero: the slime floats free; a compact menu card overlaps its base. */
+    /* Hero slime: drawn on a fixed, full-viewport canvas BEHIND the page (low
+       z-index) and positioned over .stage each frame, so it can outgrow the
+       hero and the screen while text and cards stay on top. */
+    #slime-canvas { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+    main, footer { position: relative; z-index: 1; }
     .hero-right { position: relative; min-width: 0; }
-    .stage { position: relative; height: 430px; cursor: grab; touch-action: pan-y; }
-    .stage:active { cursor: grabbing; }
-    .stage::before { /* plasma halo behind the slime */
-      content: ""; position: absolute; left: 50%; top: 48%; width: 78%; max-width: 420px; aspect-ratio: 1; transform: translate(-50%, -50%);
-      background: radial-gradient(closest-side, rgba(255,20,118,.30), rgba(143,0,67,.10) 60%, transparent);
-      filter: blur(28px); pointer-events: none;
-    }
-    .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    .stage { position: relative; height: 440px; }
     .stage-fallback { /* shown until WebGL is ready, or if it never is */
-      position: absolute; left: 50%; top: 46%; width: 200px; height: 200px; margin: -100px 0 0 -100px; border-radius: 50%;
+      position: absolute; left: 50%; top: 46%; width: 220px; height: 220px; margin: -110px 0 0 -110px; border-radius: 50%;
       background: radial-gradient(circle at 34% 28%, var(--plasma-highlight), var(--plasma-primary) 45%, var(--plasma-shadow));
       box-shadow: 0 20px 60px var(--glow-primary); transition: opacity .6s ease;
     }
     .stage.ready .stage-fallback { opacity: 0; }
-    .stage-status { position: absolute; top: 10px; left: 0; z-index: 2; }
     .stage-hint {
-      position: absolute; top: 16px; right: 0; z-index: 2; pointer-events: none;
-      font-family: var(--font-mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--wireframe-grey);
+      position: absolute; top: 14px; right: 0; z-index: 2; pointer-events: none;
+      font-family: var(--font-mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--text-pure);
     }
 
-    /* Compact menu card */
+    /* Small menu card, bottom-right, so you can watch each droplet fly up. */
     .menu {
-      position: relative; z-index: 3; width: min(100%, 400px); margin: -70px auto 0;
-      padding: 14px 20px 6px; border-radius: 20px;
-      background: rgba(22,16,25,.84); border: 1px solid var(--border-color);
+      position: absolute; right: -48px; bottom: -150px; z-index: 3; width: 290px;
+      padding: 10px 14px 4px; border-radius: 16px;
+      background: rgba(22,16,25,.86); border: 1px solid var(--border-color);
       backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-      box-shadow: 0 24px 60px rgba(0,0,0,.45);
+      box-shadow: 0 20px 50px rgba(0,0,0,.45);
     }
-    .menu-head { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 8px; border-bottom: 1px dashed var(--border-bright); }
-    .menu-title { font-size: 21px; margin: 0; }
-    .menu-kicker { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .22em; text-transform: uppercase; color: var(--wireframe-grey); }
+    .menu-head { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 6px; border-bottom: 1px dashed var(--border-bright); }
+    .menu-title { font-size: 16px; margin: 0; }
+    .menu-kicker { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .22em; text-transform: uppercase; color: var(--wireframe-grey); }
     .menu-list { list-style: none; margin: 0; padding: 0; }
     .menu-list li + li { border-top: 1px solid rgba(45,31,51,.7); }
     .dish {
-      width: 100%; display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; column-gap: 10px;
-      padding: 9px 0; background: none; border: 0; cursor: pointer; text-align: left; color: var(--text-pure); font: inherit;
+      width: 100%; display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; column-gap: 8px;
+      padding: 7px 0; background: none; border: 0; cursor: pointer; text-align: left; color: var(--text-pure); font: inherit;
     }
-    .dish-name { font-family: var(--font-mono); font-size: 13px; font-weight: 500; transition: color .2s ease; white-space: nowrap; }
+    .dish-name { font-family: var(--font-mono); font-size: 11.5px; font-weight: 500; transition: color .2s ease; white-space: nowrap; }
     .dish-leader { border-bottom: 1.5px dotted var(--border-bright); transform: translateY(3px); transition: border-color .2s ease; }
-    .dish-kind { font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--text-muted); white-space: nowrap; }
+    .dish-kind { font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--text-muted); white-space: nowrap; }
     .dish-count {
-      min-width: 28px; height: 22px; padding: 0 7px; border-radius: 999px; display: inline-grid; place-items: center;
-      font-family: var(--font-mono); font-size: 11.5px; font-weight: 700; color: var(--wireframe-grey);
+      min-width: 24px; height: 19px; padding: 0 6px; border-radius: 999px; display: inline-grid; place-items: center;
+      font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; color: var(--wireframe-grey);
       border: 1px solid var(--border-bright); transition: color .2s ease, border-color .2s ease, background .2s ease;
     }
     .dish-count.has { color: #fff; border-color: var(--plasma-primary); background: rgba(255,20,118,.16); }
@@ -419,6 +415,7 @@
       section { padding: 96px 0; }
       .hero-grid, .trust-grid { grid-template-columns: 1fr; gap: 40px; }
       .stage { height: 400px; }
+      .menu { right: 0; bottom: -110px; }
       .demo-body { grid-template-columns: 1fr; }
       .demo-col + .demo-col { border-left: 0; border-top: 1px solid var(--border-color); }
       .states, .audiences { grid-template-columns: 1fr; }
@@ -432,11 +429,8 @@
       section { padding: 76px 0; }
       .section-head { margin-bottom: 40px; }
       .hero { padding: 24px 0 76px; }
-      .stage { height: 330px; }
-      .stage-hint { display: none; }
-      .menu { margin-top: -50px; padding: 12px 14px 4px; }
-      .dish-name { font-size: 12px; }
-      .dish-kind { font-size: 9.5px; letter-spacing: .08em; }
+      .stage { height: 340px; }
+      .menu { width: 270px; bottom: -48px; }
       .cases { grid-template-columns: 1fr; }
       .case { padding: 26px 22px; }
       .cage { display: none; }
@@ -485,7 +479,6 @@
         <div class="hero-right">
           <div class="stage" id="slime-stage">
             <div class="stage-fallback" aria-hidden="true"></div>
-            <span class="tag gas stage-status" id="slime-status" role="status" aria-live="polite"><span class="dot"></span>Hungry</span>
             <span class="stage-hint" aria-hidden="true">poke it</span>
           </div>
           <div class="menu">
@@ -764,19 +757,10 @@
       }
 
       /* ---------- Feed the Slime (hero menu) ----------
-         Each click bumps that line's counter and fires 'slime:feed'. The 3D
-         module below listens and drops a droplet into the slime, so the menu
-         still works when WebGL or the CDN is unavailable. */
-      var dishes = document.querySelectorAll('#menu-list .dish');
-      var statusTag = document.getElementById('slime-status');
-      var digestTimer = null;
-
-      function setSlimeStatus(cls, text) {
-        statusTag.className = 'tag stage-status ' + cls;
-        statusTag.innerHTML = '<span class="dot"></span>' + text;
-      }
-
-      dishes.forEach(function (d) {
+         Each click bumps that line's counter and fires 'slime:feed' with the
+         counter's screen position; the 3D module launches a droplet from
+         there. The menu still works when WebGL or the CDN is unavailable. */
+      document.querySelectorAll('#menu-list .dish').forEach(function (d) {
         var counter = d.querySelector('.dish-count');
         var n = 0;
         d.addEventListener('click', function () {
@@ -785,11 +769,10 @@
           counter.setAttribute('aria-label', 'fed ' + n + (n === 1 ? ' time' : ' times'));
           counter.classList.add('has');
           counter.classList.remove('bump'); void counter.offsetWidth; counter.classList.add('bump');
-          setSlimeStatus('gas', 'Gas · digesting');
-          document.dispatchEvent(new CustomEvent('slime:feed'));
-          // Matches the droplet's travel time in the 3D module.
-          clearTimeout(digestTimer);
-          digestTimer = setTimeout(function () { setSlimeStatus('liquid', 'Liquid · new shape'); }, reduceMotion ? 0 : 1100);
+          // Launch from just above the card, in line with this counter, so the whole flight is visible.
+          var r = counter.getBoundingClientRect();
+          var menuTop = d.closest('.menu').getBoundingClientRect().top;
+          document.dispatchEvent(new CustomEvent('slime:feed', { detail: { x: r.left + r.width / 2, y: menuTop - 14 } }));
         });
       });
 
@@ -935,7 +918,7 @@
     })();
   </script>
 
-  <!-- Hero slime: a round metaball body (big core + surface lumps) in a glossy physical material. -->
+  <!-- Hero slime: a round metaball body on a full-viewport canvas behind the page. -->
   <script type="module">
     import * as THREE from 'three';
     import { MarchingCubes } from 'three/addons/objects/MarchingCubes.js';
@@ -947,12 +930,15 @@
 
     // If WebGL is unavailable this throws, the module stops, and the CSS fallback blob stays.
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5)); // full-viewport canvas: cap the cost
     renderer.setClearColor(0x000000, 0);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 0.9;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    stage.prepend(renderer.domElement);
+    const canvas = renderer.domElement;
+    canvas.id = 'slime-canvas';
+    canvas.setAttribute('aria-hidden', 'true');
+    document.body.prepend(canvas);
 
     const scene = new THREE.Scene();
     const pmrem = new THREE.PMREMGenerator(renderer);
@@ -960,6 +946,10 @@
 
     const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 50);
     camera.position.set(0, 0, 6.2);
+    const HALF_H = camera.position.z * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+    let W = innerWidth, H = innerHeight, pxPerWorld = H / (2 * HALF_H);
+    // Screen pixel -> point on the z = 0 plane.
+    const toWorld = (sx, sy) => new THREE.Vector3((sx - W / 2) / pxPerWorld, -(sy - H / 2) / pxPerWorld, 0);
 
     // Brand colours: Laser Plasma body, Bruised Berry depth, Specular Jelly sheen, Cryo Mint rim.
     const material = new THREE.MeshPhysicalMaterial({
@@ -984,131 +974,167 @@
     const radiusOf = (strength) => Math.sqrt(strength / (80 + SUB));
     const blob = new MarchingCubes(RES, material, false, false, 90000);
     blob.isolation = 80;
-    const SCALE = 2.6;
-    blob.scale.setScalar(SCALE);
-    blob.position.y = 0.15;
     scene.add(blob);
 
     const key = new THREE.DirectionalLight(0xffffff, 2.4);
     key.position.set(-2.5, 3, 4);
     const rim = new THREE.DirectionalLight(0x38f8b8, 2.2);
     rim.position.set(3, -1.5, -2.5);
-    const fill = new THREE.PointLight(0xff85c0, 18, 20, 2);
+    const fill = new THREE.PointLight(0xff85c0, 18, 40, 1.2);
     fill.position.set(2.5, 1.5, 3);
     scene.add(key, rim, fill);
 
-    // --- shape: a round core with lumps that drift over its surface ----------
-    const CORE = 3.4;          // core strength -> radius ~0.19 of the field
-    const GROW = 0.32;         // extra core strength per feed
-    const MAX_GROWTH = 8;      // after this, feeding only makes it wobble
+    // --- shape: a round core with lumps drifting over its surface -------------
+    const CORE = 3.4;
+    const RC = radiusOf(CORE);               // core radius in field units
+    const BASE_PX = small ? 100 : 135;       // on-screen radius of an unfed slime
+    const GROWTH = 1.14;                     // size multiplier per feed; no cap, it may outgrow the screen
+    const DROP_PX = small ? 13 : 17;         // on-screen radius of a flying droplet
+    const FLY_T = reduceMotion ? 0.01 : 1.0;
     const LUMPS = 7;
     const lumps = Array.from({ length: LUMPS }, (_, i) => ({
-      theta: i * 2.399,                         // golden angle around the equator
-      phi: Math.acos(1 - (2 * (i + 0.5)) / LUMPS), // spread from pole to pole
+      theta: i * 2.399,
+      phi: Math.acos(1 - (2 * (i + 0.5)) / LUMPS),
       speed: 0.18 + 0.1 * ((i * 5) % 7) / 6,
       size: 0.2 + 0.12 * ((i * 3) % 4) / 3,
     }));
     const moon = { speed: 0.5, size: 0.05, gap: 0.075 };
 
-    const DROP_T = reduceMotion ? 0.01 : 1.1; // seconds a fed droplet takes to merge
-    const drops = [];
-    const s = { grow: 0, growTarget: 0, jiggle: 0, reach: 0, reachTarget: 0, px: 0, py: 0, tx: 0, ty: 0 };
+    const s = { grow: 1, growTarget: 1, jiggle: 0, reach: 0, reachTarget: 0, dx: 0, dy: 0, tdx: 0, tdy: 0 };
+    const flights = [];   // droplet meshes flying from the menu
+    const bulges = [];    // merge ripples once a droplet lands
+    const dropGeo = new THREE.SphereGeometry(1, 32, 20);
 
     const clamp01 = (v) => Math.min(1, Math.max(0, v));
     const lerp = (a, b, t) => a + (b - a) * t;
     const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
+    // Follow .stage as the page scrolls; returns the slime's screen centre.
+    const center = new THREE.Vector3();
+    let radiusPx = BASE_PX, cx = 0, cy = 0;
+    function layout() {
+      const r = stage.getBoundingClientRect();
+      cx = r.left + r.width / 2;
+      cy = r.top + r.height * 0.46;
+      center.copy(toWorld(cx, cy));
+      radiusPx = BASE_PX * s.grow;
+      blob.position.copy(center);
+      blob.scale.setScalar((radiusPx / pxPerWorld) / (2 * RC));
+      return r;
+    }
+
     function buildField(t, now) {
       blob.reset();
-      const core = CORE + s.grow * GROW;
-      const rc = radiusOf(core);
-      blob.addBall(0.5, 0.5, 0.5, core, SUB);
-
-      // Lumps ride just under the surface so they read as soft bumps on a sphere.
+      blob.addBall(0.5, 0.5, 0.5, CORE, SUB);
       const wob = s.jiggle * 0.03;
       for (let i = 0; i < LUMPS; i++) {
         const L = lumps[i];
         const th = L.theta + t * L.speed;
         const ph = L.phi + Math.sin(t * 0.4 + i) * 0.35;
-        const d = rc * (0.82 + Math.sin(t * 1.3 + i * 1.7) * 0.06) + Math.sin(t * 18 + i) * wob;
-        blob.addBall(
-          0.5 + Math.sin(ph) * Math.cos(th) * d,
-          0.5 + Math.cos(ph) * d,
-          0.5 + Math.sin(ph) * Math.sin(th) * d,
-          L.size, SUB
-        );
+        const d = RC * (0.82 + Math.sin(t * 1.3 + i * 1.7) * 0.06) + Math.sin(t * 18 + i) * wob;
+        blob.addBall(0.5 + Math.sin(ph) * Math.cos(th) * d, 0.5 + Math.cos(ph) * d, 0.5 + Math.sin(ph) * Math.sin(th) * d, L.size, SUB);
       }
-
-      // A small moon that orbits close enough to stretch toward the body.
       const ma = t * moon.speed;
-      const mo = rc + moon.gap + Math.sin(t * 0.8) * 0.02;
+      const mo = RC + moon.gap + Math.sin(t * 0.8) * 0.02;
       blob.addBall(0.5 + Math.cos(ma) * mo, 0.5 + Math.sin(ma * 0.7) * mo * 0.5, 0.5 + Math.sin(ma) * mo, moon.size, SUB);
-
-      // A bulge that reaches toward the pointer.
       if (s.reach > 0.01) {
-        const len = Math.hypot(s.px, s.py) || 1;
-        const dist = rc * 0.95;
-        blob.addBall(0.5 + (s.px / len) * dist, 0.5 + (s.py / len) * dist, 0.56, 0.45 * s.reach, SUB);
+        const len = Math.hypot(s.dx, s.dy) || 1;
+        blob.addBall(0.5 + (s.dx / len) * RC * 0.95, 0.5 + (s.dy / len) * RC * 0.95, 0.56, 0.45 * s.reach, SUB);
       }
-
-      // Fed droplets rise from the menu below and merge into the body.
-      for (let i = drops.length - 1; i >= 0; i--) {
-        const d = drops[i];
-        const e = ease(clamp01((now - d.t0) / DROP_T));
-        blob.addBall(lerp(d.x0, 0.5, e), lerp(0.08, 0.5 - rc * 0.6, e), 0.55, lerp(0.12, 0.4, e), SUB);
-        if (e >= 1) {
-          drops.splice(i, 1);
-          s.growTarget = Math.min(MAX_GROWTH, s.growTarget + 1);
-          s.jiggle = 1;
-        }
+      for (let i = bulges.length - 1; i >= 0; i--) {
+        const b = bulges[i];
+        const e = clamp01((now - b.t0) / 0.6);
+        const d = RC * lerp(0.98, 0.4, e);
+        blob.addBall(0.5 + b.x * d, 0.5 + b.y * d, 0.55, lerp(0.8, 0.05, e), SUB);
+        if (e >= 1) bulges.splice(i, 1);
       }
       blob.update();
     }
 
-    // --- interaction ---------------------------------------------------------
-    function aim(ev) {
-      const r = stage.getBoundingClientRect();
-      s.tx = ((ev.clientX - r.left) / r.width) * 2 - 1;
-      s.ty = -(((ev.clientY - r.top) / r.height) * 2 - 1);
+    function updateFlights(now) {
+      for (let i = flights.length - 1; i >= 0; i--) {
+        const f = flights[i];
+        const e = 0.5 - Math.cos(Math.PI * clamp01((now - f.t0) / FLY_T)) / 2; // gentle in/out, visible from the start
+        const dir = new THREE.Vector3().subVectors(f.start, center).setZ(0).normalize();
+        const target = center.clone().addScaledVector(dir, (radiusPx * 0.85) / pxPerWorld);
+        const p = f.start.clone().lerp(target, e);
+        p.y += Math.sin(Math.PI * e) * f.start.distanceTo(target) * 0.22; // an arc up to the slime
+        f.mesh.position.copy(p);
+        f.mesh.scale.setScalar((DROP_PX / pxPerWorld) * (1 - 0.25 * e));
+        if (e >= 1) {
+          scene.remove(f.mesh);
+          flights.splice(i, 1);
+          bulges.push({ t0: now, x: dir.x, y: dir.y });
+          s.growTarget *= GROWTH;
+          s.jiggle = 1;
+        }
+      }
     }
-    stage.addEventListener('pointermove', (ev) => { aim(ev); s.reachTarget = 1; });
-    stage.addEventListener('pointerleave', () => { s.reachTarget = 0; });
-    stage.addEventListener('pointerdown', (ev) => { aim(ev); s.reachTarget = 1; s.jiggle = 1; });
-    document.addEventListener('slime:feed', () => {
-      drops.push({ t0: performance.now() / 1000, x0: 0.5 + (Math.random() - 0.5) * 0.2 });
+
+    document.addEventListener('slime:feed', (ev) => {
+      const d = ev.detail || {};
+      const start = toWorld(d.x ?? W * 0.8, d.y ?? H * 0.8);
+      const mesh = new THREE.Mesh(dropGeo, material);
+      mesh.position.copy(start);
+      mesh.scale.setScalar(DROP_PX / pxPerWorld);
+      scene.add(mesh);
+      flights.push({ mesh, start, t0: performance.now() / 1000 });
     });
 
-    // --- sizing & loop -------------------------------------------------------
+    // --- pointer: the slime bulges toward a nearby cursor, wobbles when poked ---
+    let pointer = null;
+    addEventListener('pointermove', (ev) => { pointer = { x: ev.clientX, y: ev.clientY }; }, { passive: true });
+    document.documentElement.addEventListener('pointerleave', () => { pointer = null; });
+    addEventListener('pointerdown', (ev) => {
+      if (Math.hypot(ev.clientX - cx, ev.clientY - cy) < radiusPx * 1.05) s.jiggle = 1;
+    }, { passive: true });
+
+    // --- sizing & loop ---------------------------------------------------------
     function resize() {
-      const w = stage.clientWidth, h = stage.clientHeight;
-      if (!w || !h) return;
-      renderer.setSize(w, h, false);
-      camera.aspect = w / h;
+      W = innerWidth; H = innerHeight;
+      pxPerWorld = H / (2 * HALF_H);
+      renderer.setSize(W, H, false);
+      camera.aspect = W / H;
       camera.updateProjectionMatrix();
     }
-    new ResizeObserver(resize).observe(stage);
+    addEventListener('resize', resize);
     resize();
 
-    let visible = true;
-    new IntersectionObserver(([e]) => { visible = e.isIntersecting; }).observe(stage);
-
     const speed = reduceMotion ? 0.15 : 1;
-    let t = 0, last = performance.now();
+    let t = 0, last = performance.now(), wasVisible = true;
     function frame(nowMs) {
       requestAnimationFrame(frame);
       const dt = Math.min(0.05, (nowMs - last) / 1000);
       last = nowMs;
-      if (!visible || document.hidden) return;
+      if (document.hidden) return;
+      const now = nowMs / 1000;
+
+      s.grow += (s.growTarget - s.grow) * 0.06;
+      const r = layout();
+      // Skip work while the slime (whatever its size) is fully off-screen, but
+      // draw one last frame on the way out so no stale image is left behind.
+      const margin = radiusPx * 1.4;
+      const visible = (r.bottom + margin > 0 && r.top - margin < H) || flights.length > 0;
+      if (!visible && !wasVisible) return;
+      wasVisible = visible;
+
       t += dt * speed;
-      s.grow += (s.growTarget - s.grow) * 0.05;
       s.jiggle *= 0.965;
+      if (pointer) {
+        const dx = pointer.x - cx, dy = -(pointer.y - cy), dist = Math.hypot(dx, dy);
+        s.reachTarget = dist > radiusPx * 0.3 && dist < radiusPx * 2.6 ? 1 : 0;
+        s.tdx = dx; s.tdy = dy;
+      } else {
+        s.reachTarget = 0;
+      }
       s.reach += (s.reachTarget - s.reach) * 0.06;
-      s.px += (s.tx - s.px) * 0.08;
-      s.py += (s.ty - s.py) * 0.08;
-      buildField(t, nowMs / 1000);
-      // Keep the mesh nearly still (lumps carry the motion) so the pointer bulge stays under the cursor.
-      blob.rotation.y = Math.sin(t * 0.2) * 0.12 + s.px * 0.15;
-      blob.rotation.x = Math.cos(t * 0.17) * 0.08 - s.py * 0.12;
+      s.dx += (s.tdx - s.dx) * 0.08;
+      s.dy += (s.tdy - s.dy) * 0.08;
+
+      updateFlights(now);
+      buildField(t, now);
+      blob.rotation.y = Math.sin(t * 0.2) * 0.12;
+      blob.rotation.x = Math.cos(t * 0.17) * 0.08;
       renderer.render(scene, camera);
     }
     requestAnimationFrame((n) => { last = n; frame(n); stage.classList.add('ready'); });
