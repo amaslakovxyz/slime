@@ -28,6 +28,9 @@ also be run by hand from the Actions tab.
 One-time setup by a repo admin: **Settings → Pages → Build and deployment →
 Source: GitHub Actions**.
 
+The same folder is also served from AWS Lambda; see
+[`infra/aws/landing/`](../infra/aws/landing/README.md).
+
 ## Where things come from
 
 - Colors, fonts and component styles:
