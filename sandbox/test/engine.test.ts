@@ -9,6 +9,7 @@ import { PostgresConnector } from '../src/connectors/postgres.js';
 import { MemoryHandlerStore } from '../src/store.js';
 import {
   DB_URL,
+  NO_CRYSTAL_DIR,
   StubGenerator,
   StubReviewer,
   TOP_ACCOUNTS,
@@ -104,7 +105,7 @@ describe('engine', { skip: !hasDb }, () => {
   test('locked mode serves nothing it has not seen and never loads a generator', async () => {
     await withConfig({ mode: 'locked' }, async () => {
       const connector = new PostgresConnector(DB_URL);
-      const engine = await Engine.create(connector, { store: new MemoryHandlerStore() });
+      const engine = await Engine.create(connector, { store: new MemoryHandlerStore(), crystalDir: NO_CRYSTAL_DIR });
       try {
         assert.equal(engine.stats().model, null);
         assert.equal(await errorCode(ask(engine)), 'HANDLER_NOT_FOUND');

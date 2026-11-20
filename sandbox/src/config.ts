@@ -1,4 +1,7 @@
 // Loads sandbox/.env if present (Node 22 built-in), then reads typed settings.
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 try {
   process.loadEnvFile(new URL('../.env', import.meta.url));
 } catch {
@@ -41,6 +44,8 @@ export const config = {
   // slime_meta schema. Set to "" to keep everything in memory.
   metaDatabaseUrl:
     process.env.META_DATABASE_URL ?? 'postgres://slime_writer:slime_writer@localhost:54329/slime',
+  // Table inside slime_meta. The demo script uses its own so it never touches dev data.
+  metaTable: process.env.SLIME_META_TABLE || 'handlers',
   // SLIME_MODE is read only from the environment, never from a request.
   // "locked": cache misses get 404 and the generator is never loaded.
   mode: (process.env.SLIME_MODE === 'locked' ? 'locked' : 'explore') as 'explore' | 'locked',
@@ -70,6 +75,16 @@ export const config = {
   // Successful runs recorded per handler (distinct inputs). They are stored with
   // Liquid handlers and are what Crystal's equivalence test replays.
   fixturesPerHandler: num('FIXTURES_PER_HANDLER', 5),
+
+  // Crystal: handlers an agent rewrote into plain modules in a folder in git
+  // (`npm run crystallize`). Core loads them at startup and runs them without
+  // the sandbox worker. SLIME_CRYSTAL=off is the kill switch.
+  crystal: process.env.SLIME_CRYSTAL !== 'off',
+  crystalDir: process.env.SLIME_CRYSTAL_DIR
+    ? resolve(process.env.SLIME_CRYSTAL_DIR)
+    : fileURLToPath(new URL('../crystal', import.meta.url)),
+  // A Liquid handler needs this many successful runs before it is crystallized.
+  crystalMinRuns: num('CRYSTAL_MIN_RUNS', 10),
 
   // Generation limits.
   maxRepairs: num('MAX_REPAIRS', 1),

@@ -45,7 +45,7 @@ app.get('/healthz', async (c) => {
   const safety = await connector.safetyCheck();
   return c.json({ ok: safety.ok, database: safety, ...engine.stats() }, safety.ok ? 200 : 503);
 });
-app.get('/v0/handlers', (c) => c.json({ handlers: engine.listHandlers() }));
+app.get('/v0/handlers', (c) => c.json({ handlers: engine.listHandlers(), crystals: engine.listCrystals() }));
 app.delete('/v0/handlers/:id', (c) =>
   engine.evict(c.req.param('id')) ? c.json({ evicted: true }) : c.json({ evicted: false }, 404),
 );

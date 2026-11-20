@@ -18,6 +18,8 @@ Backend -- Slime runtime:
 
 ## Subdirectories & System Boundaries
 
+- [landing/](./landing/README.md) - Static marketing page (one `index.html`,
+  no build step). Preview with `just landing`.
 - [sandbox/](./sandbox/README.md) - Slime v0 prototype (Node 22, TypeScript,
   Hono, Postgres, Claude, QuickJS) and its speed/correctness benchmark.
 - `docs/` (no contract file; documentation only)
@@ -38,7 +40,8 @@ Backend -- Slime runtime:
     - [slime_master_brand_book_design_system.html](./docs/brand/slime_master_brand_book_design_system.html) - Interactive brand book and component kit.
     - [slime_marketing_positioning_tone_of_voice_use_cases.md](./docs/brand/slime_marketing_positioning_tone_of_voice_use_cases.md) - Positioning, tone of voice, use cases, and messaging.
 - `.github/workflows/` (no contract file) - [ci.yml](./.github/workflows/ci.yml)
-  runs the pre-commit job on every push and pull request.
+  runs the pre-commit job on every push and pull request. The landing page is
+  deployed with Terraform from [infra/aws/landing](./infra/aws/landing/README.md).
 
 Root files: [AGENTS.md](./AGENTS.md) (repository contract for agents),
 [justfile](./justfile) (task runner), and
@@ -59,6 +62,8 @@ Root files: [AGENTS.md](./AGENTS.md) (repository contract for agents),
 - No runtime side effects in code yet (`None`).
 - CI: [ci.yml](./.github/workflows/ci.yml) job `pre-commit` runs
   `pre-commit/action@v3.0.1` on `push` and `pull_request`.
+- Deploy: `landing/` is served by CloudFront + Lambda, applied with Terraform
+  from [infra/aws/landing](./infra/aws/landing/README.md).
 
 ## System Verification
 
