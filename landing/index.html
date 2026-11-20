@@ -405,11 +405,12 @@
     .uc.is-active .uc-bar i { animation: uc-progress 7s linear forwards; }
     .uc-row.hold .uc.is-active .uc-bar i { animation-play-state: paused; }
     @keyframes uc-progress { to { transform: scaleX(1); } }
-    .uc h3 { font-family: var(--font-body); font-weight: 700; font-size: 1.05rem; }
+    .uc h3 { font-family: var(--font-body); font-weight: 700; font-size: 1.1rem; color: var(--text-pure); }
     .soon { margin-left: 6px; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--crystal-border); color: var(--crystal-glow); font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; vertical-align: 2px; }
     /* Short summary always shows; the longer detail opens only on the expanded card. */
-    .uc .summary { color: var(--text-muted); font-size: 15px; margin-top: 6px; }
-    .uc .detail { color: var(--plasma-highlight); font-size: 15px; margin-top: 0; max-height: 0; opacity: 0; overflow: hidden; transition: max-height .5s ease, opacity .4s ease, margin .4s ease; }
+    .uc .summary { color: var(--plasma-highlight); font-weight: 600; font-size: 15px; line-height: 1.45; margin-top: 6px; }
+    .uc:not(.is-active) .summary { color: var(--text-muted); font-weight: 500; } /* collapsed cards stay quiet */
+    .uc .detail { color: var(--text-muted); font-size: 15px; line-height: 1.55; margin-top: 0; max-height: 0; opacity: 0; overflow: hidden; transition: max-height .5s ease, opacity .4s ease, margin .4s ease; }
     .uc.is-active .detail { max-height: 90px; opacity: 1; margin-top: 10px; }
     .uc .soon { display: none; }
     .uc.is-active .soon { display: inline-block; animation: pop-in .4s ease both; }
