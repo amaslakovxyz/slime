@@ -1,8 +1,7 @@
 # Landing on AWS Lambda
 
 Serves [`landing/`](../../../landing/) from a Lambda Function URL in
-`eu-central-1`. GitHub Pages ([`pages.yml`](../../../.github/workflows/pages.yml))
-keeps working in parallel.
+`eu-central-1`, behind CloudFront on the custom domain.
 
 | Resource | Notes |
 |---|---|
@@ -15,6 +14,10 @@ State: `s3://slime-tfstate-025772230981/landing/terraform.tfstate` (bucket from
 `infra/aws/bootstrap`, S3 lockfile).
 
 ## Deploy
+
+[`terraform.yml`](../../../.github/workflows/terraform.yml) plans this stack on
+pull requests and applies it on merge to `main` (then invalidates CloudFront).
+Apply by hand only for recovery:
 
 ```sh
 cd infra/aws/landing
