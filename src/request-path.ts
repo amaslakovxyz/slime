@@ -1,3 +1,4 @@
+import { checkRole } from "./gatekeeper";
 import { sha256Hex } from "./hash";
 import type { Ctx, DispatchResult, Fixture, HarnessOutcome, RequestDeps } from "./types";
 
@@ -10,6 +11,11 @@ export async function dispatchIntent(deps: RequestDeps, intent: string, payload:
   const loaded = await deps.loadIntent(intent);
   if (!loaded) return { kind: "unknown_intent", intent };
   const { spec, specHash } = loaded;
+
+  // The role is decided by spec + session, not by any handler: reject before resolving or generating,
+  // so a forbidden caller never costs a generation. (The harness re-checks it on every run.)
+  const role = checkRole(spec, ctx);
+  if (!role.ok) return { kind: "rejected", intent, tier: null, handlerHash: null, stage: "role", reason: role.reason, detail: role.detail };
 
   const slot = deps.store.resolve(intent, specHash);
   if (slot) {

@@ -23,9 +23,12 @@ export function checkEffects(spec: IntentSpec, effects: Effect[]): GateResult {
         return fail("FORBIDDEN_COLUMN", `'${c}' is kernel-owned`); // rejected, never filtered
       if (!cols.includes(c)) return fail("COLUMN_UNKNOWN", `'${c}' on '${e.table}'`);
     }
-    for (const c of Object.keys(e.where ?? {})) {
+    for (const [c, v] of Object.entries(e.where ?? {})) {
       if (c === "tenant_id") return fail("FORBIDDEN_COLUMN", `'tenant_id' in where is kernel-owned`);
       if (!cols.includes(c)) return fail("COLUMN_UNKNOWN", `'${c}' on '${e.table}'`);
+      // A write must address concrete rows: NULL equals nothing, objects cannot bind.
+      if (!(typeof v === "string" || (typeof v === "number" && Number.isFinite(v))))
+        return fail("WHERE_VALUE_INVALID", `'${c}' on '${e.table}' must be a string or finite number`);
     }
     if ((e.op === "update" || e.op === "delete") && !(PK[e.table] in (e.where ?? {})))
       return fail("PK_NOT_FULLY_ADDRESSED", `${e.op} on '${e.table}' must address ${PK[e.table]} by equality`);

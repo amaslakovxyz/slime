@@ -2,7 +2,7 @@ import type { Database } from "bun:sqlite";
 
 // ── A1 domain primitives ──
 export type Ctx = { tenantId: number; userId: number; role: string; now: string };
-export type ReadQuery = { table: string; columns: string[]; where: Record<string, string | number>; limit?: number };
+export type ReadQuery = { table: string; columns: string[]; where: Record<string, string | number | null>; limit?: number };
 export type Effect = { op: "insert" | "update" | "delete"; table: string; data?: Record<string, unknown>; where?: Record<string, string | number> };
 export type HandlerResult = { response: unknown; error?: string };
 export type IntentSpec = {
@@ -19,6 +19,7 @@ export type Reason =
   | "ROLE_NOT_DECLARED"
   | "READ_TABLE_NOT_DECLARED"
   | "READ_COLUMN_UNKNOWN"
+  | "WHERE_VALUE_INVALID"     // where value is not a string, finite number or null
   | "WRITE_NOT_DECLARED"      // table+op pair absent from spec.writes
   | "COLUMN_UNKNOWN"          // effect column not in schema
   | "FORBIDDEN_COLUMN"        // kernel-owned column supplied by handler
@@ -74,6 +75,7 @@ export type RequestDeps = {
 };
 export type DispatchResult =
   | { kind: "served"; intent: string; tier: Tier; handlerHash: string; response: unknown; effectsApplied: Effect[] }
-  | { kind: "rejected"; intent: string; tier: Tier; handlerHash: string; stage: Stage; reason: Reason; detail: string }
+  // tier/handlerHash are null when the request was rejected before any handler was chosen (role check).
+  | { kind: "rejected"; intent: string; tier: Tier | null; handlerHash: string | null; stage: Stage; reason: Reason; detail: string }
   | { kind: "unknown_intent"; intent: string }
   | { kind: "generation_failed"; intent: string; detail: string };

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { createSeedDb } from "../src/db";
 import { runThroughHarness } from "../src/harness";
 import { createQuickJsRunner } from "../src/quickjs-runner";
+import { FnRunner } from "../src/runner";
 import { parseIntent } from "../src/spec";
 import type { Ctx } from "../src/types";
 
@@ -35,4 +36,24 @@ describe("QuickJsRunner", () => {
     }`, {}, ctx, createSeedDb(), { commit: false });
     expect(out).toMatchObject({ ok: true, response: ["undefined", "undefined", "undefined"] });
   });
+});
+
+const order = parseIntent(await Bun.file("intents/place_order.md").text(), "place_order");
+const placeOrder = await Bun.file("examples/place_order.handler.js").text();
+describe("runner parity on missing and invalid where values", () => {
+  const objectWhere = `export function handler(input, db) {
+    return { response: db.read({ table: "products", columns: ["id"], where: { id: { $gt: 0 } } }) };
+  }`;
+  for (const [name, make] of [["quickjs", () => createQuickJsRunner()], ["fn", async () => new FnRunner()]] as const) {
+    test(`${name}: undefined lookup value matches no row (never "every row")`, async () => {
+      const db = createSeedDb();
+      const out = runThroughHarness(await make(), order, placeOrder, { qty: 1 }, ctx, db, { commit: true });
+      expect(out).toMatchObject({ ok: false, reason: "HANDLER_ERROR", detail: "PRODUCT_NOT_FOUND" });
+      expect(db.query("SELECT COUNT(*) AS n FROM orders").get()).toEqual({ n: 0 });
+    });
+    test(`${name}: object where value → WHERE_VALUE_INVALID`, async () => {
+      const out = runThroughHarness(await make(), order, objectWhere, {}, ctx, createSeedDb(), { commit: false });
+      expect(out).toMatchObject({ ok: false, stage: "sandbox", reason: "WHERE_VALUE_INVALID" });
+    });
+  }
 });

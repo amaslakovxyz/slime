@@ -75,6 +75,15 @@ describe("dispatchIntent", () => {
     expect(calls.generate).toBe(0);
   });
 
+  test("role not declared → rejected before resolve or generation", async () => {
+    const { deps, calls } = setup({});
+    expect(await dispatchIntent(deps, "book_ticket", payload, { ...ctx, role: "guest" }))
+      .toMatchObject({ kind: "rejected", tier: null, handlerHash: null, stage: "role", reason: "ROLE_NOT_DECLARED" });
+    expect(calls.resolve).toBe(0);
+    expect(calls.generate).toBe(0);
+    expect(calls.harness).toHaveLength(0);
+  });
+
   test("liquid hit → served liquid; afterGasRun never called", async () => {
     const { deps, calls } = setup({ slot: "liquid" });
     expect(await dispatchIntent(deps, "book_ticket", payload, ctx)).toMatchObject({ kind: "served", tier: "liquid", handlerHash: "h-liquid" });

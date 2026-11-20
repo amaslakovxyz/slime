@@ -225,6 +225,34 @@ describe("roles", () => {
     expect(r.body).toMatchObject({ stage: "role", reason: "ROLE_NOT_DECLARED" });
     expect(s.stock(4)).toBe(0);
   });
+
+  test("forbidden callers never trigger a generation (role checked before resolve/generate)", async () => {
+    const s = shop();
+    for (let i = 0; i < 3; i++) {
+      const r = await s.send({ intent: "restock", payload: { productId: 4, qty: 10 } });
+      expect(r.status).toBe(403);
+      expect(r.body).toMatchObject({ tier: null, handlerHash: null, stage: "role" });
+    }
+    expect(s.gens.restock ?? 0).toBe(0);
+  });
+});
+
+describe("regressions from QA", () => {
+  test("V2: order without productId finds no product instead of buying the first row", async () => {
+    const s = shop();
+    const before = s.snapshot();
+    const r = await s.order({ qty: 1 });
+    expect(r.status).toBe(422);
+    expect(r.body).toMatchObject({ stage: "sandbox", reason: "HANDLER_ERROR", detail: "PRODUCT_NOT_FOUND" });
+    expect(s.snapshot()).toBe(before);
+  });
+
+  test("T5: invariants are tenant-scoped — another tenant's bad row does not block this tenant", async () => {
+    const s = shop({ seed: db => db.exec("UPDATE products SET stock = -1 WHERE id = 101") });
+    const r = await s.order({ productId: 1, qty: 1 });
+    expect(r.status).toBe(200);
+    expect(s.stock(1)).toBe(99);
+  });
 });
 
 describe("input validation", () => {

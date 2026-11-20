@@ -31,4 +31,9 @@ describe("gatekeeper", () => {
     expect(checkEffects(upd, [{ op: "update", table: "tickets", data: { qty: 2 }, where: { event_id: 7 } }]))
       .toMatchObject({ ok: false, reason: "PK_NOT_FULLY_ADDRESSED" });
   });
+  test("update addressing a NULL id → WHERE_VALUE_INVALID", () => {
+    const upd: IntentSpec = { ...spec, writes: [{ table: "tickets", ops: ["update"] }] };
+    expect(checkEffects(upd, [{ op: "update", table: "tickets", data: { qty: 2 }, where: { id: null as unknown as number } }]))
+      .toMatchObject({ ok: false, reason: "WHERE_VALUE_INVALID" });
+  });
 });

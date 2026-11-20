@@ -31,9 +31,12 @@ export async function createQuickJsRunner(
           const body = source.replace(/^\s*export\s+/m, "");
           const program = `
             const ctx = ${JSON.stringify(ctx)};
+            // undefined → null so a missing value reaches the kernel instead of silently dropping its key
+            // (JSON.stringify drops undefined: where {id: undefined} would become where {} = "every row").
+            const keepUndefined = (k, v) => v === undefined ? null : v;
             const db = {
-              read: q => JSON.parse(__read(JSON.stringify(q))),
-              emit: e => { __emit(JSON.stringify(e)); },
+              read: q => JSON.parse(__read(JSON.stringify(q, keepUndefined))),
+              emit: e => { __emit(JSON.stringify(e, keepUndefined)); },
             };
             ${body}
             JSON.stringify(handler(${JSON.stringify(input)}, db, ctx))

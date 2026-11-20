@@ -26,7 +26,8 @@ export function applyAndCheck(db: Database, spec: IntentSpec, effects: Effect[],
     }
   }
   for (const inv of spec.invariants) {
-    const rows = db.query(inv.sql).all();
+    // Invariants are tenant-scoped by writing `:tenant_id` in their SQL; the kernel binds it from ctx.
+    const rows = db.query(inv.sql).all({ ":tenant_id": ctx.tenantId });
     if (rows.length > 0)
       return { ok: false, reason: "INVARIANT_VIOLATION", detail: `invariant '${inv.name}' returned ${rows.length} row(s)` };
   }

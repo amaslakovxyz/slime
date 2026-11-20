@@ -40,6 +40,7 @@ reads: events, promos, tickets
 writes: tickets(insert)
 rule: total = qty * event.price_cents. Valid promo => minus pct%, capped at 50%.
 invariant sold_out: SELECT e.id FROM events e JOIN tickets t ON t.event_id=e.id
+                    WHERE e.tenant_id = :tenant_id
                     GROUP BY e.id HAVING SUM(t.qty) > e.capacity
 try: {eventId: 7, qty: 2, promo: "FALL10"}
 ```
@@ -58,7 +59,8 @@ These are the only host functions exposed to the sandbox:
 
 ```ts
 db.read({ table, columns, where, limit })
-// where is an equality map; the kernel adds tenant_id
+// where is an equality map of string | finite number | null (null/undefined match no row);
+// the kernel adds tenant_id, orders by primary key and clamps limit to 1..100
 
 db.emit({
   op: "insert" | "update" | "delete",
@@ -81,7 +83,7 @@ db.emit({
 ### Request path (dev and prod)
 
 1. Dispatcher receives `POST /dispatch {intent, payload}`, builds `ctx` from the dev session.
-2. Load intent (unknown → 404). Registry resolves Crystal → Liquid → Gas (a Gas hit bumps hits and slides the TTL).
+2. Load intent (unknown → 404). Check `ctx.role` against the spec (undeclared → 403 before any resolve or generation). Registry resolves Crystal → Liquid → Gas (a Gas hit bumps hits and slides the TTL).
 3. **Hit** → harness on the real DB with commit. If the tier is Gas, a passing run is recorded as a fixture and may promote the handler. Return the result.
 4. **Miss** → the build path's generate-with-repair (≤ 3 rounds, judged on the spec's `try` inputs against seed copies, reason codes fed back). Exhausted → 502, nothing cached. Success → harness on the real DB with commit for the live payload → pass: COMMIT, admit to Gas, 200; fail: rollback, 4xx, nothing cached.
    - Repair is judged on `try` inputs, never on the live payload: a live rejection (sold out, `BAD_QTY`) is business logic, not a code defect, and must not trigger regeneration.
@@ -112,10 +114,10 @@ Lookup order is Crystal → Liquid → Gas. A spec edit changes the spec hash: e
 
 Every check is required; any failure rejects the complete effect set:
 
-- `ctx.role` is declared in the spec.
+- `ctx.role` is declared in the spec (checked before a handler is resolved or generated, and again in the harness).
 - Reads and effects target declared tables, operations and columns.
-- `tenant_id` is forced on inserts and added to every `where` clause.
-- Updates and deletes address the full primary key using equality.
+- `tenant_id` is forced on inserts and added to every `where` clause; invariant SQL is tenant-scoped by writing `:tenant_id`, which the kernel binds from `ctx`.
+- Updates and deletes address the full primary key using equality; write `where` values must be strings or finite numbers.
 - Effect count is below a fixed cap.
 - Forbidden columns are rejected, never silently filtered.
 

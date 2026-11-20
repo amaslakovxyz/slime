@@ -32,6 +32,20 @@ describe("db.read", () => {
   });
 });
 
+const shopSpec = parseIntent(await Bun.file("intents/list_products.md").text(), "list_products");
+describe("db.read limits", () => {
+  test("limit is clamped to 1..100 and rows come back in primary-key order", () => {
+    const db = createSeedDb();
+    for (let id = 1000; id < 1150; id++) db.run("INSERT INTO products VALUES (?, 1, 'S', 'N', 100, 5)", [id]);
+    const { api } = makeDbApi(db, shopSpec, ctx);
+    const read = (limit?: number) => api.read({ table: "products", columns: ["id"], where: {}, limit }).map(r => r.id as number);
+    expect(read(-1)).toHaveLength(1);
+    expect(read(1e9)).toHaveLength(100);
+    expect(read()).toHaveLength(100);
+    expect(read(2.9)).toEqual([1, 2]);
+  });
+});
+
 describe("db.emit", () => {
   test("collects without executing", () => {
     const db = createSeedDb();
