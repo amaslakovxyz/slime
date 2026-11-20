@@ -32,6 +32,29 @@ the data. Repeat requests skip Claude.
 
    `.env` is git-ignored; never commit a key.
 
+## See it work
+
+```bash
+npm run db:up
+npm run demo                          # uses SLIME_PROVIDER from .env
+SLIME_PROVIDER=offline npm run demo   # no model: hand-written handlers
+```
+
+`scripts/demo.sh` sends one question through every tier on the real server.
+Each step prints the tier, whether it was a cache hit, timings and the review
+status:
+
+1. A new request, where the model writes the SQL (Gas).
+2. The same question with another value, which reuses the code.
+3. The background review.
+4. More runs, until the handler becomes Liquid.
+5. A restart, after which the handler is loaded from the database.
+6. `crystallize`.
+7. Another restart, after which the handler is served as Crystal.
+
+It uses its own table (`slime_meta.handlers_demo`) and a temporary Crystal
+folder, so dev data and the repo are untouched.
+
 ## Run the tests
 
 ```bash
@@ -123,7 +146,9 @@ intent does not.
 * **Liquid:** a Gas handler that had `GAS_TO_LIQUID_HITS` **successful** runs
   within the window **and** passed the background review. Failed runs don't
   count.
-* **Crystal:** (not built yet) optimized code that ships as part of the app.
+* **Crystal:** a Liquid handler that an agent rewrote into a plain module in
+  `crystal/`, committed to git. It's served without the sandbox worker. See
+  [Crystal](#crystal) below.
 
 ### Saved Liquid handlers
 
@@ -170,6 +195,84 @@ On Groq's free tier, reviews share the rate limit with live generations. While
 reviews are running, new requests can wait. Use a separate key or a paid tier
 for demos.
 
+## Crystal
+
+```bash
+npm run crystallize -- --dry-run                   # what would be crystallized, and why not
+npm run crystallize -- --optimizer groq            # write modules into crystal/
+npm run crystallize -- --optimizer groq --commit --push   # ...and commit/push the current branch
+```
+
+The command reads saved Liquid handlers that have at least `CRYSTAL_MIN_RUNS`
+successful runs and an approved review. For each one:
+
+1. **The optimizing agent rewrites the handler.** It uses `--optimizer
+   claude|groq|none`, defaulting to the provider. It sees only the code, the
+   output shape and the input names and types. It never sees the request
+   text, so a crafted intent can't instruct it, and it never sees data. It
+   may move shaping into SQL.
+2. **The candidate must pass three checks:**
+   * the **Crystal allowlist** (below);
+   * the read-only SQL lint;
+   * `EXPLAIN`.
+3. **Equivalence test.** On every recorded input, the Liquid version and the
+   candidate both run against the live database, and their outputs must be
+   identical.
+4. **Fallback.** If the optimized version fails any check, the unchanged
+   Liquid code is tried the same way. If that fails too, the handler stays
+   Liquid, with the reasons printed.
+5. **Files.** A passing candidate is written as three files:
+   * `crystal/<key>.mjs`
+   * `crystal/<key>.fixtures.json`, holding the recorded inputs and outputs
+   * an entry in `crystal/manifest.json`, pinned by the module's sha256
+
+**At startup the server loads `crystal/` and checks each module:**
+
+* its hash must match the manifest;
+* it must still pass the allowlist;
+* it must have been built against the current schema.
+
+Requests whose fingerprint matches are then served by a plain function call:
+read-only SQL, then `shape(rows, input)` in-process. Crystal is keyed by
+request plus schema, not by prompt or model. So prompt or model changes keep
+it, but a schema change retires it. A module that fails a check is refused
+and listed on `/healthz`. `SLIME_CRYSTAL=off` ignores the folder.
+
+**The allowlist.** Crystal runs in the server process, so `shape` may use only
+a small subset of JavaScript.
+
+Allowed:
+
+* `Math`;
+* a few static methods on `Object`, `Array`, `JSON`, `Number`, `Date` and
+  `Intl`;
+* `new Map()` and `new Set()`;
+* `for...of` loops and array methods;
+* literal property access.
+
+Refused:
+
+* `this`, classes, async code and generators;
+* `while`, `for(;;)` and `for...in` loops;
+* property access with a variable key (`obj[key]`, which can reach
+  `constructor` at run time), anything named `constructor`, `prototype` or
+  `__proto__`, and changing globals;
+* any other global, such as `process`, `require`, `fetch` or `eval`.
+
+**What the allowlist does not cover:** Crystal has no CPU or memory limit.
+Allowed code that does heavy work for unusual data, such as a huge
+`String.repeat`, blocks the server. The review, the equivalence test and the
+kill switch are the protection here.
+
+**Git:** `--commit` refuses to run on `main`, because `AGENTS.md` sends every
+change through a pull request. Run it on a branch and open a PR, or enable
+auto-merge on GitHub for hands-off promotion. CI checks every committed
+Crystal: its hash, the allowlist, and that it imports.
+
+How this runs once deployed (a scheduled job reading `{CODE_STORAGE}`, a PR
+bot, and the deploy on `{RUNTIME_FOR_SLIME_CLOUD}`) is in
+[docs/crystal-deployment.md](docs/crystal-deployment.md).
+
 ## Safety
 
 The real boundary is the database user. Each layer below it is extra protection.
@@ -182,6 +285,7 @@ The real boundary is the database user. Each layer below it is extra protection.
 | Lint | Rejects write keywords and wrong `$n` mappings. Also rejects input values hardcoded into the code. |
 | QuickJS in a worker thread | Shaping code has no I/O and is limited to 200 ms and 32 MB. If a long native call can't be interrupted, the worker is killed. |
 | Model never sees values | Only input names and types are sent to Claude, never values or rows. |
+| Crystal allowlist | Crystal code runs without the worker, so it's parsed and limited to a small side-effect-free subset of JavaScript, both when it's written and when it's loaded. |
 | Separate storage user | Saved handlers live in `slime_meta`, owned by `slime_writer`. `slime_reader`, which runs generated SQL, can't read or change them. |
 
 ## Tuning for speed

@@ -19,7 +19,7 @@ function apiKey(): string {
   return key;
 }
 
-interface JsonCall<T> {
+export interface JsonCall<T> {
   model: string;
   effort: string;
   system: string;
@@ -30,7 +30,7 @@ interface JsonCall<T> {
 }
 
 /** One chat completion in JSON mode, validated against `schema`. Waits out 429s. */
-async function callGroqJson<T>(call: JsonCall<T>) {
+export async function callGroqJson<T>(call: JsonCall<T>) {
   const body = {
     model: call.model,
     messages: [
