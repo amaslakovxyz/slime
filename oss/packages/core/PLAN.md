@@ -1,7 +1,7 @@
 # @slime-cloud/core: library plan
 
-* **Status:** draft, being decided step by step
-* **Date:** 2026-11-20
+* **Status:** draft. M0 and M1 are done; M2 is next.
+* **Date:** 2026-11-20 (review fixes applied 2026-11-21)
 * **Owner:** Konstantin (core only; server and Slime Cloud are owned by others)
 
 ## 1. Goal
@@ -19,6 +19,21 @@ code and tests may be copied where they help, but they are reshaped into a
 library: options in, no global state, no `.env` reading. Nothing has to match
 the sandbox's behavior.
 
+**How it works.** The first time Slime sees a request, a model writes a
+read-only SQL query plus an optional shaping function. Slime checks and runs
+them, then caches the result as a handler. Repeat requests reuse the handler,
+even with different input values. Handlers move up through three tiers:
+
+* **Gas:** newly generated, held in memory, and expires.
+* **Liquid:** ran successfully `gasToLiquidRuns` times and passed a background
+  review by a second model (if a reviewer is configured, M4); saved in the
+  store.
+* **Crystal:** rewritten by an agent into modules in the app's own code (C10).
+
+Core is the bottom layer. `@slime-cloud/server` (a standalone HTTP server) and
+Slime Cloud (the hosted, multi-tenant service on AWS) build on it and are
+owned by others.
+
 ## 2. What we start from
 
 | Source | What it says about core |
@@ -31,16 +46,19 @@ the sandbox's behavior.
 
 Where this plan differs from PR #7: PR #7's Tasks 1–3 move the sandbox as is.
 This plan builds core as a library at the same path instead. Server and
-platform (PR #7 Tasks 2 and 4) then build on `createSlime()`. **Agree this
-with the PR #7 author before M0 lands.**
+platform (PR #7 Tasks 2 and 4) then build on `createSlime()`. Core is built at
+`oss/packages/core` (M0 and M1 have landed there). If PR #7's tasks that move
+`sandbox/` merge as written, they land on the same path, so they need to be
+dropped or rebased onto core first (§8).
 
-`slime-cloud/runtime` moves to the package (agreed with the team; its README
+`slime-cloud/runtime` switches to the package (agreed with the team; its README
 still says `sandbox/` gets published, which is now out of date). The runtime
 changes in a few places (§7, M7):
 
 * it uses `createSlime(new SlimeConfig(…))` instead of setting env before
   importing;
-* it uses the `dynamodb` store type instead of its own `DynamoHandlerStore`;
+* it replaces its own `DynamoHandlerStore` with a `SlimeStore` over the same
+  table;
 * it imports the package instead of the path mapping to `sandbox/src`.
 
 ## 3. Decisions
@@ -51,20 +69,20 @@ Status: **Decided**, **Proposed** (default unless someone objects) or
 | # | Question | Proposal | Status |
 |---|---|---|---|
 | C1 | Name and location | `@slime-cloud/core` in `oss/packages/core/`, inside npm workspaces at the repo root (PR #7 D10). | Decided |
-| C2 | Start from scratch or move the sandbox? | New package. Core is the only engine; `sandbox/` is frozen and not used (team agreement, 2026-11-20). Its code and tests are a quarry to copy from, not a reference to match. It is deleted once `slime-cloud/runtime` has moved to the package (M7). | Decided |
-| C3 | Runtime | v1: Node ≥ 22, ESM only. Built so that other runtimes (Bun, Deno, edge) can be added later without touching the engine. Runtime-specific code stays behind Ports: the shaping sandbox goes behind a new `SandboxRunner` Port (today a QuickJS worker thread), and database drivers stay behind `Connector`. The engine uses only `node:*` modules that Bun and Deno also provide. | Decided |
+| C2 | Start from scratch or move the sandbox? | New package. Core is the only engine; `sandbox/` is frozen and not used (team agreement, 2026-11-20). Its code and tests are a quarry to copy from, not a reference to match. It is deleted once `slime-cloud/runtime` has switched to the package (M7). | Decided |
+| C3 | Runtime | v1: Node ≥ 22, ESM only. Built so that other runtimes (Bun, Deno, edge) can be added later without touching the engine. Runtime-specific code stays behind Ports: the shaping sandbox (QuickJS in a worker thread) goes behind a new `SandboxRunner` Port, and database drivers stay behind `Connector`. The engine uses only `node:*` modules that Bun and Deno also provide. | Decided |
 | C4 | Configuration | A `SlimeConfig` class. The app creates it and adds the parts it needs: connector, generator, store, limits. Each part can come from env, a secrets store or anywhere else in the app. The class fills defaults, validates everything at once (reporting every problem, not just the first), and is immutable; `config.with({...})` returns a changed copy for tests. Core never reads `process.env` or `.env`. | Decided (class shape: Proposed) |
-| C5 | Entry point | Three steps in the app: create a connector (where data comes from), create a Slime instance with `createSlime(config)`, then call `slime.query()` inside any endpoint. The instance also has `handlers()`, `stats()`, `evict(id)`, `flush()` and `close()`. | Decided |
-| C6 | Locked mode | Locked means no `generator` is passed. Then no model client is ever imported, by construction. An explicit `mode` setting can be added later without breaking this. | Decided |
-| C7 | Packaging of adapters | Subpath exports from one package: `@slime-cloud/core/postgres`, `/dynamodb`, `/claude`, `/groq`, `/offline`. Model SDKs and database drivers are optional peer dependencies. | Decided |
-| C8 | What ships | Compiled JS and `.d.ts` in `dist/` (built with `tsc`), plus the shape worker file. Not TS source. | Decided |
+| C5 | Entry point | Three steps in the app: create a connector (where data comes from), create a Slime instance with `createSlime(config)`, then call `slime.query()` inside any endpoint. The instance's methods are listed in §5. | Decided |
+| C6 | Locked mode | Locked means no `generator` is passed. Then no model client is ever imported, by construction. An explicit `mode` setting can be added later without breaking this. Explore mode is the opposite: a `generator` is passed, and Slime generates handlers for new requests. | Decided |
+| C7 | Packaging of adapters | Subpath exports from one package: `@slime-cloud/core/postgres`, `/claude`, `/groq`, `/offline`. Model SDKs and database drivers are optional peer dependencies. | Decided |
+| C8 | What ships | Compiled JS and `.d.ts` in `dist/` (built with `tsc`), plus the shaping sandbox's worker file. Not TS source. | Decided |
 | C9 | HTTP | No HTTP in core. The app calls `slime.query()` from its own endpoint in any framework. A thrown `SlimeError` carries `status` and `toJSON()`, so the endpoint can return it directly. Admin data comes from methods only (`handlers()`, `stats()`, `evict()`); exposing and protecting them over HTTP is up to the app or `@slime-cloud/server`. | Decided |
-| C10 | Crystal | Crystal handlers are ordinary modules in the app's own code. The crystallize job writes TS or JS (a config setting) plus a generated `index` and a manifest. The app imports the index and passes it as `crystal` in `SlimeConfig`; leaving it out (or `false`) turns Crystal off. Because the code is compiled with the app, safety is checked when the job writes it (allowlist, SQL lint, equivalence test on recorded runs) and by a `check` command in the app's CI, which re-parses the sources and compares manifest hashes. Core doesn't re-check at startup. The job and `check` are a separate entry (`@slime-cloud/core/crystallize`, plus a bin), so the runtime never imports them. | Decided |
-| C11 | Observability | An `onEvent(event)` option (generated, promoted, reviewed, error, timings, tokens). Core doesn't log on its own. Metering builds on this later. | Decided |
-| C12 | Out of scope for core v1 | Writes, tenancy, connectors other than Postgres, Redis, semantic matching. | Proposed |
-| C13 | Store contract | A small key-value Port, `SlimeStore`: `get(ns, key)`, `put(ns, key, value)`, `list(ns, prefix?)`, `delete(ns, key)`. Values are JSON. Namespaces: `handlers`, `dictionary`. The engine builds the keys and filters by prefix (schema, glossary, prompt, model), so a backend is only a mapping to 4 calls. It replaces the sandbox's domain-shaped `HandlerStore`. | Decided |
-| C14 | Choosing a store | The `store` option in `SlimeConfig` picks a built-in store by config, or takes any object that implements `SlimeStore`. Built in: `file` (the default), `memory`, `postgres` and `dynamodb` (§4.8). Files and memory have no dependencies. Postgres and DynamoDB ship in core as optional adapters: their drivers (`pg`, `@aws-sdk/client-dynamodb`) are optional peer dependencies, loaded only when that store is chosen. | Decided |
-| C15 | Background work on serverless | Core runs work off the request path: store writes, background reviews and the dictionary build (D4). On Lambda the process is frozen after each response, so nothing runs in between. `slime.flush()` waits for queued store writes (cheap; call it before every response on Lambda). `slime.settled()` waits for everything, including reviews and the dictionary build. Work that is cut off resumes on the instance's next invocation, or is redone later; it is never half-saved. | Proposed |
+| C10 | Crystal | Crystal handlers are ordinary modules in the app's own code. The crystallize job writes JS modules with `.d.ts` files, plus a generated `index` and a manifest. The app imports the index and passes it as `crystal` in `SlimeConfig`; leaving it out (or `false`) turns Crystal off. Because the code is compiled with the app, safety is checked when the job writes it (allowlist, SQL lint, equivalence test on recorded runs) and by a `check` command in the app's CI, which re-parses the sources and compares manifest hashes. Core doesn't re-check at startup. The job and `check` are a separate entry (`@slime-cloud/core/crystallize`, plus a bin), so the runtime never imports them. | Decided |
+| C11 | Observability | An `onEvent(event)` option (the `SlimeEvent` types in §5). Core doesn't log on its own. Metering builds on this later. | Decided |
+| C12 | Out of scope for core v1 | Writes, tenancy (core has no tenant concept; a store isolates tenants if needed), connectors other than Postgres, built-in stores other than file and memory, semantic matching. | Proposed |
+| C13 | Store contract | A small key-value Port, `SlimeStore`: `get(ns, key)`, `put(ns, key, value)`, `list(ns, prefix?)`, `delete(ns, key)`. Values are JSON. Namespace: `handlers`. The engine builds the keys (the request key, §4.7), so a backend is only a mapping to 4 calls. It replaces the sandbox's domain-shaped `HandlerStore`. | Decided |
+| C14 | Choosing a store | The `store` option takes any object that implements `SlimeStore`. Core ships two that need no extra packages: `fileStore(dir)` (the default, `./.slime`) and `memoryStore()`. Other backends (Postgres, DynamoDB, Redis) are custom stores; Slime Cloud brings its own (M7). | Decided |
+| C15 | Background work on serverless | Core runs store writes and background reviews off the request path. On Lambda the process is frozen after each response, so `slime.flush()` must be awaited before every response. It waits for queued writes and running reviews. Work that never ran is redone on a later request. | Proposed |
 
 ## 4. Request format and matching
 
@@ -82,7 +100,8 @@ separately, and gives the shape it wants back:
 
 The more precisely the intent is written, the more precise the generated
 query. If a result is wrong, the developer rewords the intent: that is a new
-key, so Slime generates again, and the old handler expires unused.
+key, so Slime generates again, and the old handler stays until it expires
+(Gas) or is deleted (Liquid).
 
 A structured protocol (`from`, `where` with operators, `groupBy`, paths) was
 designed and dropped on 2026-11-20. It turned the request into a query
@@ -122,32 +141,32 @@ benchmark material.
 | R4 | What of `input` is hashed? | The key **names** only, sorted. Never the values, so `{ limit: 5 }` and `{ limit: 50 }` share a handler. Types are not in the key either: the handler records each parameter's coarse type (`string`, `number`, `boolean`, `list`) from the first non-null value it sees, and a later value of another type fails with `INVALID_REQUEST`. So `5` and `5.5` share a handler, and a parameter behaves like a typed route parameter. | Proposed |
 | R5 | Optional filters (`null`)? | Every parameter may be `null`, meaning "not given". The key doesn't change, and the generator is told every parameter is nullable, so it writes `($1 IS NULL OR country = $1)`. A frontend with 5 optional filters always sends all 5 keys and gets **one** handler, not 32. Leaving a key out entirely is a different request. | Proposed |
 | R6 | Paging? | `input.limit` and `input.offset` are reserved: non-negative integers. After each run Slime checks, without a model, that the top-level list has at most `limit` rows; a failed check is a failed run. | Decided |
-| R7 | Values written into the intent? | In explore mode, an intent containing literals (a number with 2+ digits, quoted text, an email, an id) is an `INVALID_REQUEST` error that says to move the value into `input`. In locked mode it can't generate anyway. | Proposed |
-| R8 | Explore vs locked in production? | Generation is for development. In explore mode anyone who can send a request (including from a browser's devtools) can make Slime generate a new read query against everything `slime_reader` sees. So the documented setup is: **explore in development, locked in production** (C6), serving only handlers that were saved (Liquid) or crystallized. Intents then act as named routes. | Decided |
-| R9 | Can the developer see what was generated? | Yes. `meta` carries `sql`, `shapeJs` and the model's `assumptions`. On every new generation core emits an `onEvent` event (C11) with them, so a dev setup can print it to the console. A wrong answer is only fixable if it's visible. | Decided |
+| R7 | Values written into the intent? | An intent that seems to contain a literal (a number, quoted text, an email, a UUID) gets a warning in `meta.warnings` that says to move the value into `input`. A warning, not an error, because "top 10" and possessives match too. | Proposed |
+| R8 | Explore vs locked in production? | Generation is for development. In explore mode anyone who can send a request (including from a browser's devtools) can make Slime generate a new read query against everything the connector's read-only database user (`slime_reader` in the examples) can see. So the documented setup is: **explore in development, locked in production** (C6), serving only handlers that were saved (Liquid) or crystallized. Intents then act as named routes. | Decided |
+| R9 | Can the developer see what was generated? | Yes, in explore mode. `meta` then carries `sql`, `shapeJs` and the model's `assumptions`; in locked mode they are left out. On every new generation core emits an `onEvent` event (C11) with them, so a dev setup can print it to the console. A wrong answer is only fixable if it's visible. | Decided |
 | R10 | Matching by meaning (embeddings, a model normalizing the text)? | No. A non-deterministic key is worse than one extra generation. | Decided |
+| R11 | Can `input` carry authorization? | No. The caller can set any `input` value, including `null` (R5). In production the app's endpoint chooses the intent and sets every identity-bound value (account, user, tenant) on the server; it never passes the request body through. | Proposed |
 
 ### 4.4 Startup dictionary
 
-Heavy context work happens once, when the app starts, not on every
-generation. `createSlime()` starts building a **dictionary** of the database
-in the background. `slime.query()` generates against it.
+Before the first generation, `createSlime()` reads the database's metadata
+once and renders a **dictionary**: the text every generation gets as context.
 
 | # | Question | Decision | Status |
 |---|---|---|---|
 | D1 | What does Slime read from the database? | Metadata only, never row data: tables, columns, types, comments, primary and foreign keys, and the allowed values of enum-like columns. Those come from the catalog (Postgres enums and `CHECK … IN (…)` constraints), not from the rows. | Decided |
-| D2 | Who writes the dictionary? | A model, in a step inside `createSlime()`. It reads the metadata plus the app's `glossary` and writes **SQL notes** for this schema, for example "group by ids, not names", "amounts are integer cents", "`issued_at` is the invoice date". The app can add its own `rules` in `SlimeConfig`. They are stored next to the model's notes, and the app's rules win when the two conflict. | Decided |
-| D3 | Where is it stored? | In the same store as Liquid handlers (C13), namespace `dictionary`, keyed by the hash of its inputs (D6). The store can be files, memory, Postgres or DynamoDB; core doesn't care which. | Decided |
-| D4 | Blocking or background? | Background. `createSlime()` returns at once. | Decided |
-| D5 | What happens to requests before it's ready? | Cache hits (Liquid and Crystal loaded at startup) are served immediately; they don't need the dictionary. New generations wait for it. If building it fails, core emits an `onEvent` error and generations go ahead with the plain metadata. | Proposed |
-| D6 | When is it rebuilt? | When its inputs change: the metadata hash, the `glossary`, the `rules` or the model that writes the notes. Otherwise it is loaded from the store. Its hash is part of every Gas and Liquid handler key, so a rebuilt dictionary regenerates the handlers that depend on it. | Proposed |
-| D7 | Locked mode? | Only loaded, never built: locked mode has no model. If none is stored, locked mode serves its saved handlers without one. | Proposed |
-| D8 | Can the developer see it? | `slime.dictionary()` returns it, and building it emits an `onEvent` event with the notes, so a dev setup can print them. | Proposed |
+| D2 | Who writes the dictionary? | Slime, not a model. It renders the metadata, the app's `glossary` and the app's `rules` as text. The same inputs always give the same text. Model-written SQL notes may be added later behind the same context, if the M6 bench shows they help. | Decided |
+| D3 | Where is it stored? | Nowhere. It is rebuilt from the live metadata at each start. | Decided |
+| D4 | Blocking or background? | `createSlime()` awaits it. It is one catalog read. | Decided |
+| D6 | When is it rebuilt? | At every start. Its hash is recorded in each handler (§4.7). In explore mode a changed hash regenerates a handler the next time it is requested. | Proposed |
+| D7 | Locked mode? | Built the same way; no model is needed. Saved handlers are served even if its hash differs from the one they recorded (§4.7). | Proposed |
+
+D5 and D8 (waiting for a background build, `slime.dictionary()`) were dropped
+with the model-written dictionary on 2026-11-21; the numbers are not reused.
 
 ### 4.5 What the model sees
 
-* the dictionary (§4.4): metadata, glossary, the model's SQL notes and the app's
-  rules;
+* the dictionary (§4.4): metadata, glossary and the app's rules;
 * the intent;
 * the input key names, with their types when known;
 * `output`.
@@ -158,34 +177,19 @@ It never sees input values or rows.
 
 * **`data`** matches `output` exactly: no missing keys, no extra keys, right
   types and date formats. Otherwise the run fails with `SHAPE_MISMATCH`.
-* **`meta`** has:
-  * `tier` and `cache`;
-  * `timingsMs`;
-  * `sql`, `shapeJs` and `assumptions`;
-  * `warnings`;
-  * `review`.
+* **`meta`**: see `QueryMeta` in §5.
 * **Errors** are thrown as `SlimeError`: `{ code, message, retryable }` with an
   HTTP `status` (C9).
 
-### 4.7 Changes from the sandbox
-
-* `output` becomes required.
-* Input types move out of the key and into the handler (R4), so `5` and `5.5`
-  share a handler.
-* Nullable parameters (R5): one handler for any combination of optional
-  filters.
-* Reserved `limit`/`offset` with a check after each run (R6).
-* `date` and `datetime` leaves; a top-level object means one row (§4.2).
-* Literals in the intent are an error in explore mode, not just a warning
-  (R7).
-* Locked is the documented production mode (R8).
-* The startup dictionary, built by a model in the background (§4.4).
-
-### 4.8 Storage: chosen in the config
+### 4.7 Storage: chosen in the config
 
 Core depends on no database for its own storage. Everything it keeps (Liquid
-handlers with their fixtures, run counts, the dictionary) goes through the
-`SlimeStore` Port (C13):
+handlers with their fixtures, and run counts) goes through the `SlimeStore`
+Port (C13).
+
+A fixture is the `input` of one successful run, used by Crystal's equivalence
+test. It holds no rows. Input values do reach the store, and the committed
+`.slime/` with it.
 
 ```ts
 export interface SlimeStore {
@@ -198,126 +202,80 @@ export interface SlimeStore {
 }
 ```
 
-The engine builds the keys: `handlers` / `${scope}#${requestKey}`, where
-`scope` is a 16-character hash of the schema, dictionary, prompt and model
-hashes. Loading "every handler for this scope" is then one
-`list('handlers', scope + '#')`, and keys stay short and safe for file
-names.
+The engine keys handlers by the request key alone: `handlers` /
+`${requestKey}`. Each stored handler records where it came from: the schema,
+dictionary and prompt hashes and the model name. In explore mode, a handler
+whose record differs from the current values counts as a miss: Slime
+generates again and overwrites it. In locked mode Slime serves the stored
+handler as it is, and emits one `onEvent` warning at startup if the schema
+hash differs.
 
 The app picks the store in `SlimeConfig`:
 
 ```ts
-store: { type: 'file', dir: './.slime' }                         // the default
-store: { type: 'memory' }                                         // tests
-store: { type: 'postgres', url: process.env.SLIME_STORE_URL!, table: 'slime_store' }
-store: { type: 'dynamodb', table: 'slime-store', region: 'eu-central-1', prefix: 'acme' }
-store: myRedisStore                                               // anything implementing SlimeStore
+store: fileStore('./.slime')   // the default
+store: memoryStore()           // tests
+store: myStore                 // anything implementing SlimeStore
 ```
 
-| `type` | Dependencies | Good for |
-|---|---|---|
-| `file` (default) | none (`node:fs`) | local development, and production in locked mode with `.slime/` committed to git |
-| `memory` | none | tests |
-| `postgres` | `pg` (optional peer; the Postgres connector needs it anyway) | self-hosting with several instances, in the app's own database or another one |
-| `dynamodb` | `@aws-sdk/client-dynamodb` (optional peer) | AWS deployments, and Slime Cloud |
-| a custom object | whatever it uses | anything else: Redis, S3, an internal service |
-
-**Loading.** Core imports the Postgres or DynamoDB adapter only when that
-type is chosen. If its driver isn't installed, `SlimeConfig` fails with one
-clear message, for example "store type 'postgres' needs the `pg` package:
-`npm install pg`".
-
 **Why files are the default.** They follow the explore → locked flow (R8).
-In development, handlers and the dictionary are written to `./.slime/`. The
-developer commits that folder, like Crystal. In production, locked mode only
-reads it: no database for Slime's own state, and no model. A team that
-doesn't want state in git picks `postgres` or `dynamodb`; in production they
-then work in locked mode too, against a store filled during development.
+In development, handlers are written to `./.slime/`. The developer commits
+that folder, like Crystal. In production, locked mode only reads it: no
+database for Slime's own state, and no model. A team that doesn't want state
+in git uses a custom shared store; in production they then work in locked
+mode too, against a store filled during development.
 
 **The file store's rules:**
 
 * one JSON file per key: `.slime/<ns>/<key>.json`;
 * writes go to a temporary file first, then a rename, so a crash never leaves
   half a file;
-* one writer: in locked mode Slime never writes to the store, and run counts
-  stay in memory.
+* **one writer per store:** core v1 assumes a single process writes to a
+  store. In locked mode Slime never writes, and run counts stay in memory.
+  Several writers need a custom store that handles them.
 
-**Postgres store:**
-
-* one table, by default `slime_store`, with columns `(ns, key, value jsonb,
-  updated_at)` and primary key `(ns, key)`;
-* `list` is `WHERE ns = $1 AND key LIKE $2 || '%'`;
-* `init()` creates the table if it's missing. The store's user needs a schema
-  it may create tables in, and must not be the read-only connector user.
-
-**DynamoDB store:**
-
-* one table with a string partition key and a string sort key;
-* partition key = `prefix`, which is the tenant in Slime Cloud and a fixed
-  value such as `default` elsewhere;
-* sort key = `${ns}#${key}`;
-* the JSON goes in one attribute;
-* `list(ns, prefix)` is one `Query` on the partition with
-  `begins_with(sk, ns + '#' + prefix)`;
-* the attribute names are options, defaulting to `pk` and `sk`;
-* the table is created outside Slime (Terraform, CDK, console). `init()` only
-  checks that it exists and has this key schema.
-
-Slime Cloud's existing table (`slime-handlers`, keys `tenantId` and
-`artifactKey`, in `infra/aws/platform/runtime.tf`) works as it is:
-
-```ts
-store: { type: 'dynamodb', table: 'slime-handlers', prefix: tenantId,
-         keys: { partition: 'tenantId', sort: 'artifactKey' } }
-```
-
-Rows written by today's `DynamoHandlerStore` don't start with
-`handlers#`, so the new store ignores them. They can be deleted after the
-switch, and the handlers are regenerated.
-
-Because the tenant is the partition key, core never sees tenants, and an IAM
-condition on `dynamodb:LeadingKeys` keeps each tenant's role in its own
-partition (PR #7 §6).
+A shared store for several instances is a custom store: one table keyed by
+`(ns, key)` is enough.
 
 **One contract test** runs against every store, the built-in ones and any
 custom store, so an adapter either passes or it doesn't.
 
-**Value size.** DynamoDB items are limited to 400 KB, so core keeps every
-value under a documented limit (300 KB) for every store:
-
-* each handler's `history` and `fixtures` are capped;
-* the dictionary is stored as one entry per table plus an index entry, not
-  one big value.
-
 ## 5. Draft public API
 
-This is the target for C4–C10, and it changes as we decide them.
+The target API. Only C4's class shape and the items in §9 are still open.
 
 ```ts
-import { createSlime, SlimeConfig } from '@slime-cloud/core';
+import express from 'express';
+import { createSlime, SlimeConfig, SlimeError, fileStore } from '@slime-cloud/core';
 import { postgresConnector } from '@slime-cloud/core/postgres';
 import { claude } from '@slime-cloud/core/claude';
+import { crystals } from './slime-crystal/index.js';
 
 // The app decides where values come from: env here, but any source works.
 const config = new SlimeConfig({
-  connector: postgresConnector({ url: process.env.READER_URL! }), // required; refuses to start if the user can write
-  store: { type: 'postgres', url: process.env.SLIME_STORE_URL! },  // default: { type: 'file', dir: './.slime' } (§4.8)
+  connector: postgresConnector({ url: process.env.READER_URL! }), // required; createSlime() refuses database users that can write
+  store: fileStore('./.slime'),                                    // the default (§4.7)
   generator: claude.generator({ apiKey: process.env.ANTHROPIC_API_KEY!, model: 'claude-haiku-5-5' }), // omit = locked mode
   reviewer: claude.reviewer({ apiKey: process.env.ANTHROPIC_API_KEY!, model: 'claude-opus-5-5' }),    // omit = no review
-  crystal: crystals,                // import { crystals } from './slime-crystal/index.js'; omit = off
+  crystal: crystals,                                               // omit = off
   glossary: { revenue: 'sum of paid invoices, in cents' },        // optional; meaning of the app's words (§4.4)
-  rules: ['Count only paid invoices as revenue.'],                 // optional; added to the model's SQL notes (D2)
-  tiers: { gasToLiquidRuns: 3, gasWindowMs: 3_600_000 },           // optional, defaults shown
-  limits: { rowCap: 1_000, statementTimeoutMs: 2_000, maxGenerationsPerHour: 200 },
+  rules: ['Count only paid invoices as revenue.'],                 // optional; added to the dictionary (D2)
+  tiers: { gasToLiquidRuns: 3, gasWindowMs: 3_600_000 },           // optional; see DEFAULT_TIERS
+  limits: { rowCap: 1_000, statementTimeoutMs: 2_000, maxGenerationsPerHour: 200 }, // optional; see DEFAULT_LIMITS (per instance)
   onEvent: (e) => console.log(JSON.stringify(e)),
 }); // throws one SlimeConfigError listing every problem
 
 const slime = await createSlime(config);
+const app = express().use(express.json());
 
-// Inside any endpoint, in any framework. Express shown here.
-app.post('/api/data', async (req, res) => {
+// Each endpoint picks its intent and sets identity-bound values itself (R11).
+app.get('/api/top-accounts', async (req, res) => {
   try {
-    res.json(await slime.query(req.body)); // { data, meta }
+    res.json(await slime.query({
+      intent: 'top N accounts by total paid amount, highest first',
+      input: { limit: Number(req.query.limit ?? 5), orgId: req.user.orgId }, // req.user set by the app's auth
+      output: [{ name: 'string', totalPaid: 'integer' }],
+    }));
   } catch (err) {
     if (err instanceof SlimeError) return res.status(err.status).json({ error: err.toJSON() });
     throw err;
@@ -327,93 +285,194 @@ app.post('/api/data', async (req, res) => {
 await slime.close(); // on shutdown
 ```
 
-Contracts (Ports) that core exports, unchanged from the sandbox unless noted:
+The instance, its results and its events:
 
-* `Connector`: `describe`, `check`, `run`, `safetyCheck`, `close`. The
-  schema from `describe` may gain the allowed values of enum-like columns
-  (§4.4);
-* `Generator` and `Reviewer`;
+```ts
+interface Slime {
+  query(request: SlimeRequest): Promise<QueryResult>;
+  handlers(): HandlerSummary[];             // Liquid and Crystal; replaces runtime listHandlers()/listCrystals()
+  stats(): SlimeStats;                       // counts per tier, generations this hour, queue length
+  evict(handlerKey: string): Promise<boolean>; // removes from memory and the store; false if unknown
+  flush(): Promise<void>;                    // waits for queued store writes and running reviews
+  close(): Promise<void>;
+}
+interface QueryResult { data: unknown; meta: QueryMeta }
+interface QueryMeta {
+  handlerKey: string;
+  tier: 'gas' | 'liquid' | 'crystal';
+  cache: 'hit' | 'miss' | 'coalesced';
+  truncated: boolean;                        // rowCap cut the rows
+  timingsMs: { total: number; generate?: number; run?: number; shape?: number };
+  warnings: string[];
+  review: 'none' | 'pending' | 'approved' | 'rejected';
+  sql?: string; shapeJs?: string; assumptions?: string[]; // explore mode only (R9)
+}
+type SlimeEvent =
+  | { type: 'generated'; handlerKey: string; sql: string; shapeJs?: string; assumptions: string[]; tokens: number; ms: number }
+  | { type: 'reviewed'; handlerKey: string; verdict: 'approved' | 'rejected'; notes: string }
+  | { type: 'promoted'; handlerKey: string; tier: 'liquid' }
+  | { type: 'warning'; message: string }
+  | { type: 'error'; code: string; message: string };
+```
+
+Contracts (Ports) that core exports, as defined in `src/ports.ts`:
+
+* `Connector`: `name`, `describe`, `check`, `run`, `safetyCheck`, `close`.
+  `describe` returns the allowed values of enum-like columns (D1). `check` and
+  `run` receive the limits for the call (`{ timeoutMs, rowCap }`). The engine
+  compares the cost from `check` with `limits.maxQueryCost` and raises
+  `QUERY_TOO_EXPENSIVE` itself.
+* `Generator` (`model`, `promptHash`, `generate`) and `Reviewer` (`review`).
+  Both take `{ timeoutMs, signal }`.
 * `SlimeStore`: the key-value Port (C13). It replaces the sandbox's
-  `HandlerStore` and PR #7's `SLIME_META_TABLE`: a tenant's isolation is a
-  constructor option of the store (a directory, a table, a partition key);
-* `SlimeError` and its error codes.
+  `HandlerStore` and PR #7's `SLIME_META_TABLE`.
+* `SandboxRunner`: exported as a type. In v1 core always uses its own QuickJS
+  runner, and there is no option to pass another.
+
+Also exported: `SlimeError`, `SlimeConfigError`, the error codes,
+`DEFAULT_TIERS` and `DEFAULT_LIMITS`.
 
 ## 6. Package layout (target)
 
 ```
 oss/packages/core/
-├── package.json        # @slime-cloud/core, "exports" per subpath, peerDeps optional
-├── tsconfig.json       # build → dist/, declarations on
+├── package.json          # @slime-cloud/core, "exports" per subpath, peerDeps optional
+├── tsconfig.json         # typecheck only (noEmit)
+├── tsconfig.build.json   # build → dist/, declarations on
+├── scripts/
+│   └── check-pack.mjs    # what npm pack would ship
+├── docs/                 # protocol-cases.md
 ├── src/
-│   ├── index.ts        # createSlime, SlimeConfig, types, SlimeError
-│   ├── config.ts       # SlimeConfig: defaults, validation, with()
-│   ├── engine/         # engine, tiers, review loop, coalescing, rate limits
-│   ├── request/        # parsing, normalization, request key (§4)
-│   ├── dictionary/     # startup dictionary (§4.4)
-│   ├── checks/         # shape, sql guard, lint, limit check (R6)
-│   ├── sandbox/        # SandboxRunner Port + QuickJS worker (shape-worker.mjs)
-│   ├── crystal/        # Crystal registry types; serving crystal handlers
-│   ├── store/          # SlimeStore Port, file and memory stores, store config, contract test
-│   ├── postgres/       # connector + postgres store → @slime-cloud/core/postgres
-│   ├── dynamodb/       # dynamodb store           → @slime-cloud/core/dynamodb
-│   ├── claude/         # generator + reviewer → @slime-cloud/core/claude
-│   ├── groq/           #                      → @slime-cloud/core/groq
-│   ├── offline/        #                      → @slime-cloud/core/offline
-│   └── crystallize/    # job, allowlist, check → @slime-cloud/core/crystallize (+ bin)
-└── test/
+│   ├── index.ts          # createSlime, SlimeConfig, errors, Port types, file and memory stores
+│   ├── config.ts         # SlimeConfig: defaults, validation, with()
+│   ├── errors.ts         # SlimeError, SlimeConfigError, error codes
+│   ├── ports.ts          # Connector, Generator, Reviewer, SlimeStore, SandboxRunner
+│   ├── request/          # parse.ts, shape.ts, params.ts, key.ts (§4)
+│   ├── checks/           # sql.ts: SQL guard and lint; limit check (R6, M2+)
+│   ├── store/            # types.ts; file and memory stores, contract test (M2+)
+│   ├── engine/           # (M2+) engine, tiers, review loop, coalescing, rate limits
+│   ├── dictionary/       # (M3+) dictionary rendered from the catalog (§4.4)
+│   ├── shaping/          # (M2+) QuickJS runner and its worker (shape-worker.ts, compiled by tsc),
+│   │                     #       one pool per Slime instance, closed by close()
+│   ├── crystal/          # (M5+) Crystal registry types; serving crystal handlers
+│   ├── postgres/         # (M3+) connector → @slime-cloud/core/postgres
+│   ├── claude/           # (M4+) generator + reviewer → @slime-cloud/core/claude
+│   ├── groq/             # (M4+) generator + reviewer → @slime-cloud/core/groq
+│   ├── offline/          # (M2+) generator for tests → @slime-cloud/core/offline
+│   └── crystallize/      # (M5+) job, allowlist, check → @slime-cloud/core/crystallize (+ bin)
+└── test/                 # node:test, one file per area
 ```
+
+Dependencies:
+
+| Package | Range | Kind | Needed from |
+|---|---|---|---|
+| `quickjs-emscripten` | ^0.32.0 | dependency | M2 |
+| `zod` | ^4.6.7 | dependency | M2 |
+| `pg` | ^8.23.1 | optional peer | M3 |
+| `@anthropic-ai/sdk` | ^1.11.0 | optional peer | M4 |
+| `acorn`, `acorn-walk` | ^8.19.0, ^8.3.5 | dependency of `/crystallize` only | M5 |
+
+Groq is called with `fetch`, so it needs no SDK. The main entry depends only
+on `quickjs-emscripten` and `zod`.
 
 ## 7. Milestones
 
 Each milestone ends with green tests and a commit. Where a sandbox test file
 is named, its cases are copied and adapted; matching the sandbox is not a
-goal.
+goal. Before a milestone starts, its row gets the files it creates or changes
+(including `package.json` exports, `test/package.test.ts`,
+`scripts/check-pack.mjs` and `.github/workflows/ci.yml`) and its test cases.
 
-| # | Milestone | Done when |
-|---|---|---|
-| M0 | **Skeleton.** Root `package.json` with workspaces, core `package.json` with an exports map, `tsconfig`, `node:test`, a CI job "Core tests". | `npm test -w @slime-cloud/core` runs; `npm pack` builds a tarball; CI is green. |
-| M1 | **Request, contracts and pure parts.** Request parsing, intent normalization and the request key (§4); output notation with `date`/`datetime`; Ports and `SlimeError`; SQL guard and lint; `SlimeConfig` with defaults, validation and `glossary`. | `units.test.ts` ported and adjusted for §4.7. |
-| M2 | **Engine, Gas path.** `createSlime`, `query`, the `SlimeStore` Port with the `memory` and `file` stores and the shared store contract test, offline generator, `SandboxRunner` with the QuickJS worker, coalescing, rate limits, locked mode, typed and nullable parameters (R4, R5), the limit check (R6). | `engine.test.ts` and `sandbox.test.ts` ported; one handler serves every combination of `null` filters; no `config` singleton anywhere. |
-| M3 | **Postgres, DynamoDB and the dictionary.** Connector with the start-up safety check and enum values from the catalog; the `postgres` and `dynamodb` stores; the background dictionary build (§4.4). | `postgres.test.ts` and `persistence.test.ts` ported; both stores pass the shared contract test (DynamoDB against DynamoDB Local in Docker); a missing driver gives the install message; a restart loads the dictionary instead of rebuilding it; changing `rules` rebuilds it. |
-| M4 | **Models and Liquid.** Claude and Groq generators and reviewers with prompts updated for §4 (nullable parameters, the dictionary); the review loop; promotion to Liquid. | Review and promotion tests pass; one live run against Groq or Claude. |
-| M5 | **Crystal.** Serving from an imported registry; the crystallize job writing TS or JS; the `check` command. | `crystal*.test.ts` ported; a hand-edited Crystal file fails `check`; TS and JS output both pass the equivalence test. |
-| M6 | **Use it as a package.** An example app in `oss/examples/` that installs the packed tarball and calls `slime.query()` from an endpoint; docs for the request format; the bench ported to run on core. | The example answers a query from the tarball; the bench is at least as correct as the sandbox's. |
-| M7 | **Switch `slime-cloud/runtime` to the package** (with its owner). Drop the path mapping to `sandbox/src`; build the engine with `createSlime(new SlimeConfig(…))`; use the `dynamodb` store type on the existing table; keep `slime.flush()` before each response (C15). Then retire `sandbox/`: nothing imports it any more. | The runtime's tests pass on the package; a deployed function answers from handlers stored by the new store. |
+| # | Milestone | Done when | Status |
+|---|---|---|---|
+| M0 | **Skeleton.** Root `package.json` with workspaces, core `package.json` with an exports map, `tsconfig`, `node:test`, a CI job "Core tests". | `npm test -w @slime-cloud/core` runs; `npm pack` builds a tarball; CI is green. | done |
+| M1 | **Request, contracts and pure parts.** Request parsing, intent normalization and the request key (§4); output notation with `date`/`datetime`; Ports and `SlimeError`; SQL guard and lint; `SlimeConfig` with defaults, validation and `glossary`. | `request`, `shape`, `params`, `key`, `sql`, `config` and `package` tests pass. | done |
+| M2 | **Engine, Gas path.** `createSlime` and the instance API (`query`, `flush`, `close`, `evict`, `handlers`, `stats`; `onEvent` with `generated`, `warning` and `error`), the `memory` and `file` stores and the shared store contract test, offline generator, the shaping sandbox with the QuickJS worker, coalescing, rate limits, locked mode, typed and nullable parameters (R4, R5), the limit check (R6), the R7 warning. Engine rules below. | The M2 tests below pass with no database; no core test is skipped because a database is missing; no `config` singleton anywhere. | planned |
+| M3 | **Postgres connector and the dictionary.** Connector with the startup safety check and enum values from the catalog; the dictionary rendered from the catalog (§4.4). CI gets a Postgres service using `sandbox/db/init.sql` (roles and seed data). | `postgres.test.ts` cases pass against Postgres in CI (database tests require `REQUIRE_DB=1` in CI rather than skipping); the file and memory stores pass the shared contract test; changing `rules` changes the dictionary and regenerates handlers in explore mode. | planned |
+| M4 | **Models and Liquid.** Claude and Groq generators and reviewers with prompts updated for §4 (nullable parameters, the dictionary); the review loop; promotion to Liquid (rule below); `reviewed` and `promoted` events. | Review and promotion tests pass; one live run against Groq or Claude. | planned |
+| M5 | **Crystal.** Serving from an imported registry; the crystallize job writing JS with `.d.ts`; the `check` command. | `crystal*.test.ts` ported; a hand-edited Crystal file fails `check`; the output passes the equivalence test. | planned |
+| M6 | **Use it as a package.** An example app that installs the packed tarball and calls `slime.query()` from an endpoint; docs for the request format; the bench ported to run on core. Publishing to npm is not part of v1. | The example (`oss/examples/express`, its own lockfile, run in CI from the packed tarball) answers a query. The bench, ported to `oss/packages/core/bench/`, gets the 5 cases recorded as correct in `concepts_brief.md` right, and refuses the 2 unsafe ones. | planned |
+| M7 | **Switch `slime-cloud/runtime` to the package** (with its owner). Drop the path mapping to `sandbox/src`; build the engine with `createSlime(new SlimeConfig(…))`; replace `DynamoHandlerStore` with a `SlimeStore` over the existing table that serves the items already there; keep `slime.flush()` before each response (C15). Then delete `sandbox/`: nothing imports it any more. | The runtime's tests pass on the package; a deployed function answers from handlers stored by the new store. Handlers saved before the switch are still served. The previous deploy can be restored. | planned |
 
-## 8. Risks
+**M2 engine rules.** `createSlime()` awaits `connector.safetyCheck()` (unsafe
+credentials throw `SlimeConfigError`), `store.init()` and the dictionary, in
+that order. Concurrent requests with the same handler key share one
+generation, and its error goes to all of them. `maxGenerationsPerHour` is per
+instance and counted over a fixed hour. Over the limit, requests fail with
+`GENERATION_RATE_LIMITED` (`retryable: true`).
 
-* **The file store in production with explore mode.** Several instances
-  writing to one `.slime/` directory would overwrite each other. Locked mode
-  never writes; explore mode in production is against R8. A server with
-  several instances in explore mode must use a shared store (Postgres,
-  DynamoDB).
+**M2 tests.** Engine tests run against a scripted fake connector
+(`test/helpers.ts`: rows, cost, truncation) and a stub generator and reviewer.
+Required cases:
 
-* **The runtime runs on frozen sandbox code until M7.** `slime-cloud/runtime`
-  keeps compiling `sandbox/src` until it moves to the package. Bugs found there
-  are fixed in core, not in the sandbox, so M7 shouldn't wait too long.
-* **The worker file in a built package.** `shape-worker.mjs` is resolved
-  relative to the module. It must be copied into `dist/` and tested from the
-  packed tarball (M6), not only from the source tree.
-* **Prompt hash depends on the provider.** Today
-  `promptHashFor(config.provider)` is part of the store scope. With injected
-  generators, each generator has to report its own prompt hash and model.
-  Otherwise locked mode won't find saved handlers again (the bug fixed in
-  PR #6).
-* **PR #7 overlap.** Its Tasks 1–3 move the same code to the same path.
+* a repeat request is a cache hit, and different input values reuse the
+  handler;
+* one handler serves every combination of `null` filters;
+* a parameter's type changing after its first non-null value gives
+  `INVALID_REQUEST`;
+* more rows than `limit` is a failed run;
+* locked mode serves a stored handler and refuses to generate;
+* concurrent identical requests share one generation;
+* the hourly limit gives `GENERATION_RATE_LIMITED`.
+
+**M4 promotion rule.** A Gas handler with `gasToLiquidRuns` successful runs on
+distinct inputs inside `gasWindowMs` goes to the reviewer. Approved: saved as
+Liquid. Rejected: regenerated with the reviewer's notes, up to `maxReviews`
+times; then it stays Gas and an `error` event is emitted. With no reviewer
+configured, handlers are promoted after the runs and marked `review: 'none'`.
+`promptHash` is a hash of the generator's prompt text.
+
+**M7 checklist (with the runtime owner):**
+
+* how the runtime depends on the package (workspace, `file:` or tarball);
+* changes to `scripts/build.mjs` (the shape worker and the QuickJS WASM);
+* how each env var maps to `SlimeConfig`;
+* one Slime instance per tenant, cached across invocations;
+* `app.ts` calls mapped to the §5 API;
+* the `DynamoHandlerStore` tests replaced;
+* CI: remove the `sandbox` job and the `sandbox/src` checks; delete
+  `sandbox/`.
+
+## 8. Risks and limits
+
+* **Several processes writing one store.** Writes are last-writer-wins, so
+  run counts and promotions can be lost. Separate hosts with their own
+  `.slime/` drift apart. Explore with one process, or use a custom store
+  built for several writers.
+* **Authorization comes from `input`.** An app that passes `req.body` to
+  `query()` lets any client read any row `slime_reader` can see. The README
+  and the example app follow R11.
+* **The runtime runs on the frozen `sandbox/` prototype until M7.**
+  `slime-cloud/runtime` keeps compiling `sandbox/src` until it switches to the
+  package. Bugs found there are fixed in core, not in the sandbox, so M7 is
+  scheduled directly after M6.
+* **The worker file in a built package.** The worker is written in TS so tsc
+  emits it. It is resolved with `new URL('./shape-worker.js',
+  import.meta.url)`, and `check-pack.mjs` requires it from M2.
+* **Locked mode serves handlers made against another schema.** A handler
+  records the schema hash it was made with. If production's schema differs,
+  locked mode still serves it and warns once at startup. A query that no
+  longer fits fails with `QUERY_ERROR`. Regenerate in development after a
+  migration.
+* **PR #7 overlap.** Its Tasks 1–3 move `sandbox/` onto the same path. They
+  need to be dropped or rebased onto core before PR #7 merges.
 * **Crystal checks move from startup to CI (C10).** Crystal runs in the app
-  process without a sandbox. If an app skips `check` in CI, an edited module
-  runs unchecked. The README must say this plainly, and the example app's CI
-  runs `check`.
-* **Checking TS output.** The allowlist parses JS, so TS has to be
-  type-stripped first. Plan to use Node's built-in type stripping; confirm the
-  exact API and minimum Node version at M5.
+  process outside the shaping sandbox. If an app skips `check` in CI, an
+  edited module runs unchecked. The README must say this plainly, and the
+  example app's CI runs `check`.
+* **Token cost grows with the schema.** The whole dictionary goes into every
+  generation. v1 has no table selection.
 
 ## 9. Next decision
 
-C1–C11 and most of §4 are decided. Still to do:
+M0 and M1 are done. Still to decide:
 
-* R4, R5, R7, D5–D8 and C15 (Proposed);
-* confirm C12 (what's out of scope);
-* agree with the PR #7 author that core is built at `oss/packages/core` (§2).
-
-M0, the skeleton, doesn't depend on any of these and can start now.
+* **Before M2:** R4, R5, R7, R11, C12, C15 and C4's class shape (all
+  Proposed).
+* **Before M5:** the `CrystalRegistry` shape, the manifest format and hash,
+  the `bin` name, the `Optimizer` Port, how the CLI receives its connector,
+  store and optimizer (no env), and where `crystalMinRuns` lives.
+* **Before M7, with the runtime owner:** Slime Cloud's production mode
+  (explore, locked, or chosen per tenant), and how its custom store serves
+  the items already in `slime-handlers`.
