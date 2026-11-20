@@ -553,8 +553,6 @@
     .st-body .tag { align-self: flex-start; }
     .st-body h3 { font-size: 1.35rem; margin-top: 4px; }
     .st-body p { color: var(--text-muted); flex: 1; }
-    .st-speed { font-family: var(--font-mono); font-size: 12.5px; color: var(--text-muted); padding-top: 14px; border-top: 1px dashed var(--border-bright); }
-    .st-speed b { color: var(--text-pure); }
 
     /* ---------- Why Slime: quote-style cards ---------- */
     .quotes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
@@ -871,7 +869,6 @@
               <span class="tag gas"><span class="dot"></span>First request</span>
               <h3>Gas</h3>
               <p>The first time Slime sees a request, an agent writes its endpoint on the spot and checks it. Unused ones evaporate.</p>
-              <span class="st-speed">answers in · <b>about a second</b></span>
             </div>
           </article>
           <article class="st st-liquid reveal">
@@ -885,7 +882,6 @@
               <span class="tag liquid"><span class="dot"></span>Every repeat</span>
               <h3>Liquid</h3>
               <p>Seen it before? Slime finds the endpoint by its hash and serves it from memory, no AI involved. A second model reviews it before it's kept.</p>
-              <span class="st-speed">answers in · <b>milliseconds</b></span>
             </div>
           </article>
           <article class="st st-crystal reveal">
@@ -898,7 +894,6 @@
               <span class="tag crystal">Hot paths</span>
               <h3>Crystal</h3>
               <p>Endpoints that run hot crystallize: an agent optimizes them into ordinary code, committed to your repo.</p>
-              <span class="st-speed">lives in · <b>your repo</b></span>
             </div>
           </article>
         </div>
