@@ -20,4 +20,37 @@ jobs:
           python-version: "3.12"
       - uses: pre-commit/action@v3.0.1
 
-  # Add a lint & test job here once the project stack is chosen.
+  sandbox:
+    name: Sandbox tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: sandbox
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: slime_admin
+          POSTGRES_PASSWORD: slime_admin
+          POSTGRES_DB: slime
+        ports:
+          - 54329:5432
+        options: >-
+          --health-cmd "pg_isready -U slime_admin -d slime"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: sandbox/package-lock.json
+      # Same schema, seed data and database users as `npm run db:up` locally.
+      - run: psql "postgres://slime_admin:slime_admin@localhost:54329/slime" -v ON_ERROR_STOP=1 -f db/init.sql
+      - run: npm ci
+      - run: npm run typecheck
+      # REQUIRE_DB makes database tests fail instead of skipping if Postgres is missing.
+      - run: npm test
+        env:
+          REQUIRE_DB: "1"
