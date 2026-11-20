@@ -269,6 +269,9 @@ change through a pull request. Run it on a branch and open a PR, or enable
 auto-merge on GitHub for hands-off promotion. CI checks every committed
 Crystal: its hash, the allowlist, and that it imports.
 
+How this runs once deployed (scheduled ECS task, PR bot, deploy pipeline) is
+in [docs/crystal-deployment.md](docs/crystal-deployment.md).
+
 ## Safety
 
 The real boundary is the database user. Each layer below it is extra protection.
