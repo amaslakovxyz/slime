@@ -212,6 +212,26 @@
     .dish:hover .dish-name { color: var(--plasma-highlight); }
     .dish:hover .dish-leader { border-color: var(--plasma-primary); }
     .dish:active .dish-count { transform: scale(.9); }
+    .menu.off { opacity: .4; pointer-events: none; transition: opacity .3s ease; }
+
+    /* Burst: stains land on the "glass", above everything, until cleaned up.
+       .stain (wrapper) handles the wipe transition; its svg runs the splat
+       animation, so the two transforms don't fight. */
+    .stains { position: fixed; inset: 0; z-index: 60; pointer-events: none; overflow: hidden; }
+    .stain { position: absolute; transition: transform .55s ease, opacity .55s ease; }
+    .stain svg { display: block; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 6px 14px rgba(143,0,67,.45)); animation: splat .38s cubic-bezier(.2, 1.5, .4, 1) both; }
+    .stain .drip { transform-box: fill-box; transform-origin: top; animation: drip var(--drip-t, 6s) cubic-bezier(.3, .1, .3, 1) .3s both; }
+    .stain.wipe { opacity: 0; transform: translateY(40px) scale(.85); }
+    @keyframes splat { 0% { transform: scale(.2); opacity: 0; } 60% { opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+    @keyframes drip { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+    .cleanup {
+      position: fixed; left: 50%; bottom: 28px; z-index: 70;
+      transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
+      transition: opacity .3s ease, transform .3s ease;
+    }
+    .cleanup.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+    .cleanup { box-shadow: 0 0 0 4px var(--bg-canvas), 0 10px 34px rgba(0,0,0,.55); } /* stands out on pink stains */
+    .cleanup.show:hover { transform: translate(-50%, -2px); }
 
     @keyframes drift {
       0%, 100% { transform: translate(0, 0); }
@@ -479,7 +499,7 @@
         <div class="hero-right">
           <div class="stage" id="slime-stage">
             <div class="stage-fallback" aria-hidden="true"></div>
-            <span class="stage-hint" aria-hidden="true">poke it</span>
+            <span class="stage-hint" id="slime-hint" aria-hidden="true">poke it</span>
           </div>
           <div class="menu">
             <div class="menu-head">
@@ -732,6 +752,10 @@
     </div>
   </footer>
 
+  <!-- Burst aftermath: stains on the glass and the button that wipes them. -->
+  <div class="stains" id="stains" aria-hidden="true"></div>
+  <button class="btn btn-primary cleanup" id="cleanup" type="button">Clean up the mess</button>
+
   <script>
     (function () {
       document.documentElement.classList.add('js');
@@ -760,9 +784,19 @@
          Each click bumps that line's counter and fires 'slime:feed' with the
          counter's screen position; the 3D module launches a droplet from
          there. The menu still works when WebGL or the CDN is unavailable. */
+      var menuEl = document.querySelector('.hero .menu');
+      document.addEventListener('slime:burst', function () { menuEl.classList.add('off'); });
+      document.addEventListener('slime:reset', function () { menuEl.classList.remove('off'); });
+
       document.querySelectorAll('#menu-list .dish').forEach(function (d) {
         var counter = d.querySelector('.dish-count');
         var n = 0;
+        document.addEventListener('slime:reset', function () {
+          n = 0;
+          counter.textContent = '0';
+          counter.setAttribute('aria-label', 'fed 0 times');
+          counter.classList.remove('has');
+        });
         d.addEventListener('click', function () {
           n += 1;
           counter.textContent = n;
@@ -1002,6 +1036,14 @@
 
     const s = { grow: 1, growTarget: 1, jiggle: 0, reach: 0, reachTarget: 0, dx: 0, dy: 0, tdx: 0, tdy: 0 };
     const flights = [];   // droplet meshes flying from the menu
+    const shards = [];    // burst droplets flying at the screen
+    const BURST_AT = 10;  // feeds until it pops
+    let feeds = 0;
+    let phase = 'alive';  // alive -> critical -> burst -> (clean up) -> alive
+    let criticalAt = 0;
+    const hint = document.getElementById('slime-hint');
+    const stainsEl = document.getElementById('stains');
+    const cleanupBtn = document.getElementById('cleanup');
     const bulges = [];    // merge ripples once a droplet lands
     const dropGeo = new THREE.SphereGeometry(1, 32, 20);
 
@@ -1067,11 +1109,144 @@
           bulges.push({ t0: now, x: dir.x, y: dir.y });
           s.growTarget *= GROWTH;
           s.jiggle = 1;
+          feeds += 1;
+          if (feeds >= BURST_AT && phase === 'alive') {
+            phase = 'critical';
+            criticalAt = now;
+            hint.textContent = 'uh oh';
+          }
         }
       }
     }
 
+    // --- burst: shards fly at the camera and splat on the "glass" as stains ---
+    const SVG_NS = 'http://www.w3.org/2000/svg';
+    let stainId = 0;
+    const rand = (a, b) => a + Math.random() * (b - a);
+
+    // A closed, smoothed blob path; every few points shoots out a splat arm.
+    function splatPath(r) {
+      const n = 18, pts = [];
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2 + rand(-0.08, 0.08);
+        const arm = Math.random() < 0.28 ? rand(1.3, 1.75) : rand(0.82, 1.08);
+        pts.push([Math.cos(a) * r * arm, Math.sin(a) * r * arm]);
+      }
+      const mid = (p, q) => [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
+      let m = mid(pts[n - 1], pts[0]);
+      let d = `M${m[0].toFixed(1)},${m[1].toFixed(1)}`;
+      for (let i = 0; i < n; i++) {
+        const p = pts[i], q = mid(p, pts[(i + 1) % n]);
+        d += `Q${p[0].toFixed(1)},${p[1].toFixed(1)} ${q[0].toFixed(1)},${q[1].toFixed(1)}`;
+      }
+      return d + 'Z';
+    }
+
+    function addStain(x, y, size) {
+      const id = 'sg' + (stainId++);
+      const wrap = document.createElement('div');
+      wrap.className = 'stain';
+      wrap.style.left = (x - size / 2) + 'px';
+      wrap.style.top = (y - size / 2) + 'px';
+      wrap.style.width = wrap.style.height = size + 'px';
+      const svg = document.createElementNS(SVG_NS, 'svg');
+      svg.setAttribute('viewBox', '-100 -100 200 200');
+      let inner = `<defs><radialGradient id="${id}" cx="38%" cy="32%" r="75%">` +
+        '<stop offset="0" stop-color="#FF85C0"/><stop offset=".45" stop-color="#FF1476"/><stop offset="1" stop-color="#8F0043"/></radialGradient></defs>';
+      // Drips run straight down, so they sit outside the rotated group.
+      const drips = Math.random() < 0.75 ? Math.ceil(rand(0, 2.5)) : 0;
+      for (let i = 0; i < drips; i++) {
+        const w = rand(7, 13), dx = rand(-26, 26), len = rand(40, 110);
+        inner += `<g class="drip" style="--drip-t:${rand(4, 9).toFixed(1)}s"><rect x="${(dx - w / 2).toFixed(1)}" y="10" width="${w.toFixed(1)}" height="${len.toFixed(1)}" rx="${(w / 2).toFixed(1)}" fill="url(#${id})"/>` +
+          `<circle cx="${dx.toFixed(1)}" cy="${(10 + len).toFixed(1)}" r="${(w * 0.75).toFixed(1)}" fill="url(#${id})"/></g>`;
+      }
+      inner += `<g transform="rotate(${rand(0, 360).toFixed(0)})"><path d="${splatPath(46)}" fill="url(#${id})"/>`;
+      const dots = Math.floor(rand(3, 7));
+      for (let i = 0; i < dots; i++) {
+        const a = rand(0, Math.PI * 2), dist = rand(70, 98);
+        inner += `<circle cx="${(Math.cos(a) * dist).toFixed(1)}" cy="${(Math.sin(a) * dist).toFixed(1)}" r="${rand(2.5, 8).toFixed(1)}" fill="url(#${id})"/>`;
+      }
+      inner += '</g><ellipse cx="-16" cy="-20" rx="15" ry="7" fill="#fff" opacity=".45" transform="rotate(-28 -16 -20)"/>';
+      svg.innerHTML = inner;
+      wrap.appendChild(svg);
+      stainsEl.appendChild(wrap);
+    }
+
+    const shardGeo = new THREE.SphereGeometry(1, 20, 14);
+    function burst(now) {
+      phase = 'burst';
+      blob.visible = false;
+      bulges.length = 0;
+      const rw = radiusPx / pxPerWorld;
+      const count = small ? 16 : 24;
+      for (let i = 0; i < count; i++) {
+        // Pick where on the screen it lands first, then find the point on the
+        // "glass" plane that projects there. Flying straight at the camera with
+        // free velocities sends most shards off-screen through perspective.
+        const sx = Math.min(W - 20, Math.max(20, cx + rand(-1, 1) * W * 0.45));
+        const sy = Math.min(H - 20, Math.max(20, cy + rand(-1, 1) * H * 0.42));
+        const ray = new THREE.Vector3((sx / W) * 2 - 1, -((sy / H) * 2 - 1), 0.5).unproject(camera).sub(camera.position).normalize();
+        const glass = camera.position.clone().addScaledVector(ray, (GLASS_Z - camera.position.z) / ray.z);
+        const a = rand(0, Math.PI * 2);
+        const start = center.clone().add(new THREE.Vector3(Math.cos(a) * rw * 0.6, Math.sin(a) * rw * 0.6, 0));
+        const mesh = new THREE.Mesh(shardGeo, material);
+        mesh.position.copy(start);
+        const rPx = rand(7, 22) * Math.min(1.8, s.grow / 2.5 + 0.6);
+        mesh.scale.setScalar(rPx / pxPerWorld);
+        scene.add(mesh);
+        shards.push({ mesh, start, glass, sx, sy, rPx, age: 0, dur: rand(0.45, 1.0) });
+      }
+      // What's left of the body splats right where it was.
+      setTimeout(() => addStain(cx, cy, Math.min(Math.max(W, H) * 0.7, radiusPx * 1.3)), reduceMotion ? 0 : 120);
+      document.dispatchEvent(new CustomEvent('slime:burst'));
+      hint.textContent = '';
+      setTimeout(() => cleanupBtn.classList.add('show'), reduceMotion ? 0 : 1300);
+    }
+
+    const GLASS_Z = camera.position.z - 1.6; // a shard "hits the screen" here
+    function updateShards(now, dt) {
+      for (let i = shards.length - 1; i >= 0; i--) {
+        const sh = shards[i];
+        sh.age += reduceMotion ? 10 : dt;
+        const e = Math.pow(clamp01(sh.age / sh.dur), 1.7); // accelerates toward the glass
+        const p = sh.start.clone().lerp(sh.glass, e);
+        p.y += Math.sin(Math.PI * e) * 0.35; // a little lob
+        sh.mesh.position.copy(p);
+        if (e >= 1) {
+          scene.remove(sh.mesh);
+          shards.splice(i, 1);
+          addStain(sh.sx, sh.sy, Math.min(320, Math.max(30, sh.rPx * 5.5)));
+        }
+      }
+    }
+
+    function cleanUp() {
+      cleanupBtn.classList.remove('show');
+      const items = Array.from(stainsEl.children);
+      items.forEach((el) => {
+        const x = el.getBoundingClientRect().left / Math.max(1, W);
+        el.style.transitionDelay = (Math.max(0, x) * 0.45).toFixed(2) + 's';
+        el.classList.add('wipe');
+      });
+      setTimeout(() => {
+        stainsEl.textContent = '';
+        feeds = 0;
+        flights.forEach((f) => scene.remove(f.mesh));
+        flights.length = 0;
+        // Re-form from a speck back to the starting size.
+        s.grow = 0.05;
+        s.growTarget = 1;
+        s.jiggle = 1;
+        blob.visible = true;
+        phase = 'alive';
+        hint.textContent = 'poke it';
+        document.dispatchEvent(new CustomEvent('slime:reset'));
+      }, reduceMotion ? 0 : 1000);
+    }
+    cleanupBtn.addEventListener('click', cleanUp);
+
     document.addEventListener('slime:feed', (ev) => {
+      if (phase !== 'alive') return;
       const d = ev.detail || {};
       const start = toWorld(d.x ?? W * 0.8, d.y ?? H * 0.8);
       const mesh = new THREE.Mesh(dropGeo, material);
@@ -1114,7 +1289,7 @@
       // Skip work while the slime (whatever its size) is fully off-screen, but
       // draw one last frame on the way out so no stale image is left behind.
       const margin = radiusPx * 1.4;
-      const visible = (r.bottom + margin > 0 && r.top - margin < H) || flights.length > 0;
+      const visible = (r.bottom + margin > 0 && r.top - margin < H) || flights.length > 0 || shards.length > 0;
       if (!visible && !wasVisible) return;
       wasVisible = visible;
 
@@ -1131,8 +1306,15 @@
       s.dx += (s.tdx - s.dx) * 0.08;
       s.dy += (s.tdy - s.dy) * 0.08;
 
+      if (phase === 'critical') {
+        // Swell and shudder, then pop.
+        s.jiggle = 1;
+        s.growTarget *= 1 + 0.35 * dt;
+        if (now - criticalAt > (reduceMotion ? 0 : 0.9)) burst(now);
+      }
       updateFlights(now);
-      buildField(t, now);
+      updateShards(now, dt);
+      if (blob.visible) buildField(t, now);
       blob.rotation.y = Math.sin(t * 0.2) * 0.12;
       blob.rotation.x = Math.cos(t * 0.17) * 0.08;
       renderer.render(scene, camera);

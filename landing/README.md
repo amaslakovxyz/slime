@@ -37,8 +37,11 @@ Source: GitHub Actions**.
   and positioned over `.stage` each frame, so it can grow past the hero and
   the screen while content stays on top. Clicking a menu line fires a
   `slime:feed` event; the 3D module flies a droplet from the menu into the
-  slime and it grows ~14% per feed, uncapped. If WebGL or the CDN is
-  unavailable, a CSS blob stays in its place and the menu still works.
+  slime and it grows ~14% per feed. On the 10th feed (`BURST_AT`) it swells
+  and bursts: shards fly at the camera and leave SVG stains on a fixed overlay
+  above the page. "Clean up the mess" wipes them, resets the menu counters
+  and re-forms the slime. If WebGL or the CDN is unavailable, a CSS blob stays
+  in its place and the menu still works (no burst).
 
 - The "How it works" demo is a scripted animation, not a live call to the
   server. Its timings (about 2.8 s for a new request, 14 ms cached) are kept in
