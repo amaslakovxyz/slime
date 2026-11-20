@@ -16,15 +16,15 @@ Two lenses:
 Each objection was raised in its strongest form and either fixed, defended,
 or parked. The ledger is the deliverable.
 
-## Survived — real risks, need an owner decision
+## Survived — owner decisions (2026-11-20)
 
-| # | Objection | Evidence | Proposed fix |
+| # | Objection | Evidence | Decision |
 |---|---|---|---|
-| S1 | **Two Terraform states own the `amaslakov.com` apex.** The next ex-infra apply reverts the apex to `142.93.162.168` and takes the site down; `allow_overwrite = true` here hides the conflict instead of resolving it. | ex-infra `origin/main` `infra/terraform/aws/route53.tf:34` `aws_route53_record.com_a`; ex-infra PR #87 also targets the apex. | In ex-infra: `removed { from = aws_route53_record.com_a  lifecycle { destroy = false } }` (Terraform >= 1.7), or move the landing aliases into ex-infra. One owner per record. |
-| S2 | **One account-wide Lambda concurrency pool of 10** is shared by `slime-landing`, `seccura-dev` and the runtime in #12. A burst on any public function starves landing cache misses (visitors get the origin's 429 instead of the page). | `aws service-quotas get-service-quota --quota-code L-B99A9384` → 10; no increase requested. | Free Service Quotas request to 1000, then reserve concurrency for the landing. Optionally codify with `aws_servicequotas_service_quota`. |
-| S3 | **The static site runs on custom code.** AWS's reference pattern for a static site is S3 + CloudFront OAC. That removes the function, layer, role, log group, Function URL, both permissions and ~120 lines of JS/tests, and it cannot hit S2. | `landing/` is 160 KB of static files; the function only maps paths to bytes. | Swap the origin to a private `slime-landing-*` bucket with OAC. This conflicts with the original "on Lambda" request, so it needs a decision. |
-| S4 | **The CI trust gap is still open.** Without branch protection, any collaborator push to `main` gets the apply role (Admin minus fences). The plan role's `ReadOnlyAccess` includes data-plane reads such as `dynamodb:Scan`/`GetItem` and `sqs:ReceiveMessage` on non-slime resources, and a PR can rewrite the workflow to dump them. | `README.md` "Known trust gap"; GitHub rulesets return 403 on Free; IAM simulator on `slime-gha-plan`: `dynamodb:Scan`, `dynamodb:GetItem`, `sqs:ReceiveMessage` on a foreign resource → allowed. | GitHub Pro (protected `main`) or a separate AWS account. Short of that: deny data-plane reads outside `slime-*` on the plan role. |
-| S5 | **CloudFront spend has no fast brake.** The project budget filters by region until the `Project` tag is active, so CloudFront is not counted. Budgets lag 8-24 h, and the freeze stops deploys, not requests. | `bootstrap/main.tf` project budget; `FINOPS.md` follow-up. | Activate the tag (`project_cost_tag_active=true`) once AWS lists it. For a hard cap, evaluate CloudFront flat-rate pricing plans or a WAF rate rule (~$5+/month). Check origin compatibility first. |
+| S1 | **Two Terraform states own the `amaslakov.com` apex.** The next ex-infra apply reverts the apex to `142.93.162.168` and takes the site down; `allow_overwrite = true` here hides the conflict. | ex-infra `origin/main` `infra/terraform/aws/route53.tf:34` `aws_route53_record.com_a`; ex-infra PR #87 also targets the apex. | **Accepted risk.** The landing will move off `amaslakov.com`; until then an ex-infra apply can cause an outage. Recovery: `terraform apply` in `infra/aws/landing`. |
+| S2 | **One account-wide Lambda concurrency pool of 10** is shared by `slime-landing`, `seccura-dev` and the runtime in #12. A burst on any function starves landing cache misses (visitors get 429). | `aws service-quotas get-service-quota --quota-code L-B99A9384` → 10. | **Requested 1000** on 2026-11-20 (request `30f37cb9…`, status `CASE_OPENED`). Once it is approved, reserve concurrency for the landing. Check with `aws service-quotas list-requested-service-quota-change-history --service-code lambda`. |
+| S3 | **The static site runs on custom code**; S3 + CloudFront OAC is AWS's reference pattern and would drop the function, layer, role, log group and URL. | `landing/` is 160 KB of static files. | **Declined.** The landing stays on Lambda (already minimised by A3). |
+| S4 | **The plan role could read foreign data.** `ReadOnlyAccess` includes data-plane reads (`dynamodb:Scan`/`GetItem`, `sqs:ReceiveMessage`, ...), and a PR can rewrite the plan job; ex-infra's `terraform-locks` table lives in `eu-central-1`. | Before the fix, the IAM simulator on `slime-gha-plan` allowed `dynamodb:Scan`/`GetItem` and `sqs:ReceiveMessage` on foreign resources. | **Fixed (A7, A8).** The CI-trust part (no branch protection) remains as documented in `README.md`. |
+| S5 | **CloudFront spend has no fast brake.** The project budget counts CloudFront only after the `Project` tag is active; Budgets lag 8-24 h; the freeze stops deploys, not requests. | `bootstrap/main.tf` project budget; `FINOPS.md` follow-up. | Open. Activate the tag (`project_cost_tag_active=true`) once AWS lists it. |
 
 ## Answered — fixed in this PR (already applied, drift 0)
 
@@ -36,6 +36,8 @@ or parked. The ledger is the deliverable.
 | A4 | `ci.yml` pinned actions by mutable tags and had no `permissions:` block, so it inherited the repo default token scope. | Full-SHA pins (same major versions) and `permissions: contents: read`. |
 | A5 | `landing` repeated its tag map in both providers. | `local.tags`, same pattern as `bootstrap`. |
 | A6 | The `landing/main.tf` header still said "URL public, auth NONE". | Corrected to `AWS_IAM` + OAC. |
+| A7 | Both CI roles could read foreign data-plane content. | `foreign-reads` now denies DynamoDB item/stream reads, `sqs:ReceiveMessage`, Kinesis reads and ECR image pulls outside `slime-*`. Simulator: `Scan`/`GetItem`/`Query` on `terraform-locks` → explicitDeny; `Scan` on `slime-handlers` and `DescribeTable` (metadata) → allowed. |
+| A8 | The apply role (Admin) could forge or delete items in ex-infra's `terraform-locks`, breaking or bypassing its state locking. | New `DenyForeignTableChanges` statement. Simulator: `PutItem`/`DeleteTable` on `terraform-locks` → explicitDeny; `CreateTable`/`PutItem`/`UpdateTable` on `slime-handlers` → allowed. |
 
 ## Answered — defended, no change
 
