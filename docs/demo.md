@@ -6,12 +6,16 @@ Offline, a cache miss "generates" `examples/<intent>.handler.js` instead of call
 
 ## 0. Setup
 
+The code lives on branch `feat/shop-bench` (PR #4), not on `main`. Use its worktree. It already exists as `.worktrees/shop-bench`; otherwise create one with `git fetch && git worktree add .worktrees/demo origin/feat/shop-bench`.
+
 ```bash
-# both terminals
-cd <repo> && bun install            # once
-export REPO=$PWD
-export DEMO=/private/tmp/lee-demo   # scratch root: state/, handlers/, fixtures/, data/ land here, not in the repo
+# Terminal A — once
+cd <slime>/.worktrees/shop-bench && bun install
+export REPO=$PWD DEMO=/private/tmp/lee-demo   # scratch root: state/, handlers/, fixtures/, data/ land here, not in the repo
 rm -rf $DEMO && mkdir -p $DEMO && cp -R intents examples $DEMO/ && cd $DEMO
+
+# Terminal B — same variables, no reset
+export REPO=<slime>/.worktrees/shop-bench DEMO=/private/tmp/lee-demo && cd $DEMO
 ```
 
 **Terminal A**
