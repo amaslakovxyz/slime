@@ -6,8 +6,8 @@ import { describe, test } from 'node:test';
 import { PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { app, envNameFor, keyMatches } from '../src/lambda.js';
 import { DynamoHandlerStore, type DocClient } from '../src/store-dynamodb.js';
-import { codeHash, type StoredHandler } from '../src/store.js';
-import { artifact } from './helpers.js';
+import type { Artifact } from '@slime-kit/core/generator.js';
+import { codeHash, type StoredHandler } from '@slime-kit/core/store.js';
 
 /** Just enough DynamoDB: one table keyed by tenantId + artifactKey, pages of `pageSize`. */
 class FakeDynamo implements DocClient {
@@ -42,6 +42,8 @@ class FakeDynamo implements DocClient {
     };
   }
 }
+
+const artifact = (sql: string): Artifact => ({ unsatisfiable: null, sql, params: [], shapeJs: null, assumptions: [] });
 
 function handler(key: string, scope = { schemaHash: 's1', promptHash: 'p1', model: 'm1' }): StoredHandler {
   const a = artifact('SELECT 1 AS one');

@@ -47,9 +47,9 @@ let booting: Promise<Runtime> | null = null;
 
 function boot(): Promise<Runtime> {
   booting ??= (async () => {
-    const { config } = await import('./config.js');
-    const { PostgresConnector } = await import('./connectors/postgres.js');
-    const { Engine } = await import('./engine.js');
+    const { config } = await import('@slime-kit/core/config.js');
+    const { PostgresConnector } = await import('@slime-kit/core/connectors/postgres.js');
+    const { Engine } = await import('@slime-kit/core/engine.js');
     const { DynamoHandlerStore } = await import('./store-dynamodb.js');
     const { createApp } = await import('./app.js');
     const connector = new PostgresConnector(config.databaseUrl);

@@ -13,9 +13,9 @@ hooks:
 landing:
     python3 -m http.server 8000 --directory landing
 
-# Build the Slime runtime Lambda bundle (sandbox/dist/lambda).
+# Build the Slime Cloud runtime Lambda bundle (slime-cloud/runtime/dist/lambda).
 runtime-build:
-    cd sandbox && npm run build:lambda
+    bash infra/aws/platform/build.sh
 
 # Plan an infra/aws stack with the slime deployer role (e.g. `just tf-plan platform`).
 tf-plan stack: (runtime-build)

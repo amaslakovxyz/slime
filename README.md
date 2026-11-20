@@ -43,6 +43,10 @@ Backend -- Slime runtime:
 - [infra/aws/](./infra/aws/README.md) - Terraform: `bootstrap/` (human-applied
   roles, state bucket, budgets) and the CI-applied stacks (`platform/`: Slime
   runtime on Lambda + DynamoDB).
+- [slime-cloud/runtime/](./slime-cloud/runtime/README.md) - `@slime-cloud/runtime`:
+  the Lambda entry and DynamoDB handler store around the core. Imports
+  `sandbox/` (the future open-source `@slime-kit/core`); `sandbox/` never
+  imports it.
 
 Root files: [AGENTS.md](./AGENTS.md) (repository contract for agents),
 [justfile](./justfile) (task runner), and
@@ -65,7 +69,7 @@ Root files: [AGENTS.md](./AGENTS.md) (repository contract for agents),
   `pre-commit/action@v3.0.1` on `push` and `pull_request`.
 - Deploy: [terraform.yml](./.github/workflows/terraform.yml) applies every
   `infra/aws/` stack except `bootstrap/` on each push to `main` that touches
-  `infra/aws/`, `sandbox/` or `landing/` (AWS account `025772230981`,
+  `infra/aws/`, `sandbox/`, `slime-cloud/` or `landing/` (AWS account `025772230981`,
   `eu-central-1`).
 
 ## System Verification

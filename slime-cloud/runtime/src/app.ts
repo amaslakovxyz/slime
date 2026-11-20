@@ -1,9 +1,10 @@
-// HTTP routes, shared by the local server (index.ts) and the Lambda entry (lambda.ts).
+// HTTP routes of the hosted runtime. They mirror sandbox/src/index.ts; once
+// @slime-kit/server exists this file becomes an import of its route factory.
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
-import type { Connector } from './connectors/types.js';
-import type { Engine } from './engine.js';
-import { SlimeError } from './errors.js';
+import type { Connector } from '@slime-kit/core/connectors/types.js';
+import type { Engine } from '@slime-kit/core/engine.js';
+import { SlimeError } from '@slime-kit/core/errors.js';
 
 export function createApp(engine: Engine, connector: Connector): Hono {
   const app = new Hono();

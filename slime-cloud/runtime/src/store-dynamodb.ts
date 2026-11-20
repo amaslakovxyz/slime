@@ -8,7 +8,7 @@
 // Integrity stays with the engine, which re-checks codeHash on load.
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
-import type { Fixture, HandlerStore, StoredHandler, StoreScope } from './store.js';
+import type { Fixture, HandlerStore, StoredHandler, StoreScope } from '@slime-kit/core/store.js';
 
 /** The slice of DynamoDBDocumentClient this store uses; tests pass a fake. */
 export interface DocClient {

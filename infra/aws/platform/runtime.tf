@@ -1,6 +1,6 @@
 # Slime runtime (Gas / Liquid / Crystal engine) on Lambda, Liquid handlers in DynamoDB.
 #
-#   function   slime-runtime      <- sandbox/dist/lambda (npm run build:lambda)
+#   function   slime-runtime      <- slime-cloud/runtime/dist/lambda (build.sh)
 #   URL        public, auth NONE; the function itself requires x-api-key
 #   table      slime-handlers     <- pk tenantId, sk artifactKey
 #   settings   SSM /slime/runtime/<ENV_NAME>, read at cold start
@@ -9,12 +9,12 @@
 # Terraform: their values are secrets (DB URL, model key, API key) and would
 # otherwise land in state, which the read-only plan role can read.
 #
-# Build first: Terraform zips sandbox/dist/lambda, so plan fails without it.
+# Build first (build.sh): Terraform zips the bundle, so plan fails without it.
 
 locals {
   runtime_name   = "${var.project}-runtime"
   runtime_ssm    = "/${var.project}/runtime"
-  runtime_bundle = "${path.module}/../../../sandbox/dist/lambda"
+  runtime_bundle = "${path.module}/../../../slime-cloud/runtime/dist/lambda"
 }
 
 # --- Handler store --------------------------------------------------------------

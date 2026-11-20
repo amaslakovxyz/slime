@@ -139,24 +139,6 @@ the output shape and the input key names and types, never the values. So
 `limit: 5` and `limit: 10` share one handler, while "top 5" written into the
 intent does not.
 
-## Run on AWS Lambda
-
-`npm run build:lambda` bundles [src/lambda.ts](src/lambda.ts) into
-`dist/lambda/`, which [infra/aws/platform](../infra/aws/README.md#platform-slime-runtime)
-deploys as the `slime-runtime` function. Differences from `npm start`:
-
-* Liquid handlers are stored in DynamoDB ([src/store-dynamodb.ts](src/store-dynamodb.ts)),
-  one partition per `SLIME_TENANT_ID`, instead of `slime_meta` in Postgres.
-* Every route needs `x-api-key: $SLIME_API_KEY`. Without a configured key every
-  request gets 401.
-* Settings come from SSM parameters under `SLIME_SSM_PREFIX`, read at cold start.
-* The engine starts on the first request; if that fails (e.g. the database is
-  unreachable) the request gets `503 NOT_READY` and the next one retries.
-* Queued store writes are flushed before each response, because Lambda freezes
-  the process afterwards. A background review that has not finished by then
-  continues on the next invocation of the same instance, or is lost if the
-  instance is retired; the handler then simply stays Gas.
-
 ## Tiers
 
 * **Gas:** newly generated. It lives in memory only, in a holding area, for
