@@ -26,7 +26,8 @@ Backend -- Slime runtime:
 - [oss/packages/core/](./oss/packages/core/README.md) - `@slime-cloud/core`,
   the engine rebuilt from `sandbox/` as an installable library. Design phase:
   [PLAN.md](./oss/packages/core/PLAN.md) holds the decisions and milestones.
-  No code yet.
+  Package skeleton only (M0); part of the root npm workspaces, the only
+  workspace so far.
 - `docs/` (no contract file; documentation only)
   - [architecture-spec.md](./docs/architecture-spec.md) - Development spec for
     the Slime runtime: request path, DB API, Gatekeeper rules, and Gas / Liquid
@@ -56,8 +57,10 @@ Backend -- Slime runtime:
   imports it.
 
 Root files: [AGENTS.md](./AGENTS.md) (repository contract for agents),
-[justfile](./justfile) (task runner), and
-[.pre-commit-config.yaml](./.pre-commit-config.yaml) (hooks).
+[justfile](./justfile) (task runner),
+[.pre-commit-config.yaml](./.pre-commit-config.yaml) (hooks), and
+[package.json](./package.json) (npm workspaces for `oss/packages/*` only;
+`sandbox/` and `slime-cloud/runtime` keep their own lockfiles).
 
 ## Global Invariants
 
@@ -81,6 +84,7 @@ Root files: [AGENTS.md](./AGENTS.md) (repository contract for agents),
 
 ## System Verification
 
-- Run: `just check` (runs `pre-commit run --all-files`; there is no test
-  suite yet)
+- Run: `just check` (runs `pre-commit run --all-files`)
+- Core package: `just core` (type-check, test, build and pack-check
+  `@slime-cloud/core`)
 - Install hooks once per clone: `just hooks`

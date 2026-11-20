@@ -29,8 +29,23 @@ input values. Handlers move up through three tiers:
 * **Crystal:** rewritten by an agent into TS or JS modules in the app's own
   code, and passed to Slime through the config.
 
-> **Status:** design phase. Nothing in this folder runs yet. The API above is
-> a draft. Decisions and build steps are in [PLAN.md](PLAN.md).
+> **Status:** M0, the package skeleton, is done: it builds, tests and packs,
+> but exports nothing yet. The API above is the target. Decisions and
+> milestones are in [PLAN.md](PLAN.md).
+
+## Development
+
+Run from the repository root (npm workspaces):
+
+```bash
+npm install                              # once
+npm run typecheck -w @slime-cloud/core
+npm test -w @slime-cloud/core            # node:test, sources run through tsx
+npm run build -w @slime-cloud/core       # dist/: compiled JS + .d.ts
+npm run check:pack -w @slime-cloud/core  # what npm pack would ship
+```
+
+`just core` runs all of them, as CI's "Core tests" job does.
 
 ## Scope
 

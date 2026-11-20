@@ -58,6 +58,28 @@ jobs:
         env:
           REQUIRE_DB: "1"
 
+  core:
+    name: Core tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      # Boundary: the open-source core never imports Slime Cloud packages.
+      # (@aws-sdk is allowed: the optional DynamoDB store lives in core, PLAN.md C14.)
+      - name: Core does not import Slime Cloud
+        run: "! grep -rnE \"@slime-cloud/(runtime|server|control-plane)|slime-cloud/runtime\" oss/packages/core/src"
+      - run: npm ci
+      - run: npm run typecheck -w @slime-cloud/core
+      - run: npm test -w @slime-cloud/core
+      # What would be published: compiled dist/ with types, no sources or tests.
+      - run: npm run build -w @slime-cloud/core
+      - run: npm run check:pack -w @slime-cloud/core
+
   runtime:
     name: Slime Cloud runtime
     runs-on: ubuntu-latest

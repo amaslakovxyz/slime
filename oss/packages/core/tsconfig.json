@@ -1,0 +1,19 @@
+{
+  // Type-checks sources and tests. The build uses tsconfig.build.json.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    // TypeScript 7 no longer includes every @types package by default.
+    "types": ["node"],
+    "noEmit": true
+  },
+  "include": ["src/**/*", "test/**/*"]
+}

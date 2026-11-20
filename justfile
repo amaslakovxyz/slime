@@ -13,6 +13,14 @@ hooks:
 landing:
     python3 -m http.server 8000 --directory landing
 
+# Type-check, test, build and pack-check @slime-cloud/core, as CI does.
+core:
+    npm ci
+    npm run typecheck -w @slime-cloud/core
+    npm test -w @slime-cloud/core
+    npm run build -w @slime-cloud/core
+    npm run check:pack -w @slime-cloud/core
+
 # Build the Slime Cloud runtime Lambda bundle (slime-cloud/runtime/dist/lambda).
 runtime-build:
     bash infra/aws/platform/build.sh
