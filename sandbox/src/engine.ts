@@ -6,8 +6,9 @@ import {
   inputSignature,
   literalWarnings,
   requestFingerprint,
-  sha256,
   canonicalJSON,
+  crystalKey,
+  schemaHashOf,
 } from './fingerprint.js';
 import type { Artifact, Generator } from './generator.js';
 import { promptHashFor } from './prompts.js';
@@ -20,7 +21,9 @@ import {
   type HandlerStore,
   type StoredHandler,
 } from './store.js';
+import { loadCrystals, type LoadedCrystal } from './crystal/loader.js';
 import { runShape, warmSandbox } from './sandbox.js';
+import { assertReadOnlySql } from './sql-guard.js';
 import { assertValidShape, validateAgainstShape, type Shape } from './shape.js';
 
 // Gas: generated recently, kept in a holding area that expires after GAS_WINDOW_MS.
@@ -88,6 +91,8 @@ export interface EngineDeps {
   generator?: Generator;
   reviewer?: Reviewer | null;
   store?: HandlerStore;
+  /** Crystal folder to load (defaults to config.crystalDir). */
+  crystalDir?: string;
 }
 
 export interface Timings {
@@ -120,7 +125,6 @@ interface Execution {
   timings: Omit<Timings, 'total' | 'generate'>;
 }
 
-const WRITE_SQL = /\b(insert|update|delete|merge|drop|alter|create|grant|revoke|truncate|copy|vacuum|set_config|pg_sleep|pg_read_file|lo_import|dblink)\b/i;
 
 export class Engine {
   private handlers = new Map<string, Handler>();
@@ -134,6 +138,9 @@ export class Engine {
   // Store writes happen off the request path; tracked so tests and shutdown can await them.
   private pendingWrites = new Set<Promise<void>>();
   private loaded = { liquid: 0, refused: 0 };
+  // Crystal handlers by crystalKey(fingerprint, schemaHash): plain code from git, no sandbox.
+  private crystals = new Map<string, LoadedCrystal>();
+  private crystalReport = { loaded: 0, refused: [] as { key: string; reason: string }[], otherSchema: 0 };
 
   private constructor(
     private readonly connector: Connector,
@@ -153,7 +160,7 @@ export class Engine {
       throw new Error(`Refusing to start: the database user is not read-only.\n - ${safety.problems.join('\n - ')}`);
     }
     const schema = await connector.describe();
-    const schemaHash = sha256(canonicalJSON(schema)).slice(0, 16);
+    const schemaHash = schemaHashOf(schema);
     await warmSandbox();
 
     const store =
@@ -177,11 +184,15 @@ export class Engine {
     }
     const engine = new Engine(connector, schema, schemaHash, promptHash, generator, reviewer, store);
     await engine.loadPersisted();
+    if (config.crystal) await engine.loadCrystalFolder(deps.crystalDir ?? config.crystalDir);
     return engine;
   }
 
-  /** Waits for queued store writes (used by tests and shutdown). */
+  /** Saves batched run counts and waits for queued store writes (used by tests and shutdown). */
   async flush(): Promise<void> {
+    clearTimeout(this.runsTimer);
+    this.runsTimer = undefined;
+    this.flushRuns();
     while (this.pendingWrites.size) await Promise.all([...this.pendingWrites]);
   }
 
@@ -197,6 +208,10 @@ export class Engine {
     const fingerprint = requestFingerprint(req.intent, inputSig, req.output);
     const key = artifactKey({ fingerprint, schemaHash: this.schemaHash, promptHash: this.promptHash, model: config.model });
     const warnings = literalWarnings(req.intent);
+
+    // Crystal first: reviewed, equivalence-tested code shipped in git.
+    const crystal = this.crystals.get(crystalKey(fingerprint, this.schemaHash));
+    if (crystal) return this.serveCrystal(crystal, req, warnings, started);
 
     let handler = this.lookup(key);
     let cache: QueryMeta['cache'] = 'hit';
@@ -290,6 +305,21 @@ export class Engine {
     }));
   }
 
+  listCrystals() {
+    return [...this.crystals.values()].map((c) => ({
+      id: c.key,
+      tier: 'crystal' as const,
+      intent: c.entry.intent,
+      file: c.entry.file,
+      optimized: c.entry.optimized,
+      notes: c.entry.notes,
+      sql: c.code.sql,
+      shape: c.code.shape,
+      from: c.entry.from,
+      createdAt: c.entry.createdAt,
+    }));
+  }
+
   getHandler(id: string): Handler | undefined {
     for (const h of this.handlers.values()) if (h.id === id) return h;
     return undefined;
@@ -325,6 +355,12 @@ export class Engine {
       tables: this.schema.tables.map((t) => t.name),
       handlers: byTier,
       store: { kind: this.store.kind, loadedOnStart: this.loaded.liquid, refusedOnStart: this.loaded.refused },
+      crystal: {
+        enabled: config.crystal,
+        loaded: this.crystalReport.loaded,
+        refused: this.crystalReport.refused,
+        otherSchema: this.crystalReport.otherSchema,
+      },
       generationsLastHour: this.recentGenerations(),
     };
   }
@@ -351,13 +387,33 @@ export class Engine {
     handler.runs++;
     const added = this.recordFixture(handler, input, output);
     this.promoteIfReady(handler);
-    // Liquid rows are kept up to date when a new distinct run is recorded, and
-    // occasionally otherwise, rather than on every request.
-    if (handler.tier === 'liquid' && handler.persisted && (added || handler.runs % 50 === 0)) {
-      this.track(
-        this.store.updateRuns(handler.id, handler.fixtures, handler.runs, new Date(handler.lastUsedAt).toISOString()),
-      );
+    if (handler.tier === 'liquid' && handler.persisted) {
+      // The saved run count decides when Crystal is built, so it must not lag far
+      // behind. A newly recorded run is saved at once; plain count changes are
+      // batched every few seconds and on shutdown, not written per request.
+      if (added) this.saveRuns(handler);
+      else this.markRunsDirty(handler);
     }
+  }
+
+  private dirtyRuns = new Set<Handler>();
+  private runsTimer: NodeJS.Timeout | undefined;
+
+  private markRunsDirty(handler: Handler) {
+    this.dirtyRuns.add(handler);
+    this.runsTimer ??= setTimeout(() => {
+      this.runsTimer = undefined;
+      this.flushRuns();
+    }, 5_000).unref();
+  }
+
+  private flushRuns() {
+    for (const h of this.dirtyRuns) this.saveRuns(h);
+  }
+
+  private saveRuns(handler: Handler) {
+    this.dirtyRuns.delete(handler);
+    this.track(this.store.updateRuns(handler.id, handler.fixtures, handler.runs, new Date(handler.lastUsedAt).toISOString()));
   }
 
   private recordFixture(handler: Handler, input: Record<string, unknown>, output: unknown): boolean {
@@ -410,6 +466,57 @@ export class Engine {
       .catch((err) => console.error(`[slime] store write failed: ${(err as Error).message}`))
       .finally(() => this.pendingWrites.delete(tracked));
     this.pendingWrites.add(tracked);
+  }
+
+  /** Loads the Crystal folder. Bad entries are refused and reported, never fatal. */
+  private async loadCrystalFolder(dir: string) {
+    const { loaded, refused, ignored } = await loadCrystals(dir, this.schemaHash);
+    for (const c of loaded) this.crystals.set(c.key, c);
+    this.crystalReport = { loaded: loaded.length, refused, otherSchema: ignored };
+    for (const r of refused) console.error(`[slime] refusing Crystal ${r.key}: ${r.reason}`);
+  }
+
+  /** Crystal: the SQL still runs as the read-only user; the shaping is a plain function call. */
+  private async serveCrystal(
+    crystal: LoadedCrystal,
+    req: QueryRequest,
+    warnings: string[],
+    started: number,
+  ): Promise<{ data: unknown; meta: QueryMeta }> {
+    const run = await this.connector.run(crystal.code.sql, crystal.code.params.map((name) => req.input[name] ?? null));
+    let data: unknown = run.rows;
+    let shapeMs = 0;
+    if (crystal.shape) {
+      const t = performance.now();
+      try {
+        data = crystal.shape(run.rows, req.input);
+      } catch (err) {
+        throw new SlimeError('SANDBOX_ERROR', `Crystal shape function threw: ${(err as Error).message}`);
+      }
+      shapeMs = performance.now() - t;
+    }
+    const mismatches = validateAgainstShape(req.output, data);
+    if (mismatches.length) {
+      throw new SlimeError('SHAPE_MISMATCH', `Result does not match the requested output: ${mismatches.join('; ')}`, false, {
+        mismatches,
+      });
+    }
+    return {
+      data,
+      meta: {
+        handlerId: crystal.key,
+        tier: 'crystal',
+        cache: 'hit',
+        timingsMs: round({ generate: 0, check: 0, execute: run.ms, shape: shapeMs, total: performance.now() - started }),
+        rowCount: run.rows.length,
+        truncated: run.truncated,
+        sql: crystal.code.sql,
+        shapeJs: crystal.code.shape,
+        assumptions: [],
+        warnings,
+        review: { status: 'approved', revision: crystal.entry.from.revision },
+      },
+    };
   }
 
   /** Loads saved Liquid handlers for the current schema, prompt and model. */
@@ -697,11 +804,7 @@ function parseRequest(raw: unknown): QueryRequest {
 
 /** Static checks on generated code before it touches the database. */
 export function lintArtifact(artifact: Artifact, input: Record<string, unknown>) {
-  if (WRITE_SQL.test(artifact.sql)) {
-    throw new SlimeError('WRITE_REFUSED', 'Generated SQL contains a write or a forbidden function; refused.', false, {
-      enforcedBy: 'lint',
-    });
-  }
+  assertReadOnlySql(artifact.sql);
   const used = new Set([...artifact.sql.matchAll(/\$(\d+)/g)].map((m) => Number(m[1])));
   const highest = Math.max(0, ...used);
   if (highest > artifact.params.length) {

@@ -1,4 +1,7 @@
 // Loads sandbox/.env if present (Node 22 built-in), then reads typed settings.
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 try {
   process.loadEnvFile(new URL('../.env', import.meta.url));
 } catch {
@@ -70,6 +73,16 @@ export const config = {
   // Successful runs recorded per handler (distinct inputs). They are stored with
   // Liquid handlers and are what Crystal's equivalence test replays.
   fixturesPerHandler: num('FIXTURES_PER_HANDLER', 5),
+
+  // Crystal: handlers an agent rewrote into plain modules in a folder in git
+  // (`npm run crystallize`). Core loads them at startup and runs them without
+  // the sandbox worker. SLIME_CRYSTAL=off is the kill switch.
+  crystal: process.env.SLIME_CRYSTAL !== 'off',
+  crystalDir: process.env.SLIME_CRYSTAL_DIR
+    ? resolve(process.env.SLIME_CRYSTAL_DIR)
+    : fileURLToPath(new URL('../crystal', import.meta.url)),
+  // A Liquid handler needs this many successful runs before it is crystallized.
+  crystalMinRuns: num('CRYSTAL_MIN_RUNS', 10),
 
   // Generation limits.
   maxRepairs: num('MAX_REPAIRS', 1),

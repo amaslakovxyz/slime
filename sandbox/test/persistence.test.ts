@@ -9,6 +9,7 @@ import { Engine } from '../src/engine.js';
 import { PostgresHandlerStore } from '../src/store.js';
 import {
   DB_URL,
+  NO_CRYSTAL_DIR,
   META_URL,
   StubGenerator,
   TOP_ACCOUNTS,
@@ -88,7 +89,7 @@ describe('Liquid persistence', { skip: !hasDb }, () => {
       await promoteOnce();
       await withConfig({ mode: 'locked' }, async () => {
         const connector = new PostgresConnector(DB_URL);
-        const engine = await Engine.create(connector, { store: new PostgresHandlerStore(META_URL, TABLE) });
+        const engine = await Engine.create(connector, { store: new PostgresHandlerStore(META_URL, TABLE), crystalDir: NO_CRYSTAL_DIR });
         try {
           assert.equal((await ask(engine)).meta.tier, 'liquid');
         } finally {
@@ -122,6 +123,17 @@ describe('Liquid persistence', { skip: !hasDb }, () => {
         assert.equal(engine.stats().store.loadedOnStart, 0);
       });
       assert.equal(config.model, 'offline');
+    });
+  });
+
+  test('the saved run count keeps up after the recorded-run cap is reached', async () => {
+    await withConfig({ gasToLiquidHits: 3, fixturesPerHandler: 3 }, async () => {
+      const id = await promoteOnce();
+      const engine = await makeEngine({ store: new PostgresHandlerStore(META_URL, TABLE) });
+      for (const limit of [5, 5, 10, 3]) await ask(engine, limit); // repeats: no new recorded runs
+      await engine.flush();
+      const rows = await meta<{ runs: string }>(`SELECT runs FROM slime_meta.${TABLE} WHERE artifact_key = $1`, [id]);
+      assert.equal(Number(rows[0].runs), 7, 'three runs before the restart, four after');
     });
   });
 
