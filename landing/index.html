@@ -1,0 +1,907 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Slime — the living backend</title>
+  <meta name="description" content="Vibecode the UI. Let Slime be the backend. Slime turns what your UI or agent asks for into safe, self-optimizing backend logic — without writing a single route.">
+  <meta property="og:title" content="Slime — the living backend">
+  <meta property="og:description" content="Vibecode the UI. Let Slime be the backend.">
+  <meta property="og:type" content="website">
+  <meta name="theme-color" content="#0B070C">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3CradialGradient id='g' cx='35%25' cy='30%25' r='75%25'%3E%3Cstop offset='0' stop-color='%23FF85C0'/%3E%3Cstop offset='.5' stop-color='%23FF1476'/%3E%3Cstop offset='1' stop-color='%238F0043'/%3E%3C/radialGradient%3E%3C/defs%3E%3Cpath fill='url(%23g)' d='M32 6c14 0 26 9 26 24 0 10-5 14-5 20 0 5-4 8-9 8-4 0-5-3-8-3s-4 3-9 3c-6 0-9-4-9-9 0-6-6-9-6-19C12 15 18 6 32 6z'/%3E%3C/svg%3E">
+
+  <!-- Brand fonts (docs/brand/slime_master_brand_book_agent_design_system.md §3). -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Oi&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Titan+One&display=swap" rel="stylesheet">
+
+  <style>
+    /* Tokens from the brand book (§2). Slime is dark-only by brand rule (§7.3). */
+    :root {
+      --bg-canvas: #0B070C;
+      --bg-surface: #161019;
+      --bg-surface-hover: #211825;
+      --border-color: #2D1F33;
+      --border-bright: #442D4D;
+
+      --plasma-primary: #FF1476;
+      --plasma-shadow: #8F0043;
+      --plasma-highlight: #FF85C0;
+      --glow-primary: rgba(255, 20, 118, 0.35);
+
+      --gas-accent: #38F8B8;
+      --gas-bg: rgba(56, 248, 184, 0.1);
+      --gas-border: rgba(56, 248, 184, 0.35);
+
+      --crystal-accent: #F2EAFF;
+      --crystal-glow: #C4B5FD;
+      --crystal-bg: rgba(196, 181, 253, 0.12);
+      --crystal-border: rgba(196, 181, 253, 0.35);
+
+      --wireframe-grey: #6E5C77;
+      --text-pure: #F8F6FC;
+      --text-muted: #A396AC;
+
+      --font-mark: "Oi", Georgia, serif;
+      --font-title: "Titan One", "Plus Jakarta Sans", system-ui, sans-serif;
+      --font-body: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+      --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+      --radius-lg: 24px;
+      --radius-md: 16px;
+      --radius-sm: 12px;
+      --gutter: 24px;
+      color-scheme: dark;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg-canvas);
+      color: var(--text-pure);
+      font-family: var(--font-body);
+      font-size: 17px;
+      line-height: 1.6;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; }
+    img, svg { display: block; }
+    ::selection { background: var(--plasma-primary); color: var(--text-pure); }
+    :focus-visible { outline: 2px solid var(--plasma-highlight); outline-offset: 3px; border-radius: 6px; }
+
+    .container { width: 100%; max-width: 1160px; margin: 0 auto; padding: 0 var(--gutter); }
+    section { position: relative; padding: 120px 0; }
+    .section-head { max-width: 720px; margin-bottom: 56px; }
+    .section-head.center { margin-left: auto; margin-right: auto; text-align: center; }
+
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 10px;
+      font-family: var(--font-mono); font-size: 12.5px; font-weight: 500;
+      letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--plasma-highlight); margin: 0 0 18px;
+    }
+    .eyebrow::before { content: ""; width: 22px; height: 1px; background: currentColor; opacity: .7; }
+    .section-head.center .eyebrow::after { content: ""; width: 22px; height: 1px; background: currentColor; opacity: .7; }
+
+    h1, h2, h3 { font-family: var(--font-title); font-weight: 400; margin: 0; letter-spacing: 0.005em; line-height: 1.08; }
+    h2 { font-size: clamp(2.1rem, 4.4vw, 3.4rem); }
+    h3 { font-size: 1.45rem; line-height: 1.2; }
+    p { margin: 0; }
+    .lead { color: var(--text-muted); font-size: 1.15rem; margin-top: 18px; }
+
+    .slime-text {
+      background: linear-gradient(120deg, var(--plasma-highlight) 0%, var(--plasma-primary) 48%, var(--plasma-shadow) 100%);
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent; color: var(--plasma-primary);
+    }
+    .wordmark { font-family: var(--font-mark); font-weight: 400; letter-spacing: 0.01em; line-height: 1; }
+
+    /* Buttons (brand book §5) */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+      font-family: var(--font-body); font-weight: 700; font-size: 16px;
+      padding: 15px 26px; border-radius: 999px; border: 1px solid transparent;
+      text-decoration: none; cursor: pointer; white-space: nowrap;
+      transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease, background .2s ease;
+    }
+    .btn-primary {
+      color: var(--text-pure);
+      background: linear-gradient(135deg, var(--plasma-primary), var(--plasma-shadow));
+      box-shadow: 0 4px 20px var(--glow-primary), inset 0 1px 0 rgba(255,133,192,.45);
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 34px rgba(255,20,118,.5), inset 0 1px 0 rgba(255,133,192,.55); }
+    .btn-ghost { color: #fff; background: var(--bg-canvas); border-color: var(--border-bright); }
+    .btn-ghost:hover { border-color: var(--plasma-primary); }
+    .btn:disabled { opacity: .55; cursor: progress; transform: none; }
+
+    /* Badges / state tags (mono, brand book §3.4) */
+    .tag {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-family: var(--font-mono); font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+      padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border-bright); color: var(--text-muted);
+      background: var(--bg-canvas); white-space: nowrap;
+    }
+    .tag .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+    .tag.gas { color: var(--gas-accent); background: var(--gas-bg); border: 1px dashed var(--gas-border); }
+    .tag.liquid { color: #fff; background: rgba(255,20,118,.16); border-color: var(--plasma-primary); box-shadow: 0 0 22px var(--glow-primary); }
+    .tag.liquid .dot { background: var(--plasma-primary); }
+    .tag.crystal { color: var(--crystal-accent); background: var(--crystal-bg); border-color: var(--crystal-border); border-radius: 6px; }
+
+    /* ---------- Nav ---------- */
+    .nav {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(11, 7, 12, .72);
+      backdrop-filter: blur(14px) saturate(140%); -webkit-backdrop-filter: blur(14px) saturate(140%);
+      border-bottom: 1px solid transparent; transition: border-color .3s ease;
+    }
+    .nav.scrolled { border-bottom-color: var(--border-color); }
+    .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 70px; gap: 24px; }
+    .nav .wordmark { font-size: 30px; text-decoration: none; }
+    .nav-links { display: flex; gap: 30px; list-style: none; margin: 0; padding: 0; }
+    .nav-links a { text-decoration: none; color: var(--text-muted); font-weight: 500; font-size: 15px; transition: color .2s; }
+    .nav-links a:hover { color: var(--text-pure); }
+    .nav .btn { padding: 10px 18px; font-size: 14px; }
+
+    /* ---------- Hero ---------- */
+    .hero { padding: 72px 0 120px; overflow: hidden; }
+    .hero-grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 48px; align-items: center; }
+    .hero h1 { font-size: clamp(2.7rem, 6.2vw, 5rem); line-height: 1.02; }
+    .hero h1 .line2 { display: block; margin-top: 6px; }
+    .hero .lead { max-width: 540px; font-size: 1.2rem; margin-top: 26px; }
+    .hero-ctas { display: flex; gap: 14px; margin-top: 38px; flex-wrap: wrap; }
+    .hero-meta { display: flex; gap: 10px; margin-top: 44px; flex-wrap: wrap; }
+
+    .hero-visual { position: relative; height: 520px; }
+    .hero-visual::before { /* soft plasma halo behind the goo */
+      content: ""; position: absolute; inset: 8% 4%;
+      background: radial-gradient(closest-side, rgba(255,20,118,.32), rgba(143,0,67,.12) 55%, transparent 100%);
+      filter: blur(30px);
+    }
+    .goo { position: absolute; inset: 0; filter: url(#goo); }
+    .blob {
+      position: absolute; border-radius: 42% 58% 70% 30% / 45% 45% 55% 55%;
+      background: radial-gradient(circle at 32% 28%, var(--plasma-highlight) 0%, var(--plasma-primary) 42%, var(--plasma-shadow) 100%);
+      animation: drift 14s ease-in-out infinite, morph 9s ease-in-out infinite;
+    }
+    .b1 { width: 300px; height: 300px; left: 22%; top: 20%; }
+    .b2 { width: 170px; height: 170px; left: 54%; top: 12%; animation-duration: 11s, 7s; animation-delay: -3s, -2s; }
+    .b3 { width: 150px; height: 150px; left: 14%; top: 56%; animation-duration: 16s, 10s; animation-delay: -6s, -1s; }
+    .b4 { width: 120px; height: 120px; left: 62%; top: 58%; animation-duration: 12s, 8s; animation-delay: -8s, -4s; }
+    .b5 { width: 70px;  height: 70px;  left: 78%; top: 36%; animation-duration: 10s, 6s; animation-delay: -2s, -3s; }
+    .gloss { /* specular highlight on the main body */
+      position: absolute; left: 31%; top: 27%; width: 120px; height: 60px; border-radius: 50%;
+      background: radial-gradient(closest-side, rgba(255,255,255,.55), rgba(255,133,192,0));
+      transform: rotate(-24deg); filter: blur(2px); pointer-events: none;
+      animation: drift 14s ease-in-out infinite;
+    }
+    .vapor {
+      position: absolute; border-radius: 50%; border: 1.5px dashed var(--gas-border);
+      background: radial-gradient(circle at 35% 30%, rgba(56,248,184,.35), rgba(56,248,184,.04) 70%);
+      animation: rise 7s ease-in-out infinite;
+    }
+    .v1 { width: 46px; height: 46px; left: 12%; top: 18%; }
+    .v2 { width: 26px; height: 26px; left: 84%; top: 18%; animation-delay: -2.5s; }
+    .v3 { width: 34px; height: 34px; left: 86%; top: 74%; animation-delay: -4.5s; }
+
+    .float-chip {
+      position: absolute; z-index: 2;
+      display: flex; flex-direction: column; gap: 6px;
+      padding: 14px 16px; border-radius: var(--radius-md);
+      background: rgba(22,16,25,.82); border: 1px solid var(--border-color);
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      box-shadow: 0 18px 40px rgba(0,0,0,.45);
+      font-family: var(--font-mono); font-size: 12.5px; color: var(--text-muted);
+      animation: bob 6s ease-in-out infinite;
+    }
+    .float-chip strong { color: var(--text-pure); font-weight: 500; }
+    .float-chip.c1 { left: 0; top: 6%; }
+    .float-chip.c2 { right: 0; bottom: 8%; animation-delay: -3s; }
+    .float-chip .ms { font-size: 22px; font-weight: 700; color: var(--text-pure); letter-spacing: -.01em; }
+
+    @keyframes drift {
+      0%, 100% { transform: translate(0, 0); }
+      33% { transform: translate(18px, -22px); }
+      66% { transform: translate(-16px, 14px); }
+    }
+    @keyframes morph {
+      0%, 100% { border-radius: 42% 58% 70% 30% / 45% 45% 55% 55%; }
+      50% { border-radius: 58% 42% 34% 66% / 56% 38% 62% 44%; }
+    }
+    @keyframes rise {
+      0%, 100% { transform: translateY(0) scale(1); opacity: .9; }
+      50% { transform: translateY(-26px) scale(1.12); opacity: .45; }
+    }
+    @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+
+    /* ---------- Use cases (the problem) ---------- */
+    .problem { background: linear-gradient(180deg, transparent, rgba(22,16,25,.55) 30%, transparent); }
+    .cases { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+    .case {
+      position: relative; display: flex; flex-direction: column; gap: 18px;
+      padding: 32px; border-radius: var(--radius-lg);
+      background: var(--bg-surface); border: 1px solid var(--border-color);
+      transition: border-color .25s ease, transform .25s ease, background .25s ease;
+    }
+    .case:hover { border-color: var(--border-bright); background: var(--bg-surface-hover); transform: translateY(-3px); }
+    .case-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .case .num { font-family: var(--font-mono); font-size: 12.5px; color: var(--wireframe-grey); letter-spacing: .1em; }
+    .case h3 { font-size: 1.35rem; }
+    .case .pain { color: var(--text-muted); font-size: 1.05rem; flex: 1; }
+    .case .answer {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding-top: 18px; border-top: 1px dashed var(--border-bright);
+      color: var(--plasma-highlight); font-weight: 600;
+    }
+    .case .answer::before { content: "→"; font-family: var(--font-mono); color: var(--plasma-primary); }
+    .cage { /* the "petrified" static stack, drawn as a wireframe */
+      font-family: var(--font-mono); font-size: 11.5px; color: var(--wireframe-grey);
+      border: 1px dashed var(--wireframe-grey); border-radius: 8px; padding: 2px 8px; opacity: .85;
+    }
+
+    /* ---------- Demo ---------- */
+    .demo-panel {
+      border-radius: var(--radius-lg); background: var(--bg-surface);
+      border: 1px solid var(--border-color); overflow: hidden;
+      box-shadow: 0 30px 80px rgba(0,0,0,.4);
+      transition: border-color .4s ease, box-shadow .4s ease;
+    }
+    .demo-panel[data-state="gas"] { border-color: var(--gas-border); }
+    .demo-panel[data-state="liquid"] { border-color: var(--plasma-primary); box-shadow: 0 8px 30px var(--glow-primary), 0 30px 80px rgba(0,0,0,.4); }
+    .demo-bar {
+      display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+      padding: 16px 22px; border-bottom: 1px solid var(--border-color); background: rgba(11,7,12,.55);
+    }
+    .endpoint { font-family: var(--font-mono); font-size: 14px; color: var(--text-muted); }
+    .endpoint b { color: var(--gas-accent); font-weight: 700; margin-right: 8px; }
+    .demo-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); }
+    .demo-col { padding: 24px 22px 26px; min-width: 0; }
+    .demo-col + .demo-col { border-left: 1px solid var(--border-color); }
+    .label {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      font-family: var(--font-mono); font-size: 11.5px; letter-spacing: .12em; text-transform: uppercase;
+      color: var(--wireframe-grey); margin-bottom: 12px;
+    }
+    pre.code {
+      margin: 0; padding: 16px 18px; border-radius: var(--radius-sm);
+      background: var(--bg-canvas); border: 1px solid var(--border-color);
+      font-family: var(--font-mono); font-size: 13px; line-height: 1.65; color: var(--text-pure);
+      overflow-x: auto; white-space: pre; tab-size: 2;
+    }
+    .k { color: var(--plasma-highlight); }       /* JSON keys */
+    .s { color: var(--gas-accent); }             /* strings */
+    .n { color: var(--crystal-glow); }           /* numbers */
+    .p { color: var(--wireframe-grey); }         /* punctuation */
+    .kw { color: var(--plasma-primary); font-weight: 700; } /* SQL keywords */
+    .prm { color: var(--crystal-glow); }         /* $1 params */
+
+    .send-row { display: flex; gap: 12px; align-items: center; margin-top: 18px; flex-wrap: wrap; }
+    .send-hint { font-size: 14px; color: var(--text-muted); }
+    .checks {
+      list-style: none; margin: 26px 0 0; padding: 20px 0 0; border-top: 1px dashed var(--border-bright);
+      display: grid; gap: 12px; font-family: var(--font-mono); font-size: 13px; color: var(--wireframe-grey);
+    }
+    .checks li { display: flex; gap: 12px; align-items: center; transition: color .3s ease; }
+    .checks li::before {
+      content: ""; flex: none; width: 18px; height: 18px; border-radius: 50%;
+      border: 1px dashed var(--wireframe-grey); display: grid; place-items: center; font-size: 11px; line-height: 1;
+    }
+    .checks li.ok { color: var(--text-pure); }
+    .checks li.ok::before { content: "✓"; border: 1px solid var(--gas-border); background: var(--gas-bg); color: var(--gas-accent); }
+    .demo-panel[data-state="liquid"] .checks li.ok::before { border-color: var(--plasma-primary); background: rgba(255,20,118,.14); color: var(--plasma-highlight); }
+
+    .sql-box { min-height: 220px; position: relative; }
+    .sql-box .placeholder { color: var(--wireframe-grey); }
+    .caret { display: inline-block; width: 8px; height: 1.1em; vertical-align: -2px; background: var(--gas-accent); animation: blink 1s steps(1) infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    .timer-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 20px 0 12px; flex-wrap: wrap; }
+    .timer { font-family: var(--font-mono); font-size: 34px; font-weight: 700; letter-spacing: -.02em; line-height: 1; }
+    .timer small { font-size: 15px; color: var(--text-muted); font-weight: 500; margin-left: 4px; }
+    .meta-line { font-family: var(--font-mono); font-size: 12.5px; color: var(--text-muted); }
+    .response { min-height: 130px; transition: opacity .35s ease; }
+    .response.flash { animation: flash .6s ease; }
+    @keyframes flash { 0% { box-shadow: 0 0 0 0 rgba(255,20,118,.6); } 100% { box-shadow: 0 0 0 14px rgba(255,20,118,0); } }
+
+    .steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin-top: 28px; }
+    .step { display: flex; gap: 14px; align-items: flex-start; }
+    .step .i {
+      flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+      font-family: var(--font-mono); font-size: 13px; font-weight: 700;
+      border: 1px solid var(--border-bright); color: var(--plasma-highlight);
+    }
+    .step b { display: block; font-weight: 700; margin-bottom: 2px; }
+    .step span { color: var(--text-muted); font-size: 15px; }
+
+    /* ---------- Matter states ---------- */
+    .states { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; position: relative; }
+    .state {
+      position: relative; padding: 32px 28px; border-radius: var(--radius-lg);
+      background: var(--bg-surface); display: flex; flex-direction: column; gap: 16px;
+    }
+    .state .speed { font-family: var(--font-mono); font-size: 13px; color: var(--text-muted); }
+    .state .speed b { font-size: 24px; color: var(--text-pure); display: block; margin-top: 2px; letter-spacing: -.01em; }
+    .state p { color: var(--text-muted); }
+    .state-gas { border: 1.5px dashed var(--gas-border); }
+    .state-gas h3 { color: var(--gas-accent); }
+    .state-liquid { border: 1.5px solid var(--plasma-primary); box-shadow: 0 8px 30px var(--glow-primary); background: linear-gradient(180deg, rgba(255,20,118,.08), var(--bg-surface) 60%); }
+    .state-liquid h3 { color: #fff; }
+    .state-crystal { border: 1px solid var(--crystal-border); border-radius: 10px; background: linear-gradient(160deg, rgba(196,181,253,.08), var(--bg-surface) 55%); }
+    .state-crystal h3 { color: var(--crystal-accent); }
+    .state-visual { height: 74px; position: relative; }
+    .sv-gas span { position: absolute; border-radius: 50%; border: 1.5px dashed var(--gas-border); background: var(--gas-bg); animation: rise 6s ease-in-out infinite; }
+    .sv-gas span:nth-child(1) { width: 34px; height: 34px; left: 0; top: 30px; }
+    .sv-gas span:nth-child(2) { width: 22px; height: 22px; left: 46px; top: 10px; animation-delay: -2s; }
+    .sv-gas span:nth-child(3) { width: 14px; height: 14px; left: 80px; top: 40px; animation-delay: -4s; }
+    .sv-liquid span {
+      position: absolute; left: 0; top: 4px; width: 112px; height: 64px;
+      border-radius: 42% 58% 70% 30% / 45% 45% 55% 55%;
+      background: radial-gradient(circle at 30% 28%, var(--plasma-highlight), var(--plasma-primary) 45%, var(--plasma-shadow));
+      box-shadow: 0 8px 26px var(--glow-primary); animation: morph 7s ease-in-out infinite;
+    }
+    .sv-crystal svg { height: 70px; width: auto; filter: drop-shadow(0 0 14px rgba(196,181,253,.45)); }
+    .state-arrow {
+      position: absolute; top: 50%; width: 22px; height: 22px; margin-top: -11px; z-index: 2;
+      color: var(--border-bright); display: grid; place-items: center;
+    }
+    .state-arrow.a1 { left: calc(33.333% - 11px); }
+    .state-arrow.a2 { left: calc(66.666% - 11px); }
+
+    /* ---------- Trust ---------- */
+    .trust-grid { display: grid; grid-template-columns: .95fr 1.05fr; gap: 64px; align-items: center; }
+    .trust h2 .slime-text { display: inline; }
+    .pillars { display: grid; gap: 16px; }
+    .pillar {
+      display: flex; gap: 18px; align-items: flex-start;
+      padding: 22px 24px; border-radius: var(--radius-md);
+      background: var(--bg-surface); border: 1px solid var(--border-color);
+    }
+    .pillar .ico {
+      flex: none; width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center;
+      background: rgba(255,20,118,.1); border: 1px solid rgba(255,20,118,.35); color: var(--plasma-highlight);
+    }
+    .pillar b { display: block; font-size: 1.05rem; margin-bottom: 2px; }
+    .pillar span { color: var(--text-muted); font-size: 15.5px; }
+    .ladder { display: flex; gap: 8px; margin-top: 30px; flex-wrap: wrap; }
+
+    /* ---------- Why Slime ---------- */
+    .why { text-align: center; }
+    .why .statement { font-size: clamp(1.25rem, 2.3vw, 1.6rem); line-height: 1.5; color: var(--text-muted); max-width: 860px; margin: 26px auto 0; }
+    .why .statement em { font-style: normal; color: var(--text-pure); }
+    .audiences { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin-top: 60px; text-align: left; }
+    .aud { padding: 30px 28px; border-radius: var(--radius-lg); background: var(--bg-surface); border: 1px solid var(--border-color); }
+    .aud .tag { margin-bottom: 18px; }
+    .aud h3 { margin-bottom: 10px; }
+    .aud p { color: var(--text-muted); }
+    .punch { font-size: clamp(2.4rem, 6vw, 4.6rem); margin-top: 90px; }
+
+    /* ---------- Footer ---------- */
+    footer { border-top: 1px solid var(--border-color); padding: 56px 0 40px; }
+    .foot { display: flex; justify-content: space-between; align-items: flex-end; gap: 32px; flex-wrap: wrap; }
+    .foot .wordmark { font-size: 44px; }
+    .foot .tagline { color: var(--text-muted); margin-top: 10px; }
+    .builders-label { font-family: var(--font-mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--wireframe-grey); margin-bottom: 12px; }
+    .builders { display: flex; gap: 12px; flex-wrap: wrap; }
+    .builder {
+      display: inline-flex; align-items: center; gap: 10px; text-decoration: none;
+      padding: 10px 16px 10px 12px; border-radius: 999px;
+      border: 1px solid var(--border-bright); background: var(--bg-canvas);
+      font-weight: 600; font-size: 15px; transition: border-color .2s ease, transform .2s ease;
+    }
+    .builder:hover { border-color: var(--plasma-primary); transform: translateY(-2px); }
+    .builder svg { color: var(--plasma-highlight); }
+    .copyright { margin-top: 44px; font-size: 13.5px; color: var(--wireframe-grey); font-family: var(--font-mono); }
+
+    /* ---------- Reveal on scroll (only when JS runs) ---------- */
+    .js .reveal { opacity: 0; transform: translateY(22px); transition: opacity .7s ease, transform .7s ease; }
+    .js .reveal.in { opacity: 1; transform: none; }
+
+    /* ---------- Responsive ---------- */
+    @media (max-width: 960px) {
+      section { padding: 96px 0; }
+      .hero-grid, .trust-grid { grid-template-columns: 1fr; gap: 40px; }
+      .hero-visual { height: 400px; order: -1; margin: -10px 0 -20px; }
+      .demo-body { grid-template-columns: 1fr; }
+      .demo-col + .demo-col { border-left: 0; border-top: 1px solid var(--border-color); }
+      .states, .audiences { grid-template-columns: 1fr; }
+      .state-arrow { display: none; }
+      .steps { grid-template-columns: 1fr; gap: 16px; }
+      .nav-links { display: none; }
+    }
+    @media (max-width: 720px) {
+      :root { --gutter: 16px; }
+      body { font-size: 16px; }
+      section { padding: 76px 0; }
+      .section-head { margin-bottom: 40px; }
+      .hero { padding: 24px 0 76px; }
+      .hero-visual { height: 320px; }
+      .b1 { width: 200px; height: 200px; }
+      .b2 { width: 110px; height: 110px; }
+      .b3 { width: 100px; height: 100px; }
+      .b4 { width: 80px; height: 80px; }
+      .b5 { width: 46px; height: 46px; }
+      .gloss { width: 80px; height: 40px; }
+      .float-chip { font-size: 11.5px; padding: 10px 12px; }
+      .float-chip .ms { font-size: 18px; }
+      .cases { grid-template-columns: 1fr; }
+      .case { padding: 26px 22px; }
+      .cage { display: none; }
+      .demo-col { padding: 20px 16px 22px; }
+      pre.code { font-size: 12px; padding: 14px; }
+      .timer { font-size: 28px; }
+      .punch { margin-top: 64px; }
+      .foot .wordmark { font-size: 36px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+      .js .reveal { opacity: 1; transform: none; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Goo filter: blurs the blobs together, then sharpens the alpha so they merge like gel. -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <filter id="goo" color-interpolation-filters="sRGB">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="16" result="blur"/>
+        <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -9" result="goo"/>
+        <feComposite in="SourceGraphic" in2="goo" operator="atop"/>
+      </filter>
+    </defs>
+  </svg>
+
+  <header class="nav" id="nav">
+    <div class="container nav-inner">
+      <a href="#top" class="wordmark slime-text" aria-label="Slime home">slime</a>
+      <ul class="nav-links">
+        <li><a href="#use-cases">Use cases</a></li>
+        <li><a href="#how">How it works</a></li>
+        <li><a href="#states">Matter states</a></li>
+        <li><a href="#trust">Trust</a></li>
+      </ul>
+      <a href="#how" class="btn btn-primary">See it work</a>
+    </div>
+  </header>
+
+  <main id="top">
+    <!-- ================= HERO ================= -->
+    <section class="hero">
+      <div class="container hero-grid">
+        <div>
+          <p class="eyebrow">The living backend</p>
+          <h1>Vibecode the UI.<span class="line2 slime-text">Let Slime be the backend.</span></h1>
+          <p class="lead">Your UI or AI agent says what data it needs. Slime writes the logic, runs it safely against your database, and remembers it. No routes. No tickets. No glue code.</p>
+          <div class="hero-ctas">
+            <a href="#how" class="btn btn-primary">See it work</a>
+            <a href="#use-cases" class="btn btn-ghost">Use cases</a>
+          </div>
+          <div class="hero-meta" aria-label="Matter states">
+            <span class="tag gas"><span class="dot"></span>Gas</span>
+            <span class="tag liquid"><span class="dot"></span>Liquid</span>
+            <span class="tag crystal">Crystal</span>
+          </div>
+        </div>
+
+        <div class="hero-visual" aria-hidden="true">
+          <div class="goo">
+            <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+            <div class="blob b4"></div><div class="blob b5"></div>
+          </div>
+          <div class="gloss"></div>
+          <span class="vapor v1"></span><span class="vapor v2"></span><span class="vapor v3"></span>
+          <div class="float-chip c1">
+            <span class="tag gas" style="align-self:flex-start"><span class="dot"></span>Gas · synthesizing</span>
+            <span><strong>intent:</strong> "top accounts by revenue"</span>
+          </div>
+          <div class="float-chip c2">
+            <span class="tag liquid" style="align-self:flex-start"><span class="dot"></span>Liquid · cache hit</span>
+            <span class="ms">14 ms</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= THE PROBLEM, THROUGH USE CASES ================= -->
+    <section class="problem" id="use-cases">
+      <div class="container">
+        <div class="section-head reveal">
+          <p class="eyebrow">The problem</p>
+          <h2>Everything moves at AI speed.<br><span class="slime-text">Backends are petrified clay.</span></h2>
+          <p class="lead">Frontends get generated in minutes. Agents reason on the fly. Then every one of them waits in line for someone to hand-write the backend it needs.</p>
+        </div>
+
+        <div class="cases">
+          <article class="case reveal">
+            <div class="case-top"><span class="num">01 · VIBECODED UIs</span><span class="cage">REST + DTO + deploy</span></div>
+            <h3>The UI took ten minutes. Its backend takes two weeks.</h3>
+            <p class="pain">Lovable, v0 and Cursor ship a screen before lunch. Wiring it to real data still means routes, models and a deploy for every widget.</p>
+            <p class="answer">Vibecode the UI. Let Slime be the backend.</p>
+          </article>
+
+          <article class="case reveal">
+            <div class="case-top"><span class="num">02 · AI AGENTS</span><span class="cage">raw SQL / 1 endpoint per action</span></div>
+            <h3>Too dangerous to trust, too narrow to be useful.</h3>
+            <p class="pain">Give an agent raw database access and you risk everything. Hand-code an endpoint for every action and it can barely move.</p>
+            <p class="answer">Unleash your agents. Keep your database untouchable.</p>
+          </article>
+
+          <article class="case reveal">
+            <div class="case-top"><span class="num">03 · LEGACY SYSTEMS</span><span class="cage">SOAP · BFF · glue</span></div>
+            <h3>Every new client needs another layer of glue.</h3>
+            <p class="pain">Old services and tangled schemas mean each new app or AI tool gets its own fragile middleware, and nobody wants to touch it.</p>
+            <p class="answer">Don't rewrite legacy. Let Slime digest it.</p>
+          </article>
+
+          <article class="case reveal">
+            <div class="case-top"><span class="num">04 · SAAS CUSTOMIZATION</span><span class="cage">fork per customer</span></div>
+            <h3>Every custom report becomes a code fork.</h3>
+            <p class="pain">Enterprise customers want their own views, fields and webhooks. Each one adds a branch to maintain and eats into margins.</p>
+            <p class="answer">One runtime. Every customer's view.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= HOW IT WORKS (scripted demo) ================= -->
+    <section id="how">
+      <div class="container">
+        <div class="section-head reveal">
+          <p class="eyebrow">How it works</p>
+          <h2>Ask once. <span class="slime-text">Slime remembers.</span></h2>
+          <p class="lead">Describe the data and the shape you want back. The first request is synthesized on the spot. Every repeat skips the AI entirely.</p>
+        </div>
+
+        <div class="demo-panel reveal" id="demo" data-state="idle">
+          <div class="demo-bar">
+            <span class="endpoint"><b>POST</b>/v0/query</span>
+            <span class="tag" id="demo-status" role="status" aria-live="polite"><span class="dot"></span>Ready</span>
+          </div>
+          <div class="demo-body">
+            <div class="demo-col">
+              <div class="label"><span>Request · from your UI</span></div>
+<pre class="code" aria-label="Example request"><span class="p">{</span>
+  <span class="k">"intent"</span><span class="p">:</span> <span class="s">"top N accounts by total paid
+             invoices, highest first"</span><span class="p">,</span>
+  <span class="k">"input"</span><span class="p">:</span>  <span class="p">{</span> <span class="k">"limit"</span><span class="p">:</span> <span class="n">3</span> <span class="p">},</span>
+  <span class="k">"output"</span><span class="p">:</span> <span class="p">[{</span>
+    <span class="k">"name"</span><span class="p">:</span> <span class="s">"string"</span><span class="p">,</span>
+    <span class="k">"totalPaidCents"</span><span class="p">:</span> <span class="s">"integer"</span>
+  <span class="p">}]</span>
+<span class="p">}</span></pre>
+              <div class="send-row">
+                <button class="btn btn-primary" id="demo-btn" type="button">Send request</button>
+                <span class="send-hint" id="demo-hint">No backend route exists for this yet.</span>
+              </div>
+              <ul class="checks" id="demo-checks" aria-label="Safety checks">
+                <li>Read-only access</li>
+                <li>Logic runs in a sandbox</li>
+                <li>Result matches your shape</li>
+              </ul>
+            </div>
+
+            <div class="demo-col">
+              <div class="label"><span id="sql-label">Handler · not generated yet</span></div>
+              <pre class="code sql-box" id="demo-sql" aria-label="Generated SQL"><span class="placeholder">-- Slime will synthesize a safe, read-only
+-- query here on the first request.</span></pre>
+
+              <div class="timer-row">
+                <span class="timer" id="demo-timer">0<small>ms</small></span>
+                <span class="meta-line" id="demo-meta">waiting for a request</span>
+              </div>
+              <pre class="code response" id="demo-res" aria-label="Response"><span class="p">// response appears here</span></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="steps reveal">
+          <div class="step"><span class="i">1</span><div><b>Describe</b><span>The UI sends intent, inputs and the JSON shape it wants.</span></div></div>
+          <div class="step"><span class="i">2</span><div><b>Synthesize</b><span>Slime writes the logic, runs it safely and checks the shape.</span></div></div>
+          <div class="step"><span class="i">3</span><div><b>Remember</b><span>Next time it answers straight from memory, in milliseconds.</span></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= MATTER STATES ================= -->
+    <section id="states" class="problem">
+      <div class="container">
+        <div class="section-head center reveal">
+          <p class="eyebrow">Matter states</p>
+          <h2>From <span style="color:var(--gas-accent)">Gas</span> to <span class="slime-text">Liquid</span> to <span style="color:var(--crystal-accent)">Crystal</span>.</h2>
+          <p class="lead">Your backend grows from what your product actually asks for, not from what someone guessed up front.</p>
+        </div>
+
+        <div class="states">
+          <article class="state state-gas reveal">
+            <div class="state-visual sv-gas" aria-hidden="true"><span></span><span></span><span></span></div>
+            <span class="tag gas" style="align-self:flex-start"><span class="dot"></span>Tier 0 · Gas</span>
+            <h3>Born on demand</h3>
+            <p>A new request is synthesized on the spot and kept on probation. Unused logic simply evaporates.</p>
+            <div class="speed">first request<b>seconds</b></div>
+          </article>
+
+          <article class="state state-liquid reveal">
+            <div class="state-visual sv-liquid" aria-hidden="true"><span></span></div>
+            <span class="tag liquid" style="align-self:flex-start"><span class="dot"></span>Tier 1 · Liquid</span>
+            <h3>Hardened by use</h3>
+            <p>Requests that keep coming back are verified by a second model and become a permanent, fast part of your backend.</p>
+            <div class="speed">every repeat<b>milliseconds</b></div>
+          </article>
+
+          <article class="state state-crystal reveal">
+            <div class="state-visual sv-crystal" aria-hidden="true">
+              <svg viewBox="0 0 120 70" fill="none" stroke="#C4B5FD" stroke-width="1.5" stroke-linejoin="round">
+                <path d="M20 26 L40 6 L80 6 L100 26 L60 66 Z" fill="rgba(196,181,253,.10)"/>
+                <path d="M20 26 H100 M40 6 L52 26 L60 66 L68 26 L80 6 M52 26 L60 6 L68 26" stroke="#F2EAFF" stroke-opacity=".7"/>
+              </svg>
+            </div>
+            <span class="tag crystal" style="align-self:flex-start">Tier 2 · Crystal</span>
+            <h3>Pinned and polished</h3>
+            <p>The hottest paths get reviewed, pinned and optimized into code that ships with your app.</p>
+            <div class="speed">status<b>coming next</b></div>
+          </article>
+
+          <span class="state-arrow a1" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+          <span class="state-arrow a2" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= TRUST ================= -->
+    <section id="trust" class="trust">
+      <div class="container trust-grid">
+        <div class="reveal">
+          <p class="eyebrow">Trust built in</p>
+          <h2>You control the permissions. <span class="slime-text">Not the AI.</span></h2>
+          <p class="lead">Slime starts read-only. Writes and other actions come next, each behind stricter checks that you set.</p>
+          <div class="ladder" aria-label="Permission roadmap">
+            <span class="tag gas"><span class="dot"></span>Read · on</span>
+            <span class="tag">Write · gated</span>
+            <span class="tag">Actions · gated</span>
+          </div>
+        </div>
+
+        <div class="pillars">
+          <div class="pillar reveal">
+            <span class="ico" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span>
+            <div><b>Permissions live in your database</b><span>Slime can only do what you grant it. AI output never decides access.</span></div>
+          </div>
+          <div class="pillar reveal">
+            <span class="ico" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/></svg></span>
+            <div><b>Every step gets checked</b><span>Read-only today. Each new kind of action arrives with more checks before it can run.</span></div>
+          </div>
+          <div class="pillar reveal">
+            <span class="ico" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M9.9 5.1A10 10 0 0 1 12 5c6 0 9.5 7 9.5 7a17 17 0 0 1-3 3.9M6.6 6.6C3.9 8.4 2.5 12 2.5 12S6 19 12 19a9.6 9.6 0 0 0 4.4-1"/></svg></span>
+            <div><b>Sandboxed and blind to your data</b><span>Generated code runs isolated, and the AI never sees your rows.</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= WHY SLIME ================= -->
+    <section class="why" id="why">
+      <div class="container">
+        <div class="reveal">
+          <p class="eyebrow">Why Slime</p>
+          <h2>A new category: <span class="slime-text">the living backend.</span></h2>
+          <p class="statement">Static APIs were built for software that changed slowly. Slime is built for software that doesn't: it turns what <em>frontends and agents ask for</em> directly into <em>safe, self-optimizing execution</em>, without writing a single route.</p>
+        </div>
+
+        <div class="audiences">
+          <article class="aud reveal">
+            <span class="tag gas"><span class="dot"></span>Builders</span>
+            <h3>Ship at the speed you design</h3>
+            <p>New data features go live as fast as the UI that needs them.</p>
+          </article>
+          <article class="aud reveal">
+            <span class="tag liquid"><span class="dot"></span>Engineering teams</span>
+            <h3>End the backend-for-frontend grind</h3>
+            <p>No more ticket queues for one more field in one more endpoint.</p>
+          </article>
+          <article class="aud reveal">
+            <span class="tag crystal">Businesses</span>
+            <h3>Move at the speed of AI, safely</h3>
+            <p>Products that adapt to every customer and agent, with you in control.</p>
+          </article>
+        </div>
+
+        <p class="wordmark punch reveal"><span class="slime-text">Stop writing endpoints.</span></p>
+      </div>
+    </section>
+  </main>
+
+  <!-- ================= FOOTER ================= -->
+  <footer>
+    <div class="container">
+      <div class="foot">
+        <div>
+          <p class="wordmark slime-text">Feed the Slime.</p>
+          <p class="tagline">Swallows legacy APIs. Powers vibecoded UIs.</p>
+        </div>
+        <div>
+          <p class="builders-label">Built by</p>
+          <div class="builders">
+            <a class="builder" href="https://www.linkedin.com/in/kanstantsin-yaromenka/" target="_blank" rel="noopener noreferrer">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.04-1.85-3.04-1.86 0-2.14 1.45-2.14 2.95v5.66H9.36V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 20.45H3.56V9h3.56v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.73V1.73C24 .77 23.2 0 22.22 0z"/></svg>
+              Kanstantsin Yaromenka
+            </a>
+            <a class="builder" href="https://www.linkedin.com/in/amaslakov/" target="_blank" rel="noopener noreferrer">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.04-1.85-3.04-1.86 0-2.14 1.45-2.14 2.95v5.66H9.36V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 20.45H3.56V9h3.56v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.73V1.73C24 .77 23.2 0 22.22 0z"/></svg>
+              A. Maslakov
+            </a>
+          </div>
+        </div>
+      </div>
+      <p class="copyright">© 2026 Slime · Built at a hackathon</p>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      document.documentElement.classList.add('js');
+      var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      /* Nav border once the page scrolls */
+      var nav = document.getElementById('nav');
+      function onScroll() { nav.classList.toggle('scrolled', window.scrollY > 8); }
+      window.addEventListener('scroll', onScroll, { passive: true });
+      onScroll();
+
+      /* Reveal sections as they enter the viewport */
+      var reveals = document.querySelectorAll('.reveal');
+      if ('IntersectionObserver' in window && !reduceMotion) {
+        var io = new IntersectionObserver(function (entries) {
+          entries.forEach(function (e) {
+            if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+          });
+        }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
+        reveals.forEach(function (el) { io.observe(el); });
+      } else {
+        reveals.forEach(function (el) { el.classList.add('in'); });
+      }
+
+      /* ---------- Scripted demo ----------
+         This is an illustration, not a live call. Timings are in the range the
+         sandbox prototype shows: seconds for a new (Gas) request, tens of ms for
+         a cached (Liquid) one. Keep them realistic so the live demo matches. */
+      var GAS_MS = 2840;
+      var LIQUID_MS = 14;
+      var SQL = [
+        'SELECT a.name,',
+        '       SUM(i.amount_cents)::int AS total_paid_cents',
+        'FROM accounts a',
+        'JOIN invoices i ON i.account_id = a.id',
+        "WHERE i.status = 'paid'",
+        'GROUP BY a.id, a.name',
+        'ORDER BY total_paid_cents DESC',
+        'LIMIT $1;'
+      ].join('\n');
+      var DATA = [
+        { name: 'Plumtree Studio', totalPaidCents: 1284500 },
+        { name: 'Kelp & Co', totalPaidCents: 973200 },
+        { name: 'Orbital Pantry', totalPaidCents: 811950 }
+      ];
+
+      var panel = document.getElementById('demo');
+      var btn = document.getElementById('demo-btn');
+      var hint = document.getElementById('demo-hint');
+      var statusEl = document.getElementById('demo-status');
+      var sqlEl = document.getElementById('demo-sql');
+      var sqlLabel = document.getElementById('sql-label');
+      var timerEl = document.getElementById('demo-timer');
+      var metaEl = document.getElementById('demo-meta');
+      var resEl = document.getElementById('demo-res');
+      var checks = document.querySelectorAll('#demo-checks li');
+      var state = 'idle';
+      function tickChecks(spanMs) {
+        checks.forEach(function (li, i) {
+          if (reduceMotion) { li.classList.add('ok'); return; }
+          setTimeout(function () { li.classList.add('ok'); }, spanMs * (0.35 + 0.28 * i));
+        });
+      }
+
+      function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+      function hlSql(s) {
+        return esc(s)
+          .replace(/\$\d+/g, '<span class="prm">$&</span>')
+          .replace(/'[^']*'/g, '<span class="s">$&</span>')
+          .replace(/\b(SELECT|SUM|AS|FROM|JOIN|ON|WHERE|GROUP BY|ORDER BY|DESC|LIMIT|int)\b/g, '<span class="kw">$1</span>');
+      }
+      function hlJson(obj) {
+        return esc(JSON.stringify(obj, null, 2))
+          .replace(/"([^"]+)":/g, '<span class="k">"$1"</span><span class="p">:</span>')
+          .replace(/: "([^"]*)"/g, ': <span class="s">"$1"</span>')
+          .replace(/: (\d+)/g, ': <span class="n">$1</span>');
+      }
+      function fmt(n) { return Math.round(n).toLocaleString('en-US'); }
+      function setTimer(ms) { timerEl.innerHTML = fmt(ms) + '<small>ms</small>'; }
+      function setStatus(cls, text) {
+        statusEl.className = 'tag' + (cls ? ' ' + cls : '');
+        statusEl.innerHTML = '<span class="dot"></span>' + text;
+      }
+      function countTo(target, duration, done) {
+        if (reduceMotion || duration <= 0) { setTimer(target); done(); return; }
+        var start = performance.now();
+        (function tick(now) {
+          var t = Math.min(1, (now - start) / duration);
+          setTimer(target * t);
+          if (t < 1) requestAnimationFrame(tick); else done();
+        })(start);
+      }
+      function typeSql(duration, done) {
+        if (reduceMotion) { sqlEl.innerHTML = hlSql(SQL); done(); return; }
+        var start = performance.now();
+        (function tick(now) {
+          var t = Math.min(1, (now - start) / duration);
+          var n = Math.floor(SQL.length * t);
+          sqlEl.innerHTML = hlSql(SQL.slice(0, n)) + (t < 1 ? '<span class="caret"></span>' : '');
+          if (t < 1) requestAnimationFrame(tick); else done();
+        })(start);
+      }
+      function showResponse(meta) {
+        resEl.innerHTML = '<span class="p">// data · ' + meta + '</span>\n' + hlJson(DATA);
+        resEl.classList.remove('flash'); void resEl.offsetWidth; resEl.classList.add('flash');
+      }
+
+      function runGas() {
+        state = 'busy'; btn.disabled = true;
+        panel.dataset.state = 'gas';
+        setStatus('gas', 'Gas · synthesizing');
+        sqlLabel.textContent = 'Handler · writing now';
+        hint.textContent = 'First time Slime sees this. Writing the logic…';
+        metaEl.textContent = 'cache: miss';
+        resEl.innerHTML = '<span class="p">// checking the result matches your shape…</span>';
+        var left = 2;
+        function finished() {
+          if (--left) return;
+          setStatus('gas', 'Gas · generated');
+          sqlLabel.textContent = 'Handler · read-only, saved';
+          metaEl.textContent = 'cache: miss · tier: gas · ' + fmt(GAS_MS) + ' ms';
+          showResponse('shape verified');
+          hint.textContent = 'Now send the exact same request again.';
+          btn.textContent = 'Send it again';
+          btn.disabled = false; state = 'gas';
+        }
+        tickChecks(GAS_MS);
+        typeSql(GAS_MS * 0.75, finished);
+        countTo(GAS_MS, GAS_MS, finished);
+      }
+
+      function runLiquid() {
+        state = 'busy'; btn.disabled = true;
+        panel.dataset.state = 'liquid';
+        setStatus('liquid', 'Liquid · cache hit');
+        sqlLabel.textContent = 'Handler · from memory, no AI call';
+        countTo(LIQUID_MS, 160, function () {
+          metaEl.textContent = 'cache: hit · tier: liquid · ' + LIQUID_MS + ' ms · no AI call';
+          showResponse('served from memory');
+          hint.textContent = 'Same answer, about 200× faster. No model involved.';
+          btn.textContent = 'Replay';
+          btn.disabled = false; state = 'liquid';
+        });
+      }
+
+      function reset() {
+        state = 'idle'; panel.dataset.state = 'idle';
+        setStatus('', 'Ready');
+        sqlLabel.textContent = 'Handler · not generated yet';
+        sqlEl.innerHTML = '<span class="placeholder">-- Slime will synthesize a safe, read-only\n-- query here on the first request.</span>';
+        setTimer(0);
+        metaEl.textContent = 'waiting for a request';
+        resEl.innerHTML = '<span class="p">// response appears here</span>';
+        hint.textContent = 'No backend route exists for this yet.';
+        btn.textContent = 'Send request';
+        checks.forEach(function (li) { li.classList.remove('ok'); });
+      }
+
+      btn.addEventListener('click', function () {
+        if (state === 'idle') runGas();
+        else if (state === 'gas') runLiquid();
+        else if (state === 'liquid') reset();
+      });
+    })();
+  </script>
+</body>
+</html>
