@@ -10,8 +10,8 @@ bun test
 
 # JIT serve (needs ANTHROPIC_API_KEY for cache misses)
 bun run lee serve
-# offline: every cache miss "generates" the reference handler
-bun run lee serve --handler-file examples/book_ticket.handler.js
+# offline: every cache miss "generates" examples/<intent>.handler.js (book_ticket, place_order, list_products, restock)
+bun run lee serve --handler-dir examples
 
 # manual build path: generate (or read a file), dry-run the spec's try inputs, show effects; caches nothing
 bun run lee build book_ticket [--handler-file examples/book_ticket.handler.js]

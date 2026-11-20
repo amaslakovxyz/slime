@@ -1,3 +1,5 @@
+import { existsSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { anthropicGenerate, dryRun, generateWithRepair } from "./build-path";
 import { openAppDb } from "./db";
 import { createFetchHandler, devSession } from "./dispatcher";
@@ -8,7 +10,7 @@ import { FileSlotStore } from "./slot-store";
 import { makeIntentLoader } from "./spec";
 import { GAS_TTL_MS, PROMOTE_HITS, type Generate, type RequestDeps, type Runner } from "./types";
 
-const USAGE = "usage: lee serve [--handler-file <path>] | lee build <intent> [--handler-file <path>]";
+const USAGE = "usage: lee serve [--handler-file <path> | --handler-dir <dir>] | lee build <intent> [--handler-file <path> | --handler-dir <dir>]";
 
 function die(msg: string): never { console.error(msg); process.exit(1); }
 
@@ -22,13 +24,21 @@ async function pickRunner(): Promise<{ runner: Runner; name: string }> {
   }
 }
 
-// --handler-file switches generation to offline mode: every "generation" returns the file's bytes.
-async function pickGenerate(flags: string[]): Promise<Generate> {
-  if (flags.length === 0) return anthropicGenerate;
-  if (flags.length !== 2 || flags[0] !== "--handler-file") die(USAGE);
-  const path = flags[1];
-  if (!(await Bun.file(path).exists())) die(`handler file not found: ${path}`);
-  return async () => Bun.file(path).text();
+// Offline modes replace the agent: --handler-file returns one file's bytes for every intent;
+// --handler-dir returns <dir>/<intent>.handler.js (a missing file fails that request with 500).
+async function pickGenerator(flags: string[]): Promise<(intent: string) => Generate> {
+  if (flags.length === 0) return () => anthropicGenerate;
+  if (flags.length !== 2) die(USAGE);
+  const [flag, path] = flags;
+  if (flag === "--handler-file") {
+    if (!(await Bun.file(path).exists())) die(`handler file not found: ${path}`);
+    return () => async () => Bun.file(path).text();
+  }
+  if (flag === "--handler-dir") {
+    if (!existsSync(path) || !statSync(path).isDirectory()) die(`handler dir not found: ${path}`);
+    return intent => async () => Bun.file(join(path, `${intent}.handler.js`)).text();
+  }
+  die(USAGE);
 }
 
 function positiveInt(name: string, fallback: number): number {
@@ -39,7 +49,7 @@ function positiveInt(name: string, fallback: number): number {
 }
 
 async function serve(flags: string[]) {
-  const generate = await pickGenerate(flags);
+  const generatorFor = await pickGenerator(flags);
   const ttlMs = positiveInt("LEE_GAS_TTL_MS", GAS_TTL_MS);
   const promoteHits = positiveInt("LEE_PROMOTE_HITS", PROMOTE_HITS);
   const { runner, name } = await pickRunner();
@@ -49,14 +59,14 @@ async function serve(flags: string[]) {
     store: new FileSlotStore(process.cwd(), { now: Date.now, ttlMs, promoteHits }),
     harness,
     db: openAppDb(process.env.LEE_DB ?? "data/lee.sqlite"),
-    generateHandler: spec => generateWithRepair(generate, spec, harness),
+    generateHandler: spec => generateWithRepair(generatorFor(spec.name), spec, harness),
   };
   const server = Bun.serve({ port: Number(process.env.PORT ?? 3000), fetch: createFetchHandler(deps, devSession) });
   console.log(`lee serve on http://localhost:${server.port}  runner: ${name}  gasTtlMs: ${ttlMs}  promoteHits: ${promoteHits}`);
 }
 
 async function build(intent: string, flags: string[]) {
-  const generate = await pickGenerate(flags);
+  const generate = (await pickGenerator(flags))(intent);
   const loaded = await makeIntentLoader("intents")(intent);
   if (!loaded) die(`unknown intent '${intent}' (no intents/${intent}.md)`);
   const { spec } = loaded;

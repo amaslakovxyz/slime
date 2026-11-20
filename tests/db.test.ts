@@ -9,6 +9,8 @@ describe("seed db", () => {
     expect(SCHEMA.events).toEqual(["id", "tenant_id", "capacity", "price_cents"]);
     expect(SCHEMA.tickets).toEqual(["id", "tenant_id", "event_id", "user_id", "qty", "promo_code", "total_cents"]);
     expect(SCHEMA.promos).toEqual(["code", "tenant_id", "pct", "max_uses"]);
+    expect(SCHEMA.products).toEqual(["id", "tenant_id", "sku", "name", "price_cents", "stock"]);
+    expect(SCHEMA.orders).toEqual(["id", "tenant_id", "user_id", "product_id", "qty", "promo_code", "total_cents"]);
     expect(PK.promos).toBe("code");
   });
   test("seed rows exist for tenant 1", () => {

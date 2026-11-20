@@ -11,6 +11,13 @@ describe("lee build --handler-file", () => {
     expect(stdout).toContain('"table": "tickets"');
     expect(stdout).toContain("rolled back"); // build path never commits
   });
+  test("--handler-dir picks <dir>/<intent>.handler.js", async () => {
+    const proc = lee("build", "place_order", "--handler-dir", "examples");
+    const stdout = await new Response(proc.stdout).text();
+    expect(await proc.exited).toBe(0);
+    expect(stdout).toContain('"table": "orders"');
+    expect(stdout).toContain("BUILD PASS");
+  });
   test("unknown intent exits 1", async () => {
     const proc = lee("build", "nope");
     expect(await new Response(proc.stderr).text()).toContain("unknown intent 'nope' (no intents/nope.md)");

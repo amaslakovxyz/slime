@@ -6,20 +6,32 @@ export const SCHEMA: Record<string, string[]> = {
   events: ["id", "tenant_id", "capacity", "price_cents"],
   tickets: ["id", "tenant_id", "event_id", "user_id", "qty", "promo_code", "total_cents"],
   promos: ["code", "tenant_id", "pct", "max_uses"],
+  products: ["id", "tenant_id", "sku", "name", "price_cents", "stock"],
+  orders: ["id", "tenant_id", "user_id", "product_id", "qty", "promo_code", "total_cents"],
 };
-export const PK: Record<string, string> = { events: "id", tickets: "id", promos: "code" };
+export const PK: Record<string, string> = { events: "id", tickets: "id", promos: "code", products: "id", orders: "id" };
 
 export const DDL = `
 CREATE TABLE events  (id INTEGER PRIMARY KEY, tenant_id INTEGER NOT NULL, capacity INTEGER NOT NULL, price_cents INTEGER NOT NULL);
 CREATE TABLE tickets (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, event_id INTEGER NOT NULL, user_id INTEGER NOT NULL, qty INTEGER NOT NULL, promo_code TEXT, total_cents INTEGER NOT NULL);
 CREATE TABLE promos  (code TEXT PRIMARY KEY, tenant_id INTEGER NOT NULL, pct INTEGER NOT NULL, max_uses INTEGER NOT NULL);
+CREATE TABLE products (id INTEGER PRIMARY KEY, tenant_id INTEGER NOT NULL, sku TEXT NOT NULL, name TEXT NOT NULL, price_cents INTEGER NOT NULL, stock INTEGER NOT NULL);
+CREATE TABLE orders  (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, user_id INTEGER NOT NULL, product_id INTEGER NOT NULL, qty INTEGER NOT NULL, promo_code TEXT, total_cents INTEGER NOT NULL);
 `;
 
 const SEED = `
 INSERT INTO events VALUES (7, 1, 100, 5000), (8, 1, 2, 10000);
 INSERT INTO promos VALUES ('FALL10', 1, 10, 100), ('BIG90', 1, 90, 100);
+INSERT INTO products VALUES
+  (1, 1, 'TEE-BLK-M', 'T-shirt black M', 2000, 100),
+  (2, 1, 'MUG-WHT', 'Mug white', 1200, 50),
+  (3, 1, 'CAP-RED', 'Cap red', 1500, 2),
+  (4, 1, 'HOOD-GRY-L', 'Hoodie grey L', 6000, 0),
+  (5, 1, 'STICK-PACK', 'Sticker pack', 300, 1000),
+  (101, 2, 'TEE-T2', 'Tenant 2 shirt', 9900, 10);
 `;
 
+// Shop seed: product 3 has stock 2 (out-of-stock path), 4 is sold out, 101 belongs to tenant 2 (isolation).
 export function createSeedDb(): Database {
   const db = new Database(":memory:");
   db.exec(DDL);
