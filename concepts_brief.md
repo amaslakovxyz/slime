@@ -268,9 +268,12 @@ SQL."*
      If the optimized version fails, the unchanged code is tried instead.
   4. **Passing modules** go into `crystal/`, pinned in `manifest.json`, and
      are committed on a branch.
-  5. **In production:** a nightly ECS task runs this job and opens a pull
-     request. CI and auto-merge merge it, and the next deploy ships the new
-     image. Servers load `crystal/` at startup.
+  5. **In production:** a scheduled run on `{RUNTIME_FOR_SLIME_CLOUD}` (not
+     chosen yet) runs this job. It reads Liquid handlers from
+     `{CODE_STORAGE}` (Postgres today, a key-value store as the Slime Cloud
+     target) and opens a pull request. CI and auto-merge merge it, and the
+     next deploy ships a new Server build. Servers load `crystal/` at
+     startup.
 
      The full plan, including what is still to build, is in
      [sandbox/docs/crystal-deployment.md](sandbox/docs/crystal-deployment.md).
@@ -295,13 +298,17 @@ SQL."*
   by the repo rule PR #1 added: no direct pushes to `main`. Crystal now lands
   through an automated pull request. Auto-merge keeps it hands-off, and
   branch protection can require a person if wanted.
-* **Crystal stored in the database and hot-loaded:** rejected. It would skip
-  the deploy wait, but lose review, history, `git revert`, and the guarantee
-  that the deployed image holds exactly the code that runs.
-* **A Lambda for the crystallize job:** rejected. The job needs `git`, a full
-  checkout, Node and the tests, plus access to RDS, GitHub and the model API.
-  An ECS task reuses the service image and its subnets, with no NAT gateway
-  and no time limit.
+* **Crystal stored in `{CODE_STORAGE}` and hot-loaded:** rejected for now. It
+  would skip the deploy wait, but lose review, history, `git revert`, and the
+  guarantee that the deployed build holds exactly the code that runs. It's
+  still an option for per-tenant Crystal in Slime Cloud.
+* **Naming a specific runtime for the crystallize job:** deferred to the choice
+  of `{RUNTIME_FOR_SLIME_CLOUD}`. Whatever runs it needs:
+  * the Server's own build, plus `git` and the tests;
+  * access to `{CODE_STORAGE}`, the customer database, the model API and
+    GitHub;
+  * a scheduler and a secret store;
+  * no short time limit.
 * **isolated-vm, Node `vm`, or an external sandbox service:** rejected.
   isolated-vm needs a native build, Node `vm` is not a security boundary, and
   an external service adds 100–300 ms per call. QuickJS in a worker thread is
@@ -326,7 +333,10 @@ SQL."*
 * **Stack:**
   * Node 22 + TypeScript, Hono for HTTP, `pg`, QuickJS in a worker thread.
   * Postgres 16 in docker compose locally.
-  * AWS (ECS Fargate + RDS) for the demo, not yet built.
+  * Production runtime: `{RUNTIME_FOR_SLIME_CLOUD}`, not chosen yet. PR #7
+    designs Slime Cloud as one Server per tenant.
+  * Liquid handler storage: `{CODE_STORAGE}`, behind the `HandlerStore`
+    contract. Postgres today; a key-value store is the Slime Cloud target.
 * **Models:**
   * Generator: speed first. Groq `gpt-oss-120b` works today on the free tier.
     Claude `claude-haiku-5-5` is supported but untested until there is a key.
@@ -385,10 +395,8 @@ SQL."*
 1. **Crystal automation:** branch and PR creation in `crystallize`, and skip
    handlers with an open PR. Report "optimized" only when the code actually
    changed.
-2. **AWS:**
-   * Dockerfile;
-   * CDK for the ECS service, RDS, the crystallize task and its schedule;
-   * a deploy workflow from `main`.
+2. **Deployment:** once `{RUNTIME_FOR_SLIME_CLOUD}` is chosen, add the Server
+   build, the scheduled crystallize run and a deploy workflow from `main`.
 3. **Package as a library:** turn the sandbox into the `@slime/core` library
    plus an example app.
 4. **Warm-up:** add a `slime warm` command that pre-generates the frontend's

@@ -36,7 +36,9 @@ vision is in [../../docs/slime_runtime_master_spec.md](../../docs/slime_runtime_
 
 * **Gas:** in memory, in a holding area that expires after `GAS_WINDOW_MS`.
 * **Liquid:** `GAS_TO_LIQUID_HITS` successful runs plus an approved background
-  review. It is saved in `slime_meta.handlers` and loaded again on restart.
+  review. It is saved to the code storage behind the `HandlerStore` contract
+  and loaded again on restart. Today that storage is Postgres
+  (`slime_meta.handlers`).
   The saved row holds the code hash, the review result, the run count and the
   recorded inputs.
 * **Crystal:** built by `npm run crystallize` from proven Liquid handlers.

@@ -269,8 +269,9 @@ change through a pull request. Run it on a branch and open a PR, or enable
 auto-merge on GitHub for hands-off promotion. CI checks every committed
 Crystal: its hash, the allowlist, and that it imports.
 
-How this runs once deployed (scheduled ECS task, PR bot, deploy pipeline) is
-in [docs/crystal-deployment.md](docs/crystal-deployment.md).
+How this runs once deployed (a scheduled job reading `{CODE_STORAGE}`, a PR
+bot, and the deploy on `{RUNTIME_FOR_SLIME_CLOUD}`) is in
+[docs/crystal-deployment.md](docs/crystal-deployment.md).
 
 ## Safety
 
