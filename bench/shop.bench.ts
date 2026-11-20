@@ -93,7 +93,7 @@ type Server = { port: number; proc: Subprocess; banner: string; stopped: boolean
 async function startServer(root: string, dbPath: string, env: Record<string, string> = {}): Promise<Server> {
   const proc = Bun.spawn([process.execPath, "run", join(REPO, "src", "lee.ts"), "serve", "--handler-dir", "examples"], {
     cwd: root,
-    env: { ...process.env, PORT: "0", LEE_DB: dbPath, ...env },
+    env: { ...process.env, PORT: "0", LEE_DB: dbPath, LEE_LOG: "0", ...env }, // no per-request logging in measurements
     stdout: "pipe", stderr: "pipe",
   });
   const reader = (proc.stdout as ReadableStream<Uint8Array>).getReader();
@@ -207,6 +207,7 @@ function environment(): string[] {
     "## Environment",
     "",
     `- Date: ${new Date().toISOString()}`,
+    `- Commit: \`${Bun.spawnSync(["git", "rev-parse", "--short", "HEAD"], { cwd: REPO }).stdout.toString().trim()}\`${Bun.spawnSync(["git", "status", "--porcelain", "--", "src", "intents", "examples"], { cwd: REPO }).stdout.toString().trim() ? " (+ uncommitted changes in src/intents/examples)" : ""}`,
     `- CPU: ${cpu}, ${cpus().length} logical cores; OS: ${platform()} ${release()}`,
     `- Bun ${Bun.version}; SQLite ${sqliteVersion} (bun:sqlite); quickjs-emscripten ${qjs}`,
     `- App DB as opened by \`openAppDb\`: journal_mode=${jm}, synchronous=${sync} (defaults; every committed request is a rollback-journal transaction on the DB file)`,

@@ -22,9 +22,11 @@ curl -s -X POST localhost:3000/dispatch -H 'content-type: application/json' \
   -d '{"intent":"book_ticket","payload":{"eventId":7,"qty":2,"promo":"FALL10"}}'
 ```
 
+Hands-on demo script: [`docs/demo.md`](docs/demo.md).
+
 Benchmark (offline, ~50 s): `bun run bench/shop.bench.ts` → [`bench/RESULTS.md`](bench/RESULTS.md). QA findings: [`docs/qa/2026-11-20-shop.md`](docs/qa/2026-11-20-shop.md).
 
-Environment: `PORT` (3000), `LEE_DB` (`data/lee.sqlite`), `LEE_GAS_TTL_MS` (600000), `LEE_PROMOTE_HITS` (3).
+Environment: `PORT` (3000), `LEE_DB` (`data/lee.sqlite`), `LEE_GAS_TTL_MS` (600000), `LEE_PROMOTE_HITS` (3), `LEE_LOG=0` silences the per-request log.
 
 ## Docs
 

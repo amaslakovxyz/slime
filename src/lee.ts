@@ -61,8 +61,37 @@ async function serve(flags: string[]) {
     db: openAppDb(process.env.LEE_DB ?? "data/lee.sqlite"),
     generateHandler: spec => generateWithRepair(generatorFor(spec.name), spec, harness),
   };
-  const server = Bun.serve({ port: Number(process.env.PORT ?? 3000), fetch: createFetchHandler(deps, devSession) });
+  const fetch = createFetchHandler(deps, devSession);
+  const log = process.env.LEE_LOG !== "0";
+  if (log) {
+    const generate = deps.generateHandler;
+    deps.generateHandler = async spec => {
+      const t0 = performance.now();
+      console.log(`  ⚙ JIT generate ${spec.name} (cache miss)…`);
+      const gen = await generate(spec);
+      const ms = (performance.now() - t0).toFixed(1);
+      console.log(gen.ok
+        ? `  ⚙ generated ${spec.name} handler ${sha256Hex(gen.source).slice(0, 12)} in ${ms} ms; ${gen.runs.length} try input(s) passed`
+        : `  ⚙ generation failed for ${spec.name} in ${ms} ms: ${gen.detail}`);
+      return gen;
+    };
+  }
+  const server = Bun.serve({
+    port: Number(process.env.PORT ?? 3000),
+    fetch: log ? req => logged(fetch, req) : fetch,
+  });
   console.log(`lee serve on http://localhost:${server.port}  runner: ${name}  gasTtlMs: ${ttlMs}  promoteHits: ${promoteHits}`);
+}
+
+// One line per request for hands-on demos; disable with LEE_LOG=0 (benchmarks do).
+async function logged(fetch: (req: Request) => Promise<Response>, req: Request): Promise<Response> {
+  const t0 = performance.now();
+  const res = await fetch(req);
+  const b = await res.clone().json() as Record<string, unknown>;
+  const outcome = res.status === 200 ? `${b.tier} ${String(b.handlerHash).slice(0, 12)}`
+    : [b.tier, b.stage, b.reason ?? b.error, b.detail].filter(x => x !== undefined && x !== null).join(" ");
+  console.log(`${req.method} ${b.intent ?? new URL(req.url).pathname} → ${res.status} ${outcome}  ${(performance.now() - t0).toFixed(1)} ms`);
+  return res;
 }
 
 async function build(intent: string, flags: string[]) {
