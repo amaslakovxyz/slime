@@ -39,13 +39,25 @@ variable "trusted_principal_arns" {
 }
 
 variable "budget_limit_usd" {
-  description = "Monthly account-wide cost budget in USD."
+  description = "Monthly account-wide cost budget in USD (baseline ~$2/month; domain renewals add ~$17-23 in their month)."
   type        = number
-  default     = 100
+  default     = 50
+}
+
+variable "project_cost_tag_active" {
+  description = "Activate the Project cost-allocation tag and filter the project budget by it. Set true once AWS lists the tag (aws ce list-cost-allocation-tags --tag-keys Project)."
+  type        = bool
+  default     = false
+}
+
+variable "anomaly_alert_usd" {
+  description = "Email when a cost anomaly's total impact reaches this many USD (account-wide, all services)."
+  type        = number
+  default     = 5
 }
 
 variable "project_budget_limit_usd" {
-  description = "Monthly project budget in USD (spend in var.region only)."
+  description = "Monthly project budget in USD. At 100% actual spend the freeze action blocks new paid resources (finops.tf)."
   type        = number
   default     = 15
 }

@@ -1,0 +1,18 @@
+# Accepted Trivy misconfiguration findings. Each one is a deliberate cost
+# trade-off for a hackathon-sized project; revisit if the threat model grows.
+misconfigurations:
+  - id: AWS-0132
+    paths:
+      - "infra/aws/bootstrap/state.tf"
+    statement: >-
+      State bucket uses SSE-S3. A customer-managed KMS key costs $1/month plus
+      requests and adds key-policy recovery risk; TLS-only policy, versioning
+      and blocked public access already protect the state.
+  - id: AWS-0011
+    paths:
+      - "infra/aws/landing/domain.tf"
+    statement: >-
+      No WAF on the landing distribution. WAF starts at about $5/month plus
+      per-request fees (this account already paid $7-8/month for WAF earlier
+      in 2026); the origin is a cached static page behind an IAM-locked
+      Function URL.
