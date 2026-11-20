@@ -44,14 +44,14 @@ Status: **Decided**, **Proposed** (default unless someone objects) or
 | C4 | Configuration | A `SlimeConfig` class. The app creates it and adds the parts it needs: connector, generator, store, limits. Each part can come from env, a secrets store or anywhere else in the app. The class fills defaults, validates everything at once (reporting every problem, not just the first), and is immutable; `config.with({...})` returns a changed copy for tests. Core never reads `process.env` or `.env`. | Decided (class shape: Proposed) |
 | C5 | Entry point | Three steps in the app: create a connector (where data comes from), create a Slime instance with `createSlime(config)`, then call `slime.query()` inside any endpoint. The instance also has `handlers()`, `stats()`, `evict(id)`, `flush()` and `close()`. | Decided |
 | C6 | Locked mode | Locked means no `generator` is passed. Then no model client is ever imported, by construction. An explicit `mode` setting can be added later without breaking this. | Decided |
-| C7 | Packaging of adapters | Subpath exports from one package: `@slime-cloud/core/postgres`, `/claude`, `/groq`, `/offline`. Model SDKs are optional peer dependencies. | Decided |
+| C7 | Packaging of adapters | Subpath exports from one package: `@slime-cloud/core/postgres`, `/dynamodb`, `/claude`, `/groq`, `/offline`. Model SDKs and database drivers are optional peer dependencies. | Decided |
 | C8 | What ships | Compiled JS and `.d.ts` in `dist/` (built with `tsc`), plus the shape worker file. Not TS source. | Decided |
 | C9 | HTTP | No HTTP in core. The app calls `slime.query()` from its own endpoint in any framework. A thrown `SlimeError` carries `status` and `toJSON()`, so the endpoint can return it directly. Admin data comes from methods only (`handlers()`, `stats()`, `evict()`); exposing and protecting them over HTTP is up to the app or `@slime-cloud/server`. | Decided |
 | C10 | Crystal | Crystal handlers are ordinary modules in the app's own code. The crystallize job writes TS or JS (a config setting) plus a generated `index` and a manifest. The app imports the index and passes it as `crystal` in `SlimeConfig`; leaving it out (or `false`) turns Crystal off. Because the code is compiled with the app, safety is checked when the job writes it (allowlist, SQL lint, equivalence test on recorded runs) and by a `check` command in the app's CI, which re-parses the sources and compares manifest hashes. Core doesn't re-check at startup. The job and `check` are a separate entry (`@slime-cloud/core/crystallize`, plus a bin), so the runtime never imports them. | Decided |
 | C11 | Observability | An `onEvent(event)` option (generated, promoted, reviewed, error, timings, tokens). Core doesn't log on its own. Metering builds on this later. | Decided |
 | C12 | Out of scope for core v1 | Writes, tenancy, connectors other than Postgres, Redis, semantic matching. | Proposed |
 | C13 | Store contract | A small key-value Port, `SlimeStore`: `get(ns, key)`, `put(ns, key, value)`, `list(ns, prefix?)`, `delete(ns, key)`. Values are JSON. Namespaces: `handlers`, `dictionary`. The engine builds the keys and filters by prefix (schema, glossary, prompt, model), so a backend is only a mapping to 4 calls. It replaces the sandbox's domain-shaped `HandlerStore`. | Decided |
-| C14 | Default store and dependencies | Core ships only zero-dependency stores: `fileStore(dir)` (JSON files, `node:fs`) and `memoryStore()`. Database-backed stores are adapters outside the core entry: `postgresStore` in `@slime-cloud/core/postgres` (uses the `pg` peer dependency the connector already needs), and DynamoDB in a Slime Cloud package (§4.8). The default when no `store` is given is `fileStore('./.slime')`. | Proposed |
+| C14 | Choosing a store | The `store` option in `SlimeConfig` picks a built-in store by config, or takes any object that implements `SlimeStore`. Built in: `file` (the default), `memory`, `postgres` and `dynamodb` (§4.8). Files and memory have no dependencies. Postgres and DynamoDB ship in core as optional adapters: their drivers (`pg`, `@aws-sdk/client-dynamodb`) are optional peer dependencies, loaded only when that store is chosen. | Decided |
 
 ## 4. Request format and matching
 
@@ -168,7 +168,7 @@ It never sees input values or rows.
 * Locked is the documented production mode (R8).
 * The startup dictionary, built by a model in the background (§4.4).
 
-### 4.8 Storage: files by default, DynamoDB in Slime Cloud
+### 4.8 Storage: chosen in the config
 
 Core depends on no database for its own storage. Everything it keeps (Liquid
 handlers with their fixtures, run counts, the dictionary) goes through the
@@ -188,18 +188,35 @@ The engine builds the keys, for example
 Loading "every handler for this schema, prompt and model" is then one
 `list(ns, prefix)`.
 
-| Store | Where | Dependencies | For |
-|---|---|---|---|
-| `fileStore(dir)` | core | none (`node:fs`) | the default: local development, and production in locked mode with `.slime/` committed to git |
-| `memoryStore()` | core | none | tests |
-| `postgresStore({ url, table })` | `@slime-cloud/core/postgres` | `pg` (already needed by the connector) | self-hosting with several instances |
-| DynamoDB store | a Slime Cloud package, owned by the platform team | `@aws-sdk/client-dynamodb` | Slime Cloud |
+The app picks the store in `SlimeConfig`:
+
+```ts
+store: { type: 'file', dir: './.slime' }                         // the default
+store: { type: 'memory' }                                         // tests
+store: { type: 'postgres', url: process.env.SLIME_STORE_URL!, table: 'slime_store' }
+store: { type: 'dynamodb', table: 'slime-store', region: 'eu-central-1', prefix: 'acme' }
+store: myRedisStore                                               // anything implementing SlimeStore
+```
+
+| `type` | Dependencies | Good for |
+|---|---|---|
+| `file` (default) | none (`node:fs`) | local development, and production in locked mode with `.slime/` committed to git |
+| `memory` | none | tests |
+| `postgres` | `pg` (optional peer; the Postgres connector needs it anyway) | self-hosting with several instances, in the app's own database or another one |
+| `dynamodb` | `@aws-sdk/client-dynamodb` (optional peer) | AWS deployments, and Slime Cloud |
+| a custom object | whatever it uses | anything else: Redis, S3, an internal service |
+
+**Loading.** Core imports the Postgres or DynamoDB adapter only when that
+type is chosen. If its driver isn't installed, `SlimeConfig` fails with one
+clear message, for example "store type 'postgres' needs the `pg` package:
+`npm install pg`".
 
 **Why files are the default.** They follow the explore → locked flow (R8).
 In development, handlers and the dictionary are written to `./.slime/`. The
 developer commits that folder, like Crystal. In production, locked mode only
-reads it: no database for Slime's own state, and no model. With memory as the
-default, production would start empty.
+reads it: no database for Slime's own state, and no model. A team that
+doesn't want state in git picks `postgres` or `dynamodb`; in production they
+then work in locked mode too, against a store filled during development.
 
 **The file store's rules:**
 
@@ -209,20 +226,31 @@ default, production would start empty.
 * one writer: in locked mode Slime never writes to the store, and run counts
   stay in memory.
 
-**DynamoDB in Slime Cloud.** One table for all tenants:
+**Postgres store:**
 
-* partition key: `${tenantId}#${ns}`;
-* sort key: `key`;
-* the value: one attribute holding the JSON;
-* `list(ns, prefix)`: one `Query` with `begins_with(sk, prefix)`.
+* one table, by default `slime_store`, with columns `(ns, key, value jsonb,
+  updated_at)` and primary key `(ns, key)`;
+* `list` is `WHERE ns = $1 AND key LIKE $2 || '%'`;
+* `init()` creates the table if it's missing. The store's user needs a schema
+  it may create tables in, and must not be the read-only connector user.
 
-The tenant id is a constructor option, so core never sees tenants. An IAM
+**DynamoDB store:**
+
+* one table with partition key `pk` and sort key `sk`;
+* `pk = ${prefix}#${ns}` and `sk = key`; the JSON goes in one attribute;
+* `list(ns, prefix)` is one `Query` with `begins_with(sk, prefix)`;
+* the table is created outside Slime (Terraform, CDK, console). `init()` only
+  checks that it exists and has this key schema.
+
+In Slime Cloud, `prefix` is the tenant id, so core never sees tenants. An IAM
 condition on `dynamodb:LeadingKeys` keeps each tenant's role in its own
-partitions (PR #7 §6). The adapter is about 40 lines and passes the same
-store contract test as the core stores.
+partitions (PR #7 §6).
 
-**Value size.** DynamoDB items are limited to 400 KB. Core keeps every value
-under a documented limit (300 KB):
+**One contract test** runs against every store, the built-in ones and any
+custom store, so an adapter either passes or it doesn't.
+
+**Value size.** DynamoDB items are limited to 400 KB, so core keeps every
+value under a documented limit (300 KB) for every store:
 
 * each handler's `history` and `fixtures` are capped;
 * the dictionary is stored as one entry per table plus an index entry, not
@@ -233,14 +261,14 @@ under a documented limit (300 KB):
 This is the target for C4–C10, and it changes as we decide them.
 
 ```ts
-import { createSlime, SlimeConfig, fileStore } from '@slime-cloud/core';
+import { createSlime, SlimeConfig } from '@slime-cloud/core';
 import { postgresConnector } from '@slime-cloud/core/postgres';
 import { claude } from '@slime-cloud/core/claude';
 
 // The app decides where values come from: env here, but any source works.
 const config = new SlimeConfig({
   connector: postgresConnector({ url: process.env.READER_URL! }), // required; refuses to start if the user can write
-  store: fileStore('./.slime'),                                     // the default; or memoryStore(), postgresStore(…), a DynamoDB store
+  store: { type: 'postgres', url: process.env.SLIME_STORE_URL! },  // default: { type: 'file', dir: './.slime' } (§4.8)
   generator: claude.generator({ apiKey: process.env.ANTHROPIC_API_KEY!, model: 'claude-haiku-5-5' }), // omit = locked mode
   reviewer: claude.reviewer({ apiKey: process.env.ANTHROPIC_API_KEY!, model: 'claude-opus-5-5' }),    // omit = no review
   crystal: crystals,                // import { crystals } from './slime-crystal/index.js'; omit = off
@@ -292,8 +320,9 @@ oss/packages/core/
 │   ├── checks/         # shape, sql guard, lint, limit check (R6)
 │   ├── sandbox/        # SandboxRunner Port + QuickJS worker (shape-worker.mjs)
 │   ├── crystal/        # Crystal registry types; serving crystal handlers
-│   ├── store/          # SlimeStore Port, fileStore, memoryStore (no dependencies)
-│   ├── postgres/       # connector + postgresStore → @slime-cloud/core/postgres
+│   ├── store/          # SlimeStore Port, file and memory stores, store config, contract test
+│   ├── postgres/       # connector + postgres store → @slime-cloud/core/postgres
+│   ├── dynamodb/       # dynamodb store           → @slime-cloud/core/dynamodb
 │   ├── claude/         # generator + reviewer → @slime-cloud/core/claude
 │   ├── groq/           #                      → @slime-cloud/core/groq
 │   ├── offline/        #                      → @slime-cloud/core/offline
@@ -310,8 +339,8 @@ one ports is named, so parity can be checked.
 |---|---|---|
 | M0 | **Skeleton.** Root `package.json` with workspaces, core `package.json` with an exports map, `tsconfig`, `node:test`, a CI job "Core tests". | `npm test -w @slime-cloud/core` runs; `npm pack` builds a tarball; CI is green. |
 | M1 | **Request, contracts and pure parts.** Request parsing, intent normalization and the request key (§4); output notation with `date`/`datetime`; Ports and `SlimeError`; SQL guard and lint; `SlimeConfig` with defaults, validation and `glossary`. | `units.test.ts` ported and adjusted for §4.7. |
-| M2 | **Engine, Gas path.** `createSlime`, `query`, the `SlimeStore` Port with `memoryStore` and `fileStore`, a shared store contract test, offline generator, `SandboxRunner` with the QuickJS worker, coalescing, rate limits, locked mode, typed and nullable parameters (R4, R5), the limit check (R6). | `engine.test.ts` and `sandbox.test.ts` ported; one handler serves every combination of `null` filters; no `config` singleton anywhere. |
-| M3 | **Postgres and the dictionary.** Connector with the start-up safety check and enum values from the catalog; `postgresStore`; the background dictionary build (§4.4). | `postgres.test.ts` and `persistence.test.ts` ported; `postgresStore` passes the shared store contract test; a restart loads the dictionary instead of rebuilding it; changing `rules` rebuilds it. |
+| M2 | **Engine, Gas path.** `createSlime`, `query`, the `SlimeStore` Port with the `memory` and `file` stores and the shared store contract test, offline generator, `SandboxRunner` with the QuickJS worker, coalescing, rate limits, locked mode, typed and nullable parameters (R4, R5), the limit check (R6). | `engine.test.ts` and `sandbox.test.ts` ported; one handler serves every combination of `null` filters; no `config` singleton anywhere. |
+| M3 | **Postgres, DynamoDB and the dictionary.** Connector with the start-up safety check and enum values from the catalog; the `postgres` and `dynamodb` stores; the background dictionary build (§4.4). | `postgres.test.ts` and `persistence.test.ts` ported; both stores pass the shared contract test (DynamoDB against DynamoDB Local in Docker); a missing driver gives the install message; a restart loads the dictionary instead of rebuilding it; changing `rules` rebuilds it. |
 | M4 | **Models and Liquid.** Claude and Groq generators and reviewers with prompts updated for §4 (nullable parameters, the dictionary); the review loop; promotion to Liquid. | Review and promotion tests pass; one live run against Groq or Claude. |
 | M5 | **Crystal.** Serving from an imported registry; the crystallize job writing TS or JS; the `check` command. | `crystal*.test.ts` ported; a hand-edited Crystal file fails `check`; TS and JS output both pass the equivalence test. |
 | M6 | **Use it as a package.** An example app in `oss/examples/` that installs the packed tarball and calls `slime.query()` from an endpoint; docs for the request format; the bench ported to run on core. Then retire `sandbox/`. | The example answers a query from the tarball; the bench is at least as correct as the sandbox's. |

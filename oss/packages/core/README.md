@@ -38,9 +38,9 @@ input values. Handlers move up through three tiers:
 QuickJS shaping sandbox, the background review, Crystal loading, and the
 contracts (Ports) for connectors, generators, reviewers and stores, with
 their first implementations: the Postgres connector; Claude, Groq and offline
-generators; and stores with no dependencies (files by default, memory),
-plus Postgres. Slime's own storage needs no database: a DynamoDB store for
-Slime Cloud plugs into the same key-value contract.
+generators; and stores for Slime's own state, chosen in the config: files
+(the default) and memory with no dependencies, Postgres and DynamoDB as
+optional adapters, or any custom store.
 
 **Not in core:**
 
