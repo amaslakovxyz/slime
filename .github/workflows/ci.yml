@@ -20,4 +20,12 @@ jobs:
           python-version: "3.12"
       - uses: pre-commit/action@v3.0.1
 
-  # Add a lint & test job here once the project stack is chosen.
+  test:
+    name: Bun tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun test
