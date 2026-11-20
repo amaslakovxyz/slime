@@ -34,3 +34,18 @@ provider "aws" {
     }
   }
 }
+
+# CloudFront only accepts ACM certificates from us-east-1. The deployer
+# role's region guard exempts acm:*, so this alias is allowed.
+provider "aws" {
+  alias  = "us_east_1"
+  region = "us-east-1"
+
+  default_tags {
+    tags = {
+      Project   = var.project
+      ManagedBy = "terraform"
+      Stack     = "aws-landing"
+    }
+  }
+}

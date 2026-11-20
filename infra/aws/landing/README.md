@@ -29,9 +29,29 @@ terraform output -raw url
 node --test infra/aws/landing/function/index.test.mjs
 ```
 
-## Custom domain (next step)
+## Custom domain
 
-Function URLs do not accept custom domains. Put CloudFront in front (ACM
-certificate in `us-east-1`, origin = the Function URL host, Route 53 alias).
-CloudFront caching also shields the function from traffic spikes: the account
-has a concurrency limit of 10 shared by every Lambda in it.
+[`domain.tf`](domain.tf) serves `https://amaslakov.com` and `www.` through
+CloudFront (Function URLs do not accept custom domains). CloudFront caching
+also shields the function: the account Lambda concurrency limit is 10.
+
+| Resource | Notes |
+|---|---|
+| ACM certificate (`us-east-1`) | apex + `www`, DNS-validated in the registrar-created zone |
+| CloudFront distribution | `PriceClass_100`, HTTP→HTTPS redirect, `Managed-CachingOptimized`, origin = Function URL host |
+| Route 53 `A`/`AAAA` aliases | apex and `www` → CloudFront |
+
+The hosted zone is not managed here and keeps the iCloud mail records (MX,
+SPF, DKIM, DMARC). The apex `A` record previously pointed at `142.93.162.168`
+(unreachable); `allow_overwrite` replaced it. Rollback: `terraform destroy`
+removes the aliases; recreate that `A` record by hand if it is needed again.
+
+After a `landing/` change, HTML refreshes within 5 min and assets within a
+day; to force it:
+`aws cloudfront create-invalidation --distribution-id $(terraform output -raw cloudfront_distribution_id) --paths '/*'`.
+
+**Known issue:** `CreateDistribution` repeatedly failed under `slime-deployer`
+with `InvalidViewerCertificate` although the certificate was `ISSUED`; the
+same apply under the admin `default` profile succeeded a minute later. Cause
+not yet isolated (role vs. ACM→CloudFront propagation). If a distribution
+must be recreated, retry under `AWS_PROFILE=default`.
