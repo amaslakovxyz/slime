@@ -30,6 +30,9 @@ Backend -- Slime runtime:
     Vision pitch and target architecture (request-time synthesis, V8/Wasm,
     Redis, connectors). Broader than, and in places conflicting with, the
     development spec above.
+  - [oss-saas-split-design.md](./docs/oss-saas-split-design.md) - Proposed
+    split into Slime OSS (Apache-2.0 packages, self-hosted) and Slime Cloud
+    (SaaS, one Server per customer): repo boundary, Ports, packages, phases.
   - `docs/brand/` - Brand and marketing material:
     - [slime_master_brand_book_agent_design_system.md](./docs/brand/slime_master_brand_book_agent_design_system.md) - Color tokens, typography, and UI rules for agents generating Slime UI.
     - [slime_master_brand_book_design_system.html](./docs/brand/slime_master_brand_book_design_system.html) - Interactive brand book and component kit.
