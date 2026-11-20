@@ -1,24 +1,6 @@
-// Errors that reach the caller of slime.query(). Each code has a fixed HTTP
-// status, so an endpoint can answer with `err.status` and `err.toJSON()`
-// without knowing Slime's internals (PLAN.md C9).
+// Each code has a fixed HTTP status, so an endpoint can answer with err.status and err.toJSON() (C9).
 
-export type ErrorCode =
-  | 'INVALID_REQUEST'
-  | 'FIELD_NOT_EXPOSED'
-  | 'WRITE_REFUSED'
-  | 'HANDLER_NOT_FOUND'
-  | 'INTENT_UNSATISFIABLE'
-  | 'GENERATION_RATE_LIMITED'
-  | 'SHAPE_MISMATCH'
-  | 'SANDBOX_ERROR'
-  | 'QUERY_ERROR'
-  | 'QUERY_TOO_EXPENSIVE'
-  | 'INVALID_HANDLER'
-  | 'GENERATION_FAILED'
-  | 'GENERATION_TIMEOUT'
-  | 'EXECUTION_TIMEOUT';
-
-const STATUS: Record<ErrorCode, number> = {
+const STATUS_BY_CODE = {
   INVALID_REQUEST: 400,
   FIELD_NOT_EXPOSED: 403,
   WRITE_REFUSED: 403,
@@ -33,29 +15,44 @@ const STATUS: Record<ErrorCode, number> = {
   GENERATION_FAILED: 502,
   GENERATION_TIMEOUT: 504,
   EXECUTION_TIMEOUT: 504,
-};
+} as const satisfies Record<string, number>;
+
+export type ErrorCode = keyof typeof STATUS_BY_CODE;
+
+export interface SlimeErrorOptions {
+  retryable?: boolean;
+  details?: Record<string, unknown>;
+}
+
+export interface SlimeErrorBody {
+  code: ErrorCode;
+  message: string;
+  retryable: boolean;
+  [detail: string]: unknown;
+}
 
 export class SlimeError extends Error {
   override readonly name = 'SlimeError';
   readonly status: number;
+  readonly retryable: boolean;
+  readonly details: Record<string, unknown> | undefined;
 
   constructor(
     readonly code: ErrorCode,
     message: string,
-    readonly retryable = false,
-    readonly details?: Record<string, unknown>,
+    { retryable = false, details }: SlimeErrorOptions = {},
   ) {
     super(message);
-    this.status = STATUS[code];
+    this.status = STATUS_BY_CODE[code];
+    this.retryable = retryable;
+    this.details = details;
   }
 
-  /** The body an endpoint sends: `{ error: err.toJSON() }`. */
-  toJSON(): { code: ErrorCode; message: string; retryable: boolean; [key: string]: unknown } {
+  toJSON(): SlimeErrorBody {
     return { ...this.details, code: this.code, message: this.message, retryable: this.retryable };
   }
 }
 
-/** Thrown by `new SlimeConfig()`, listing every problem at once rather than only the first. */
 export class SlimeConfigError extends Error {
   override readonly name = 'SlimeConfigError';
 

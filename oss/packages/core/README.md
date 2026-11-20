@@ -78,6 +78,8 @@ input values. Handlers move up through three tiers:
 - [src/](./src/README.md): the package sources and its public entry
   `index.ts`. As of M1 that is `SlimeConfig`, the errors and the Port
   types. Pure building blocks live in:
+  - [src/config/](./src/config/README.md): `SlimeConfig`'s option types,
+    defaults and validation;
   - [src/request/](./src/request/README.md): request parsing, the output
     notation, parameter types and cache keys;
   - [src/checks/](./src/checks/README.md): SQL lint;

@@ -1,39 +1,53 @@
-// Static checks on generated code before it touches the database. Defence in
-// depth only: the read-only database user is the real boundary.
+// Defence in depth only: the read-only database user is the real boundary.
 import { SlimeError } from '../errors.js';
 import type { Artifact } from '../ports.js';
 
+type Inputs = Readonly<Record<string, unknown>>;
+
 const WRITE_SQL =
   /\b(insert|update|delete|merge|drop|alter|create|grant|revoke|truncate|copy|vacuum|set_config|pg_sleep|pg_read_file|lo_import|dblink)\b/i;
+const PLACEHOLDER = /\$(\d+)/g;
+// Two-letter values such as "DE" would match inside keywords like DESC.
+const MIN_HARDCODED_LENGTH = 3;
 
 export function assertReadOnlySql(sql: string): void {
-  if (WRITE_SQL.test(sql)) {
-    throw new SlimeError('WRITE_REFUSED', 'SQL contains a write or a forbidden function; refused.', false, { enforcedBy: 'lint' });
+  if (!WRITE_SQL.test(sql)) return;
+  throw new SlimeError('WRITE_REFUSED', 'SQL contains a write or a forbidden function; refused.', { details: { enforcedBy: 'lint' } });
+}
+
+export function lintArtifact(artifact: Artifact, input: Inputs): void {
+  assertReadOnlySql(artifact.sql);
+  assertPlaceholdersMapped(artifact, input);
+  assertNoHardcodedInputs(artifact, input);
+}
+
+function assertPlaceholdersMapped({ sql, params }: Artifact, input: Inputs): void {
+  const usedPlaceholders = placeholderNumbers(sql);
+  const highestPlaceholder = Math.max(0, ...usedPlaceholders);
+  if (highestPlaceholder > params.length) {
+    throw invalidHandler(`SQL uses $${highestPlaceholder} but only ${params.length} params are mapped.`);
+  }
+  params.forEach((name, index) => {
+    const placeholder = index + 1;
+    if (!(name in input)) throw invalidHandler(`Param $${placeholder} maps to "${name}", which is not an input name.`);
+    if (!usedPlaceholders.has(placeholder)) throw invalidHandler(`Param $${placeholder} ("${name}") is mapped but never used in the SQL.`);
+  });
+}
+
+// The model never sees input values, so a value found in the code was copied from the intent.
+function assertNoHardcodedInputs({ sql, shapeJs }: Artifact, input: Inputs): void {
+  for (const [name, value] of Object.entries(input)) {
+    if (typeof value !== 'string' || value.length < MIN_HARDCODED_LENGTH) continue;
+    if (sql.includes(value) || shapeJs?.includes(value)) {
+      throw invalidHandler(`The value of input "${name}" is hardcoded in the handler; use $n / input.${name}.`);
+    }
   }
 }
 
-/**
- * Checks that the SQL reads only, that every $n maps to an input name and is
- * used, and that no input value was copied into the code.
- */
-export function lintArtifact(artifact: Artifact, input: Readonly<Record<string, unknown>>): void {
-  assertReadOnlySql(artifact.sql);
-  const used = new Set([...artifact.sql.matchAll(/\$(\d+)/g)].map((m) => Number(m[1])));
-  const highest = Math.max(0, ...used);
-  if (highest > artifact.params.length) {
-    throw new SlimeError('INVALID_HANDLER', `SQL uses $${highest} but only ${artifact.params.length} params are mapped.`);
-  }
-  artifact.params.forEach((name, i) => {
-    if (!(name in input)) throw new SlimeError('INVALID_HANDLER', `Param $${i + 1} maps to "${name}", which is not an input name.`);
-    if (!used.has(i + 1)) throw new SlimeError('INVALID_HANDLER', `Param $${i + 1} ("${name}") is mapped but never used in the SQL.`);
-  });
-  // The model never sees input values, so a value appearing in the code means it
-  // was copied from the intent: the handler would return wrong data for other values.
-  for (const [name, value] of Object.entries(input)) {
-    if (typeof value === 'string' && value.length > 2) {
-      if (artifact.sql.includes(value) || artifact.shapeJs?.includes(value)) {
-        throw new SlimeError('INVALID_HANDLER', `The value of input "${name}" is hardcoded in the handler; use $n / input.${name}.`);
-      }
-    }
-  }
+function placeholderNumbers(sql: string): Set<number> {
+  return new Set([...sql.matchAll(PLACEHOLDER)].map(([, digits]) => Number(digits)));
+}
+
+function invalidHandler(message: string): SlimeError {
+  return new SlimeError('INVALID_HANDLER', message);
 }

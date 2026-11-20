@@ -44,7 +44,7 @@ and `Shape`.
   shapes before anything is generated.
 - `validateData(shape: Shape, data: unknown): string[]`: checks a handler result;
   accepts `null` when the top-level shape is an object (one row, no row found).
-- `validateAgainstShape(shape, value, path = '$', out = []): string[]`: returns
+- `validateAgainstShape(shape: Shape, value: unknown): string[]`: returns
   `$`-rooted mismatch messages; empty means the value matches.
 
 ### `params.ts`: parameter types (R4, R5)
@@ -53,7 +53,7 @@ and `Shape`.
 - `type ParamTypes = Record<string, ParamType | null>`: `null` while only `null`
   has been seen.
 - `coarseType(value: InputValue): ParamType | null`
-- `checkParamTypes(known, input): ParamTypes`: checks `input` against a handler's
+- `checkParamTypes(recorded, input): ParamTypes`: checks `input` against a handler's
   recorded types and returns the updated record, or throws `INVALID_REQUEST`.
 
 ### `key.ts`: cache keys (§4.3, R2 to R4)
@@ -116,14 +116,12 @@ and `Shape`.
 - Explore mode treats any `changedProvenance` result as a miss and
   regenerates; locked mode serves the handler and warns once if `schemaHash`
   changed. The engine applies this from M2.
-- Bumping the `v: 1` field invalidates every existing key; change it only on purpose.
+- Bumping `KEY_VERSION` invalidates every existing key; change it only on purpose.
 
 ## Side Effects
 
 - None: no I/O, network, disk or global state. `checkParamTypes` returns a new
-  record and does not mutate `known`.
-- `validateAgainstShape` pushes into the caller-supplied `out` array and returns
-  that same array.
+  record and does not mutate `recorded`.
 
 ## Verification
 

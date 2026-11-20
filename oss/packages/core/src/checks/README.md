@@ -15,7 +15,7 @@ These functions are internal. Nothing in `src/` imports this directory yet, and
 ## Interface
 
 - `assertReadOnlySql(sql: string): void` (`sql.ts`): throws
-  `SlimeError('WRITE_REFUSED', ..., false, { enforcedBy: 'lint' })` when `sql`
+  `SlimeError('WRITE_REFUSED', ..., { details: { enforcedBy: 'lint' } })` when `sql`
   matches the `WRITE_SQL` pattern. Otherwise it returns without a value.
 - `lintArtifact(artifact: Artifact, input: Readonly<Record<string, unknown>>): void`
   (`sql.ts`): calls `assertReadOnlySql(artifact.sql)` and then validates the
@@ -39,15 +39,15 @@ These functions are internal. Nothing in `src/` imports this directory yet, and
     `artifact.params.length`.
   - Every name in `artifact.params` must be a key of `input`.
   - Every mapped placeholder `$(i+1)` must appear in `artifact.sql`.
-- Hardcoded-value check: for every `input` value that is a string longer than 2
-  characters, the value must not appear verbatim in `artifact.sql` or
+- Hardcoded-value check: for every `input` value that is a string of at least
+  `MIN_HARDCODED_LENGTH` (3) characters, the value must not appear verbatim in `artifact.sql` or
   `artifact.shapeJs`. The model never sees input values, so a match means the
   value was copied from the intent. Non-string values and strings of 2
   characters or fewer are not checked.
 - Checks run in order (read-only, placeholder bound, per-param mapping,
   hardcoded values), and the first failure throws.
 - `WRITE_REFUSED` maps to HTTP 403 and `INVALID_HANDLER` maps to HTTP 500 (via
-  `STATUS` in `../errors.ts`). Both are thrown with `retryable = false`.
+  `STATUS_BY_CODE` in `../errors.ts`). Both are thrown with `retryable` false.
 
 ## Side Effects
 
