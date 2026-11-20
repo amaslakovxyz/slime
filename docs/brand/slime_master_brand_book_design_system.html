@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en" class="dark scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SLIME — v3.0 Wetware Lab Brand Book & Component Kit</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts Stack: Oi, Titan One, Plus Jakarta Sans, JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&family=Oi&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Titan+One&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        slime: {
+                            canvas: '#0B070C',
+                            surface: '#161019',
+                            'surface-hover': '#211825',
+                            border: '#2D1F33',
+                            'border-bright': '#442D4D',
+                            plasma: '#FF1476',
+                            berry: '#8F0043',
+                            jelly: '#FF85C0',
+                            mint: '#38F8B8',
+                            quartz: '#F2EAFF',
+                            ice: '#C4B5FD',
+                            wireframe: '#6E5C77',
+                            pure: '#F8F6FC',
+                            muted: '#A396AC'
+                        }
+                    },
+                    fontFamily: {
+                        oi: ['Oi', 'cursive'],
+                        titan: ['Titan One', 'cursive'],
+                        jakarta: ['Plus Jakarta Sans', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace']
+                    },
+                    boxShadow: {
+                        'plasma-glow': '0 0 35px -5px rgba(255, 20, 118, 0.45)',
+                        'mint-glow': '0 0 35px -5px rgba(56, 248, 184, 0.35)',
+                        'crystal-glow': '0 0 35px -5px rgba(196, 181, 253, 0.35)',
+                        'jelly-inner': 'inset 0 2px 4px 0 rgba(255, 133, 192, 0.4)'
+                    },
+                    animation: {
+                        'liquid-pulse': 'liquidPulse 6s ease-in-out infinite',
+                        'float-slow': 'floatSlow 8s ease-in-out infinite',
+                        'crystal-shimmer': 'crystalShimmer 3s linear infinite'
+                    },
+                    keyframes: {
+                        liquidPulse: {
+                            '0%, 100%': { borderRadius: '42% 58% 70% 30% / 45% 45% 55% 55%', transform: 'scale(1) rotate(0deg)' },
+                            '50%': { borderRadius: '65% 35% 38% 62% / 55% 65% 35% 45%', transform: 'scale(1.05) rotate(5deg)' }
+                        },
+                        floatSlow: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-12px)' }
+                        },
+                        crystalShimmer: {
+                            '0%': { backgroundPosition: '-200% 0' },
+                            '100%': { backgroundPosition: '200% 0' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --bg-canvas: #0B070C;
+            --bg-surface: #161019;
+            --border-color: #2D1F33;
+            --border-bright: #442D4D;
+            --plasma-primary: #FF1476;
+            --plasma-shadow: #8F0043;
+            --plasma-highlight: #FF85C0;
+            --gas-accent: #38F8B8;
+            --crystal-accent: #F2EAFF;
+            --crystal-glow: #C4B5FD;
+            --wireframe-grey: #6E5C77;
+            --text-pure: #F8F6FC;
+            --text-muted: #A396AC;
+        }
+
+        body {
+            background-color: var(--bg-canvas);
+            color: var(--text-pure);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            overflow-x: hidden;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0B070C;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #2D1F33;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #FF1476;
+        }
+
+        /* Bioluminescent plasma gradient text */
+        .slime-gradient-text {
+            background: linear-gradient(135deg, #FF85C0 0%, #FF1476 50%, #8F0043 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .mint-gradient-text {
+            background: linear-gradient(135deg, #A7F3D0 0%, #38F8B8 50%, #059669 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .crystal-gradient-text {
+            background: linear-gradient(135deg, #FFFFFF 0%, #F2EAFF 40%, #C4B5FD 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Subsurface jelly effect */
+        .glass-membrane {
+            background: rgba(22, 16, 25, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(45, 31, 51, 0.8);
+        }
+
+        .glass-membrane-bright {
+            background: rgba(33, 24, 37, 0.85);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 20, 118, 0.3);
+        }
+
+        /* Grid Pattern */
+        .bg-grid-pattern {
+            background-size: 32px 32px;
+            background-image:
+                linear-gradient(to right, rgba(45, 31, 51, 0.3) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(45, 31, 51, 0.3) 1px, transparent 1px);
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-grid-pattern flex flex-col selection:bg-slime-plasma selection:text-white">
+
+    <!-- Toast Notification Overlay -->
+    <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 ease-out pointer-events-none flex items-center gap-3 bg-slime-surface border border-slime-plasma text-slime-pure px-5 py-3 rounded-2xl shadow-plasma-glow">
+        <div class="w-3 h-3 rounded-full bg-slime-plasma animate-ping"></div>
+        <span id="toast-message" class="font-mono text-sm font-semibold">Copied to clipboard!</span>
+    </div>
+
+    <!-- Header Navigation -->
+    <header class="sticky top-0 z-40 border-b border-slime-border glass-membrane px-4 lg:px-8 py-3">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <!-- Slime Bioluminescent Blob Logo -->
+                <div class="relative w-10 h-10 flex items-center justify-center">
+                    <div class="absolute inset-0 bg-slime-plasma rounded-full blur-md opacity-60 animate-pulse"></div>
+                    <svg class="w-9 h-9 relative z-10 text-slime-pure" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M50 10C30 10 15 28 15 50C15 72 32 88 54 88C76 88 88 74 88 54C88 34 70 10 50 10ZM40 45C43.3137 45 46 42.3137 46 39C46 35.6863 43.3137 33 40 33C36.6863 33 34 35.6863 34 39C34 42.3137 36.6863 45 40 45ZM65 45C68.3137 45 71 42.3137 71 39C71 35.6863 68.3137 33 65 33C61.6863 33 59 35.6863 59 39C59 42.3137 61.6863 45 65 45Z" fill="url(#slime-header-grad)"/>
+                        <circle cx="42" cy="37" r="2" fill="#FFFFFF"/>
+                        <circle cx="67" cy="37" r="2" fill="#FFFFFF"/>
+                        <defs>
+                            <linearGradient id="slime-header-grad" x1="15" y1="10" x2="88" y2="88" gradientUnits="userSpaceOnUse">
+                                <stop stop-color="#FF85C0"/>
+                                <stop offset="0.5" stop-color="#FF1476"/>
+                                <stop offset="1" stop-color="#8F0043"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+                <div>
+                    <span class="font-oi text-2xl tracking-wider slime-gradient-text">slime</span>
+                    <span class="hidden sm:inline-block ml-3 px-2.5 py-0.5 rounded-full text-xs font-mono bg-slime-border text-slime-mint border border-slime-mint/30">v3.0 Wetware Lab</span>
+                </div>
+            </div>
+
+            <!-- Navigation Tabs -->
+            <nav class="flex items-center gap-1 sm:gap-2 bg-slime-canvas p-1 rounded-2xl border border-slime-border">
+                <button onclick="switchTab('tab-identity')" id="nav-tab-identity" class="nav-tab active px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 bg-slime-plasma text-white shadow-plasma-glow">
+                    01. Visual Tokens
+                </button>
+                <button onclick="switchTab('tab-matter')" id="nav-tab-matter" class="nav-tab px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slime-muted hover:text-slime-pure transition-all duration-200">
+                    02. Matter States
+                </button>
+                <button onclick="switchTab('tab-components')" id="nav-tab-components" class="nav-tab px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slime-muted hover:text-slime-pure transition-all duration-200">
+                    03. UI Templates
+                </button>
+                <button onclick="switchTab('tab-agent')" id="nav-tab-agent" class="nav-tab px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slime-muted hover:text-slime-pure transition-all duration-200">
+                    04. Agent Prompt
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- MAIN CONTAINER -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-8">
+
+        <!-- ========================================== -->
+        <!-- TAB 1: VISUAL IDENTITY & WETWARE PALETTE   -->
+        <!-- ========================================== -->
+        <section id="tab-identity" class="tab-content space-y-12">
+            <!-- Hero Banner Intro -->
+            <div class="relative overflow-hidden rounded-3xl p-8 lg:p-12 border border-slime-border bg-slime-surface">
+                <div class="absolute -top-24 -right-24 w-96 h-96 bg-slime-plasma/20 rounded-full blur-3xl pointer-events-none animate-liquid-pulse"></div>
+                <div class="absolute -bottom-20 -left-20 w-80 h-80 bg-slime-mint/10 rounded-full blur-3xl pointer-events-none"></div>
+
+                <div class="relative z-10 max-w-3xl space-y-4">
+                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slime-border/60 border border-slime-plasma/40 text-slime-jelly text-xs font-mono">
+                        <span class="w-2 h-2 rounded-full bg-slime-plasma animate-ping"></span>
+                        High-Fashion Wetware Bioluminescence Archetype
+                    </div>
+                    <h1 class="font-titan text-4xl lg:text-6xl text-slime-pure leading-tight">
+                        Feed the <span class="slime-gradient-text">Slime</span> Engine.
+                    </h1>
+                    <p class="text-slime-muted text-lg font-jakarta leading-relaxed">
+                        Slime swallows legacy database schemas and REST endpoints, synthesizing isolated V8/Wasm logic on the fly with automated cell-membrane security and sub-millisecond execution.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Color Palette System Swatches -->
+            <div class="space-y-6">
+                <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                    <div>
+                        <h2 class="font-titan text-2xl sm:text-3xl text-slime-pure">v3.0 Wetware Lab Color Tokens</h2>
+                        <p class="text-slime-muted text-sm mt-1">Click any swatch to copy CSS variable or Hex code directly to clipboard.</p>
+                    </div>
+                    <div class="flex items-center gap-2 text-xs font-mono text-slime-muted bg-slime-surface px-3 py-2 rounded-xl border border-slime-border">
+                        <span class="w-3 h-3 rounded-full bg-slime-plasma"></span> Laser Plasma Accent Baseline
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" id="color-grid">
+                    <!-- Swatches will be generated by JS or static HTML -->
+                </div>
+            </div>
+
+            <!-- 70 / 20 / 10 Palette Ratio Bar Visualizer -->
+            <div class="p-6 rounded-3xl bg-slime-surface border border-slime-border space-y-4">
+                <h3 class="font-titan text-xl text-slime-pure">70 / 20 / 10 Balance Paradigm</h3>
+                <p class="text-sm text-slime-muted font-jakarta">Strict proportion guide to prevent rainbow clutter and maintain deep-sea bioluminescent contrast.</p>
+
+                <div class="h-10 w-full rounded-2xl overflow-hidden flex border border-slime-border">
+                    <div class="h-full bg-[#0B070C] w-[70%] flex items-center justify-center text-xs font-mono text-slime-muted border-r border-slime-border group relative cursor-pointer" onclick="copyText('#0B070C', 'Canvas Base Hex copied!')">
+                        <span class="truncate px-2">70% Canvas (#0B070C & #161019)</span>
+                    </div>
+                    <div class="h-full bg-slime-border w-[20%] flex items-center justify-center text-xs font-mono text-slime-pure border-r border-slime-border group relative cursor-pointer" onclick="copyText('#2D1F33', 'Surface Border Hex copied!')">
+                        <span class="truncate px-1">20% Structure</span>
+                    </div>
+                    <div class="h-full bg-slime-plasma w-[10%] flex items-center justify-center text-xs font-mono text-white font-bold group relative cursor-pointer" onclick="copyText('#FF1476', 'Plasma Accent Hex copied!')">
+                        <span class="truncate px-1">10% Plasma</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Logomark Showcase -->
+            <div class="p-8 rounded-3xl bg-slime-surface border border-slime-border space-y-6">
+                <h3 class="font-titan text-2xl text-slime-pure">Logomark Lockups & Liquid Form</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Dark Plasma Lockup -->
+                    <div class="p-6 rounded-2xl bg-slime-canvas border border-slime-border flex flex-col items-center justify-center gap-4 text-center">
+                        <div class="w-20 h-20 relative flex items-center justify-center">
+                            <div class="absolute inset-0 bg-slime-plasma/30 rounded-full blur-xl"></div>
+                            <svg class="w-16 h-16 relative z-10" viewBox="0 0 100 100" fill="none">
+                                <path d="M50 10C30 10 15 28 15 50C15 72 32 88 54 88C76 88 88 74 88 54C88 34 70 10 50 10Z" fill="url(#lm1)"/>
+                                <circle cx="42" cy="40" r="3" fill="#FFFFFF"/>
+                                <circle cx="67" cy="40" r="3" fill="#FFFFFF"/>
+                                <defs>
+                                    <linearGradient id="lm1" x1="15" y1="10" x2="88" y2="88">
+                                        <stop stop-color="#FF85C0"/>
+                                        <stop offset="0.5" stop-color="#FF1476"/>
+                                        <stop offset="1" stop-color="#8F0043"/>
+                                    </linearGradient>
+                                </defs>
+                            </svg>
+                        </div>
+                        <span class="font-oi text-2xl slime-gradient-text">slime</span>
+                        <span class="text-xs font-mono text-slime-muted">Primary Plasma Lockup</span>
+                    </div>
+
+                    <!-- Cryo Mint Gas Variant -->
+                    <div class="p-6 rounded-2xl bg-slime-canvas border border-slime-border flex flex-col items-center justify-center gap-4 text-center">
+                        <div class="w-20 h-20 relative flex items-center justify-center">
+                            <div class="absolute inset-0 bg-slime-mint/20 rounded-full blur-xl"></div>
+                            <svg class="w-16 h-16 relative z-10" viewBox="0 0 100 100" fill="none">
+                                <path d="M50 10C30 10 15 28 15 50C15 72 32 88 54 88C76 88 88 74 88 54C88 34 70 10 50 10Z" fill="url(#lm2)"/>
+                                <circle cx="42" cy="40" r="3" fill="#0B070C"/>
+                                <circle cx="67" cy="40" r="3" fill="#0B070C"/>
+                                <defs>
+                                    <linearGradient id="lm2" x1="15" y1="10" x2="88" y2="88">
+                                        <stop stop-color="#A7F3D0"/>
+                                        <stop offset="0.6" stop-color="#38F8B8"/>
+                                        <stop offset="1" stop-color="#059669"/>
+                                    </linearGradient>
+                                </defs>
+                            </svg>
+                        </div>
+                        <span class="font-oi text-2xl mint-gradient-text">slime</span>
+                        <span class="text-xs font-mono text-slime-muted">Tier 0 Gas Variant</span>
+                    </div>
+
+                    <!-- Diamond Quartz Crystal Variant -->
+                    <div class="p-6 rounded-2xl bg-slime-canvas border border-slime-border flex flex-col items-center justify-center gap-4 text-center">
+                        <div class="w-20 h-20 relative flex items-center justify-center">
+                            <div class="absolute inset-0 bg-slime-ice/30 rounded-full blur-xl"></div>
+                            <svg class="w-16 h-16 relative z-10" viewBox="0 0 100 100" fill="none">
+                                <path d="M50 10L88 50L54 88L15 50L50 10Z" fill="url(#lm3)" stroke="#C4B5FD" stroke-width="2"/>
+                                <circle cx="45" cy="45" r="3" fill="#0B070C"/>
+                                <circle cx="65" cy="45" r="3" fill="#0B070C"/>
+                                <defs>
+                                    <linearGradient id="lm3" x1="15" y1="10" x2="88" y2="88">
+                                        <stop stop-color="#FFFFFF"/>
+                                        <stop offset="0.5" stop-color="#F2EAFF"/>
+                                        <stop offset="1" stop-color="#C4B5FD"/>
+                                    </linearGradient>
+                                </defs>
+                            </svg>
+                        </div>
+                        <span class="font-oi text-2xl crystal-gradient-text">slime</span>
+                        <span class="text-xs font-mono text-slime-muted">Tier 2 Crystal Variant</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Typography System Grid Specimens -->
+            <div class="space-y-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="font-titan text-2xl sm:text-3xl text-slime-pure">4-Font Type Scale Matrix</h2>
+                        <p class="text-slime-muted text-sm">Every font has a locked role. Test and preview live input below.</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Font 1: Oi -->
+                    <div class="p-6 rounded-3xl bg-slime-surface border border-slime-border space-y-4">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-mono px-2.5 py-1 rounded-full bg-slime-plasma/20 text-slime-jelly border border-slime-plasma/40">1. Oi (Display Serif)</span>
+                            <span class="text-xs font-mono text-slime-muted">Wordmarks & Punchlines Only</span>
+                        </div>
+                        <div class="py-4">
+                            <p class="font-oi text-4xl sm:text-5xl slime-gradient-text tracking-wide break-words">
+                                slime
+                            </p>
+                        </div>
+                        <p class="text-xs text-slime-muted font-jakarta">Used exclusively for the lowercase <code class="text-slime-pure">slime</code> wordmark and ultra-short 1-3 word high impact hero hooks.</p>
+                    </div>
+
+                    <!-- Font 2: Titan One -->
+                    <div class="p-6 rounded-3xl bg-slime-surface border border-slime-border space-y-4">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-mono px-2.5 py-1 rounded-full bg-slime-border text-slime-pure">2. Titan One (Display Cursive)</span>
+                            <span class="text-xs font-mono text-slime-muted">H1/H2 & Card Titles</span>
+                        </div>
+                        <div class="py-4">
+                            <h3 class="font-titan text-2xl sm:text-3xl text-slime-pure">
+                                Swallows Legacy REST APIs.
+                            </h3>
+                        </div>
+                        <p class="text-xs text-slime-muted font-jakarta">Adds soft-cornered physical volume to structural section headings and bento grid titles.</p>
+                    </div>
+
+                    <!-- Font 3: Plus Jakarta Sans -->
+                    <div class="p-6 rounded-3xl bg-slime-surface border border-slime-border space-y-4">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-mono px-2.5 py-1 rounded-full bg-slime-border text-slime-pure">3. Plus Jakarta Sans</span>
+                            <span class="text-xs font-mono text-slime-muted">UI Copy, Paragraphs, Buttons</span>
+                        </div>
+                        <div class="py-2 space-y-2">
+                            <p class="font-jakarta text-base text-slime-pure font-bold">Primary Button Label (700 Bold)</p>
+                            <p class="font-jakarta text-sm text-slime-muted font-normal">
+                                Zero endpoints to deploy. Slime continuously monitors queries and crystallizes high-frequency paths into sub-millisecond binaries.
+                            </p>
+                        </div>
+                        <p class="text-xs text-slime-muted font-jakarta">Clean geometric sans-serif for optimal readability across UI cards and long-form technical docs.</p>
+                    </div>
+
+                    <!-- Font 4: JetBrains Mono -->
+                    <div class="p-6 rounded-3xl bg-slime-surface border border-slime-border space-y-4">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-mono px-2.5 py-1 rounded-full bg-slime-mint/20 text-slime-mint border border-slime-mint/40">4. JetBrains Mono</span>
+                            <span class="text-xs font-mono text-slime-muted">AST, Latency, SHA Fingerprints</span>
+                        </div>
+                        <div class="py-2 font-mono text-xs space-y-1.5 text-slime-mint bg-slime-canvas p-4 rounded-xl border border-slime-border">
+                            <div><span class="text-slime-wireframe"># AST Execution Fingerprint</span></div>
+                            <div>LATENCY: <span class="text-slime-pure font-bold">0.38 ms</span> [TIER 2 CRYSTAL]</div>
+                            <div class="text-slime-ice">hash: 0x8f9a2b4e7c1d3091</div>
+                        </div>
+                        <p class="text-xs text-slime-muted font-jakarta">Dedicated monospace font for execution telemetry, latency badges, and AST code blocks.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ========================================== -->
+        <!-- TAB 2: ELEMENTAL MATTER STATES SIMULATOR   -->
+        <!-- ========================================== -->
+        <section id="tab-matter" class="tab-content hidden space-y-10">
+            <!-- Header Section -->
+            <div class="space-y-3">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slime-surface border border-slime-border text-slime-mint text-xs font-mono">
+                    <span class="w-2 h-2 rounded-full bg-slime-mint animate-pulse"></span>
+                    Dynamic Intent-to-Isolate Pipeline
+                </div>
+                <h2 class="font-titan text-3xl sm:text-4xl text-slime-pure">The 3 Matter States of Execution</h2>
+                <p class="text-slime-muted text-base max-w-3xl">
+                    As traffic increases, Slime metamorphoses logic from unoptimized vapor intent into warm V8 isolates, and finally into immutable AOT machine binaries.
+                </p>
+            </div>
+
+            <!-- Interactive Simulator Dashboard -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Controls & Input Panel -->
+                <div class="lg:col-span-5 p-6 sm:p-8 rounded-3xl bg-slime-surface border border-slime-border space-y-6">
+                    <h3 class="font-titan text-xl text-slime-pure">State Controller Sandbox</h3>
+
+                    <div class="space-y-2">
+                        <label class="text-xs font-mono text-slime-muted uppercase">1. Enter Natural Language / Intent</label>
+                        <input type="text" id="sim-intent-input" value="SELECT * FROM customers WHERE tier = 'enterprise'"
+                            class="w-full bg-slime-canvas border border-slime-border rounded-xl px-4 py-3 text-xs font-mono text-slime-pure focus:outline-none focus:border-slime-plasma transition-all">
+                    </div>
+
+                    <div class="space-y-3">
+                        <label class="text-xs font-mono text-slime-muted uppercase">2. Promote Execution State</label>
+                        <div class="grid grid-cols-1 gap-2.5">
+                            <button onclick="setSimState('gas')" id="btn-state-gas" class="state-btn flex items-center justify-between p-3.5 rounded-xl border border-slime-mint/40 bg-slime-mint/10 text-slime-mint font-mono text-xs font-bold transition-all">
+                                <span class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-slime-mint"></span> TIER 0 · GAS (VAPOR)</span>
+                                <span>~184 ms</span>
+                            </button>
+                            <button onclick="setSimState('liquid')" id="btn-state-liquid" class="state-btn flex items-center justify-between p-3.5 rounded-xl border border-slime-border bg-slime-canvas text-slime-muted font-mono text-xs font-bold transition-all hover:border-slime-plasma">
+                                <span class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-slime-plasma"></span> TIER 1 · LIQUID (PLASMA)</span>
+                                <span>2.40 ms</span>
+                            </button>
+                            <button onclick="setSimState('crystal')" id="btn-state-crystal" class="state-btn flex items-center justify-between p-3.5 rounded-xl border border-slime-border bg-slime-canvas text-slime-muted font-mono text-xs font-bold transition-all hover:border-slime-ice">
+                                <span class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-slime-ice"></span> TIER 2 · CRYSTAL (AOT)</span>
+                                <span>0.38 ms</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="p-4 rounded-xl bg-slime-canvas border border-slime-border space-y-2">
+                        <div class="flex justify-between text-xs font-mono">
+                            <span class="text-slime-muted">Query Execution Throughput:</span>
+                            <span id="sim-throughput" class="text-slime-pure font-bold">120 req/sec</span>
+                        </div>
+                        <div class="w-full bg-slime-border h-2 rounded-full overflow-hidden">
+                            <div id="sim-progress-bar" class="bg-slime-mint h-full w-[25%] transition-all duration-500"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Interactive Visualization Output Screen -->
+                <div class="lg:col-span-7 p-6 sm:p-8 rounded-3xl bg-slime-surface border transition-all duration-500 flex flex-col justify-between" id="sim-output-card">
+                    <div class="space-y-6">
+                        <!-- Top Header Ticker -->
+                        <div class="flex items-center justify-between border-b border-slime-border pb-4">
+                            <div class="flex items-center gap-3">
+                                <div id="sim-badge-dot" class="w-3.5 h-3.5 rounded-full bg-slime-mint animate-pulse"></div>
+                                <span id="sim-state-title" class="font-titan text-xl text-slime-mint">TIER 0 · GAS (Ephemera)</span>
+                            </div>
+                            <span id="sim-latency" class="font-mono text-lg font-bold text-slime-pure bg-slime-canvas px-3 py-1 rounded-xl border border-slime-border">
+                                184.2 ms
+                            </span>
+                        </div>
+
+                        <!-- Live Visual State Graphic Canvas Representation -->
+                        <div class="h-48 rounded-2xl bg-slime-canvas border border-slime-border flex items-center justify-center relative overflow-hidden p-6" id="sim-canvas-bg">
+                            <!-- Background Glowing Effect -->
+                            <div id="sim-glow-blob" class="absolute w-40 h-40 bg-slime-mint/20 rounded-full blur-2xl transition-all duration-700"></div>
+
+                            <!-- State SVG Dynamic Graphic -->
+                            <div class="relative z-10 text-center space-y-3" id="sim-graphic-box">
+                                <div id="sim-icon" class="w-16 h-16 mx-auto flex items-center justify-center rounded-2xl border border-dashed border-slime-mint text-slime-mint text-2xl font-mono">
+                                    ☁️
+                                </div>
+                                <p id="sim-status-desc" class="font-mono text-xs text-slime-muted max-w-sm">
+                                    Intent is interpreted dynamically with zero compilation. High flex, moderate latency.
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Code AST Fingerprint Display -->
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center text-xs font-mono text-slime-muted">
+                                <span>Compiled Isolate Output AST</span>
+                                <span id="sim-hash">sha256: 4f8b...902a</span>
+                            </div>
+                            <pre id="sim-code-block" class="bg-slime-canvas p-4 rounded-xl text-xs font-mono text-slime-mint border border-slime-border overflow-x-auto">
+// Ephemeral Interpretation Mode
+const result = await slime.interpret({
+  intent: "SELECT * FROM customers WHERE tier = 'enterprise'",
+  rls: "cellular_isolation"
+});</pre>
+                        </div>
+                    </div>
+
+                    <!-- Card Footer Actions -->
+                    <div class="pt-6 border-t border-slime-border flex items-center justify-between text-xs font-mono">
+                        <span class="text-slime-muted">State Lock: <strong id="sim-lock-status" class="text-slime-pure">UNLOCKED</strong></span>
+                        <button onclick="copySimCode()" class="px-4 py-2 rounded-xl bg-slime-canvas hover:bg-slime-border text-slime-pure border border-slime-border transition-all">
+                            Copy AST Code
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ready-to-use Matter State Templates -->
+            <div class="space-y-6 pt-6">
+                <h3 class="font-titan text-2xl text-slime-pure">Matter State Card Templates</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Gas Template Card -->
+                    <div class="p-6 rounded-3xl bg-slime-surface border border-dashed border-slime-mint/40 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <span class="px-3 py-1 rounded-full text-xs font-mono bg-slime-mint/10 text-slime-mint border border-slime-mint/30">Tier 0 · Gas</span>
+                            <span class="font-mono text-xs text-slime-muted">150-300ms</span>
+                        </div>
+                        <h4 class="font-titan text-lg text-slime-pure">Vapor Intent Engine</h4>
+                        <p class="text-xs text-slime-muted font-jakarta leading-relaxed">
+                            Zero schema upfront. Natural language and fuzzy REST endpoints parsed on first contact.
+                        </p>
+                        <button onclick="copySnippet('gas-card-code')" class="w-full py-2 rounded-xl bg-slime-canvas hover:bg-slime-border text-slime-mint border border-slime-mint/30 font-mono text-xs transition-all">
+                            Copy Tier 0 Card HTML
+                        </button>
+                    </div>
+
+                    <!-- Liquid Template Card -->
+                    <div class="p-6 rounded-3xl bg-slime-surface border border-slime-plasma/50 shadow-plasma-glow space-y-4">
+                        <div class="flex items-center justify-between">
+                            <span class="px-3 py-1 rounded-full text-xs font-mono bg-slime-plasma/20 text-slime-jelly border border-slime-plasma/40">Tier 1 · Liquid</span>
+                            <span class="font-mono text-xs text-slime-jelly">2-5ms</span>
+                        </div>
+                        <h4 class="font-titan text-lg text-slime-pure">Plasma V8 Isolate</h4>
+                        <p class="text-xs text-slime-muted font-jakarta leading-relaxed">
+                            Self-healing warm V8 isolate cache with surface tension RLS boundaries.
+                        </p>
+                        <button onclick="copySnippet('liquid-card-code')" class="w-full py-2 rounded-xl bg-slime-plasma text-white font-mono text-xs font-bold transition-all hover:bg-slime-berry">
+                            Copy Tier 1 Card HTML
+                        </button>
+                    </div>
+
+                    <!-- Crystal Template Card -->
+                    <div class="p-6 rounded-3xl bg-slime-surface border border-slime-ice/40 shadow-crystal-glow space-y-4">
+                        <div class="flex items-center justify-between">
+                            <span class="px-3 py-1 rounded-full text-xs font-mono bg-slime-ice/10 text-slime-ice border border-slime-ice/30">Tier 2 · Crystal</span>
+                            <span class="font-mono text-xs text-slime-ice">&lt; 1ms</span>
+                        </div>
+                        <h4 class="font-titan text-lg text-slime-pure">Native AOT Binary</h4>
+                        <p class="text-xs text-slime-muted font-jakarta leading-relaxed">
+                            Compiled machine code AVX-512 routines for high-frequency hotspot endpoints.
+                        </p>
+                        <button onclick="copySnippet('crystal-card-code')" class="w-full py-2 rounded-xl bg-slime-canvas hover:bg-slime-border text-slime-ice border border-slime-ice/40 font-mono text-xs transition-all">
+                            Copy Tier 2 Card HTML
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ========================================== -->
+        <!-- TAB 3: UI COMPONENT & PAGE TEMPLATES       -->
+        <!-- ========================================== -->
+        <section id="tab-components" class="tab-content hidden space-y-12">
+            <div class="space-y-3">
+                <h2 class="font-titan text-3xl sm:text-4xl text-slime-pure">Production UI Component Kits</h2>
+                <p class="text-slime-muted text-base">
+                    Pre-styled, high-fashion web components ready to paste into any Slime interface or web application.
+                </p>
+            </div>
+
+            <!-- Component 1: Hero Banner Component -->
+            <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-titan text-xl text-slime-pure">1. Bioluminescent Hero Section</h3>
+                    <button onclick="copySnippet('code-hero')" class="px-3.5 py-1.5 rounded-xl bg-slime-surface border border-slime-border hover:border-slime-plasma text-slime-pure text-xs font-mono transition-all">
+                        Copy HTML Snippet
+                    </button>
+                </div>
+
+                <div class="p-8 sm:p-12 rounded-3xl bg-slime-surface border border-slime-border relative overflow-hidden flex flex-col items-center text-center space-y-6">
+                    <div class="absolute inset-0 bg-grid-pattern opacity-50"></div>
+                    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-slime-plasma/25 rounded-full blur-3xl pointer-events-none animate-liquid-pulse"></div>
+
+                    <div class="relative z-10 max-w-2xl space-y-4">
+                        <span class="px-3.5 py-1.5 rounded-full bg-slime-canvas border border-slime-plasma/40 text-slime-jelly text-xs font-mono inline-block">
+                            ⚡ Dynamic API Synthesis Pipeline
+                        </span>
+                        <h1 class="font-titan text-4xl sm:text-5xl text-slime-pure">
+                            Swallow Databases. <br><span class="slime-gradient-text">Power Vibecoded UIs.</span>
+                        </h1>
+                        <p class="text-slime-muted text-sm sm:text-base font-jakarta">
+                            Feed raw Postgres, ClickHouse, or REST endpoints directly to Slime. Zero ORM migrations, zero API server boilerplate.
+                        </p>
+                        <div class="flex flex-wrap items-center justify-center gap-4 pt-4">
+                            <button class="px-6 py-3 rounded-xl bg-gradient-to-r from-slime-plasma to-slime-berry text-white font-jakarta font-bold text-sm shadow-plasma-glow hover:opacity-90 transition-all">
+                                Start Digesting Schemas
+                            </button>
+                            <button class="px-6 py-3 rounded-xl bg-slime-canvas border border-slime-border text-slime-pure font-jakarta font-semibold text-sm hover:border-slime-plasma transition-all">
+                                Read Wetware Architecture
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Component 2: Gatekeeper AST Code Terminal -->
+            <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-titan text-xl text-slime-pure">2. Gatekeeper & UniversalQueryAST Terminal</h3>
+                    <button onclick="copySnippet('code-terminal')" class="px-3.5 py-1.5 rounded-xl bg-slime-surface border border-slime-border hover:border-slime-plasma text-slime-pure text-xs font-mono transition-all">
+                        Copy HTML Snippet
+                    </button>
+                </div>
+
+                <div class="rounded-3xl bg-slime-surface border border-slime-border overflow-hidden">
+                    <div class="bg-slime-canvas px-6 py-3 border-b border-slime-border flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <div class="w-3 h-3 rounded-full bg-red-500/80"></div>
+                            <div class="w-3 h-3 rounded-full bg-yellow-500/80"></div>
+                            <div class="w-3 h-3 rounded-full bg-slime-mint/80"></div>
+                            <span class="text-xs font-mono text-slime-muted ml-2">slime-ast-runtime.ts</span>
+                        </div>
+                        <span class="text-xs font-mono text-slime-mint px-2 py-0.5 rounded bg-slime-mint/10 border border-slime-mint/30">TIER 1 PLASMA · ACTIVE</span>
+                    </div>
+                    <div class="p-6 font-mono text-xs leading-relaxed overflow-x-auto text-slime-pure space-y-2">
+                        <div><span class="text-slime-plasma">import</span> { SlimeRuntime, MembraneRLS } <span class="text-slime-plasma">from</span> <span class="text-slime-mint">'@slime/core'</span>;</div>
+                        <br>
+                        <div><span class="text-slime-wireframe">// Instantiate zero-endpoint V8 plasma isolate</span></div>
+                        <div><span class="text-slime-plasma">const</span> runtime = <span class="text-slime-plasma">new</span> SlimeRuntime({</div>
+                        <div class="pl-4">source: <span class="text-slime-mint">'postgres://db.internal:5432/analytics'</span>,</div>
+                        <div class="pl-4">membrane: MembraneRLS.CellularIsolation(),</div>
+                        <div class="pl-4">autoCrystallize: <span class="text-slime-jelly">true</span></div>
+                        <div>});</div>
+                        <br>
+                        <div><span class="text-slime-wireframe">// Synthesize query in 2.14 ms</span></div>
+                        <div><span class="text-slime-plasma">const</span> result = <span class="text-slime-plasma">await</span> runtime.synthesize(<span class="text-slime-mint">`SELECT * FROM telemetry`</span>);</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Component 3: Telemetry Pills & Badges -->
+            <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-titan text-xl text-slime-pure">3. Status Pills & Latency Telemetry Matrix</h3>
+                    <button onclick="copySnippet('code-pills')" class="px-3.5 py-1.5 rounded-xl bg-slime-surface border border-slime-border hover:border-slime-plasma text-slime-pure text-xs font-mono transition-all">
+                        Copy HTML Snippet
+                    </button>
+                </div>
+
+                <div class="p-8 rounded-3xl bg-slime-surface border border-slime-border flex flex-wrap gap-4 items-center">
+                    <span class="px-3.5 py-1.5 rounded-full font-mono text-xs bg-slime-mint/15 text-slime-mint border border-slime-mint/40 flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-slime-mint animate-pulse"></span> TIER 0 · GAS (180ms)
+                    </span>
+                    <span class="px-3.5 py-1.5 rounded-full font-mono text-xs bg-slime-plasma/20 text-slime-jelly border border-slime-plasma/50 flex items-center gap-2 shadow-plasma-glow">
+                        <span class="w-2 h-2 rounded-full bg-slime-plasma animate-ping"></span> TIER 1 · LIQUID (2.4ms)
+                    </span>
+                    <span class="px-3.5 py-1.5 rounded-full font-mono text-xs bg-slime-ice/15 text-slime-ice border border-slime-ice/40 flex items-center gap-2 shadow-crystal-glow">
+                        <span class="w-2 h-2 rounded-full bg-slime-ice"></span> TIER 2 · CRYSTAL (0.38ms)
+                    </span>
+                    <span class="px-3.5 py-1.5 rounded-full font-mono text-xs bg-slime-canvas text-slime-muted border border-slime-border flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-slime-wireframe"></span> LEGACY REST (450ms)
+                    </span>
+                </div>
+            </div>
+
+            <!-- Component 4: Button Action System -->
+            <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-titan text-xl text-slime-pure">4. Laser Plasma Button System</h3>
+                    <button onclick="copySnippet('code-buttons')" class="px-3.5 py-1.5 rounded-xl bg-slime-surface border border-slime-border hover:border-slime-plasma text-slime-pure text-xs font-mono transition-all">
+                        Copy HTML Snippet
+                    </button>
+                </div>
+
+                <div class="p-8 rounded-3xl bg-slime-surface border border-slime-border flex flex-wrap gap-4 items-center">
+                    <!-- Primary Plasma Button -->
+                    <button class="px-6 py-3 rounded-xl bg-gradient-to-r from-slime-plasma to-slime-berry text-white font-jakarta font-bold text-sm shadow-plasma-glow hover:opacity-90 transition-all active:scale-95">
+                        Primary Plasma CTA
+                    </button>
+
+                    <!-- Secondary Ghost Button -->
+                    <button class="px-6 py-3 rounded-xl bg-slime-canvas border border-slime-border text-slime-pure font-jakarta font-semibold text-sm hover:border-slime-plasma transition-all active:scale-95">
+                        Ghost Membrane Button
+                    </button>
+
+                    <!-- Cryo Mint Gas Button -->
+                    <button class="px-6 py-3 rounded-xl bg-slime-mint/10 border border-slime-mint/40 text-slime-mint font-jakarta font-semibold text-sm hover:bg-slime-mint/20 transition-all active:scale-95">
+                        Gas State Trigger
+                    </button>
+
+                    <!-- Crystal Button -->
+                    <button class="px-6 py-3 rounded-xl bg-slime-ice/10 border border-slime-ice/40 text-slime-ice font-jakarta font-semibold text-sm hover:bg-slime-ice/20 transition-all active:scale-95">
+                        Crystalize Route
+                    </button>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ========================================== -->
+        <!-- TAB 4: AI AGENT SYSTEM PROMPT SPEC        -->
+        <!-- ========================================== -->
+        <section id="tab-agent" class="tab-content hidden space-y-10">
+            <div class="space-y-3">
+                <h2 class="font-titan text-3xl sm:text-4xl text-slime-pure">Downstream AI Agent Prompt Specification</h2>
+                <p class="text-slime-muted text-base max-w-3xl">
+                    Copy these ready-to-use CSS tokens and system-prompt instructions into LLMs (GPT-4, Claude, Gemini) when generating new Slime components, landing pages, or marketing copy.
+                </p>
+            </div>
+
+            <!-- CSS Tokens Card -->
+            <div class="p-6 rounded-3xl bg-slime-surface border border-slime-border space-y-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-titan text-xl text-slime-pure">1. `:root` CSS Variables Boilerplate</h3>
+                    <button onclick="copySnippet('code-css-root')" class="px-3.5 py-1.5 rounded-xl bg-slime-canvas border border-slime-border hover:border-slime-plasma text-slime-pure text-xs font-mono transition-all">
+                        Copy CSS Variables
+                    </button>
+                </div>
+                <pre id="code-css-root" class="bg-slime-canvas p-4 rounded-2xl text-xs font-mono text-slime-pure border border-slime-border overflow-x-auto leading-relaxed">:root {
+  --bg-canvas: #0B070C;
+  --bg-surface: #161019;
+  --border-color: #2D1F33;
+  --border-bright: #442D4D;
+  --plasma-primary: #FF1476;
+  --plasma-shadow: #8F0043;
+  --plasma-highlight: #FF85C0;
+  --gas-accent: #38F8B8;
+  --crystal-accent: #F2EAFF;
+  --crystal-glow: #C4B5FD;
+  --wireframe-grey: #6E5C77;
+  --text-pure: #F8F6FC;
+  --text-muted: #A396AC;
+}</pre>
+            </div>
+
+            <!-- AI Agent System Prompt Ruleset -->
+            <div class="p-6 rounded-3xl bg-slime-surface border border-slime-border space-y-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-titan text-xl text-slime-pure">2. System Prompt Rulebook for Other AI Agents</h3>
+                    <button onclick="copySnippet('code-agent-prompt')" class="px-3.5 py-1.5 rounded-xl bg-slime-plasma text-white text-xs font-mono font-bold transition-all hover:bg-slime-berry">
+                        Copy Full Agent Prompt
+                    </button>
+                </div>
+                <pre id="code-agent-prompt" class="bg-slime-canvas p-5 rounded-2xl text-xs font-mono text-slime-muted border border-slime-border overflow-x-auto leading-relaxed text-wrap">You are an expert UI/UX Engineer and Copywriter enforcing the SLIME v3.0 Wetware Lab Design System.
+
+STRICT DESIGN RULES:
+1. CANVAS BACKGROUND: Always use #0B070C (Abyssal Plum-Black). Never use pure black (#000000) or Slate gray.
+2. SURFACES: Use Velvet Obsidian (#161019) with 1px solid #2D1F33 borders and rounded-3xl corners.
+3. ACCENT COLOR: Laser Plasma (#FF1476) with subsurface shadow #8F0043 and specular highlight #FF85C0.
+4. TYPOGRAPHY MATRIX:
+   - Oi: Wordmark "slime" and hero punchlines only.
+   - Titan One: Card titles and section headers (H1/H2).
+   - Plus Jakarta Sans: All body text, button labels, and descriptions.
+   - JetBrains Mono: Latency telemetry (e.g. "2.4 ms"), AST trees, and fingerprints.
+5. MATTER STATES:
+   - Gas (Tier 0): Cryo Mint (#38F8B8), dashed border, ~180ms latency.
+   - Liquid (Tier 1): Laser Plasma (#FF1476), glowing border, 2-5ms latency.
+   - Crystal (Tier 2): Diamond Quartz (#F2EAFF / #C4B5FD), sharp crystalline glow, <1ms latency.
+6. VOICE & TONE: High-Fashion Wetware Bioluminescence. Talk about software as a living, hyper-performant organism that swallows legacy APIs.</pre>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slime-border py-8 text-center text-xs font-mono text-slime-muted">
+        <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-2">
+                <span class="font-oi slime-gradient-text text-lg">slime</span>
+                <span>— Zero-Endpoint Dynamic Runtime</span>
+            </div>
+            <span>v3.0 Wetware Lab Edition • Locked Specification</span>
+        </div>
+    </footer>
+
+    <!-- Hidden Raw HTML Code Snippets for Copying -->
+    <div class="hidden">
+        <div id="gas-card-code">
+<div class="p-6 rounded-3xl bg-[#161019] border border-dashed border-[#38F8B8]/40 space-y-4">
+    <div class="flex items-center justify-between">
+        <span class="px-3 py-1 rounded-full text-xs font-mono bg-[#38F8B8]/10 text-[#38F8B8] border border-[#38F8B8]/30">Tier 0 · Gas</span>
+        <span class="font-mono text-xs text-[#A396AC]">150-300ms</span>
+    </div>
+    <h4 class="font-['Titan_One'] text-lg text-[#F8F6FC]">Vapor Intent Engine</h4>
+    <p class="text-xs text-[#A396AC] font-['Plus_Jakarta_Sans']">Zero schema upfront. Intent parsed on first contact.</p>
+</div>
+        </div>
+
+        <div id="liquid-card-code">
+<div class="p-6 rounded-3xl bg-[#161019] border border-[#FF1476]/50 shadow-[0_0_35px_-5px_rgba(255,20,118,0.45)] space-y-4">
+    <div class="flex items-center justify-between">
+        <span class="px-3 py-1 rounded-full text-xs font-mono bg-[#FF1476]/20 text-[#FF85C0] border border-[#FF1476]/40">Tier 1 · Liquid</span>
+        <span class="font-mono text-xs text-[#FF85C0]">2-5ms</span>
+    </div>
+    <h4 class="font-['Titan_One'] text-lg text-[#F8F6FC]">Plasma V8 Isolate</h4>
+    <p class="text-xs text-[#A396AC] font-['Plus_Jakarta_Sans']">Self-healing warm V8 isolate cache with high surface tension.</p>
+</div>
+        </div>
+
+        <div id="crystal-card-code">
+<div class="p-6 rounded-3xl bg-[#161019] border border-[#C4B5FD]/40 shadow-[0_0_35px_-5px_rgba(196,181,253,0.35)] space-y-4">
+    <div class="flex items-center justify-between">
+        <span class="px-3 py-1 rounded-full text-xs font-mono bg-[#C4B5FD]/10 text-[#C4B5FD] border border-[#C4B5FD]/30">Tier 2 · Crystal</span>
+        <span class="font-mono text-xs text-[#C4B5FD]">&lt; 1ms</span>
+    </div>
+    <h4 class="font-['Titan_One'] text-lg text-[#F8F6FC]">Native AOT Binary</h4>
+    <p class="text-xs text-[#A396AC] font-['Plus_Jakarta_Sans']">Compiled machine code AVX-512 routines for high-frequency hotspots.</p>
+</div>
+        </div>
+
+        <div id="code-hero">
+<div class="p-12 rounded-3xl bg-[#161019] border border-[#2D1F33] relative overflow-hidden text-center space-y-6">
+    <span class="px-3.5 py-1.5 rounded-full bg-[#0B070C] border border-[#FF1476]/40 text-[#FF85C0] text-xs font-mono inline-block">
+        ⚡ Dynamic API Synthesis Pipeline
+    </span>
+    <h1 class="font-['Titan_One'] text-5xl text-[#F8F6FC]">
+        Swallow Databases. <br><span class="bg-gradient-to-r from-[#FF85C0] via-[#FF1476] to-[#8F0043] bg-clip-text text-transparent">Power Vibecoded UIs.</span>
+    </h1>
+    <p class="text-[#A396AC] text-base font-['Plus_Jakarta_Sans'] max-w-xl mx-auto">
+        Feed raw Postgres or REST endpoints directly to Slime. Zero ORM migrations required.
+    </p>
+    <button class="px-6 py-3 rounded-xl bg-gradient-to-r from-[#FF1476] to-[#8F0043] text-white font-['Plus_Jakarta_Sans'] font-bold text-sm shadow-[0_0_35px_-5px_rgba(255,20,118,0.45)]">
+        Start Digesting Schemas
+    </button>
+</div>
+        </div>
+
+        <div id="code-terminal">
+<div class="rounded-3xl bg-[#161019] border border-[#2D1F33] overflow-hidden">
+    <div class="bg-[#0B070C] px-6 py-3 border-b border-[#2D1F33] flex items-center justify-between">
+        <span class="text-xs font-mono text-[#A396AC]">slime-ast-runtime.ts</span>
+        <span class="text-xs font-mono text-[#38F8B8]">TIER 1 PLASMA · ACTIVE</span>
+    </div>
+    <pre class="p-6 font-mono text-xs text-[#F8F6FC] bg-[#161019]">
+import { SlimeRuntime, MembraneRLS } from '@slime/core';
+
+const runtime = new SlimeRuntime({
+  source: 'postgres://db.internal:5432/analytics',
+  membrane: MembraneRLS.CellularIsolation()
+});
+const result = await runtime.synthesize(`SELECT * FROM telemetry`);
+    </pre>
+</div>
+        </div>
+
+        <div id="code-pills">
+<div class="flex flex-wrap gap-3">
+    <span class="px-3.5 py-1.5 rounded-full font-mono text-xs bg-[#38F8B8]/15 text-[#38F8B8] border border-[#38F8B8]/40">TIER 0 · GAS (180ms)</span>
+    <span class="px-3.5 py-1.5 rounded-full font-mono text-xs bg-[#FF1476]/20 text-[#FF85C0] border border-[#FF1476]/50 shadow-[0_0_20px_rgba(255,20,118,0.4)]">TIER 1 · LIQUID (2.4ms)</span>
+    <span class="px-3.5 py-1.5 rounded-full font-mono text-xs bg-[#C4B5FD]/15 text-[#C4B5FD] border border-[#C4B5FD]/40">TIER 2 · CRYSTAL (0.38ms)</span>
+</div>
+        </div>
+
+        <div id="code-buttons">
+<div class="flex gap-4">
+    <button class="px-6 py-3 rounded-xl bg-gradient-to-r from-[#FF1476] to-[#8F0043] text-white font-['Plus_Jakarta_Sans'] font-bold text-sm shadow-[0_0_35px_-5px_rgba(255,20,118,0.45)]">Primary Plasma CTA</button>
+    <button class="px-6 py-3 rounded-xl bg-[#0B070C] border border-[#2D1F33] text-[#F8F6FC] font-['Plus_Jakarta_Sans'] font-semibold text-sm hover:border-[#FF1476]">Ghost Membrane</button>
+</div>
+        </div>
+    </div>
+
+    <!-- JavaScript Logic -->
+    <script>
+        // Color Palette Data Array
+        const slimeColors = [
+            { name: 'Abyssal Plum', hex: '#0B070C', var: '--bg-canvas', role: 'Dark Canvas background' },
+            { name: 'Velvet Obsidian', hex: '#161019', var: '--bg-surface', role: 'Card / Surface container' },
+            { name: 'Membrane Border', hex: '#2D1F33', var: '--border-color', role: 'Cell-wall borders (1px)' },
+            { name: 'Membrane Bright', hex: '#442D4D', var: '--border-bright', role: 'Hover state for active cards' },
+            { name: 'Laser Plasma', hex: '#FF1476', var: '--plasma-primary', role: 'Primary Accent / Primary CTAs' },
+            { name: 'Bruised Berry', hex: '#8F0043', var: '--plasma-shadow', role: '3D Goo Shadow gradient stop' },
+            { name: 'Specular Jelly', hex: '#FF85C0', var: '--plasma-highlight', role: 'Rim highlights & glows' },
+            { name: 'Cryo Mint', hex: '#38F8B8', var: '--gas-accent', role: 'Tier 0 Ephemeral Gas accent' },
+            { name: 'Diamond Quartz', hex: '#F2EAFF', var: '--crystal-accent', role: 'Tier 2 Crystal foreground' },
+            { name: 'Iridescent Ice', hex: '#C4B5FD', var: '--crystal-glow', role: 'Tier 2 Crystal glow border' },
+            { name: 'Wireframe Grey', hex: '#6E5C77', var: '--wireframe-grey', role: 'Legacy code & structural lines' },
+            { name: 'Text Pure', hex: '#F8F6FC', var: '--text-pure', role: 'Primary readable body text' }
+        ];
+
+        // Render Color Grid Swatches
+        function renderColorSwatches() {
+            const grid = document.getElementById('color-grid');
+            grid.innerHTML = slimeColors.map(c => `
+                <div onclick="copyText('${c.hex}', 'Copied ${c.name} (${c.hex})')"
+                     class="p-4 rounded-2xl bg-slime-surface border border-slime-border hover:border-slime-plasma cursor-pointer transition-all duration-200 group flex flex-col justify-between h-44 shadow-lg">
+                    <div class="h-16 w-full rounded-xl border border-slime-border transition-transform group-hover:scale-[1.02]" style="background-color: ${c.hex}"></div>
+                    <div class="mt-3 space-y-1">
+                        <div class="flex items-center justify-between">
+                            <h4 class="font-titan text-sm text-slime-pure">${c.name}</h4>
+                            <span class="font-mono text-xs text-slime-jelly font-bold">${c.hex}</span>
+                        </div>
+                        <p class="text-[11px] font-mono text-slime-muted truncate">${c.var}</p>
+                        <p class="text-[11px] text-slime-muted font-jakarta truncate">${c.role}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Tab Switching Logic
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.nav-tab').forEach(el => {
+                el.classList.remove('bg-slime-plasma', 'text-white', 'shadow-plasma-glow');
+                el.classList.add('text-slime-muted');
+            });
+
+            document.getElementById(tabId).classList.remove('hidden');
+            const activeBtn = document.getElementById(`nav-${tabId}`);
+            activeBtn.classList.remove('text-slime-muted');
+            activeBtn.classList.add('bg-slime-plasma', 'text-white', 'shadow-plasma-glow');
+        }
+
+        // Copy Text & Toast Notification
+        function copyText(text, message = 'Copied to clipboard!') {
+            const tempInput = document.createElement('textarea');
+            tempInput.value = text;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+
+            showToast(message);
+        }
+
+        function copySnippet(elementId) {
+            const el = document.getElementById(elementId);
+            if (el) {
+                copyText(el.innerText.trim(), 'HTML Snippet Copied!');
+            }
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toast-message');
+            toastMsg.innerText = msg;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 2500);
+        }
+
+        // Matter State Simulator Logic
+        const simStates = {
+            gas: {
+                title: 'TIER 0 · GAS (Ephemera)',
+                colorClass: 'text-slime-mint',
+                borderClass: 'border-slime-mint/40',
+                glowColor: 'rgba(56, 248, 184, 0.25)',
+                latency: '184.2 ms',
+                icon: '☁️',
+                desc: 'Intent is parsed dynamically on first contact. Zero upfront compilation.',
+                code: `// Ephemeral Intent Interpretation
+const result = await slime.interpret({
+  intent: "SELECT * FROM customers WHERE tier = 'enterprise'",
+  rls: "cellular_isolation"
+});`,
+                throughput: '120 req/sec',
+                progress: '25%',
+                lock: 'UNLOCKED (Vapor)'
+            },
+            liquid: {
+                title: 'TIER 1 · LIQUID (Plasma)',
+                colorClass: 'text-slime-jelly',
+                borderClass: 'border-slime-plasma shadow-plasma-glow',
+                glowColor: 'rgba(255, 20, 118, 0.45)',
+                latency: '2.40 ms',
+                icon: '🧪',
+                desc: 'Synthesized into a warm V8 isolate bundle with surface tension RLS boundaries.',
+                code: `// Warm V8 Plasma Isolate Route
+const isolate = slime.getIsolate("hash_8f9a2b");
+const result = await isolate.execute({
+  params: { tier: 'enterprise' }
+});`,
+                throughput: '4,500 req/sec',
+                progress: '65%',
+                lock: 'WARM CACHE'
+            },
+            crystal: {
+                title: 'TIER 2 · CRYSTAL (Native AOT)',
+                colorClass: 'text-slime-ice',
+                borderClass: 'border-slime-ice shadow-crystal-glow',
+                glowColor: 'rgba(196, 181, 253, 0.45)',
+                latency: '0.38 ms',
+                icon: '💎',
+                desc: 'Compiled into immutable x86_64 machine code for high-volume hotspot endpoints.',
+                code: `// Compiled Native Binary (AVX-512)
+extern "C" uint64_t slime_query_enterprise_customers() {
+    // Zero overhead sub-millisecond execution
+    return execute_aot_binary_hotspot();
+}`,
+                throughput: '48,000 req/sec',
+                progress: '100%',
+                lock: 'IMMUTABLE BINARY'
+            }
+        };
+
+        let currentSimState = 'gas';
+
+        function setSimState(stateKey) {
+            currentSimState = stateKey;
+            const data = simStates[stateKey];
+            const intentVal = document.getElementById('sim-intent-input').value;
+
+            // Update simulator card UI
+            const card = document.getElementById('sim-output-card');
+            card.className = `lg:col-span-7 p-6 sm:p-8 rounded-3xl bg-slime-surface border transition-all duration-500 flex flex-col justify-between ${data.borderClass}`;
+
+            document.getElementById('sim-state-title').innerText = data.title;
+            document.getElementById('sim-state-title').className = `font-titan text-xl ${data.colorClass}`;
+            document.getElementById('sim-badge-dot').className = `w-3.5 h-3.5 rounded-full ${data.colorClass.replace('text-', 'bg-')} animate-pulse`;
+
+            document.getElementById('sim-latency').innerText = data.latency;
+            document.getElementById('sim-icon').innerText = data.icon;
+            document.getElementById('sim-status-desc').innerText = data.desc;
+            document.getElementById('sim-code-block').innerText = data.code;
+            document.getElementById('sim-throughput').innerText = data.throughput;
+            document.getElementById('sim-progress-bar').style.width = data.progress;
+            document.getElementById('sim-lock-status').innerText = data.lock;
+
+            document.getElementById('sim-glow-blob').style.backgroundColor = data.glowColor;
+
+            // Highlight state buttons
+            document.querySelectorAll('.state-btn').forEach(btn => {
+                btn.classList.remove('border-slime-plasma', 'border-slime-mint', 'border-slime-ice', 'bg-slime-mint/10', 'bg-slime-plasma/10', 'bg-slime-ice/10');
+            });
+        }
+
+        function copySimCode() {
+            const code = document.getElementById('sim-code-block').innerText;
+            copyText(code, 'AST Code Snippet Copied!');
+        }
+
+        // Initialize App on DOM Load
+        window.onload = function() {
+            renderColorSwatches();
+            setSimState('gas');
+        };
+    </script>
+</body>
+</html>

@@ -922,13 +922,13 @@
       "updated": 1,
       "link": null,
       "locked": false,
-      "text": "Production: agent module is not loaded; only Bone handlers pinned in lee.lock are served.",
+      "text": "Production: agent module is not loaded; only Crystal handlers pinned in lee.lock are served.",
       "fontSize": 20,
       "fontFamily": 1,
       "textAlign": "center",
       "verticalAlign": "middle",
       "containerId": null,
-      "originalText": "Production: agent module is not loaded; only Bone handlers pinned in lee.lock are served.",
+      "originalText": "Production: agent module is not loaded; only Crystal handlers pinned in lee.lock are served.",
       "autoResize": true,
       "lineHeight": 1.25
     }
