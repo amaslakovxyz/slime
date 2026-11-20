@@ -425,8 +425,8 @@ that direct push. Per-tenant Crystal in Slime Cloud has no repo to push to
 | R1 | Silo cost scales linearly with customers, about $18–36/mo compute floor each (§7.1). | Accepted (D3). Pooling would need a tenant in the cache key and cross-tenant sandbox hardening. |
 | R2 | While the repo is a single private monorepo, a private import can slip into `oss/`. | Mitigated by the §4 CI checks. The subtree-split dry run is the backstop. |
 | R3 | The DynamoDB 400 KB item limit vs fixtures holding up to `ROW_CAP` rows. | Mitigated in the adapter design (§7.3). |
-| R4 | P0 moves `sandbox/` while branches still edit it (`origin/feat/crystal` adds about 1.6k lines; local worktree `feat/database-adapters`). Every open branch hits rename conflicts. | Land P0 right after those branches merge, or rebase them right after P0. Git's rename detection carries most edits across. Coordinate with the team before P0. |
-| R5 | Managed keys (D4): every tenant task shares the platform's Anthropic org rate limits, so one tenant's generation burst can throttle the others. | Per-plan generation caps through the existing per-instance limits (`config.ts:77-78`) plus aggregate monitoring. Separate keys per plan if needed. |
+| R4 | P0 moves `sandbox/` while branches still edit it (`origin/feat/crystal` adds about 1.6k lines; local worktree `feat/database-adapters`). Every open branch hits rename conflicts. | Land P0 right after those branches merge, or rebase them right after P0. Git's rename detection should carry most edits across `[INFERENCE]`. Coordinate with the team before P0. |
+| R5 | Managed keys (D4): every tenant task shares the platform's Anthropic org rate limits, so one tenant's generation burst can throttle the others. | Per-plan generation caps through the existing per-instance limits (`config.ts:77-78`) plus aggregate monitoring. Anthropic enforces limits per organization and supports per-workspace limits (<https://platform.claude.com/docs/en/api/rate-limits>), so one workspace per plan or tenant can cap a burst. |
 
 ## 12. Research and quality-gate ledger
 
@@ -474,8 +474,8 @@ Rejected alternatives:
 | Copybara now, pnpm/Turborepo/Helm, Flyway | Not needed before going public, or a JVM tool in a Node stack. |
 
 Design-doc gate: QualityGate checked this document itself. Of 62 repo citations
-and 23 URLs, all resolve. It found 16 text-level defects: four undeclared
-conflicts with `concepts_brief.md`, missing `[INFERENCE]` tags, a wrong
+and 23 URLs, all resolve. It found 16 text-level defects: two undeclared
+conflicts with `concepts_brief.md` (D6, D10), missing `[INFERENCE]` tags, a wrong
 DynamoDB URL, and Telemetry vs metering gaps. All 16 are fixed in this version.
 
 Adversarial review ledger:
