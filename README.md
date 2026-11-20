@@ -22,6 +22,7 @@ Backend -- Slime runtime:
   no build step). Preview with `just landing`.
 - [sandbox/](./sandbox/README.md) - Slime v0 prototype (Node 22, TypeScript,
   Hono, Postgres, Claude, QuickJS) and its speed/correctness benchmark.
+  Frozen: new engine work goes into `oss/packages/core/`.
 - [oss/packages/core/](./oss/packages/core/README.md) - `@slime-cloud/core`,
   the engine rebuilt from `sandbox/` as an installable library. Design phase:
   [PLAN.md](./oss/packages/core/PLAN.md) holds the decisions and milestones.

@@ -53,8 +53,7 @@ optional adapters, or any custom store.
 
 * [concepts_brief.md](../../../concepts_brief.md): the v0 concept and the
   benchmark results.
-* [sandbox/](../../../sandbox/README.md): the working prototype. Core is
-  rebuilt from it module by module; the sandbox stays as the reference until
-  core matches it.
+* [sandbox/](../../../sandbox/README.md): the first prototype. It is frozen
+  and not used any more; core may copy code and tests from it.
 * PR #7, `docs/oss-saas-split-design.md`: the layers (core → server →
   platform) and the `@slime-cloud` name.

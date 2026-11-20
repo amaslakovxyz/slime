@@ -13,9 +13,11 @@ and used:
 * configure it in code;
 * call `slime.query()` inside any Node app.
 
-We build a new package instead of moving `sandbox/`. Each sandbox module is
-brought over on purpose, together with its tests, and reshaped into a
-library: options in, no global state, no `.env` reading.
+Core is the engine from now on; the team agreed on 2026-11-20 that `sandbox/`
+is not used any more. Core is a new package, not a move of `sandbox/`. Sandbox
+code and tests may be copied where they help, but they are reshaped into a
+library: options in, no global state, no `.env` reading. Nothing has to match
+the sandbox's behavior.
 
 ## 2. What we start from
 
@@ -32,16 +34,14 @@ This plan builds core as a library at the same path instead. Server and
 platform (PR #7 Tasks 2 and 4) then build on `createSlime()`. **Agree this
 with the PR #7 author before M0 lands.**
 
-Where this plan differs from `slime-cloud/runtime`: its README says
-`sandbox/` "stays exactly what gets published". This plan publishes a new
-package instead (C2). The runtime then changes in a few places (§7, M7):
+`slime-cloud/runtime` moves to the package (agreed with the team; its README
+still says `sandbox/` gets published, which is now out of date). The runtime
+changes in a few places (§7, M7):
 
 * it uses `createSlime(new SlimeConfig(…))` instead of setting env before
   importing;
 * it uses the `dynamodb` store type instead of its own `DynamoHandlerStore`;
 * it imports the package instead of the path mapping to `sandbox/src`.
-
-**Agree this with the runtime's owner (amaslakov).**
 
 ## 3. Decisions
 
@@ -51,7 +51,7 @@ Status: **Decided**, **Proposed** (default unless someone objects) or
 | # | Question | Proposal | Status |
 |---|---|---|---|
 | C1 | Name and location | `@slime-cloud/core` in `oss/packages/core/`, inside npm workspaces at the repo root (PR #7 D10). | Decided |
-| C2 | Start from scratch or move the sandbox? | New package. Port modules one at a time, each with its tests. The sandbox isn't touched until core reaches parity and `slime-cloud/runtime` has moved to the package; then it's retired (M7). | Decided |
+| C2 | Start from scratch or move the sandbox? | New package. Core is the only engine; `sandbox/` is frozen and not used (team agreement, 2026-11-20). Its code and tests are a quarry to copy from, not a reference to match. It is deleted once `slime-cloud/runtime` has moved to the package (M7). | Decided |
 | C3 | Runtime | v1: Node ≥ 22, ESM only. Built so that other runtimes (Bun, Deno, edge) can be added later without touching the engine. Runtime-specific code stays behind Ports: the shaping sandbox goes behind a new `SandboxRunner` Port (today a QuickJS worker thread), and database drivers stay behind `Connector`. The engine uses only `node:*` modules that Bun and Deno also provide. | Decided |
 | C4 | Configuration | A `SlimeConfig` class. The app creates it and adds the parts it needs: connector, generator, store, limits. Each part can come from env, a secrets store or anywhere else in the app. The class fills defaults, validates everything at once (reporting every problem, not just the first), and is immutable; `config.with({...})` returns a changed copy for tests. Core never reads `process.env` or `.env`. | Decided (class shape: Proposed) |
 | C5 | Entry point | Three steps in the app: create a connector (where data comes from), create a Slime instance with `createSlime(config)`, then call `slime.query()` inside any endpoint. The instance also has `handlers()`, `stats()`, `evict(id)`, `flush()` and `close()`. | Decided |
@@ -362,8 +362,9 @@ oss/packages/core/
 
 ## 7. Milestones
 
-Each milestone ends with green tests and a commit. The sandbox test that each
-one ports is named, so parity can be checked.
+Each milestone ends with green tests and a commit. Where a sandbox test file
+is named, its cases are copied and adapted; matching the sandbox is not a
+goal.
 
 | # | Milestone | Done when |
 |---|---|---|
@@ -384,9 +385,9 @@ one ports is named, so parity can be checked.
   several instances in explore mode must use a shared store (Postgres,
   DynamoDB).
 
-* **Two copies during the port.** Fixes that land in `sandbox/` before M6
-  must be ported by hand. Keep the port short, and tell the team that new
-  engine work goes into core.
+* **The runtime runs on frozen sandbox code until M7.** `slime-cloud/runtime`
+  keeps compiling `sandbox/src` until it moves to the package. Bugs found there
+  are fixed in core, not in the sandbox, so M7 shouldn't wait too long.
 * **The worker file in a built package.** `shape-worker.mjs` is resolved
   relative to the module. It must be copied into `dist/` and tested from the
   packed tarball (M6), not only from the source tree.
@@ -410,8 +411,6 @@ C1–C11 and most of §4 are decided. Still to do:
 
 * R4, R5, R7, D5–D8 and C15 (Proposed);
 * confirm C12 (what's out of scope);
-* agree with the PR #7 author that core is built at `oss/packages/core` (§2);
-* agree with the owner of `slime-cloud/runtime` that it moves to the package
-  instead of `sandbox/` (§2, M7).
+* agree with the PR #7 author that core is built at `oss/packages/core` (§2).
 
 M0, the skeleton, doesn't depend on any of these and can start now.
