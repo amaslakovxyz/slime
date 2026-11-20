@@ -54,3 +54,19 @@ jobs:
       - run: npm test
         env:
           REQUIRE_DB: "1"
+      # The Lambda bundle deployed by terraform.yml (infra/aws/platform).
+      - run: npm run build:lambda
+
+  landing:
+    name: Landing function tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      # The landing stack (infra/aws/landing) arrives with its own PR; no-op until then.
+      - uses: actions/setup-node@v4
+        if: hashFiles('infra/aws/landing/function/index.test.mjs') != ''
+        with:
+          node-version: 22
+      - if: hashFiles('infra/aws/landing/function/index.test.mjs') != ''
+        run: node --test infra/aws/landing/function/

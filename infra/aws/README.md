@@ -6,7 +6,17 @@ Account `025772230981`, home region `eu-central-1`. All state lives in
 | Stack | State key | Applied by |
 |---|---|---|
 | [`bootstrap/`](bootstrap/README.md) | `bootstrap/terraform.tfstate` | A human, `default` (admin) profile |
-| `platform/` | `platform/terraform.tfstate` | GitHub Actions on merge to `main` |
+| [`platform/`](#platform-slime-runtime) | `platform/terraform.tfstate` | GitHub Actions on merge to `main` |
+| `landing/` (PR #11) | `landing/terraform.tfstate` | GitHub Actions on merge to `main` |
+
+[`terraform.yml`](../../.github/workflows/terraform.yml) picks up every
+directory here except `bootstrap/`: a new stack is deployed by adding it. A
+stack with a `build.sh` gets it run before plan/apply (platform builds the
+runtime bundle). Apply refuses plans with pure deletes; replacements pass.
+Run it by hand with `allow_destroy` when a delete is intended.
+
+Once a stack is applied by CI, do not apply it from a branch: the next push to
+`main` would plan your branch-only resources away (the delete guard stops it).
 
 ```mermaid
 flowchart LR
@@ -16,6 +26,37 @@ flowchart LR
   P --> S[(S3 state + .tflock)]
   A --> S
   H[Human] -->|AWS_PROFILE=default| B[bootstrap: roles, bucket, budgets]
+```
+
+## Platform: Slime runtime
+
+[`platform/runtime.tf`](platform/runtime.tf): Lambda `slime-runtime` (Function
+URL, arm64, Node 22) built from `sandbox/` by `npm run build:lambda`, and
+DynamoDB table `slime-handlers` for reviewed Liquid handlers (partition key
+`tenantId`, sort key `artifactKey`). Post-deploy CI checks that `/healthz`
+answers 401 without a key.
+
+Settings are SSM parameters under `/slime/runtime/`, loaded as env vars at cold
+start. Terraform never manages them, so secrets stay out of state. Set them once
+(and after any change, force a cold start by redeploying or updating the
+function configuration):
+
+```sh
+export AWS_PROFILE=slime
+put() { aws ssm put-parameter --name "/slime/runtime/$1" --type SecureString --overwrite --value "$2" >/dev/null; }
+put SLIME_API_KEY "$(openssl rand -hex 24)"   # clients send it as x-api-key
+put DATABASE_URL 'postgres://<read-only user>:<pw>@<host>:5432/<db>'
+put SLIME_PROVIDER claude                       # or groq / offline
+put ANTHROPIC_API_KEY '<key>'                   # GROQ_API_KEY for groq
+```
+
+Any other `config.ts` variable (`SLIME_MODE`, `MAX_GENERATIONS_PER_HOUR`, ...)
+can be set the same way. Until `DATABASE_URL` points at a reachable read-only
+Postgres, authenticated requests get `503 NOT_READY`.
+
+```sh
+URL=$(terraform -chdir=infra/aws/platform output -raw runtime_url)
+curl -s "${URL}healthz" -H "x-api-key: $KEY" | jq
 ```
 
 ## Rules for `platform/`

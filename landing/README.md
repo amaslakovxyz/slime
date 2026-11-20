@@ -21,12 +21,11 @@ Or open `index.html` directly in a browser.
 
 ## Deploy
 
-[`.github/workflows/pages.yml`](../.github/workflows/pages.yml) publishes this
-folder to GitHub Pages on every push to `main` that touches `landing/`. It can
-also be run by hand from the Actions tab.
-
-One-time setup by a repo admin: **Settings → Pages → Build and deployment →
-Source: GitHub Actions**.
+Served from AWS Lambda; the stack lives in
+[`infra/aws/landing/`](../infra/aws/landing/README.md).
+[`.github/workflows/terraform.yml`](../.github/workflows/terraform.yml) applies
+it on every push to `main` that touches `landing/` or `infra/aws/`.
+GitHub Pages is not an option: this private repo is on GitHub Free.
 
 ## Where things come from
 
