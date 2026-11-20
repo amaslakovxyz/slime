@@ -172,12 +172,14 @@
     .menu-list { list-style: none; margin: 0; padding: 0; }
     .menu-list li + li { border-top: 1px solid rgba(45,31,51,.7); }
     .dish {
-      width: 100%; display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; column-gap: 8px;
+      width: 100%; display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; column-gap: 10px;
       padding: 7px 0; background: none; border: 0; cursor: pointer; text-align: left; color: var(--text-pure); font: inherit;
     }
-    .dish-name { font-family: var(--font-mono); font-size: 11.5px; font-weight: 500; transition: color .2s ease; white-space: nowrap; }
+    .dish-name { font-size: 13.5px; font-weight: 600; transition: color .2s ease; white-space: nowrap; }
+    .dish-ic { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; color: var(--plasma-highlight); background: rgba(255,20,118,.1); border: 1px solid rgba(255,20,118,.28); transition: transform .2s ease; }
+    .dish-ic svg { width: 14px; height: 14px; }
+    .dish:hover .dish-ic { transform: scale(1.08) rotate(-4deg); }
     .dish-leader { border-bottom: 1.5px dotted var(--border-bright); transform: translateY(3px); transition: border-color .2s ease; }
-    .dish-kind { font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--text-muted); white-space: nowrap; }
     .dish-count {
       min-width: 24px; height: 19px; padding: 0 6px; border-radius: 999px; display: inline-grid; place-items: center;
       font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; color: var(--wireframe-grey);
@@ -345,6 +347,20 @@
       box-shadow: 0 6px 22px var(--glow-primary); animation: morph 8s ease-in-out infinite;
     }
     .ico-crystal { filter: drop-shadow(0 6px 18px rgba(124,199,255,.55)); }
+    /* "Any shape": the icon cycles through the three matter states. */
+    .ico-morph { position: relative; }
+    .mx { position: absolute; inset: 0; display: grid; place-items: center; opacity: 0; animation: matter 7.5s cubic-bezier(.4, 0, .2, 1) infinite; }
+    .mx > svg, .mx > .ico-blob { width: 100%; height: 100%; display: block; }
+    .mx-gas { animation-delay: 0s; }
+    .mx-gas svg { filter: drop-shadow(0 6px 16px rgba(56,248,184,.45)); }
+    .mx-liquid { animation-delay: 2.5s; }
+    .mx-crystal { animation-delay: 5s; }
+    @keyframes matter {
+      0% { opacity: 0; transform: scale(.4) rotate(-20deg); }
+      6%, 30% { opacity: 1; transform: scale(1) rotate(0); }
+      36%, 100% { opacity: 0; transform: scale(.4) rotate(20deg); }
+    }
+    @media (prefers-reduced-motion: reduce) { .mx-crystal { opacity: 1; } }
     .hero-sub { max-width: 560px; margin: 26px auto 0; color: var(--text-muted); font-size: 1.2rem; }
     .hero-sub strong { color: var(--text-pure); font-weight: 600; }
     .hero-ctas { display: flex; gap: 12px; justify-content: center; margin-top: 34px; flex-wrap: wrap; }
@@ -360,11 +376,6 @@
     .hero .stage-hint::after { content: "→"; font-size: 14px; letter-spacing: 0; }
     .hero .menu { position: absolute; right: 0; bottom: 34px; }
 
-    /* "Swallows whatever you feed it" row */
-    .feeds { margin-top: 64px; text-align: center; }
-    .feeds p { color: var(--text-muted); font-size: 14.5px; margin-bottom: 24px; }
-    .feeds ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 14px 48px; }
-    .feeds li { display: flex; align-items: center; gap: 10px; font-family: var(--font-mono); font-weight: 700; font-size: 16px; color: var(--wireframe-grey); }
 
     /* ---------- Section heads: label + two-tone heading left, lead right ---------- */
     .sec-head { display: grid; grid-template-columns: 1.2fr .8fr; gap: 40px; align-items: end; margin-bottom: 56px; }
@@ -643,8 +654,6 @@
       .hero .stage { height: 330px; }
       .hero .stage-hint { display: none; }
       .hero .menu { position: relative; right: auto; bottom: auto; width: min(100%, 300px); margin: -36px 0 0 auto; }
-      .feeds ul { gap: 12px 26px; }
-      .feeds li { font-size: 13.5px; }
       .uc-row { flex-direction: column; gap: 18px; }
       .uc { flex: none; }
       .uc-media { height: 120px; transition: height .5s ease; }
@@ -681,7 +690,7 @@
     <!-- ================= HERO ================= -->
     <section class="hero">
       <div class="container">
-        <h1 class="hero-title">One <span class="ico ico-blob" aria-hidden="true"></span> backend.<span class="line2 slime-text">Any <svg class="ico ico-crystal" viewBox="0 0 40 40" aria-hidden="true"><defs><linearGradient id="cg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#E6F7FF"/><stop offset=".5" stop-color="#7CC7FF"/><stop offset="1" stop-color="#2F64E0"/></linearGradient></defs><path d="M20 2 L33 15 L20 38 L7 15 Z" fill="url(#cg)"/><path d="M7 15 H33 M20 2 L15 15 L20 38 L25 15 Z" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="1"/></svg> shape.</span></h1>
+        <h1 class="hero-title">One <span class="ico ico-blob" aria-hidden="true"></span> backend.<span class="line2 slime-text">Any <span class="ico ico-morph" aria-hidden="true"><span class="mx mx-gas"><svg viewBox="0 0 40 40"><defs><radialGradient id="gg" cx="35%" cy="30%" r="70%"><stop offset="0" stop-color="#E6FFF7"/><stop offset=".5" stop-color="#38F8B8"/><stop offset="1" stop-color="#0C5C45"/></radialGradient></defs><circle cx="15" cy="23" r="10" fill="url(#gg)" opacity=".92"/><circle cx="28" cy="14" r="7" fill="url(#gg)" opacity=".85"/><circle cx="30" cy="30" r="4.5" fill="url(#gg)" opacity=".8"/><circle cx="8" cy="9" r="3" fill="url(#gg)" opacity=".7"/></svg></span><span class="mx mx-liquid"><span class="ico-blob"></span></span><span class="mx mx-crystal"><svg class="ico-crystal" viewBox="0 0 40 40" aria-hidden="true"><defs><linearGradient id="cg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#E6F7FF"/><stop offset=".5" stop-color="#7CC7FF"/><stop offset="1" stop-color="#2F64E0"/></linearGradient></defs><path d="M20 2 L33 15 L20 38 L7 15 Z" fill="url(#cg)"/><path d="M7 15 H33 M20 2 L15 15 L20 38 L25 15 Z" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="1"/></svg></span></span> shape.</span></h1>
         <p class="hero-sub"><strong>The backend that builds itself.</strong> Your app asks for data; Slime writes the endpoint and remembers it.</p>
       </div>
 
@@ -697,22 +706,14 @@
               <span class="menu-kicker">menu</span>
             </div>
             <ul class="menu-list" id="menu-list">
-                <li><button class="dish" type="button"><span class="dish-name">GET /api/v1/orders</span><span class="dish-leader" aria-hidden="true"></span><span class="dish-kind">old endpoint</span><span class="dish-count" aria-label="fed 0 times">0</span></button></li>
-                <li><button class="dish" type="button"><span class="dish-name">postgres://billing</span><span class="dish-leader" aria-hidden="true"></span><span class="dish-kind">database</span><span class="dish-count" aria-label="fed 0 times">0</span></button></li>
-                <li><button class="dish" type="button"><span class="dish-name">customers.csv</span><span class="dish-leader" aria-hidden="true"></span><span class="dish-kind">file</span><span class="dish-count" aria-label="fed 0 times">0</span></button></li>
+                <li><button class="dish" type="button"><span class="dish-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg></span><span class="dish-name">Databases</span><span class="dish-leader" aria-hidden="true"></span><span class="dish-count" aria-label="fed 0 times">0</span></button></li>
+                <li><button class="dish" type="button"><span class="dish-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3H7a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1M16 3h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-1"/></svg></span><span class="dish-name">REST APIs</span><span class="dish-leader" aria-hidden="true"></span><span class="dish-count" aria-label="fed 0 times">0</span></button></li>
+                <li><button class="dish" type="button"><span class="dish-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M13 4l-2 16"/></svg></span><span class="dish-name">SOAP</span><span class="dish-leader" aria-hidden="true"></span><span class="dish-count" aria-label="fed 0 times">0</span></button></li>
+                <li><button class="dish" type="button"><span class="dish-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M8 13h8M8 17h5"/></svg></span><span class="dish-name">CSVs &amp; files</span><span class="dish-leader" aria-hidden="true"></span><span class="dish-count" aria-label="fed 0 times">0</span></button></li>
             </ul>
           </div>
         </div>
 
-        <div class="feeds">
-          <p>Feeds on anything</p>
-          <ul>
-            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>Databases</li>
-            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3H7a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1M16 3h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-1"/></svg>REST APIs</li>
-            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M13 4l-2 16"/></svg>SOAP</li>
-            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M8 13h8M8 17h5"/></svg>CSVs &amp; files</li>
-          </ul>
-        </div>
       </div>
     </section>
 
