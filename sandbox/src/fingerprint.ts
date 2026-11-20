@@ -60,6 +60,19 @@ export function artifactKey(parts: {
   return sha256(canonicalJSON({ artifactVersion: 1, ...parts })).slice(0, 24);
 }
 
+/** Hash of what the database user can see. A schema change invalidates every tier. */
+export function schemaHashOf(schema: unknown): string {
+  return sha256(canonicalJSON(schema)).slice(0, 16);
+}
+
+/**
+ * Crystal is keyed by the request and the schema only: it is plain code in git,
+ * no longer tied to the prompt or model that first wrote it.
+ */
+export function crystalKey(fingerprint: string, schemaHash: string): string {
+  return sha256(`crystal\n${fingerprint}\n${schemaHash}`).slice(0, 24);
+}
+
 /** Literals in the intent usually mean the caller put a value where `input` belongs. */
 export function literalWarnings(intent: string): string[] {
   const found: string[] = [];

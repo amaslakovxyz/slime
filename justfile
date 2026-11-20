@@ -9,6 +9,10 @@ check:
 hooks:
     pre-commit install
 
+# Serve the landing page locally at http://localhost:8000.
+landing:
+    python3 -m http.server 8000 --directory landing
+
 # --- Stack recipes ---
 # Add install / dev / test recipes here once the project stack is chosen.
 # e.g.

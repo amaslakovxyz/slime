@@ -1,3 +1,5 @@
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import pg from 'pg';
 import { config } from '../src/config.js';
 import { PostgresConnector } from '../src/connectors/postgres.js';
@@ -63,16 +65,21 @@ export class StubReviewer implements Reviewer {
 
 const opened: { engine: Engine; connector: PostgresConnector }[] = [];
 
+// Tests never load the repo's own Crystal folder unless they pass one explicitly.
+export const NO_CRYSTAL_DIR = join(tmpdir(), 'slime-tests-no-crystal');
+
 export async function makeEngine(opts: {
   generator?: Generator;
   reviewer?: Reviewer | null;
   store?: HandlerStore;
+  crystalDir?: string;
 } = {}): Promise<Engine> {
   const connector = new PostgresConnector(DB_URL);
   const engine = await Engine.create(connector, {
     generator: opts.generator ?? new StubGenerator([artifact('SELECT 1 AS "one"')]),
     reviewer: opts.reviewer === undefined ? new StubReviewer(['approve']) : opts.reviewer,
     store: opts.store ?? new MemoryHandlerStore(),
+    crystalDir: opts.crystalDir ?? NO_CRYSTAL_DIR,
   });
   opened.push({ engine, connector });
   return engine;
