@@ -148,10 +148,11 @@ Reads come first because the database can guarantee them. Writes and multi-step 
 
 ### Hero Headlines
 1. *"The backend that builds itself."*
-2. *"Stop writing endpoints. Slime writes them."*
-3. *"Your UI asks. Slime builds the API."*
-4. *"From Gas to Liquid to Crystal: a backend that grows from what you ask for."*
-5. *"Stop writing endpoints. Feed the Slime."*
+2. *"No tickets. No PRs. No deploys. The backend grows itself."* (use against AI coding agents: they write endpoints faster, but each one is still a ticket, a review and a deploy)
+3. *"Stop writing endpoints. Slime writes them."*
+4. *"Your UI asks. Slime builds the API."*
+5. *"From Gas to Liquid to Crystal: a backend that grows from what you ask for."*
+6. *"Stop writing endpoints. Feed the Slime."*
 
 ---
 
@@ -195,6 +196,12 @@ Reads come first because the database can guarantee them. Writes and multi-step 
 |                   |                           | read-only role, reviews every     |
 |                   |                           | handler, and can lock to approved |
 |                   |                           | ones.                             |
++-------------------+---------------------------+-----------------------------------+
+| AI coding agents  | Write endpoint code       | No loop at all: endpoints grow at |
+| (Cursor, Claude   | faster, but every new one | runtime from real requests, get   |
+| Code, Copilot)    | is still a ticket, a      | reviewed automatically, and only  |
+|                   | review, a PR and a deploy,| what's used is kept. The agent    |
+|                   | built from a guess        | builds your API while it runs.    |
 +-------------------+---------------------------+-----------------------------------+
 | Text-to-SQL /     | Regenerate a query for    | Slime builds once and remembers:  |
 | AI BI tools       | every question, return    | handlers are reviewed, reused for |
