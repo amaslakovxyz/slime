@@ -407,9 +407,12 @@
     @keyframes uc-progress { to { transform: scaleX(1); } }
     .uc h3 { font-family: var(--font-body); font-weight: 700; font-size: 1.05rem; }
     .soon { margin-left: 6px; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--crystal-border); color: var(--crystal-glow); font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; vertical-align: 2px; }
-    .uc p { color: var(--text-muted); font-size: 15px; margin-top: 6px; }
-    .uc .punch { color: var(--plasma-highlight); font-weight: 600; font-size: 14px; margin-top: 10px; max-height: 0; opacity: 0; overflow: hidden; transition: max-height .5s ease, opacity .4s ease; }
-    .uc.is-active .punch { max-height: 60px; opacity: 1; }
+    /* Short summary always shows; the longer detail opens only on the expanded card. */
+    .uc .summary { color: var(--text-muted); font-size: 15px; margin-top: 6px; }
+    .uc .detail { color: var(--plasma-highlight); font-size: 15px; margin-top: 0; max-height: 0; opacity: 0; overflow: hidden; transition: max-height .5s ease, opacity .4s ease, margin .4s ease; }
+    .uc.is-active .detail { max-height: 90px; opacity: 1; margin-top: 10px; }
+    .uc .soon { display: none; }
+    .uc.is-active .soon { display: inline-block; animation: pop-in .4s ease both; }
 
     /* Mock UI inside the media cards (generated in HTML so it stays crisp). */
     .mock {
@@ -553,10 +556,21 @@
     .quote p { color: var(--text-muted); font-size: 1.08rem; line-height: 1.55; }
     .quote p strong { color: var(--text-pure); font-weight: 600; }
     .who { display: flex; align-items: center; gap: 12px; }
-    .why-ic { width: 42px; height: 42px; flex: none; border-radius: 13px; display: grid; place-items: center; }
-    .why-gas { color: var(--gas-accent); background: var(--gas-bg); border: 1px solid var(--gas-border); }
-    .why-liquid { color: var(--plasma-highlight); background: rgba(255,20,118,.12); border: 1px solid rgba(255,20,118,.4); }
-    .why-crystal { color: var(--crystal-glow); background: var(--crystal-bg); border: 1px solid var(--crystal-border); }
+    /* Audience icons: glossy, morphing slime blobs with the icon floating inside. */
+    .slime-ic {
+      width: 48px; height: 48px; flex: none; display: grid; place-items: center; color: #fff;
+      border-radius: 42% 58% 60% 40% / 48% 44% 56% 52%; animation: morph 6s ease-in-out infinite;
+    }
+    .slime-ic svg { filter: drop-shadow(0 1px 3px rgba(0,0,0,.35)); }
+    .sb-gas { background: radial-gradient(circle at 34% 28%, #fff 0, #9dffe0 16%, #1fc792 52%, #0c5c45); box-shadow: 0 6px 18px rgba(56,248,184,.3); }
+    .sb-gas svg { transform-origin: 75% 25%; animation: hammer 1.8s ease-in-out infinite; }
+    .sb-liquid { background: radial-gradient(circle at 34% 28%, #fff 0, var(--plasma-highlight) 16%, var(--plasma-primary) 52%, var(--plasma-shadow)); box-shadow: 0 6px 18px var(--glow-primary); animation-delay: -2s; }
+    .sb-liquid svg { animation: spin 6s linear infinite; }
+    .sb-crystal { background: radial-gradient(circle at 34% 28%, #fff 0, #bfe6ff 16%, #4aa8ff 52%, #1e3f9e); box-shadow: 0 6px 18px rgba(74,168,255,.35); animation-delay: -4s; }
+    .sb-crystal svg { animation: bounce 2.2s ease-in-out infinite; }
+    @keyframes hammer { 0%, 55%, 100% { transform: rotate(0); } 70% { transform: rotate(-28deg); } 82% { transform: rotate(8deg); } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes bounce { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-3px); } 60% { transform: translateY(1px); } }
     .who b { display: block; font-size: 15px; }
     .who small { color: var(--wireframe-grey); font-size: 13px; }
     .av-gas { background: radial-gradient(circle at 35% 30%, #c9fff0, var(--gas-accent) 45%, #0c5c45); }
@@ -592,8 +606,11 @@
       transition: transform .3s cubic-bezier(.34, 1.56, .64, 1);
     }
     .builder:hover .blob-av { transform: scale(1.12) rotate(-6deg); animation-duration: 1.6s; }
-    .blob-plasma { background: radial-gradient(circle at 34% 28%, #fff 0, var(--plasma-highlight) 16%, var(--plasma-primary) 52%, var(--plasma-shadow)); box-shadow: 0 6px 18px var(--glow-primary); }
-    .blob-mint { background: radial-gradient(circle at 34% 28%, #fff 0, #9dffe0 16%, #1fc792 52%, #0c5c45); box-shadow: 0 6px 18px rgba(56,248,184,.3); animation-delay: -3s; }
+    /* LinkedIn-blue slimes. */
+    .blob-in { background: radial-gradient(circle at 34% 28%, #fff 0, #8cc4ff 16%, #0a66c2 55%, #063f7a); box-shadow: 0 6px 18px rgba(10,102,194,.45); }
+    .blob-in-2 { animation-delay: -3s; }
+    .builder:hover { border-color: #0a66c2; }
+    .builder:hover .b-name small { color: #8cc4ff; }
     .copyright { margin-top: 40px; font-size: 13.5px; color: var(--wireframe-grey); font-family: var(--font-mono); }
 
     /* ---------- Reveal on scroll (only when JS runs) ---------- */
@@ -728,8 +745,8 @@
             </div></div>
             <div class="uc-bar"><i></i></div>
             <h3>Vibecoded UIs</h3>
-            <p>Point your generated UI at Slime. Every new widget gets its endpoint the moment it asks.</p>
-            <p class="punch">→ Vibecode the UI. Let Slime build the backend.</p>
+            <p class="summary">Vibecode the UI. Let Slime build the backend.</p>
+            <p class="detail">Point your generated UI at Slime. Every new widget gets its endpoint the moment it asks.</p>
           </article>
 
           <article class="uc reveal" tabindex="0" role="button" aria-pressed="false">
@@ -744,8 +761,8 @@
             </div></div>
             <div class="uc-bar"><i></i></div>
             <h3>AI agents</h3>
-            <p>Agents ask for the data they need and Slime builds the tool on the spot: read-only, reviewed, guarded by your database.</p>
-            <p class="punch">→ Unleash your agents. Keep your database untouchable.</p>
+            <p class="summary">Unleash your agents. Keep your database untouchable.</p>
+            <p class="detail">Agents ask for the data they need and Slime builds the tool on the spot: read-only, reviewed, guarded by your database.</p>
           </article>
 
           <article class="uc reveal" tabindex="0" role="button" aria-pressed="false">
@@ -761,8 +778,8 @@
             </div></div>
             <div class="uc-bar"><i></i></div>
             <h3>Legacy systems</h3>
-            <p>Slime sits in front of old databases and services and grows a modern API on top, one request at a time.</p>
-            <p class="punch">→ Don't rewrite legacy. Let Slime digest it.</p>
+            <p class="summary">Don't rewrite legacy. Let Slime digest it.</p>
+            <p class="detail">Slime sits in front of old databases and services and grows a modern API on top, one request at a time.</p>
           </article>
 
           <article class="uc reveal" tabindex="0" role="button" aria-pressed="false">
@@ -776,8 +793,8 @@
             </div></div>
             <div class="uc-bar"><i></i></div>
             <h3>SaaS customization <span class="soon">Next</span></h3>
-            <p>Each customer's custom report becomes its own self-built endpoint, on one shared runtime.</p>
-            <p class="punch">→ One runtime. Every customer's backend.</p>
+            <p class="summary">One runtime. Every customer's backend.</p>
+            <p class="detail">Each customer's custom report becomes its own self-built endpoint, on one shared runtime.</p>
           </article>
         </div>
       </div>
@@ -887,7 +904,7 @@
               <span class="tag crystal">Hot paths</span>
               <h3>Crystal</h3>
               <p>Endpoints that run hot crystallize: an agent optimizes them into ordinary code, committed to your repo.</p>
-              <span class="st-speed"><b>coming next</b></span>
+              <span class="st-speed">lives in · <b>your repo</b></span>
             </div>
           </article>
         </div>
@@ -908,15 +925,15 @@
         <div class="quotes">
           <article class="quote reveal">
             <p><strong>Ship at the speed you design.</strong> New data features go live as fast as the UI that needs them.</p>
-            <div class="who"><span class="why-ic why-gas" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4V2M15 10V8M11 6H9M21 6h-2M18.5 3.5 17 5M13 7 11.5 8.5"/><path d="M3 21l9.5-9.5"/><path d="M14 10l-2-2"/></svg></span><span><b>Builders</b><small>vibecoders &amp; product teams</small></span></div>
+            <div class="who"><span class="slime-ic sb-gas" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 12 5 21a2.1 2.1 0 0 1-3-3l9-9"/><path d="M17.6 15.4 22 11l-4.6-4.6a6 6 0 0 0-4.2-1.7H9l1 1a6 6 0 0 1 1.7 4.2v1.1l2 2"/></svg></span><span><b>Builders</b><small>vibecoders &amp; product teams</small></span></div>
           </article>
           <article class="quote reveal">
             <p><strong>End the backend-for-frontend grind.</strong> No more ticket queues for one more field in one more endpoint.</p>
-            <div class="who"><span class="why-ic why-liquid" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 4l-3 16"/></svg></span><span><b>Engineering teams</b><small>platform &amp; backend</small></span></div>
+            <div class="who"><span class="slime-ic sb-liquid" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></span><span><b>Engineering teams</b><small>platform &amp; backend</small></span></div>
           </article>
           <article class="quote reveal">
             <p><strong>Move at AI speed, safely.</strong> Your database, not the AI, decides what Slime can touch.</p>
-            <div class="who"><span class="why-ic why-crystal" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg></span><span><b>Businesses</b><small>leaders &amp; architects</small></span></div>
+            <div class="who"><span class="slime-ic sb-crystal" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6l-1.5 3h-3z"/><path d="M10.5 6C6 8 4 12 4 15.5 4 19 7 21 12 21s8-2 8-5.5C20 12 18 8 13.5 6"/><path d="M14 11.5c-.5-.6-1.2-.9-2-.9-1.1 0-2 .6-2 1.4 0 1.9 4 1 4 2.9 0 .8-.9 1.5-2 1.5-.9 0-1.7-.4-2.1-1M12 9.6v1M12 16.4v1"/></svg></span><span><b>Businesses</b><small>leaders &amp; architects</small></span></div>
           </article>
         </div>
       </div>
@@ -946,11 +963,11 @@
           <p class="builders-label">Grown by</p>
           <div class="builders">
             <a class="builder" href="https://www.linkedin.com/in/kanstantsin-yaromenka/" target="_blank" rel="noopener noreferrer">
-              <span class="blob-av blob-plasma" aria-hidden="true">KY</span>
+              <span class="blob-av blob-in" aria-hidden="true">KY</span>
               <span class="b-name">K. Yaromenka<small>LinkedIn ↗</small></span>
             </a>
             <a class="builder" href="https://www.linkedin.com/in/amaslakov/" target="_blank" rel="noopener noreferrer">
-              <span class="blob-av blob-mint" aria-hidden="true">AM</span>
+              <span class="blob-av blob-in blob-in-2" aria-hidden="true">AM</span>
               <span class="b-name">A. Maslakov<small>LinkedIn ↗</small></span>
             </a>
           </div>
