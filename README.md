@@ -2,7 +2,7 @@
 
 ## System Overview
 
-slime (the Liquid Engine, CLI `lee`) is a hackathon project in its design phase.
+Slime (runtime and CLI `slime`) is a hackathon project in its design phase.
 The repository contains **no source code yet**: only design documents, brand
 material, and repository tooling. The planned runtime is described in
 [docs/architecture-spec.md](./docs/architecture-spec.md); nothing in that spec
@@ -11,7 +11,7 @@ is implemented, so treat it as intent, not as a contract.
 ### Developer notes (original)
 
 Frontend -- sending PROMPT + Json structure for reciving
-Backend -- Liquid API:
+Backend -- Slime runtime:
 
 - Recive PROMPT + JSON
 - DB connection
@@ -20,11 +20,11 @@ Backend -- Liquid API:
 
 - `docs/` (no contract file; documentation only)
   - [architecture-spec.md](./docs/architecture-spec.md) - Development spec for
-    the Liquid Engine: request path, DB API, Gatekeeper rules, and Gas / Liquid
+    the Slime runtime: request path, DB API, Gatekeeper rules, and Gas / Liquid
     / Crystal trust levels.
   - [architecture.excalidraw](./docs/architecture.excalidraw) - Architecture
     diagram matching the spec.
-  - [liquid_execution_pitch_architecture_master_spec.md](./docs/liquid_execution_pitch_architecture_master_spec.md) -
+  - [slime_runtime_master_spec.md](./docs/slime_runtime_master_spec.md) -
     Vision pitch and target architecture (request-time synthesis, V8/Wasm,
     Redis, connectors). Broader than, and in places conflicting with, the
     development spec above.

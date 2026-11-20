@@ -1,4 +1,4 @@
-# LIQUID EXECUTION ENGINE (LEE)
+# SLIME RUNTIME
 > **Master Specification: Vision Pitch & Technical Architecture**<br>
 > *Version 2.0.0 | Zero-Endpoint Dynamic Runtime*
 
@@ -10,13 +10,13 @@
 
 Look at any modern server. What do you see? A mausoleum of dead files. Hard-coded routes like `/api/v1/users`, controllers, DTOs, and rigid validators. It is petrified clay. The server clings to its endpoints like a blind person to crutches because it fears the unknown.
 
-**Liquid Execution is the complete erasure of endpoints, routing, and manual API deployment.**
+**Slime is the complete erasure of endpoints, routing, and manual API deployment.**
 
 In our system, there is **not a single registered URL endpoint**. The backend is an absolute, formless void, held in equilibrium only by business invariants. It does not know what request will arrive a second from now—and it doesn't care.
 
 ---
 
-## 🌀 How the Liquid Runtime Breathes
+## 🌀 How the Slime Runtime Breathes
 
 ```
   [ Raw Request / Intention ]
@@ -28,7 +28,7 @@ In our system, there is **not a single registered URL endpoint**. The backend is
                │
                ▼
    ┌──────────────────────┐
-   │ 2. CRYSTALLIZATION   │ (On-the-fly synthesis of Wasm logic in ~150ms)
+   │ 2. GAS SYNTHESIS     │ (On-the-fly synthesis of Wasm logic in ~150ms)
    └───────────┬───────────┘
                │
                ▼
@@ -38,7 +38,7 @@ In our system, there is **not a single registered URL endpoint**. The backend is
                │
                ▼
    ┌──────────────────────┐
-   │ 4. PETRIFICATION     │ (Hot paths fossilize into native binaries)
+   │ 4. CRYSTALLIZATION   │ (Hot paths crystallize into native binaries)
    └──────────────────────┘
 ```
 
@@ -56,7 +56,7 @@ In our system, there is **not a single registered URL endpoint**. The backend is
 
 ## 1. System Topology
 
-The Liquid Execution Engine consists of a static core runner housing dynamic sandbox isolates, linked to a pluggable connector bus for zero-trust data access.
+The Slime runtime consists of a static core runner housing dynamic sandbox isolates, linked to a pluggable connector bus for zero-trust data access.
 
 ```
 [ Raw Request / UI Intent ]
@@ -101,7 +101,7 @@ Generated functions do **not** receive direct SQL handles, ORM instances, or raw
 ```
                   ┌─────────────────────────────────────────┐
                   │    Ephemeral Sandbox (V8 / Wasm)        │
-                  │   Crystallized Pure Function Logic      │
+                  │   Synthesized Pure Function Logic       │
                   └────────────────────┬────────────────────┘
                                        │ UniversalQueryAST
                                        ▼
