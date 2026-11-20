@@ -163,7 +163,8 @@
       box-shadow: 0 20px 50px rgba(0,0,0,.45);
     }
     .menu-head { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 6px; border-bottom: 1px dashed var(--border-bright); }
-    .menu-title { font-size: 16px; margin: 0; }
+    /* Titan One (the heading font), not the Oi wordmark: Oi is hard to read this small. */
+    .menu-title { font-family: var(--font-title); font-size: 17px; line-height: 1; letter-spacing: .01em; margin: 0; }
     .menu-kicker { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .22em; text-transform: uppercase; color: var(--wireframe-grey); }
     .menu-list { list-style: none; margin: 0; padding: 0; }
     .menu-list li + li { border-top: 1px solid rgba(45,31,51,.7); }
@@ -327,7 +328,17 @@
     .nav-cta { justify-self: end; padding: 10px 18px; font-size: 14px; }
 
     /* ---------- Hero ---------- */
-    .hero { padding: 64px 0 40px; text-align: center; }
+    /* The hero fills at least the first screen under the sticky nav (--nav-h is
+       measured by JS; 84px is the desktop fallback). The slime stage takes up
+       whatever height the copy leaves, so the blob stays centred in it. */
+    .hero {
+      padding: 64px 0 40px; text-align: center;
+      min-height: calc(100vh - var(--nav-h, 84px)); min-height: calc(100svh - var(--nav-h, 84px));
+      display: flex; flex-direction: column;
+    }
+    .hero > .container:last-child { flex: 1; display: flex; flex-direction: column; }
+    .hero-stage { flex: 1; display: flex; flex-direction: column; width: 100%; }
+    .hero .stage { flex: 1 0 auto; }
     .hero-badge {
       display: inline-flex; align-items: center; gap: 10px; padding: 5px 14px 5px 6px; margin-bottom: 30px;
       border-radius: 999px; border: 1px solid var(--border-color); background: rgba(22,16,25,.6);
@@ -336,27 +347,11 @@
     .hero-badge .tag { padding: 3px 9px; font-size: 10.5px; }
     .hero-title { font-size: clamp(2.8rem, 6.4vw, 5.1rem); line-height: 1; }
     .hero-title .line2 { display: block; margin-top: .06em; }
-    .ico { display: inline-block; width: .8em; height: .8em; vertical-align: -0.06em; margin: 0 .04em; }
     .ico-blob {
       border-radius: 42% 58% 60% 40% / 48% 44% 56% 52%;
       background: radial-gradient(circle at 34% 28%, #fff 0, var(--plasma-highlight) 14%, var(--plasma-primary) 52%, var(--plasma-shadow));
       box-shadow: 0 6px 22px var(--glow-primary); animation: morph 8s ease-in-out infinite;
     }
-    .ico-crystal { filter: drop-shadow(0 6px 18px rgba(124,199,255,.55)); }
-    /* "Any shape": the icon cycles through the three matter states. */
-    .ico-morph { position: relative; }
-    .mx { position: absolute; inset: 0; display: grid; place-items: center; opacity: 0; animation: matter 7.5s cubic-bezier(.4, 0, .2, 1) infinite; }
-    .mx > svg, .mx > .ico-blob { width: 100%; height: 100%; display: block; }
-    .mx-gas { animation-delay: 0s; }
-    .mx-gas svg { filter: drop-shadow(0 6px 16px rgba(56,248,184,.45)); }
-    .mx-liquid { animation-delay: 2.5s; }
-    .mx-crystal { animation-delay: 5s; }
-    @keyframes matter {
-      0% { opacity: 0; transform: scale(.4) rotate(-20deg); }
-      6%, 30% { opacity: 1; transform: scale(1) rotate(0); }
-      36%, 100% { opacity: 0; transform: scale(.4) rotate(20deg); }
-    }
-    @media (prefers-reduced-motion: reduce) { .mx-crystal { opacity: 1; } }
     .hero-sub { max-width: 560px; margin: 26px auto 0; color: var(--text-muted); font-size: 1.2rem; }
     .hero-sub strong { color: var(--text-pure); font-weight: 600; }
     .hero-ctas { display: flex; gap: 12px; justify-content: center; margin-top: 34px; flex-wrap: wrap; }
@@ -367,16 +362,18 @@
 
     /* Slime stage, centred under the CTAs; the menu floats to its right. */
     .hero-stage { position: relative; max-width: 1120px; margin: 4px auto 0; text-align: left; }
-    .hero .stage { height: 430px; }
+    .hero .stage { height: auto; min-height: 430px; }
     .hero .menu { position: absolute; right: 0; bottom: 34px; }
 
 
     /* ---------- Section heads: label + two-tone heading left, lead right ---------- */
     .sec-head { display: grid; grid-template-columns: 1.2fr .8fr; gap: 40px; align-items: end; margin-bottom: 56px; }
     .sec-label { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; font-size: 15px; color: var(--text-pure); margin: 0 0 18px; }
-    .sec-label .ic { width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center; background: rgba(255,20,118,.14); color: var(--plasma-highlight); }
-    .sec-label .ic.gas { background: var(--gas-bg); color: var(--gas-accent); }
-    .sec-label .ic.crystal { background: var(--crystal-bg); color: var(--crystal-glow); }
+    /* Minimal line icons in the matter-state colour, no tile behind them. */
+    .sec-label .ic { width: 18px; height: 18px; display: block; flex: none; color: var(--plasma-highlight); }
+    .sec-label .ic svg { width: 100%; height: 100%; display: block; }
+    .sec-label .ic.gas { color: var(--gas-accent); }
+    .sec-label .ic.crystal { color: var(--crystal-glow); }
     .sec-lead { color: var(--text-muted); font-size: 1.08rem; max-width: 440px; justify-self: end; }
     .sec-lead p { margin: 0; }
     /* Use cases: the heading is a three-beat line, so give it the full width. */
@@ -477,7 +474,6 @@
     /* Compact: the whole section, response included, fits one laptop screen. */
     #how { padding: 56px 0 64px; scroll-margin-top: 64px; }
     #how .sec-head { margin-bottom: 26px; }
-    #how h2 { font-size: clamp(2rem, 3.4vw, 2.7rem); }
     #how .showcase { padding: 24px; }
     #how .demo-bar { padding: 12px 20px; }
     #how .demo-col { padding: 16px 20px 18px; }
@@ -560,7 +556,7 @@
     .quote p { color: var(--text-muted); font-size: 1.08rem; line-height: 1.55; }
     .quote p strong { color: var(--text-pure); font-weight: 600; }
     .who { display: flex; align-items: center; gap: 12px; }
-    /* Audience icons: glossy, morphing slime blobs with the icon floating inside. */
+    /* Audience icons: glossy slime objects (hammer, gear, money bag). */
     .slime-ic {
       width: 48px; height: 48px; flex: none; display: grid; place-items: center; color: #fff;
       border-radius: 42% 58% 60% 40% / 48% 44% 56% 52%; animation: morph 6s ease-in-out infinite;
@@ -569,10 +565,13 @@
     /* Builders: the slime itself is a hammer, swinging from the handle end. */
     .sb-gas { background: none; box-shadow: none; border-radius: 0; animation: hammer 1.8s ease-in-out infinite; transform-origin: 50% 92%; filter: drop-shadow(0 6px 14px rgba(56,248,184,.35)); }
     .sb-gas svg { filter: none; }
-    .sb-liquid { background: radial-gradient(circle at 34% 28%, #fff 0, var(--plasma-highlight) 16%, var(--plasma-primary) 52%, var(--plasma-shadow)); box-shadow: 0 6px 18px var(--glow-primary); animation-delay: -2s; }
-    .sb-liquid svg { animation: spin 6s linear infinite; }
-    .sb-crystal { background: radial-gradient(circle at 34% 28%, #fff 0, #bfe6ff 16%, #4aa8ff 52%, #1e3f9e); box-shadow: 0 6px 18px rgba(74,168,255,.35); animation-delay: -4s; }
-    .sb-crystal svg { animation: bounce 2.2s ease-in-out infinite; }
+    /* Engineering teams: a glossy slime gear; only the gear turns, the highlight stays put. */
+    .sb-liquid { background: none; box-shadow: none; border-radius: 0; animation: none; filter: drop-shadow(0 6px 14px var(--glow-primary)); }
+    .sb-liquid svg { filter: none; }
+    .sb-liquid .gear { transform-box: fill-box; transform-origin: center; animation: spin 9s linear infinite; }
+    /* Businesses: a glossy ice-blue money bag that bounces. */
+    .sb-crystal { background: none; box-shadow: none; border-radius: 0; animation: bounce 2.2s ease-in-out infinite; filter: drop-shadow(0 6px 14px rgba(74,168,255,.4)); }
+    .sb-crystal svg { filter: none; }
     @keyframes hammer { 0%, 55%, 100% { transform: rotate(0); } 70% { transform: rotate(-28deg); } 82% { transform: rotate(8deg); } }
     @keyframes spin { to { transform: rotate(360deg); } }
     @keyframes bounce { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-3px); } 60% { transform: translateY(1px); } }
@@ -586,6 +585,8 @@
     .cta { text-align: center; padding: 120px 0 130px; }
     .cta p { color: var(--text-muted); max-width: 540px; margin: 22px auto 0; font-size: 1.1rem; }
     .cta p.wordmark { font-size: clamp(2.6rem, 7vw, 5.4rem); max-width: none; margin: 0 auto; }
+    /* Only the nav logo keeps the Oi wordmark font; these lines use Titan One so they read easily. */
+    .cta p.wordmark, .foot .wordmark { font-family: var(--font-title); }
     .cta-answer { display: block; margin-top: 18px; font-family: var(--font-title); font-size: clamp(1.6rem, 3vw, 2.4rem); color: var(--text-pure); }
 
     /* ---------- Footer ---------- */
@@ -634,7 +635,7 @@
       .demo-col + .demo-col { border-left: 0; border-top: 1px solid var(--border-color); }
       .steps { grid-template-columns: 1fr; gap: 16px; }
       .showcase { padding: 24px; }
-      .hero .stage { height: 420px; }
+      .hero .stage { min-height: 420px; }
     }
     @media (max-width: 720px) {
       :root { --gutter: 16px; }
@@ -644,7 +645,7 @@
       .nav.scrolled .nav-inner { max-width: none; padding: 4px 0; background: none; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
       .nav .wordmark { font-size: 26px; }
       .hero { padding: 44px 0 32px; }
-      .hero .stage { height: 330px; }
+      .hero .stage { min-height: 330px; }
       .hero .menu { position: relative; right: auto; bottom: auto; width: min(100%, 300px); margin: -36px 0 0 auto; }
       .uc-row { flex-direction: column; gap: 18px; }
       .uc { flex: none; }
@@ -670,9 +671,9 @@
     <div class="nav-inner">
       <a href="#top" class="wordmark slime-text" aria-label="Slime home">slime</a>
       <ul class="nav-links">
-        <li><a href="#use-cases">Use cases</a></li>
         <li><a href="#how">How it works</a></li>
         <li><a href="#states">Matter states</a></li>
+        <li><a href="#use-cases">Use cases</a></li>
       </ul>
       <a href="#how" class="btn btn-primary nav-cta">See it work</a>
     </div>
@@ -682,8 +683,8 @@
     <!-- ================= HERO ================= -->
     <section class="hero">
       <div class="container">
-        <h1 class="hero-title">One backend.<span class="line2 slime-text">Any <span class="ico ico-morph" aria-hidden="true"><span class="mx mx-gas"><svg viewBox="0 0 40 40"><defs><radialGradient id="gg" cx="35%" cy="30%" r="70%"><stop offset="0" stop-color="#E6FFF7"/><stop offset=".5" stop-color="#38F8B8"/><stop offset="1" stop-color="#0C5C45"/></radialGradient></defs><circle cx="15" cy="23" r="10" fill="url(#gg)" opacity=".92"/><circle cx="28" cy="14" r="7" fill="url(#gg)" opacity=".85"/><circle cx="30" cy="30" r="4.5" fill="url(#gg)" opacity=".8"/><circle cx="8" cy="9" r="3" fill="url(#gg)" opacity=".7"/></svg></span><span class="mx mx-liquid"><span class="ico-blob"></span></span><span class="mx mx-crystal"><svg class="ico-crystal" viewBox="0 0 40 40" aria-hidden="true"><defs><linearGradient id="cg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#E6F7FF"/><stop offset=".5" stop-color="#7CC7FF"/><stop offset="1" stop-color="#2F64E0"/></linearGradient></defs><path d="M20 2 L33 15 L20 38 L7 15 Z" fill="url(#cg)"/><path d="M7 15 H33 M20 2 L15 15 L20 38 L25 15 Z" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="1"/></svg></span></span> shape.</span></h1>
-        <p class="hero-sub"><strong>The backend that builds itself.</strong> Your app asks for data; Slime writes the endpoint and remembers it.</p>
+        <h1 class="hero-title">The backend<span class="line2 slime-text">that builds itself.</span></h1>
+        <p class="hero-sub">Your app asks for data in plain words. Slime writes the endpoint, checks it, and returns results in the shape you want.</p>
       </div>
 
       <div class="container">
@@ -693,7 +694,7 @@
           </div>
           <div class="menu">
             <div class="menu-head">
-              <p class="wordmark slime-text menu-title">Feed the Slime</p>
+              <p class="slime-text menu-title">Feed the Slime</p>
               <span class="menu-kicker">menu</span>
             </div>
             <ul class="menu-list" id="menu-list">
@@ -708,12 +709,120 @@
       </div>
     </section>
 
+    <!-- ================= HOW IT WORKS ================= -->
+    <section id="how">
+      <div class="container">
+        <div class="sec-head reveal">
+          <div>
+            <p class="sec-label"><span class="ic gas" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></span>How it works</p>
+            <h2>Make a wish.<br><span class="muted-line">Slime builds it.</span></h2>
+          </div>
+          <p class="sec-lead">Describe the data you want in one GET to <code class="inline-code">/slurp</code>. The first wish builds the endpoint in a few seconds; every repeat comes from memory in milliseconds.</p>
+        </div>
+
+        <div class="showcase reveal">
+        <div class="demo-panel" id="demo" data-state="idle">
+          <div class="demo-bar">
+            <span class="endpoint"><b>GET</b>/slurp</span>
+            <span class="endpoint-note">one endpoint · any shape</span>
+          </div>
+          <div class="demo-body">
+            <div class="demo-col">
+              <div class="label"><span>Request · from your UI</span></div>
+<pre class="code" aria-label="Example request"><span class="kw">GET</span> /slurp
+  <span class="p">?</span><span class="k">want</span><span class="p">=</span><span class="s">top N accounts by total paid
+         invoices, highest first</span>
+  <span class="p">&amp;</span><span class="k">limit</span><span class="p">=</span><span class="n">3</span>
+  <span class="p">&amp;</span><span class="k">shape</span><span class="p">=</span><span class="s">[{ name: string,
+            totalPaidCents: integer }]</span></pre>
+              <div class="send-row">
+                <button class="btn btn-primary" id="demo-btn" type="button">Send request</button>
+                <span class="send-hint" id="demo-hint">No backend route exists for this yet.</span>
+              </div>
+              <ul class="checks" id="demo-checks" aria-label="Safety checks">
+                <li>Read-only access</li>
+                <li>Logic runs in a sandbox</li>
+                <li>Result matches your shape</li>
+              </ul>
+            </div>
+
+            <div class="demo-col">
+              <div class="label"><span id="sql-label">Handler · not generated yet</span></div>
+              <pre class="code sql-box" id="demo-sql" aria-label="Generated SQL"><span class="placeholder">-- Slime will synthesize a safe, read-only
+-- query here on the first request.</span></pre>
+
+              <div class="timer-row">
+                <span class="timer" id="demo-timer">0<small>ms</small></span>
+                <span class="meta-line" id="demo-meta">waiting for a request</span>
+              </div>
+              <pre class="code response" id="demo-res" aria-label="Response"><span class="p">// response appears here</span></pre>
+            </div>
+          </div>
+        </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ================= MATTER STATES ================= -->
+    <section id="states">
+      <div class="container">
+        <div class="sec-head reveal">
+          <div>
+            <p class="sec-label"><span class="ic crystal" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 12L2 9z"/><path d="M2 9h20"/></svg></span>Matter states</p>
+            <h2>It grows its own API.<br><span class="muted-line">Gas, Liquid, Crystal.</span></h2>
+          </div>
+          <p class="sec-lead">Every endpoint starts as a first guess and hardens into permanent code, shaped only by what your product actually asks for.</p>
+        </div>
+
+        <div class="state-grid">
+          <article class="st st-gas reveal">
+            <div class="st-media" aria-hidden="true">
+              <img src="assets/state-gas.webp" width="960" height="720" loading="lazy" alt="">
+              <span class="an an-req mono"><b>MISS</b> GET /slurp?want=churn by plan</span>
+              <div class="an an-write mono"><span class="an-type">SELECT plan, count(*) FROM accounts…</span><span class="an-ok">✓ checked · 1.1 s</span></div>
+            </div>
+            <div class="st-body">
+              <span class="tag gas"><span class="dot"></span>First request</span>
+              <h3>Gas</h3>
+              <p>The first time Slime sees a request, an agent writes its endpoint on the spot and checks it. Unused ones evaporate.</p>
+            </div>
+          </article>
+          <article class="st st-liquid reveal">
+            <div class="st-media" aria-hidden="true">
+              <img src="assets/state-liquid.webp" width="960" height="720" loading="lazy" alt="">
+              <span class="an an-hash mono">want=churn by plan → <b>#a91f3c</b></span>
+              <div class="an an-mem mono"><span>#07be21</span><span class="hit">#a91f3c</span><span>#5d0c9e</span></div>
+              <span class="an an-fast mono">⚡ 4 ms · no AI</span>
+            </div>
+            <div class="st-body">
+              <span class="tag liquid"><span class="dot"></span>Every repeat</span>
+              <h3>Liquid</h3>
+              <p>Seen it before? Slime finds the endpoint by its hash and serves it from memory, no AI involved. A second model reviews it before it's kept.</p>
+            </div>
+          </article>
+          <article class="st st-crystal reveal">
+            <div class="st-media" aria-hidden="true">
+              <img src="assets/state-crystal.webp" width="960" height="720" loading="lazy" alt="">
+              <div class="an an-heat mono"><span class="an-heat-label">hot path · <span class="an-count"></span> calls</span><span class="an-bar"><i></i></span></div>
+              <span class="an an-commit mono">✓ crystallized → src/slime/churn.ts</span>
+            </div>
+            <div class="st-body">
+              <span class="tag crystal">Hot paths</span>
+              <h3>Crystal</h3>
+              <p>Endpoints that run hot crystallize: an agent optimizes them into ordinary code, committed to your repo.</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
     <!-- ================= USE CASES ================= -->
     <section id="use-cases">
       <div class="container">
         <div class="sec-head reveal">
           <div>
-            <p class="sec-label"><span class="ic" aria-hidden="true">✦</span>Use cases</p>
+            <p class="sec-label"><span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2 7 7 2-7 2-2 7-2-7-7-2 7-2z"/></svg></span>Use cases</p>
             <h2>No tickets. No PRs. No deploys.<br><span class="muted-line">The backend grows itself.</span></h2>
           </div>
           <p class="sec-lead">Coding agents write endpoints faster, but each one is still a ticket, a review and a deploy. With Slime, the request is the spec: the endpoint grows itself at runtime.</p>
@@ -793,120 +902,12 @@
       </div>
     </section>
 
-    <!-- ================= HOW IT WORKS ================= -->
-    <section id="how">
-      <div class="container">
-        <div class="sec-head reveal">
-          <div>
-            <p class="sec-label"><span class="ic gas" aria-hidden="true">↯</span>How it works</p>
-            <h2>Ask once.<br><span class="muted-line">Slime remembers.</span></h2>
-          </div>
-          <p class="sec-lead">One GET to <code class="inline-code">/slurp</code>. The first call grows the endpoint in about a second; every call after that comes from memory in milliseconds.</p>
-        </div>
-
-        <div class="showcase reveal">
-        <div class="demo-panel" id="demo" data-state="idle">
-          <div class="demo-bar">
-            <span class="endpoint"><b>GET</b>/slurp</span>
-            <span class="endpoint-note">one endpoint · any shape</span>
-          </div>
-          <div class="demo-body">
-            <div class="demo-col">
-              <div class="label"><span>Request · from your UI</span></div>
-<pre class="code" aria-label="Example request"><span class="kw">GET</span> /slurp
-  <span class="p">?</span><span class="k">want</span><span class="p">=</span><span class="s">top N accounts by total paid
-         invoices, highest first</span>
-  <span class="p">&amp;</span><span class="k">limit</span><span class="p">=</span><span class="n">3</span>
-  <span class="p">&amp;</span><span class="k">shape</span><span class="p">=</span><span class="s">[{ name: string,
-            totalPaidCents: integer }]</span></pre>
-              <div class="send-row">
-                <button class="btn btn-primary" id="demo-btn" type="button">Send request</button>
-                <span class="send-hint" id="demo-hint">No backend route exists for this yet.</span>
-              </div>
-              <ul class="checks" id="demo-checks" aria-label="Safety checks">
-                <li>Read-only access</li>
-                <li>Logic runs in a sandbox</li>
-                <li>Result matches your shape</li>
-              </ul>
-            </div>
-
-            <div class="demo-col">
-              <div class="label"><span id="sql-label">Handler · not generated yet</span></div>
-              <pre class="code sql-box" id="demo-sql" aria-label="Generated SQL"><span class="placeholder">-- Slime will synthesize a safe, read-only
--- query here on the first request.</span></pre>
-
-              <div class="timer-row">
-                <span class="timer" id="demo-timer">0<small>ms</small></span>
-                <span class="meta-line" id="demo-meta">waiting for a request</span>
-              </div>
-              <pre class="code response" id="demo-res" aria-label="Response"><span class="p">// response appears here</span></pre>
-            </div>
-          </div>
-        </div>
-        </div>
-
-      </div>
-    </section>
-
-    <!-- ================= MATTER STATES ================= -->
-    <section id="states">
-      <div class="container">
-        <div class="sec-head reveal">
-          <div>
-            <p class="sec-label"><span class="ic crystal" aria-hidden="true">◆</span>Matter states</p>
-            <h2>It grows its own API.<br><span class="muted-line">Gas, Liquid, Crystal.</span></h2>
-          </div>
-          <p class="sec-lead">Every endpoint starts as a first guess and hardens into permanent code, shaped only by what your product actually asks for.</p>
-        </div>
-
-        <div class="state-grid">
-          <article class="st st-gas reveal">
-            <div class="st-media" aria-hidden="true">
-              <img src="assets/state-gas.webp" width="960" height="720" loading="lazy" alt="">
-              <span class="an an-req mono"><b>MISS</b> GET /slurp?want=churn by plan</span>
-              <div class="an an-write mono"><span class="an-type">SELECT plan, count(*) FROM accounts…</span><span class="an-ok">✓ checked · 1.1 s</span></div>
-            </div>
-            <div class="st-body">
-              <span class="tag gas"><span class="dot"></span>First request</span>
-              <h3>Gas</h3>
-              <p>The first time Slime sees a request, an agent writes its endpoint on the spot and checks it. Unused ones evaporate.</p>
-            </div>
-          </article>
-          <article class="st st-liquid reveal">
-            <div class="st-media" aria-hidden="true">
-              <img src="assets/state-liquid.webp" width="960" height="720" loading="lazy" alt="">
-              <span class="an an-hash mono">want=churn by plan → <b>#a91f3c</b></span>
-              <div class="an an-mem mono"><span>#07be21</span><span class="hit">#a91f3c</span><span>#5d0c9e</span></div>
-              <span class="an an-fast mono">⚡ 4 ms · no AI</span>
-            </div>
-            <div class="st-body">
-              <span class="tag liquid"><span class="dot"></span>Every repeat</span>
-              <h3>Liquid</h3>
-              <p>Seen it before? Slime finds the endpoint by its hash and serves it from memory, no AI involved. A second model reviews it before it's kept.</p>
-            </div>
-          </article>
-          <article class="st st-crystal reveal">
-            <div class="st-media" aria-hidden="true">
-              <img src="assets/state-crystal.webp" width="960" height="720" loading="lazy" alt="">
-              <div class="an an-heat mono"><span class="an-heat-label">hot path · <span class="an-count"></span> calls</span><span class="an-bar"><i></i></span></div>
-              <span class="an an-commit mono">✓ crystallized → src/slime/churn.ts</span>
-            </div>
-            <div class="st-body">
-              <span class="tag crystal">Hot paths</span>
-              <h3>Crystal</h3>
-              <p>Endpoints that run hot crystallize: an agent optimizes them into ordinary code, committed to your repo.</p>
-            </div>
-          </article>
-        </div>
-      </div>
-    </section>
-
     <!-- ================= WHY SLIME ================= -->
     <section id="why">
       <div class="container">
         <div class="sec-head reveal">
           <div>
-            <p class="sec-label"><span class="ic gas" aria-hidden="true">◎</span>Why Slime</p>
+            <p class="sec-label"><span class="ic gas" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg></span>Why Slime</p>
             <h2>A new category.<br><span class="muted-line">The self-building backend.</span></h2>
           </div>
           <p class="sec-lead">Static APIs were built for software that changed slowly. Slime grows its API from what your product actually asks for.</p>
@@ -919,11 +920,11 @@
           </article>
           <article class="quote reveal">
             <p><strong>End the backend-for-frontend grind.</strong> No more ticket queues for one more field in one more endpoint.</p>
-            <div class="who"><span class="slime-ic sb-liquid" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></span><span><b>Engineering teams</b><small>platform &amp; backend</small></span></div>
+            <div class="who"><span class="slime-ic sb-liquid" aria-hidden="true"><svg width="48" height="48" viewBox="0 0 48 48"><defs><linearGradient id="geg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFC9E1"/><stop offset=".45" stop-color="#FF1476"/><stop offset="1" stop-color="#8F0043"/></linearGradient></defs><path class="gear" d="M20.40 8.41 L21.08 3.20 L26.92 3.20 L27.60 8.41 A16 16 0 0 1 32.48 10.43 L32.48 10.43 L36.64 7.23 L40.77 11.36 L37.57 15.52 A16 16 0 0 1 39.59 20.40 L39.59 20.40 L44.80 21.08 L44.80 26.92 L39.59 27.60 A16 16 0 0 1 37.57 32.48 L37.57 32.48 L40.77 36.64 L36.64 40.77 L32.48 37.57 A16 16 0 0 1 27.60 39.59 L27.60 39.59 L26.92 44.80 L21.08 44.80 L20.40 39.59 A16 16 0 0 1 15.52 37.57 L15.52 37.57 L11.36 40.77 L7.23 36.64 L10.43 32.48 A16 16 0 0 1 8.41 27.60 L8.41 27.60 L3.20 26.92 L3.20 21.08 L8.41 20.40 A16 16 0 0 1 10.43 15.52 L10.43 15.52 L7.23 11.36 L11.36 7.23 L15.52 10.43 A16 16 0 0 1 20.40 8.41 Z M30 24 A6 6 0 1 0 18 24 A6 6 0 1 0 30 24 Z" fill="url(#geg)" fill-rule="evenodd" stroke="url(#geg)" stroke-width="2.4" stroke-linejoin="round"/><ellipse cx="17" cy="14" rx="6" ry="2.4" transform="rotate(-35 17 14)" fill="#fff" opacity=".6"/><circle cx="24" cy="24" r="6.6" fill="none" stroke="#5c002b" stroke-opacity=".35" stroke-width="1.2"/></svg></span><span><b>Engineering teams</b><small>platform &amp; backend</small></span></div>
           </article>
           <article class="quote reveal">
             <p><strong>Move at AI speed, safely.</strong> Your database, not the AI, decides what Slime can touch.</p>
-            <div class="who"><span class="slime-ic sb-crystal" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6l-1.5 3h-3z"/><path d="M10.5 6C6 8 4 12 4 15.5 4 19 7 21 12 21s8-2 8-5.5C20 12 18 8 13.5 6"/><path d="M14 11.5c-.5-.6-1.2-.9-2-.9-1.1 0-2 .6-2 1.4 0 1.9 4 1 4 2.9 0 .8-.9 1.5-2 1.5-.9 0-1.7-.4-2.1-1M12 9.6v1M12 16.4v1"/></svg></span><span><b>Businesses</b><small>leaders &amp; architects</small></span></div>
+            <div class="who"><span class="slime-ic sb-crystal" aria-hidden="true"><svg width="48" height="48" viewBox="0 0 48 48"><defs><linearGradient id="mbg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#E6F7FF"/><stop offset=".45" stop-color="#4AA8FF"/><stop offset="1" stop-color="#1E3F9E"/></linearGradient></defs><path d="M16.5 3.5 L20.5 8 L24 2.5 L27.5 8 L31.5 3.5 L30 14 H18 Z" fill="url(#mbg)" stroke="url(#mbg)" stroke-width="1.5" stroke-linejoin="round"/><path d="M18.5 15 C9 20 5 29 8 36.5 C10 42.5 16.5 45.5 24 45.5 C31.5 45.5 38 42.5 40 36.5 C43 29 39 20 29.5 15 Z" fill="url(#mbg)"/><rect x="15.5" y="12" width="17" height="4.6" rx="2.3" fill="#1E3F9E"/><ellipse cx="14.5" cy="25" rx="2.2" ry="6.5" transform="rotate(25 14.5 25)" fill="#fff" opacity=".55"/><text x="25" y="39.5" text-anchor="middle" font-size="17" style="font-family: 'Titan One', sans-serif" fill="#1E3F9E" fill-opacity=".55">$</text></svg></span><span><b>Businesses</b><small>leaders &amp; architects</small></span></div>
           </article>
         </div>
       </div>
@@ -981,6 +982,11 @@
       function onScroll() { nav.classList.toggle('scrolled', window.scrollY > 8); }
       window.addEventListener('scroll', onScroll, { passive: true });
       onScroll();
+
+      /* Nav height feeds the hero's min-height (hero + nav = one screen). */
+      function setNavH() { document.documentElement.style.setProperty('--nav-h', nav.offsetHeight + 'px'); }
+      window.addEventListener('resize', setNavH);
+      setNavH();
 
       /* Reveal sections as they enter the viewport */
       var reveals = document.querySelectorAll('.reveal');
@@ -1197,6 +1203,18 @@
         else if (state === 'gas') runLiquid();
         else if (state === 'liquid') reset();
       });
+
+      // Play the first (Gas) request once when the demo is mostly on screen, so
+      // visitors see a filled panel instead of placeholders; the button then
+      // invites the repeat. Skipped if they already clicked.
+      if ('IntersectionObserver' in window) {
+        var autoIo = new IntersectionObserver(function (es) {
+          if (!es[0].isIntersecting) return;
+          autoIo.disconnect();
+          if (state === 'idle') runGas();
+        }, { threshold: 0.6 });
+        autoIo.observe(panel);
+      }
     })();
   </script>
 
