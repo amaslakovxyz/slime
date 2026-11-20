@@ -46,7 +46,7 @@ optional adapters, or any custom store.
 
 * HTTP. The app's own endpoints call `slime.query()`. The standalone
   server, API keys and CLI belong to `@slime-cloud/server`, owned by others;
-* Slime Cloud and tenancy (`platform/`, owned by others);
+* Slime Cloud and tenancy (`slime-cloud/`, owned by others);
 * writes.
 
 ## Where this comes from

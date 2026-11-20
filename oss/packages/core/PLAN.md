@@ -2,7 +2,7 @@
 
 * **Status:** draft, being decided step by step
 * **Date:** 2026-11-20
-* **Owner:** Konstantin (core only; server and platform are owned by others)
+* **Owner:** Konstantin (core only; server and Slime Cloud are owned by others)
 
 ## 1. Goal
 
@@ -25,11 +25,23 @@ library: options in, no global state, no `.env` reading.
 | `sandbox/` on `main` | Working engine, about 88 tests. Gas, Liquid in Postgres, background review, Crystal (PR #6), offline/Groq/Claude providers. Configured through a global `config` that reads env and `.env`. |
 | PR #7 (open) | Layers: core → server → platform. Name `@slime-cloud/core` at `oss/packages/core`. Its plan moves `sandbox/` there with `git mv`, and adds `SLIME_META_TABLE`. Lists "config injection instead of the module singleton" as later work. |
 | `chore/gas-v0-plan`, `onboarding` | The other direction (Bun, SQLite, named intents, writes). Not the base for core. Useful later for the write path (`EffectSink`). |
+| `slime-cloud/runtime/` on `main` | **The first consumer of core.** Slime Cloud's runtime on AWS Lambda with handlers in DynamoDB (table `slime-handlers`, partition key `tenantId`, sort key `artifactKey`). It compiles `sandbox/src` through a path mapping and imports deep modules (`@slime-cloud/core/engine.js`, `config.js`, `store.js`). It must set env before importing, because `config` reads env at import time, and it flushes store writes before every response, because Lambda freezes the process afterwards. Its own `DynamoHandlerStore` implements the sandbox's `HandlerStore`. |
 
 Where this plan differs from PR #7: PR #7's Tasks 1–3 move the sandbox as is.
 This plan builds core as a library at the same path instead. Server and
 platform (PR #7 Tasks 2 and 4) then build on `createSlime()`. **Agree this
 with the PR #7 author before M0 lands.**
+
+Where this plan differs from `slime-cloud/runtime`: its README says
+`sandbox/` "stays exactly what gets published". This plan publishes a new
+package instead (C2). The runtime then changes in a few places (§7, M7):
+
+* it uses `createSlime(new SlimeConfig(…))` instead of setting env before
+  importing;
+* it uses the `dynamodb` store type instead of its own `DynamoHandlerStore`;
+* it imports the package instead of the path mapping to `sandbox/src`.
+
+**Agree this with the runtime's owner (amaslakov).**
 
 ## 3. Decisions
 
@@ -39,7 +51,7 @@ Status: **Decided**, **Proposed** (default unless someone objects) or
 | # | Question | Proposal | Status |
 |---|---|---|---|
 | C1 | Name and location | `@slime-cloud/core` in `oss/packages/core/`, inside npm workspaces at the repo root (PR #7 D10). | Decided |
-| C2 | Start from scratch or move the sandbox? | New package. Port modules one at a time, each with its tests. The sandbox isn't touched until core reaches parity, then it's retired (M6). | Decided |
+| C2 | Start from scratch or move the sandbox? | New package. Port modules one at a time, each with its tests. The sandbox isn't touched until core reaches parity and `slime-cloud/runtime` has moved to the package; then it's retired (M7). | Decided |
 | C3 | Runtime | v1: Node ≥ 22, ESM only. Built so that other runtimes (Bun, Deno, edge) can be added later without touching the engine. Runtime-specific code stays behind Ports: the shaping sandbox goes behind a new `SandboxRunner` Port (today a QuickJS worker thread), and database drivers stay behind `Connector`. The engine uses only `node:*` modules that Bun and Deno also provide. | Decided |
 | C4 | Configuration | A `SlimeConfig` class. The app creates it and adds the parts it needs: connector, generator, store, limits. Each part can come from env, a secrets store or anywhere else in the app. The class fills defaults, validates everything at once (reporting every problem, not just the first), and is immutable; `config.with({...})` returns a changed copy for tests. Core never reads `process.env` or `.env`. | Decided (class shape: Proposed) |
 | C5 | Entry point | Three steps in the app: create a connector (where data comes from), create a Slime instance with `createSlime(config)`, then call `slime.query()` inside any endpoint. The instance also has `handlers()`, `stats()`, `evict(id)`, `flush()` and `close()`. | Decided |
@@ -52,6 +64,7 @@ Status: **Decided**, **Proposed** (default unless someone objects) or
 | C12 | Out of scope for core v1 | Writes, tenancy, connectors other than Postgres, Redis, semantic matching. | Proposed |
 | C13 | Store contract | A small key-value Port, `SlimeStore`: `get(ns, key)`, `put(ns, key, value)`, `list(ns, prefix?)`, `delete(ns, key)`. Values are JSON. Namespaces: `handlers`, `dictionary`. The engine builds the keys and filters by prefix (schema, glossary, prompt, model), so a backend is only a mapping to 4 calls. It replaces the sandbox's domain-shaped `HandlerStore`. | Decided |
 | C14 | Choosing a store | The `store` option in `SlimeConfig` picks a built-in store by config, or takes any object that implements `SlimeStore`. Built in: `file` (the default), `memory`, `postgres` and `dynamodb` (§4.8). Files and memory have no dependencies. Postgres and DynamoDB ship in core as optional adapters: their drivers (`pg`, `@aws-sdk/client-dynamodb`) are optional peer dependencies, loaded only when that store is chosen. | Decided |
+| C15 | Background work on serverless | Core runs work off the request path: store writes, background reviews and the dictionary build (D4). On Lambda the process is frozen after each response, so nothing runs in between. `slime.flush()` waits for queued store writes (cheap; call it before every response on Lambda). `slime.settled()` waits for everything, including reviews and the dictionary build. Work that is cut off resumes on the instance's next invocation, or is redone later; it is never half-saved. | Proposed |
 
 ## 4. Request format and matching
 
@@ -236,15 +249,32 @@ then work in locked mode too, against a store filled during development.
 
 **DynamoDB store:**
 
-* one table with partition key `pk` and sort key `sk`;
-* `pk = ${prefix}#${ns}` and `sk = key`; the JSON goes in one attribute;
-* `list(ns, prefix)` is one `Query` with `begins_with(sk, prefix)`;
+* one table with a string partition key and a string sort key;
+* partition key = `prefix`, which is the tenant in Slime Cloud and a fixed
+  value such as `default` elsewhere;
+* sort key = `${ns}#${key}`;
+* the JSON goes in one attribute;
+* `list(ns, prefix)` is one `Query` on the partition with
+  `begins_with(sk, ns + '#' + prefix)`;
+* the attribute names are options, defaulting to `pk` and `sk`;
 * the table is created outside Slime (Terraform, CDK, console). `init()` only
   checks that it exists and has this key schema.
 
-In Slime Cloud, `prefix` is the tenant id, so core never sees tenants. An IAM
+Slime Cloud's existing table (`slime-handlers`, keys `tenantId` and
+`artifactKey`, in `infra/aws/platform/runtime.tf`) works as it is:
+
+```ts
+store: { type: 'dynamodb', table: 'slime-handlers', prefix: tenantId,
+         keys: { partition: 'tenantId', sort: 'artifactKey' } }
+```
+
+Rows written by today's `DynamoHandlerStore` don't start with
+`handlers#`, so the new store ignores them. They can be deleted after the
+switch, and the handlers are regenerated.
+
+Because the tenant is the partition key, core never sees tenants, and an IAM
 condition on `dynamodb:LeadingKeys` keeps each tenant's role in its own
-partitions (PR #7 §6).
+partition (PR #7 §6).
 
 **One contract test** runs against every store, the built-in ones and any
 custom store, so an adapter either passes or it doesn't.
@@ -343,7 +373,8 @@ one ports is named, so parity can be checked.
 | M3 | **Postgres, DynamoDB and the dictionary.** Connector with the start-up safety check and enum values from the catalog; the `postgres` and `dynamodb` stores; the background dictionary build (§4.4). | `postgres.test.ts` and `persistence.test.ts` ported; both stores pass the shared contract test (DynamoDB against DynamoDB Local in Docker); a missing driver gives the install message; a restart loads the dictionary instead of rebuilding it; changing `rules` rebuilds it. |
 | M4 | **Models and Liquid.** Claude and Groq generators and reviewers with prompts updated for §4 (nullable parameters, the dictionary); the review loop; promotion to Liquid. | Review and promotion tests pass; one live run against Groq or Claude. |
 | M5 | **Crystal.** Serving from an imported registry; the crystallize job writing TS or JS; the `check` command. | `crystal*.test.ts` ported; a hand-edited Crystal file fails `check`; TS and JS output both pass the equivalence test. |
-| M6 | **Use it as a package.** An example app in `oss/examples/` that installs the packed tarball and calls `slime.query()` from an endpoint; docs for the request format; the bench ported to run on core. Then retire `sandbox/`. | The example answers a query from the tarball; the bench is at least as correct as the sandbox's. |
+| M6 | **Use it as a package.** An example app in `oss/examples/` that installs the packed tarball and calls `slime.query()` from an endpoint; docs for the request format; the bench ported to run on core. | The example answers a query from the tarball; the bench is at least as correct as the sandbox's. |
+| M7 | **Switch `slime-cloud/runtime` to the package** (with its owner). Drop the path mapping to `sandbox/src`; build the engine with `createSlime(new SlimeConfig(…))`; use the `dynamodb` store type on the existing table; keep `slime.flush()` before each response (C15). Then retire `sandbox/`: nothing imports it any more. | The runtime's tests pass on the package; a deployed function answers from handlers stored by the new store. |
 
 ## 8. Risks
 
@@ -377,8 +408,10 @@ one ports is named, so parity can be checked.
 
 C1–C11 and most of §4 are decided. Still to do:
 
-* R4, R5 and R7, and D5–D8 (Proposed);
+* R4, R5, R7, D5–D8 and C15 (Proposed);
 * confirm C12 (what's out of scope);
-* agree with the PR #7 author that core is built at `oss/packages/core` (§2).
+* agree with the PR #7 author that core is built at `oss/packages/core` (§2);
+* agree with the owner of `slime-cloud/runtime` that it moves to the package
+  instead of `sandbox/` (§2, M7).
 
 M0, the skeleton, doesn't depend on any of these and can start now.
