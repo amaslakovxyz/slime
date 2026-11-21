@@ -11,9 +11,9 @@
   "scripts": {
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down -v",
-    "start": "node src/server.mjs",
+    "start": "node --env-file-if-exists=.env src/server.mjs",
     "test": "node --test 'test/**/*.test.mjs'",
-    "crystallize": "node scripts/crystallize.mjs",
+    "crystallize": "node --env-file-if-exists=.env scripts/crystallize.mjs",
     "check:crystal": "slime-crystal check slime-crystal"
   },
   "dependencies": {

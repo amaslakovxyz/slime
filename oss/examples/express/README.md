@@ -38,7 +38,8 @@ Endpoints:
 | `GET /health` | `slime.stats()` |
 | `POST /dev/query` | any `{ intent, input, output }`, **explore mode only** |
 
-Environment:
+Environment (put it in `.env`: `npm start` and `npm run crystallize` load it,
+and git ignores it; `.env.example` lists the variables):
 
 | Variable | Default | Meaning |
 |---|---|---|

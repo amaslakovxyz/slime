@@ -8,7 +8,7 @@ const DEFAULT_PORT = 3000;
 const config = await slimeConfigFromEnv(process.env, { onEvent: logEvent });
 const slime = await createSlime(config);
 const isExplore = config.mode === 'explore';
-const port = Number(process.env.PORT ?? DEFAULT_PORT);
+const port = Number(process.env.PORT || DEFAULT_PORT);
 
 const server = createApp(slime, { exposeDevQuery: isExplore }).listen(port, () => {
   console.log(`Slime example on http://localhost:${port} (${config.mode} mode${isExplore ? ', POST /dev/query enabled' : ''})`);

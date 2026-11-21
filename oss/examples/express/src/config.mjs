@@ -20,8 +20,9 @@ const RULES = ['Revenue counts only invoices with status paid.'];
 export async function slimeConfigFromEnv(env = process.env, overrides = {}) {
   const models = env.SLIME_LOCKED === '1' ? {} : await chooseModels(env);
   return new SlimeConfig({
-    connector: postgresConnector({ url: env.DATABASE_URL ?? DEMO_DATABASE_URL }),
-    store: fileStore(env.SLIME_STORE_DIR ?? `${APP_DIR}.slime`),
+    // `||`, not `??`: an empty value copied from .env.example means unset.
+    connector: postgresConnector({ url: env.DATABASE_URL || DEMO_DATABASE_URL }),
+    store: fileStore(env.SLIME_STORE_DIR || `${APP_DIR}.slime`),
     glossary: GLOSSARY,
     rules: RULES,
     ...models,
