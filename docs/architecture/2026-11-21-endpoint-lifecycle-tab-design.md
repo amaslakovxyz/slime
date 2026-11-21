@@ -53,6 +53,9 @@ endpoint (`/mcp`), multi-user concurrency, persistence of the feed.
 | L8 | A Crystal gets its own route `POST /v0/e/<key>`: intent and output come from the Crystal, the body carries `input`. | "Pick a request, it becomes an endpoint" without changing the core's key scheme. |
 | L9 | The runner lives in `platform/admin/scripts/local-runner.ts`, not in the provisioner package. | It reuses the admin's DynamoDB client and secret store. |
 | L10 | The runner acts only on endpoints whose token is in this admin's secret store. | DynamoDB Local may be shared with another checkout; never touch its endpoints. |
+| L11 | Each Crystal gets its own token (`slc_…`), issued on Crystallize (or with *Issue token* for older Crystals). It opens only `POST /v0/e/<its key>`: not `/v0/query`, not another Crystal, not the admin views. Stored as one secret `CRYSTAL_TOKENS` `{key: token}`; the runner passes it as env, in AWS it arrives through the endpoint's SSM prefix like `SLIME_API_KEY`. | A Crystal can be handed to a frontend or partner without the endpoint key, which can generate new handlers. |
+| L12 | The runtime copies live Liquid run counts to the store: before Crystallize (local) and at most once a minute per instance on flush (Lambda, `SLIME_RUNS_SYNC_MS`). | The core saves a handler only when it turns Liquid; Crystallize reads runs from the store. Chosen over a core change for now. |
+| L13 | Each endpoint keeps its port across restarts (runner restart included). | Two simultaneous restarts used to swap ports, so an agent's URL pointed at another endpoint. |
 
 ## 4. Components
 
@@ -171,8 +174,12 @@ sequenceDiagram
   memory by design), so after a Crystallize the Gas rows and the counter start
   over.
 * Core gap found while building: Liquid run counts are not persisted after
-  promotion. Worked around in the local runtime; the hosted runtime needs the
-  same fix (or a core change) before Crystallize works there.
+  promotion. Worked around in both runtimes (L12). In Lambda each warm
+  instance counts its own runs, so the saved count is the busiest instance's,
+  not the sum: it under-counts with several instances until the core gets an
+  atomic increment.
+* Crystal tokens cannot be rotated or revoked one by one yet; deleting the
+  endpoint removes them.
 * Single machine, single operator.
 * DynamoDB Local runs `-inMemory`: restarting its container drops Liquid
   handlers and endpoints.
