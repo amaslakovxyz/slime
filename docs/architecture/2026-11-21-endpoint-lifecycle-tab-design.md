@@ -119,9 +119,12 @@ endpoint (`/mcp`), multi-user concurrency, persistence of the feed.
     `ready to crystallize`), review label;
   * the rail: Connected (endpoint `ready`), Agent linked (any handler),
     Liquid (any Liquid or Crystal), Crystal (any Crystal).
-  * Review label: Liquid or Crystal → `approved`; Gas with runs ≥ 3 →
-    `reviewing`; else `—`. (`HandlerSummary` has no review field; good enough
-    for v1.)
+  * Review label: a saved handler carries a `ReviewStatus`
+    (`approved` / `rejected` / `pending` → `reviewing…`). A live handler has no
+    review field on `HandlerSummary`, so it is inferred: non-Gas → `approved`
+    (or `no reviewer` when its stored review is `none`), Gas with runs ≥ 3 →
+    `reviewing…`, else `—`. Good enough for v1; a real review field on
+    `HandlerSummary` is deferred (§9).
 * `lifecycle/page.tsx`: the three cards from the mockup; snippets filled with
   the endpoint URL and the token hint (full token via the existing Reveal).
 * Server action `crystallize(endpointId, keys)`: calls the runtime, shows
