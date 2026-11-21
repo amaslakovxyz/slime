@@ -70,10 +70,10 @@ describe('dictionary with API sources (MS2, MS17)', () => {
     assert.equal(
       text,
       [
-        'Database db: postgresql 16',
+        'Database source "db": postgresql 16',
         'Table accounts -- one row per customer\n  id integer not null primary key\n  plan_id integer null references plans.id\n  status text not null one of: active, canceled -- lifecycle',
         [
-          'API source notion: Notion API 2025-09-03 (read-only access)',
+          'API source "notion": Notion API 2025-09-03 (read-only access)',
           'Operation feedback.query: Customer feedback entries, newest first',
           '  params (all optional; null = not given):',
           '    sentiment string one of: positive, negative',
@@ -82,7 +82,7 @@ describe('dictionary with API sources (MS2, MS17)', () => {
           '    id string not null primary key',
           '    account string null -- matches db.accounts.name',
         ].join('\n'),
-        'API source films: Studio Ghibli API\nOperation films.list\n  params: none\n  returns rows:\n    title string not null',
+        'API source "films": Studio Ghibli API\nOperation films.list\n  params: none\n  returns rows:\n    title string not null',
         'Rules:\n  - Count only paid invoices.',
       ].join('\n\n'),
     );
@@ -90,7 +90,7 @@ describe('dictionary with API sources (MS2, MS17)', () => {
 
   test('uses the configured SQL source name', () => {
     const { text } = buildDictionary({ schema, glossary: {}, rules: [], apiSchemas: { films }, sqlSourceName: 'warehouse' });
-    assert.ok(text.startsWith('Database warehouse: postgresql 16'));
+    assert.ok(text.startsWith('Database source "warehouse": postgresql 16'));
   });
 
   test('the schema hash depends on every source schema, never on rows', () => {

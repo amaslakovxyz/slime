@@ -22,6 +22,11 @@ describe('repair messages (MS15)', () => {
     assert.equal(repairMessage(error, 'v2'), 'SANDBOX_ERROR: the shape function threw a TypeError');
   });
 
+  test('v2 keeps lint messages verbatim: core builds them from the model\'s code', () => {
+    const error = new SlimeError('INVALID_HANDLER', 'Step "a" names an unknown source "Database db".');
+    assert.equal(repairMessage(error, 'v2'), 'INVALID_HANDLER: Step "a" names an unknown source "Database db".');
+  });
+
   test('value-free shape mismatches carry paths and types, never row text or data-derived keys', () => {
     const output = [{ name: 'string', count: 'integer' }];
     const data = [{ name: 'Acme', count: ROW_TEXT, [ROW_TEXT]: 1 }];

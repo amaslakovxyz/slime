@@ -19,7 +19,7 @@ const V2: ArtifactV2 = {
   shapeJs: 'function shape(data) { return data.accounts; }',
   assumptions: ['matched by account name'],
 };
-const REQUEST = { context: 'Database db: postgresql 16', intent: 'accounts with negative feedback', params: { plan: 'string' as const }, output: [{ name: 'string' }] };
+const REQUEST = { context: 'Database source "db": postgresql 16', intent: 'accounts with negative feedback', params: { plan: 'string' as const }, output: [{ name: 'string' }] };
 
 function recording(outputMode: OutputMode, reply: unknown): { client: ModelClient; calls: ModelCall<unknown>[] } {
   const calls: ModelCall<unknown>[] = [];

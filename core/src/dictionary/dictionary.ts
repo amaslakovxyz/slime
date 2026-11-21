@@ -29,8 +29,9 @@ const DEFAULT_SQL_SOURCE_NAME = 'db';
 export function buildDictionary({ schema, glossary, rules, apiSchemas = {}, sqlSourceName = DEFAULT_SQL_SOURCE_NAME }: DictionarySources): Dictionary {
   const apiEntries = Object.entries(apiSchemas);
   const hasApiSources = apiEntries.length > 0;
-  // With API sources the model must know the database's source name; without one it named the step "postgresql" (P0.3).
-  const databaseHeading = hasApiSources ? `Database ${sqlSourceName}: ${schema.dialect}` : `Database: ${schema.dialect}`;
+  // With API sources the model must know the database's source name. Quoted: unquoted, a model took the whole
+  // heading ("db: postgresql 16.15 (Debian ...)") as the name (P0.3, P3.4).
+  const databaseHeading = hasApiSources ? `Database source "${sqlSourceName}": ${schema.dialect}` : `Database: ${schema.dialect}`;
   const sections = [
     databaseHeading,
     ...schema.tables.map(renderTable),

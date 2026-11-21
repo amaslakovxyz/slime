@@ -7,6 +7,8 @@ import type { SlimeError } from '../shared/errors.js';
 const QUOTED = /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g;
 const QUOTED_PLACEHOLDER = '<value>';
 const THROWN_NAME = /^Shaping function threw: ([A-Za-z]+):/;
+// Built by core's own checks from the model's code, never from data: the model needs them verbatim to repair.
+const LINT_CODES = new Set(['INVALID_HANDLER', 'WRITE_REFUSED', 'QUERY_TOO_LARGE', 'QUERY_TOO_EXPENSIVE', 'INVALID_REQUEST']);
 
 export function repairMessage(error: SlimeError, format: ArtifactFormat): string {
   if (format === 'v1') return `${error.code}: ${error.message}`;
@@ -15,7 +17,7 @@ export function repairMessage(error: SlimeError, format: ArtifactFormat): string
 
 function valueFreeText({ code, message }: SlimeError): string {
   // v2 SHAPE_MISMATCH messages are already built without values (validateData isValueFree).
-  if (code === 'SHAPE_MISMATCH') return message;
+  if (code === 'SHAPE_MISMATCH' || LINT_CODES.has(code)) return message;
   if (code === 'SANDBOX_ERROR') {
     const thrownName = THROWN_NAME.exec(message)?.[1];
     return thrownName ? `the shape function threw a ${thrownName}` : 'the shape function failed';

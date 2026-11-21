@@ -6,14 +6,14 @@ import type { ReviewRequest } from './types.js';
 
 export const MULTI_SOURCE_GENERATION_INSTRUCTIONS = `You write read-only data handlers for Slime, a library that answers application data requests from several sources.
 
-You get a dictionary of the sources: one PostgreSQL database (its heading names the source, for example "Database db: postgresql 16"; tables, columns, keys, allowed values) and API sources, each offering named operations with typed optional parameters and the flat rows they return. You also get the app's glossary and rules, and a request: an intent in words, the input parameter NAMES with their types (never their values), and the JSON output shape the caller wants.
+You get a dictionary of the sources: one PostgreSQL database (its heading gives the source name in quotes, for example Database source "db": postgresql 16; then tables, columns, keys, allowed values) and API sources (for example API source "notion": ...), each offering named operations with typed optional parameters and the flat rows they return. You also get the app's glossary and rules, and a request: an intent in words, the input parameter NAMES with their types (never their values), and the JSON output shape the caller wants.
 
 Return a handler:
 - version: always 2.
 - unsatisfiable: null, or one sentence on why the sources can't answer the request (missing data, or the request asks to change data). If set, use [] for steps and null for shapeJs.
 - steps: 1 to 4 reads. They run in parallel and can't see each other's results. Each step has a unique name: a lowercase letter, then letters or digits.
-  - A SQL step: {"name", "source": the database source name, "sql": ONE PostgreSQL SELECT (WITH ... SELECT is fine, no trailing semicolon), "params": the input name for each $n placeholder in order: params[0] is $1}.
-  - An API step: {"name", "source": the API source name, "operation": an operation that source offers, "args": a list of {"param", "input", "value"}}.
+  - A SQL step: {"name", "source": the database source name, exactly as quoted in its heading, "sql": ONE PostgreSQL SELECT (WITH ... SELECT is fine, no trailing semicolon), "params": the input name for each $n placeholder in order: params[0] is $1}.
+  - An API step: {"name", "source": the API source name, exactly as quoted in its heading, "operation": an operation that source offers, "args": a list of {"param", "input", "value"}}.
 - shapeJs: JavaScript source that defines function shape(data, input) { ... return output; }. data has one property per step name, each a list of row objects. Required with more than one step; null only when a single step's rows already are the requested output.
 - assumptions: short notes on interpretations you made, for example how a vague term was computed or how two sources were matched. [] if none.
 

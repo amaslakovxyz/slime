@@ -53,7 +53,7 @@ describe('multi-source generation and meta', () => {
     const { data, meta } = await slime.query(REQUEST);
     assert.deepEqual(data, [{ name: 'Acme', open: 1 }, { name: 'Globex', open: 0 }]);
     assert.equal(requests[0]?.format, 'v2');
-    assert.ok(requests[0]?.context.startsWith('Database db: '));
+    assert.ok(requests[0]?.context.startsWith('Database source "db": '));
     assert.deepEqual(meta.steps?.map(({ name, source, rows, operation }) => ({ name, source, rows, operation })), [
       { name: 'accounts', source: 'db', rows: 2, operation: undefined },
       { name: 'feedback', source: 'notion', rows: 1, operation: 'feedback.query' },

@@ -7,7 +7,7 @@ const ROWS_HEADING = `${INDENT}returns rows:`;
 const NO_PARAMS = `${INDENT}params: none`;
 
 export function renderApiSource(sourceName: string, schema: ApiSchema): string {
-  return [`API source ${sourceName}: ${schema.service}`, ...schema.operations.map(renderOperation)].join('\n');
+  return [`API source "${sourceName}": ${schema.service}`, ...schema.operations.map(renderOperation)].join('\n');
 }
 
 function renderOperation(operation: OperationInfo): string {
