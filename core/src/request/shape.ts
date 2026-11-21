@@ -17,7 +17,10 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 // A zone is required, so a value never depends on the server's zone.
 const DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/;
 
-const LEAF_CHECKS: Readonly<Record<string, (value: unknown) => boolean>> = {
+export const LEAF_TYPES = Object.freeze(['string', 'number', 'integer', 'boolean', 'date', 'datetime'] as const);
+export type LeafType = (typeof LEAF_TYPES)[number];
+
+const LEAF_CHECKS: Readonly<Record<LeafType, (value: unknown) => boolean>> = {
   string: (value) => typeof value === 'string',
   number: (value) => typeof value === 'number' && Number.isFinite(value),
   integer: (value) => typeof value === 'number' && Number.isInteger(value),
@@ -26,7 +29,6 @@ const LEAF_CHECKS: Readonly<Record<string, (value: unknown) => boolean>> = {
   datetime: (value) => typeof value === 'string' && DATETIME.test(value) && !Number.isNaN(Date.parse(value)),
 };
 
-const LEAF_TYPES = Object.keys(LEAF_CHECKS);
 const NULLABLE_SUFFIX = '|null';
 const LEAF = new RegExp(`^(${LEAF_TYPES.join('|')})(\\|null)?$`);
 // Objects and lists both count: { plans: [ { accounts: [ { name } ] } ] } is depth 5.
@@ -85,11 +87,23 @@ function collectMismatches({ shape, value, path }: ShapeCheck, mismatches: strin
   }
 }
 
+export function isLeafType(name: string): name is LeafType {
+  return (LEAF_TYPES as readonly string[]).includes(name);
+}
+
+/** Whether a value matches a leaf type such as "integer" or "date|null". */
+export function matchesLeaf(type: string, value: unknown): boolean {
+  const isNullable = type.endsWith(NULLABLE_SUFFIX);
+  if (value === null) return isNullable;
+  const typeName = isNullable ? type.slice(0, -NULLABLE_SUFFIX.length) : type;
+  return isLeafType(typeName) && LEAF_CHECKS[typeName](value);
+}
+
 function leafMismatch({ shape, value, path }: ShapeCheck<string>): string | undefined {
   const isNullable = shape.endsWith(NULLABLE_SUFFIX);
   if (value === null) return isNullable ? undefined : `${path}: null but "${shape}" is not nullable`;
   const typeName = isNullable ? shape.slice(0, -NULLABLE_SUFFIX.length) : shape;
-  const matches = LEAF_CHECKS[typeName]?.(value) ?? false;
+  const matches = isLeafType(typeName) && LEAF_CHECKS[typeName](value);
   return matches ? undefined : `${path}: expected ${shape}, got ${describeValue(value)}`;
 }
 
