@@ -148,6 +148,8 @@ svg .group-lbl { fill: var(--wireframe-grey); font-family: var(--font-mono); fon
 .flow .chip.cry { border-color: var(--crystal-border); background: var(--crystal-bg); }
 .flow .arrow { align-self: center; color: var(--plasma-highlight); font: 500 16px/1 var(--font-mono); }
 .tiers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+.pill { display: inline-block; font: 500 11px/1 var(--font-mono); padding: 5px 9px; border-radius: 999px; color: var(--gas-accent); border: 1px solid var(--gas-border); background: var(--gas-bg); white-space: nowrap; }
+.pill.soon { color: var(--wireframe-grey); border-color: var(--border-bright); background: transparent; }
 
 .table-wrap { overflow-x: auto; border: 1px solid var(--border-color); border-radius: 12px; }
 table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 14px; }
@@ -185,10 +187,10 @@ footer { text-align: center; font: 400 12px/1.5 var(--font-mono); color: var(--w
 
 <header class="hero">
   <h1 class="wordmark"><span class="slime-gradient-text">slime</span><span class="suffix">cloud</span></h1>
-  <p><strong>Admin + endpoint provisioner.</strong> A local Next.js admin where users sign up, create endpoints and watch usage; a stream-driven worker that deploys one Lambda per endpoint on a shared <strong style="color:var(--gas-accent)">Gas</strong> layer, with <strong style="color:var(--plasma-highlight)">Liquid</strong> handlers in DynamoDB partitioned by endpoint.</p>
+  <p><strong>Admin + endpoint provisioner.</strong> A local Next.js admin where users sign up, create and reconfigure endpoints and watch usage by tier; a stream-driven worker that deploys one Lambda per endpoint on a shared <strong style="color:var(--gas-accent)">Gas</strong> layer, with <strong style="color:var(--plasma-highlight)">Liquid</strong> handlers in DynamoDB partitioned by endpoint.</p>
   <nav class="toc" aria-label="Sections">
     <a href="#topology">1 · topology</a>
-    <a href="#sequence">2 · create endpoint</a>
+    <a href="#sequence">2 · lifecycle</a>
     <a href="#request">3 · request path</a>
     <a href="#states">4 · state machine</a>
     <a href="#data">5 · data model</a>
@@ -269,7 +271,7 @@ footer { text-align: center; font: 400 12px/1.5 var(--font-mono); color: var(--w
 
       <rect class="n-ctl" x="900" y="40" width="270" height="84" rx="12"/>
       <text class="t" x="914" y="66">slime-provisioner (Lambda)</text>
-      <text class="s" x="914" y="86">filter: status pending|deleting</text>
+      <text class="s" x="914" y="86">filter: pending|updating|deleting</text>
       <text class="s" x="914" y="104">batch 1 · timeout 300 s</text>
 
       <!-- row B -->
@@ -324,8 +326,8 @@ footer { text-align: center; font: 400 12px/1.5 var(--font-mono); color: var(--w
 
       <rect class="n-ctl" x="900" y="520" width="270" height="84" rx="12"/>
       <text class="t" x="914" y="548">slime-control · usage</text>
-      <text class="s" x="914" y="568">pk USAGE#&lt;id&gt; · sk YYYY-MM</text>
-      <text class="s" x="914" y="586">ADD requests, generations</text>
+      <text class="s" x="914" y="568">pk USAGE#&lt;id&gt; · sk YYYY-MM-DD</text>
+      <text class="s" x="914" y="586">ADD tier counters, ms, tokens</text>
     </svg>
   </div>
   <p class="scroll-hint">← scroll the diagram sideways →</p>
@@ -342,15 +344,15 @@ footer { text-align: center; font: 400 12px/1.5 var(--font-mono); color: var(--w
 
 <!-- 2. Sequence -->
 <section id="sequence">
-  <h2><span class="num">02</span>Create-endpoint sequence</h2>
-  <p class="lede">The admin only writes a <code>pending</code> item and two secrets. The DynamoDB stream hands the item to <code>slime-provisioner</code>, which does all AWS work. Every "already exists" error counts as success, so a stream retry replays safely.</p>
+  <h2><span class="num">02</span>Endpoint lifecycle: create, reconfigure, delete</h2>
+  <p class="lede">The admin only writes endpoint items (<code>pending</code>, <code>updating</code>, <code>deleting</code>) and secrets. The DynamoDB stream hands those items to <code>slime-provisioner</code>, which does all AWS work. Every "already exists" error counts as success, so a stream retry replays safely. While a status is <code>pending|provisioning|updating|deleting</code>, the endpoint page calls <code>router.refresh()</code> every 5 s (a revealed token stays visible).</p>
 
   <h3>Admin (synchronous, in the server action)</h3>
   <ol class="steps">
-    <li><span class="k">A1</span><div><b>Validate</b> name (1–40 chars), provider <code>claude|groq|offline</code>, Postgres URL (<code>postgres://</code> or <code>postgresql://</code>).</div></li>
+    <li><span class="k">A1</span><div><b>Validate</b> name (1–40 chars), provider <code>claude|groq|offline</code>, connector <code>postgres</code> (the only available entry of the connector registry) with its Connection URL (<code>postgres://</code> or <code>postgresql://</code>).</div></li>
     <li><span class="k">A2</span><div><b>Generate</b> <code>endpointId = "ep-" + 5 random bytes hex</code> and token <code>"slm_" + 24 random bytes base64url</code>.</div></li>
     <li><span class="k">A3</span><div><b>Store secrets</b> <code>/slime/endpoints/&lt;id&gt;/DATABASE_URL</code> and <code>/SLIME_API_KEY</code> as SSM SecureString (locally: a 0600 git-ignored JSON file).</div></li>
-    <li><span class="k">A4</span><div><b>PutItem</b> the endpoint item with <code>status = pending</code> and <code>tokenHint</code> (last 4 chars). If this fails, the secrets are removed again.</div></li>
+    <li><span class="k">A4</span><div><b>PutItem</b> the endpoint item with <code>status = pending</code>, <code>connectorType = postgres</code> and <code>tokenHint</code> (last 4 chars). If this fails, the secrets are removed again.</div></li>
     <li><span class="k">→</span><div><b>Stream</b> record <code>INSERT</code> with <code>NewImage.status = pending</code> passes the event source filter and invokes the worker (batch size 1, 2 retries).</div></li>
   </ol>
 
@@ -364,6 +366,22 @@ footer { text-align: center; font: 400 12px/1.5 var(--font-mono); color: var(--w
     <li><span class="k">6</span><div><b>Function URL</b> with <code>AuthType NONE</code> (on conflict: read the existing one), plus the two public permissions <code>PublicFunctionUrl</code> and <code>PublicInvokeViaFunctionUrl</code>, copied from <code>runtime.tf</code>.</div></li>
     <li><span class="k">7</span><div><b>Health</b>: read the token from SSM, <code>GET &lt;url&gt;healthz</code> with <code>x-api-key</code>. Up to 5 tries, 3 s apart, on 403 or 5xx (cold start, IAM, DB).</div></li>
     <li><span class="k liq">8</span><div><b>Result</b>: 200 → <code>status = ready</code>, <code>url</code>, <code>layerArn</code>, remove <code>error</code>. Otherwise → <code>status = failed</code> with the first 300 chars of the body. Any error in steps 2–7 also ends in <code>failed</code> and the batch succeeds, so the stream never blocks.</div></li>
+  </ol>
+
+  <h3>Reconfigure (<code>updating</code>) · admin, from the Connector and Settings tabs</h3>
+  <ol class="steps">
+    <li><span class="k">U1</span><div><b><code>updateConnector</code></b>: validate, check ownership with <code>getEndpoint</code>. <code>pending</code> → overwrite <code>DATABASE_URL</code> only (condition: still <code>pending</code>). <code>ready|failed</code> → read the old secret, overwrite it (SSM <code>Overwrite: true</code>), then conditional <code>UpdateItem status = updating</code>, <code>connectorType</code>, <code>updatedAt</code> (<code>#s IN (:ready, :failed)</code>). If that condition fails, the old secret is restored and the action throws <code>NOT_UPDATABLE</code>; any other status is <code>NOT_UPDATABLE</code> too.</div></li>
+    <li><span class="k">U2</span><div><b><code>updateSettings</code></b>: a name change is a plain update (any status except <code>deleting</code>); a provider change is allowed only from <code>ready|failed</code> and sets <code>status = updating</code>.</div></li>
+    <li><span class="k">→</span><div><b>Stream</b> record <code>MODIFY</code> with <code>NewImage.status = updating</code> passes the filter and invokes the worker.</div></li>
+  </ol>
+
+  <h3>Reconfigure (<code>updating</code>) · provisioner <code>reconfigure(ep)</code></h3>
+  <ol class="steps">
+    <li><span class="k">R1</span><div><b>Claim</b>: <code>UpdateItem status = provisioning</code> with <code>ConditionExpression #s = :updating</code>. A <code>ConditionalCheckFailedException</code> means another invocation owns it: stop.</div></li>
+    <li><span class="k gas">R2</span><div><b>Environment</b>: <code>GetFunctionConfiguration</code>, merge <code>Environment.Variables</code> with <code>SLIME_PROVIDER = ep.provider</code> and <code>SLIME_CONFIG_VERSION = ep.updatedAt</code>, then <code>UpdateFunctionConfiguration</code>. The new version value forces fresh instances, which reload the SSM secrets. <code>ResourceConflictException</code> (update in progress) is retried every 3 s, up to 20 times.</div></li>
+    <li><span class="k">R3</span><div><b>Wait</b> until the update is done (<code>waitUntilFunctionUpdatedV2</code>, max 120 s).</div></li>
+    <li><span class="k">R4</span><div><b>Health</b>: <code>GetFunctionUrlConfig</code> for the URL, then the same <code>healthz</code> check as provision step 7.</div></li>
+    <li><span class="k liq">R5</span><div><b>Result</b>: 200 → <code>status = ready</code>, remove <code>error</code>; otherwise → <code>status = failed</code> with <code>error</code>. Any error in R2–R4 also ends in <code>failed</code> and returns normally.</div></li>
   </ol>
 
   <h3>Provisioner · <code>teardown(ep)</code> on <code>status = deleting</code></h3>
@@ -390,68 +408,79 @@ footer { text-align: center; font: 400 12px/1.5 var(--font-mono); color: var(--w
     <div class="arrow" aria-hidden="true">→</div>
     <div class="chip"><b>engine.query</b><span>Crystal, Liquid or Gas (below)</span></div>
     <div class="arrow" aria-hidden="true">→</div>
-    <div class="chip"><b>Usage meter</b><span><code>requests += 1</code>; <code>generations += 1</code> on cache <code>miss</code></span></div>
+    <div class="chip"><b>Usage meter</b><span>per query: <code>&lt;tier&gt;Requests += 1</code> and <code>&lt;tier&gt;Ms += timingsMs.total</code> by <code>meta.tier</code>; <code>generations += 1</code> on cache <code>miss</code>; <code>inputTokens</code> / <code>outputTokens</code> from <code>meta.generation</code></span></div>
     <div class="arrow" aria-hidden="true">→</div>
-    <div class="chip"><b>Flush, respond</b><span>engine flush + one <code>UpdateItem ADD</code> on <code>USAGE#&lt;id&gt;</code>; a failed flush is logged, never fails the request</span></div>
+    <div class="chip"><b>Flush, respond</b><span>engine flush + one <code>UpdateItem</code> on <code>USAGE#&lt;id&gt;</code> / UTC day: <code>ADD</code> counters, <code>SET updatedAt</code> and the handler snapshot; a failed flush is logged, never fails the request</span></div>
   </div>
   <div class="tiers">
-    <div class="flow"><div class="chip cry"><b style="color:var(--crystal-accent)">Crystal</b><span>compiled handlers shipped in <code>/opt/slime/crystal</code></span></div></div>
-    <div class="flow"><div class="chip liq"><b style="color:var(--plasma-highlight)">Liquid</b><span>cached handler from <code>slime-handlers</code>, partition <code>tenantId = &lt;id&gt;</code> (cache <code>hit</code>)</span></div></div>
-    <div class="flow"><div class="chip gas"><b style="color:var(--gas-accent)">Gas</b><span>generation via <code>SLIME_PROVIDER</code> (cache <code>miss</code>), result stored back into Liquid</span></div></div>
+    <div class="flow"><div class="chip cry"><b style="color:var(--crystal-accent)">Crystal</b><span>compiled handlers shipped in <code>/opt/slime/crystal</code> · counts <code>crystalRequests</code>, <code>crystalMs</code></span></div></div>
+    <div class="flow"><div class="chip liq"><b style="color:var(--plasma-highlight)">Liquid</b><span>cached handler from <code>slime-handlers</code>, partition <code>tenantId = &lt;id&gt;</code> (cache <code>hit</code>) · counts <code>liquidRequests</code>, <code>liquidMs</code></span></div></div>
+    <div class="flow"><div class="chip gas"><b style="color:var(--gas-accent)">Gas</b><span>generation via <code>SLIME_PROVIDER</code> (cache <code>miss</code>), result stored back into Liquid · counts <code>gasRequests</code>, <code>gasMs</code>, <code>generations</code>, <code>inputTokens</code>, <code>outputTokens</code></span></div></div>
   </div>
+  <p class="note">Snapshot, not a sum: each flush also <code>SET</code>s <code>gasHandlers = engine.stats().handlers.gas</code> and <code>crystalHandlers = engine.stats().crystal.loaded</code> from the instance that flushed last; the admin labels them "warm, last seen instance". The <span style="color:var(--plasma-highlight)">Liquid</span> handler count is not a usage attribute: it is a <code>Select COUNT</code> query on <code>slime-handlers</code>, <code>tenantId = &lt;id&gt;</code>. Average latency per tier = <code>&lt;tier&gt;Ms / &lt;tier&gt;Requests</code>.</p>
 </section>
 
 <!-- 4. State machine -->
 <section id="states">
   <h2><span class="num">04</span>Endpoint state machine</h2>
-  <p class="lede">The admin writes the two states that trigger the worker; the worker writes the rest. Its own writes never match the stream filter, so it cannot loop on itself.</p>
+  <p class="lede">The admin writes the three states that trigger the worker; the worker writes the rest. Its own writes never match the stream filter, so it cannot loop on itself.</p>
   <div class="diagram" role="img" aria-label="Endpoint status state machine">
-    <svg class="states" viewBox="0 0 1000 200" xmlns="http://www.w3.org/2000/svg">
+    <svg class="states" viewBox="0 0 1000 290" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <marker id="s-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8A7A94"/></marker>
       </defs>
-      <path class="e" d="M140,100 H238" marker-end="url(#s-arr)"/>
-      <text class="lbl" x="190" y="90" text-anchor="middle">claim (cond.)</text>
-      <path class="e" d="M400,88 H445 V40 H488" marker-end="url(#s-arr)"/>
-      <text class="lbl" x="445" y="68" text-anchor="middle">healthz 200</text>
-      <path class="e" d="M400,112 H445 V160 H488" marker-end="url(#s-arr)"/>
-      <text class="lbl" x="445" y="138" text-anchor="middle">any error</text>
-      <path class="e" d="M620,40 H670 V88 H718" marker-end="url(#s-arr)"/>
-      <path class="e" d="M620,160 H670 V112 H718" marker-end="url(#s-arr)"/>
-      <text class="lbl" x="670" y="104" text-anchor="middle">delete</text>
-      <path class="e" d="M850,100 H888" marker-end="url(#s-arr)"/>
-      <text class="lbl" x="940" y="150" text-anchor="middle">teardown</text>
+      <path class="e" d="M140,160 H238" marker-end="url(#s-arr)"/>
+      <text class="lbl" x="190" y="150" text-anchor="middle">claim (cond.)</text>
+      <path class="e" d="M400,148 H445 V95 H488" marker-end="url(#s-arr)"/>
+      <text class="lbl" x="445" y="125" text-anchor="middle">healthz 200</text>
+      <path class="e" d="M400,172 H445 V220 H488" marker-end="url(#s-arr)"/>
+      <text class="lbl" x="445" y="200" text-anchor="middle">any error</text>
+      <path class="e" d="M620,95 H660 V120 H718" marker-end="url(#s-arr)"/>
+      <path class="e" d="M620,220 H660 V120 H718" marker-end="url(#s-arr)"/>
+      <text class="lbl" x="690" y="111" text-anchor="middle">change</text>
+      <path class="e" d="M620,95 H660 V220 H718" marker-end="url(#s-arr)"/>
+      <path class="e" d="M620,220 H718" marker-end="url(#s-arr)"/>
+      <text class="lbl" x="690" y="211" text-anchor="middle">delete</text>
+      <path class="e" d="M785,95 V30 H320 V133" marker-end="url(#s-arr)"/>
+      <text class="lbl" x="552" y="22" text-anchor="middle">re-claim (cond.)</text>
+      <path class="e" d="M850,220 H888" marker-end="url(#s-arr)"/>
+      <text class="lbl" x="940" y="265" text-anchor="middle">teardown</text>
 
-      <rect class="n-gas" x="20" y="75" width="120" height="50" rx="10" style="stroke:#38F8B8"/>
-      <text class="t" x="34" y="97">pending</text>
-      <text class="s" x="34" y="114">admin PutItem</text>
+      <rect class="n-gas" x="20" y="135" width="120" height="50" rx="10" style="stroke:#38F8B8"/>
+      <text class="t" x="34" y="157">pending</text>
+      <text class="s" x="34" y="174">admin PutItem</text>
 
-      <rect class="n-ctl" x="240" y="75" width="160" height="50" rx="10"/>
-      <text class="t" x="254" y="97">provisioning</text>
-      <text class="s" x="254" y="114">worker</text>
+      <rect class="n-ctl" x="240" y="135" width="160" height="50" rx="10"/>
+      <text class="t" x="254" y="157">provisioning</text>
+      <text class="s" x="254" y="174">worker</text>
 
-      <rect class="n-liq" x="490" y="15" width="130" height="50" rx="10"/>
-      <text class="t" x="504" y="37">ready</text>
-      <text class="s-liq" x="504" y="54">url + layerArn</text>
+      <rect class="n-liq" x="490" y="70" width="130" height="50" rx="10"/>
+      <text class="t" x="504" y="92">ready</text>
+      <text class="s-liq" x="504" y="109">url + layerArn</text>
 
-      <rect class="n-ctl" x="490" y="135" width="130" height="50" rx="10" style="stroke:#8F0043"/>
-      <text class="t" x="504" y="157">failed</text>
-      <text class="s" x="504" y="174">error (300 chars)</text>
+      <rect class="n-ctl" x="490" y="195" width="130" height="50" rx="10" style="stroke:#8F0043"/>
+      <text class="t" x="504" y="217">failed</text>
+      <text class="s" x="504" y="234">error (300 chars)</text>
 
-      <rect class="n-gas" x="720" y="75" width="130" height="50" rx="10"/>
-      <text class="t" x="734" y="97">deleting</text>
-      <text class="s" x="734" y="114">admin (cond.)</text>
+      <rect class="n-gas" x="720" y="95" width="130" height="50" rx="10"/>
+      <text class="t" x="734" y="117">updating</text>
+      <text class="s" x="734" y="134">admin (cond.)</text>
 
-      <rect class="n-ext" x="890" y="75" width="100" height="50" rx="10"/>
-      <text class="t" x="902" y="97">removed</text>
-      <text class="s" x="902" y="114">DeleteItem</text>
+      <rect class="n-gas" x="720" y="195" width="130" height="50" rx="10"/>
+      <text class="t" x="734" y="217">deleting</text>
+      <text class="s" x="734" y="234">admin (cond.)</text>
 
-      <text class="s-gas" x="80" y="150" text-anchor="middle">triggers worker</text>
-      <text class="s-gas" x="785" y="150" text-anchor="middle">triggers worker</text>
+      <rect class="n-ext" x="890" y="195" width="100" height="50" rx="10"/>
+      <text class="t" x="902" y="217">removed</text>
+      <text class="s" x="902" y="234">DeleteItem</text>
+
+      <text class="s-gas" x="80" y="210" text-anchor="middle">triggers worker</text>
+      <text class="s-gas" x="785" y="166" text-anchor="middle">triggers worker</text>
+      <text class="s-gas" x="785" y="265" text-anchor="middle">triggers worker</text>
     </svg>
   </div>
   <p class="scroll-hint">← scroll the diagram sideways →</p>
-  <p class="note gas">Mint dashed states match the event-source filter <code>eventName ∈ {INSERT, MODIFY}</code>, <code>pk</code> prefix <code>USER#</code>, <code>type = endpoint</code>, <code>status ∈ {pending, deleting}</code>. The admin only allows delete from <code>ready</code> or <code>failed</code> (<code>ConditionExpression #s IN (:ready, :failed)</code>).</p>
+  <p class="note gas">Mint dashed states match the event-source filter <code>eventName ∈ {INSERT, MODIFY}</code>, <code>pk</code> prefix <code>USER#</code>, <code>type = endpoint</code>, <code>status ∈ {pending, updating, deleting}</code>. The admin only allows delete, a connector change or a provider change from <code>ready</code> or <code>failed</code> (<code>ConditionExpression #s IN (:ready, :failed)</code>); <code>updating</code> re-enters <code>provisioning</code> through <code>reconfigure</code>, which keeps the function, role and URL and only swaps its environment. A connector change while <code>pending</code> overwrites the secret without a status change, and a rename is a plain update.</p>
 </section>
 
 <!-- 5. Data model -->
@@ -463,8 +492,8 @@ footer { text-align: center; font: 400 12px/1.5 var(--font-mono); color: var(--w
       <thead><tr><th>Item</th><th>pk</th><th>sk</th><th>Attributes</th><th>Written by</th></tr></thead>
       <tbody>
         <tr><td>User</td><td><code>USER#&lt;email lowercased&gt;</code></td><td><code>PROFILE</code></td><td><code>type="user"</code>, <code>email</code>, <code>passwordHash</code> (<code>scrypt$salt$hash</code>), <code>createdAt</code> (ISO)</td><td>admin (signup)</td></tr>
-        <tr><td>Endpoint</td><td><code>USER#&lt;email&gt;</code></td><td><code>ENDPOINT#&lt;endpointId&gt;</code></td><td><code>type="endpoint"</code>, <code>endpointId</code>, <code>owner</code>, <code>name</code>, <code>provider</code> (<code>claude|groq|offline</code>), <code>status</code> (<code>pending|provisioning|ready|failed|deleting</code>), <code>tokenHint</code> (last 4), <code>url?</code>, <code>layerArn?</code>, <code>error?</code>, <code>createdAt</code>, <code>updatedAt</code></td><td>admin (create, delete) · provisioner (status, url)</td></tr>
-        <tr><td>Usage</td><td><code>USAGE#&lt;endpointId&gt;</code></td><td><code>YYYY-MM</code> (UTC)</td><td><code>requests</code> (N), <code>generations</code> (N), <code>updatedAt</code></td><td>endpoint Lambda (<code>ADD</code>)</td></tr>
+        <tr><td>Endpoint</td><td><code>USER#&lt;email&gt;</code></td><td><code>ENDPOINT#&lt;endpointId&gt;</code></td><td><code>type="endpoint"</code>, <code>endpointId</code>, <code>owner</code>, <code>name</code>, <code>provider</code> (<code>claude|groq|offline</code>), <code>connectorType</code> (<code>postgres</code>; missing = <code>postgres</code>), <code>status</code> (<code>pending|provisioning|ready|failed|updating|deleting</code>), <code>tokenHint</code> (last 4), <code>url?</code>, <code>layerArn?</code>, <code>error?</code>, <code>createdAt</code>, <code>updatedAt</code></td><td>admin (create, connector/settings change, delete) · provisioner (status, url)</td></tr>
+        <tr><td>Usage (daily)</td><td><code>USAGE#&lt;endpointId&gt;</code></td><td><code>YYYY-MM-DD</code> (UTC day)</td><td><code>ADD</code>: <code>requests</code>, <code>generations</code>, <code>gasRequests</code>, <code>liquidRequests</code>, <code>crystalRequests</code>, <code>gasMs</code>, <code>liquidMs</code>, <code>crystalMs</code>, <code>inputTokens</code>, <code>outputTokens</code> (N) · <code>SET</code>: <code>updatedAt</code>, <code>gasHandlers</code>, <code>crystalHandlers</code> (snapshot of the last flushing instance). Month totals = <code>Query pk = USAGE#&lt;id&gt; AND begins_with(sk, 'YYYY-MM')</code>, summed.</td><td>endpoint Lambda (one <code>UpdateItem</code> per flush)</td></tr>
       </tbody>
     </table>
   </div>
@@ -493,7 +522,7 @@ footer { text-align: center; font: 400 12px/1.5 var(--font-mono); color: var(--w
       <tbody>
         <tr>
           <td>Provisioner role<br><code>slime-provisioner</code></td>
-          <td>read the control stream; <code>UpdateItem/DeleteItem</code> on <code>slime-control</code>; <code>Query/BatchWriteItem</code> on <code>slime-handlers</code>; SSM read/delete under <code>/slime/endpoints/*</code>; create/delete roles, functions, Function URLs and log groups named <code>slime-ep-*</code>; <code>GetLayerVersion</code> on <code>slime-gas</code></td>
+          <td>read the control stream; <code>UpdateItem/DeleteItem</code> on <code>slime-control</code>; <code>Query/BatchWriteItem</code> on <code>slime-handlers</code>; SSM read/delete under <code>/slime/endpoints/*</code>; create/delete roles, functions, Function URLs and log groups named <code>slime-ep-*</code>; <code>lambda:UpdateFunctionConfiguration</code> on <code>function:slime-ep-*</code> (reconfigure); <code>GetLayerVersion</code> on <code>slime-gas</code></td>
           <td><code>iam:CreateRole</code>/<code>PutRolePolicy</code> only with <code>iam:PermissionsBoundary = slime-endpoint-boundary</code>; <code>iam:PassRole</code> only to <code>lambda.amazonaws.com</code>; every resource ARN is name-prefixed</td>
         </tr>
         <tr>
@@ -503,7 +532,7 @@ footer { text-align: center; font: 400 12px/1.5 var(--font-mono); color: var(--w
         </tr>
         <tr>
           <td>Per-endpoint role<br><code>slime-ep-&lt;hex&gt;</code></td>
-          <td>inline policy <code>endpoint</code>: handlers with <code>ForAllValues:StringEquals dynamodb:LeadingKeys = [&lt;id&gt;]</code>; control <code>UpdateItem</code> with <code>LeadingKeys = ["USAGE#&lt;id&gt;"]</code>; SSM <code>/slime/shared</code> and <code>/slime/endpoints/&lt;id&gt;</code> only; its own log group</td>
+          <td>inline policy <code>endpoint</code>: handlers with <code>ForAllValues:StringEquals dynamodb:LeadingKeys = [&lt;id&gt;]</code>; control <code>UpdateItem</code> with <code>LeadingKeys = ["USAGE#&lt;id&gt;"]</code> and <code>dynamodb:Attributes</code> = <code>pk</code>, <code>sk</code>, <code>requests</code>, <code>generations</code>, <code>gasRequests</code>, <code>liquidRequests</code>, <code>crystalRequests</code>, <code>gasMs</code>, <code>liquidMs</code>, <code>crystalMs</code>, <code>inputTokens</code>, <code>outputTokens</code>, <code>gasHandlers</code>, <code>crystalHandlers</code>, <code>updatedAt</code>; SSM <code>/slime/shared</code> and <code>/slime/endpoints/&lt;id&gt;</code> only; its own log group</td>
           <td>one endpoint cannot read another's Liquid partition, secrets or usage; boundary still applies</td>
         </tr>
         <tr>
@@ -513,8 +542,8 @@ footer { text-align: center; font: 400 12px/1.5 var(--font-mono); color: var(--w
         </tr>
         <tr>
           <td>Stream filter</td>
-          <td>event source mapping on <code>slime-control</code>: <code>pk</code> prefix <code>USER#</code>, <code>type = endpoint</code>, <code>status ∈ {pending, deleting}</code>, batch 1, 2 retries; the worker also requires <code>pk = USER#&lt;owner&gt;</code>, <code>sk = ENDPOINT#&lt;endpointId&gt;</code></td>
-          <td>worker writes (<code>provisioning|ready|failed</code>) never match, so no self-trigger loop; endpoint roles may only <code>UpdateItem</code> counter attributes in <code>USAGE#&lt;id&gt;</code> (<code>dynamodb:Attributes</code>), so they cannot forge a teardown of another endpoint</td>
+          <td>event source mapping on <code>slime-control</code>: <code>pk</code> prefix <code>USER#</code>, <code>type = endpoint</code>, <code>status ∈ {pending, updating, deleting}</code>, batch 1, 2 retries; the worker also requires <code>pk = USER#&lt;owner&gt;</code>, <code>sk = ENDPOINT#&lt;endpointId&gt;</code></td>
+          <td>worker writes (<code>provisioning|ready|failed</code>) never match, so no self-trigger loop; endpoint roles may only <code>UpdateItem</code> the usage attributes above in <code>USAGE#&lt;id&gt;</code> (<code>dynamodb:Attributes</code>), so they cannot write <code>status</code> or forge a teardown of another endpoint</td>
         </tr>
         <tr>
           <td>Endpoint auth</td>
@@ -541,9 +570,9 @@ footer { text-align: center; font: 400 12px/1.5 var(--font-mono); color: var(--w
     <table>
       <thead><tr><th>Area</th><th>Files</th><th>What changes</th></tr></thead>
       <tbody>
-        <tr><td><code>slime-cloud/runtime</code></td><td><code>src/lambda.ts</code>, <code>src/app.ts</code>, <code>src/usage.ts</code>, <code>scripts/build.mjs</code>, <code>test/</code></td><td>comma-separated <code>SLIME_SSM_PREFIX</code>; <code>UsageMeter</code> fed by an <code>onQuery</code> hook and flushed before each response; build also emits <code>dist/layer/slime/</code> for the <span style="color:var(--gas-accent)">Gas</span> layer</td></tr>
-        <tr><td><code>slime-cloud/provisioner</code> (new)</td><td><code>src/config.ts</code>, <code>src/handler.ts</code>, <code>src/provision.ts</code>, <code>shim/index.mjs</code>, <code>scripts/build.mjs</code>, <code>test/provision.test.ts</code></td><td>stream handler dispatching <code>pending → provision</code>, <code>deleting → teardown</code>; fake-client tests for order, retries, failure and teardown paging</td></tr>
-        <tr><td><code>slime-cloud/admin</code> (new)</td><td><code>app/</code> (login, dashboard, endpoint detail, actions), <code>lib/</code> (env, ddb, secrets, auth, users, endpoints, pricing, telemetry), <code>instrumentation.ts</code>, <code>docker-compose.yml</code>, <code>scripts/dev-tables.ts</code>, <code>test/</code></td><td>Next.js App Router, email/password auth, dashboard boards (status counts, usage, estimated bill), OpenTelemetry spans to Jaeger</td></tr>
+        <tr><td><code>slime-cloud/runtime</code></td><td><code>src/lambda.ts</code>, <code>src/app.ts</code>, <code>src/usage.ts</code>, <code>scripts/build.mjs</code>, <code>test/</code></td><td>comma-separated <code>SLIME_SSM_PREFIX</code>; <code>UsageMeter</code> fed by an <code>onQuery</code> hook (tier, latency, tokens) and flushed before each response into the daily usage item; build also emits <code>dist/layer/slime/</code> for the <span style="color:var(--gas-accent)">Gas</span> layer</td></tr>
+        <tr><td><code>slime-cloud/provisioner</code> (new)</td><td><code>src/config.ts</code>, <code>src/handler.ts</code>, <code>src/provision.ts</code>, <code>shim/index.mjs</code>, <code>scripts/build.mjs</code>, <code>test/provision.test.ts</code></td><td>stream handler dispatching <code>pending → provision</code>, <code>updating → reconfigure</code>, <code>deleting → teardown</code>; fake-client tests for order, retries, failure, reconfigure and teardown paging</td></tr>
+        <tr><td><code>slime-cloud/admin</code> (new)</td><td><code>app/</code> (login, dashboard, endpoint tabs, actions), <code>lib/</code> (env, ddb, secrets, auth, users, endpoints, connectors, pricing, telemetry), <code>instrumentation.ts</code>, <code>docker-compose.yml</code>, <code>scripts/dev-tables.ts</code>, <code>test/</code></td><td>Next.js App Router, email/password auth, sidebar layout, tier metrics and savings, connector settings with a connection test, reconfigure through <code>updating</code>, OpenTelemetry spans to Jaeger</td></tr>
         <tr><td><code>infra/aws/platform</code></td><td><code>control.tf</code>, <code>gas-layer.tf</code>, <code>provisioner.tf</code>, <code>outputs.tf</code>, <code>build.sh</code></td><td>control table with stream; <code>slime-gas</code> layer + endpoint shim zip; boundary policy, provisioner role/log group/function and filtered event source mapping</td></tr>
         <tr><td>CI</td><td><code>.github/workflows/ci.yml</code></td><td>jobs <em>Slime Cloud admin</em> (with a DynamoDB Local service) and <em>Slime Cloud provisioner</em>: <code>npm ci</code>, typecheck, test, build on Node 22</td></tr>
         <tr><td>Docs</td><td><code>docs/slime-cloud/architecture.html</code></td><td>this page</td></tr>
@@ -551,13 +580,50 @@ footer { text-align: center; font: 400 12px/1.5 var(--font-mono); color: var(--w
     </table>
   </div>
 
+  <h3>Admin screens</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Screen</th><th>Content</th></tr></thead>
+      <tbody>
+        <tr><td>Sidebar layout</td><td>wordmark, Dashboard, the user's endpoints with status badges, "New endpoint", the user's email and "Log out"; collapses on narrow screens</td></tr>
+        <tr><td>Dashboard</td><td>boards for endpoint counts by status, this month's requests, generations, tokens, <span style="color:var(--plasma-highlight)">Liquid</span> handlers, estimated bill and crystallization savings; daily requests by tier chart; endpoints table</td></tr>
+        <tr><td>Endpoint · Overview</td><td>status, URL, token reveal + copy, <code>curl</code> example (intent <code>number of accounts on each plan</code>), polling via <code>router.refresh()</code> every 5 s while <code>pending|provisioning|updating|deleting</code></td></tr>
+        <tr><td>Endpoint · Connector</td><td>connector registry; edit the Connection URL; "Test connection" runs from the admin's network (stated in the UI) and reports user, database, server version, table count and <code>safetyCheck</code> problems (superuser/<code>rds_superuser</code>, <code>createrole</code>/<code>createdb</code>, writable tables); saving on <code>ready|failed</code> starts <code>updating</code></td></tr>
+        <tr><td>Endpoint · Usage</td><td>daily requests by tier chart, average latency per tier (<code>&lt;tier&gt;Ms / &lt;tier&gt;Requests</code>), input/output tokens, generations, warm Gas/Crystal handlers ("warm, last seen instance"), estimate and savings</td></tr>
+        <tr><td>Endpoint · Settings</td><td>rename (plain update), provider change (from <code>ready|failed</code> → <code>updating</code>), delete (from <code>ready|failed</code> → <code>deleting</code>)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Connector registry · <code>lib/connectors.ts</code></h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Connector</th><th>Status</th><th>Secret · field</th></tr></thead>
+      <tbody>
+        <tr><td><code>postgres</code> · Postgres</td><td><span class="pill">available</span></td><td><code>DATABASE_URL</code> · "Connection URL"</td></tr>
+        <tr><td><code>mysql</code> · MySQL</td><td><span class="pill soon">coming soon</span></td><td>rendered disabled</td></tr>
+        <tr><td><code>clickhouse</code> · ClickHouse</td><td><span class="pill soon">coming soon</span></td><td>rendered disabled</td></tr>
+        <tr><td><code>rest</code> · REST / OpenAPI</td><td><span class="pill soon">coming soon</span></td><td>rendered disabled</td></tr>
+        <tr><td><code>graphql</code> · GraphQL</td><td><span class="pill soon">coming soon</span></td><td>rendered disabled</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Pricing by tier · <code>lib/pricing.ts</code> (illustrative)</h3>
+  <div class="tiers">
+    <div class="flow"><div class="chip cry"><b style="color:var(--crystal-accent)">Crystal · $0.10 / 1k</b><span>requests served by compiled handlers</span></div></div>
+    <div class="flow"><div class="chip liq"><b style="color:var(--plasma-highlight)">Liquid · $0.50 / 1k</b><span>requests served by cached handlers</span></div></div>
+    <div class="flow"><div class="chip gas"><b style="color:var(--gas-accent)">Gas · $2.00 / 1k</b><span>requests that reach the generator, + $0.02 per generation</span></div></div>
+  </div>
+  <p class="note gas"><strong>Crystallization savings</strong> = (all requests priced as Gas + generations) − actual estimate. Example month: 1,500 Crystal + 400 Liquid + 100 Gas requests and 10 generations → estimate $0.15 + $0.20 + $0.20 + $0.20 = <strong>$0.75</strong>; priced as all-Gas $4.00 + $0.20 = $4.20; savings <strong>$3.45</strong>. Not built: month-end projection, cost breakdown by endpoint, budget alerts.</p>
+
   <h3>How to verify</h3>
   <ul class="plain">
-    <li><strong>Runtime:</strong> typecheck, tests (meter: one <code>UpdateItem</code> with <code>:r=2, :g=1</code>; failing client never rejects), build produces <code>dist/layer/slime/index.mjs</code>, worker, wasm and offline handlers.</li>
-    <li><strong>Provisioner:</strong> six fake-client scenarios — happy path to <code>ready</code>, IAM propagation retry, healthz 503 → <code>failed</code>, lost claim issues nothing, teardown of 30 handlers in 25 + 5, pre-existing role/function tolerated.</li>
-    <li><strong>Admin, locally:</strong> <code>npm run infra:up &amp;&amp; npm run tables &amp;&amp; REQUIRE_DYNAMO=1 npm test</code>, then sign up, create an endpoint (stays <code>pending</code> without AWS), reveal the token, seed usage and see the bill, check <code>endpoint.create</code> / <code>dashboard.load</code> spans in Jaeger.</li>
+    <li><strong>Runtime:</strong> typecheck, tests (meter: one daily <code>UpdateItem</code> per flush with tier counters, latency, tokens and the handler snapshot; failing client never rejects), build produces <code>dist/layer/slime/index.mjs</code>, worker, wasm and offline handlers.</li>
+    <li><strong>Provisioner:</strong> fake-client scenarios — happy path to <code>ready</code>, IAM propagation retry, healthz 503 → <code>failed</code>, lost claim issues nothing, teardown of 30 handlers in 25 + 5, pre-existing role/function tolerated, reconfigure merging the environment and retrying an in-progress update.</li>
+    <li><strong>Admin, locally:</strong> <code>npm run infra:up &amp;&amp; npm run tables &amp;&amp; REQUIRE_DYNAMO=1 npm test</code>, then sign up, create an endpoint (stays <code>pending</code> without AWS), reveal the token, change the connector, seed daily usage and see tiers, bill and savings, check <code>endpoint.create</code> / <code>dashboard.load</code> spans in Jaeger.</li>
     <li><strong>Infra:</strong> <code>terraform fmt</code>/<code>validate</code>, tflint, trivy; the PR plan shows only additions plus a possible <code>slime-runtime</code> code hash change.</li>
-    <li><strong>After merge (operator):</strong> put <code>/slime/shared/ANTHROPIC_API_KEY</code>, run the admin in AWS mode, create an <code>offline</code> endpoint: <code>pending → provisioning → ready</code> within ~60 s, <code>healthz</code> 200, a query bumps Requests, delete removes everything but usage.</li>
+    <li><strong>After merge (operator):</strong> put <code>/slime/shared/ANTHROPIC_API_KEY</code>, run the admin in AWS mode, create an <code>offline</code> endpoint: <code>pending → provisioning → ready</code> within ~60 s, <code>healthz</code> 200, a query bumps Requests; a provider or connector change runs <code>updating → provisioning → ready</code>; delete removes everything but usage.</li>
   </ul>
   <pre>cd slime-cloud/provisioner &amp;&amp; npm ci &amp;&amp; npm run typecheck &amp;&amp; npm test &amp;&amp; npm run build
 cd slime-cloud/admin &amp;&amp; npm ci &amp;&amp; npm run infra:up &amp;&amp; npm run tables &amp;&amp; REQUIRE_DYNAMO=1 npm test &amp;&amp; npm run dev</pre>
