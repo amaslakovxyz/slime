@@ -111,6 +111,7 @@ browser by a second agent following fixed steps (R1–R6).
 | E2E-14 | minor | endpoint-api | Write intents refused with different codes (403 delete, 422 update/drop) | Offline: `set every plan price to zero`, `drop table invoices` | one explicit refusal | 422 "No offline handler…" | by-design: offline answers only canned intents (`core/src/models/offline/README.md:21-22`); writes are still blocked by the SQL lint and the read-only role, and the data stayed unchanged |
 | E2E-15 | cosmetic | landing | "Feed the Slime" widget lists REST APIs, SOAP, CSVs; the console offers only PostgreSQL | landing widget vs New endpoint | matching sources | console: "PostgreSQL · Postgres 12+" only | decision needed |
 | E2E-16 | cosmetic | console | Test connection reports TABLES 6 for 5 user tables | Test connection with the demo reader URL | 5 | 6: counted `slime_meta.probe`, which `slime_reader` can't read (`platform/admin/lib/connectors/postgres.ts`) | fixed (2df266e) |
+| E2E-17 | minor | tooling | Rebuilding core breaks `npm run check:crystal` in `examples/express` | `npm run build -w @slime-cloud/core`, then `npm run check:crystal` in `examples/express` | crystal check passes | `slime-crystal: Permission denied`: `tsc` rewrites `core/dist/crystallize/bin.js` as `-rw-r--r--`, and npm sets the exec bit only on install, so the `file:../../core` link loses it. `npm ci` in the example restores it. CI is unaffected: it installs the packed tarball | backlog |
 
 Fix verification, after rebuilding core and restarting the admin:
 
