@@ -90,17 +90,31 @@ describe('local routes', () => {
   test('a Crystal call with an unknown input name is a 400 and never reaches the engine', async () => {
     const queries: unknown[] = [];
     const app = createApp({ slime: fakeSlime(queries), connector, crystal });
-    const res = await app.request('/v0/e/k1', { method: 'POST', body: JSON.stringify({ input: { limit: 5, extra: 1 } }) });
-    assert.equal(res.status, 400);
-    const { error } = (await res.json()) as { error: { code: string; message: string } };
-    assert.equal(error.code, 'INVALID_REQUEST');
-    assert.match(error.message, /Unknown: extra\./);
+    // Inherited names (toString, constructor, __proto__) must count as unknown too: any extra name changes the key.
+    for (const name of ['extra', 'toString', 'constructor', '__proto__']) {
+      const res = await app.request('/v0/e/k1', { method: 'POST', body: `{"input":{"limit":5,"${name}":1}}` });
+      assert.equal(res.status, 400, name);
+      const { error } = (await res.json()) as { error: { code: string; message: string } };
+      assert.equal(error.code, 'INVALID_REQUEST');
+      assert.match(error.message, new RegExp(`Unknown: ${name}\\.`));
+    }
     assert.deepEqual(queries, []);
   });
 
-  test('an unknown Crystal key is 404', async () => {
+  test('an unknown Crystal key is 404, including names inherited from Object.prototype', async () => {
     const app = createApp({ slime: fakeSlime(), connector, crystal });
-    assert.equal((await app.request('/v0/e/nope', { method: 'POST', body: '{}' })).status, 404);
+    for (const key of ['nope', 'constructor', '__proto__']) {
+      assert.equal((await app.request(`/v0/e/${key}`, { method: 'POST', body: '{}' })).status, 404, key);
+    }
+  });
+
+  test('the Crystal route has the same 16 KB body limit as /v0/query', async () => {
+    const queries: unknown[] = [];
+    const app = createApp({ slime: fakeSlime(queries), connector, crystal });
+    const body = JSON.stringify({ input: { limit: 5, pad: 'x'.repeat(20_000) } });
+    const res = await app.request('/v0/e/k1', { method: 'POST', body, headers: { 'content-length': String(body.length) } });
+    assert.equal(res.status, 413);
+    assert.deepEqual(queries, []);
   });
 
   test('local-only routes do not exist unless their parts are given', async () => {

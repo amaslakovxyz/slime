@@ -7,6 +7,7 @@
 // Lifecycle tab, and POST /v0/crystallize. Every route needs x-api-key: the
 // endpoint key, or for POST /v0/e/<key> that Crystal's own token (CRYSTAL_TOKENS).
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { changedProvenance, createSlime, type HandlerProvenance, type SlimeStore } from '@slime-cloud/core';
 import { crystallize, DEFAULT_MIN_RUNS } from '@slime-cloud/core/crystallize';
 import { createApp, type SavedHandler } from './app.js';
@@ -20,6 +21,8 @@ export { syncLiveRuns };
 
 const HANDLERS_NS = 'handlers';
 const MAX_BODY_BYTES = 64 * 1024;
+/** Same knob and default as the Lambda entry. */
+const FLUSH_LIMIT_MS = Number(process.env.SLIME_FLUSH_LIMIT_MS || 5_000);
 
 /**
  * A read-only view whose list() returns only `keys`: crystallize() has no key
@@ -120,7 +123,8 @@ async function main(): Promise<void> {
               store: keys ? storeLimitedTo(store, keys) : store,
               dir: crystalDir,
               minRuns: crystalRuns,
-              provenance: slime.provenance(),
+              // Locked mode has no generator, so its provenance never matches a saved record.
+              ...(config.mode === 'explore' ? { provenance: slime.provenance() } : {}),
             });
           },
         }
@@ -134,8 +138,12 @@ async function main(): Promise<void> {
         return send(res, Response.json({ error: { code: 'UNAUTHORIZED', message: 'Missing or wrong x-api-key.', retryable: false } }, { status: 401 }));
       }
       const response = await app.fetch(await toRequest(req, port));
-      // Same as Lambda: finish store writes and usage before answering, so the admin reads current numbers.
-      await Promise.all([slime.flush(), meter?.flush()]);
+      // Same as Lambda: finish store writes and usage before answering, so the admin reads current
+      // numbers. Capped like Lambda, because flush also waits for a running review (tens of seconds
+      // with a real model) and the admin polls with a 3 s timeout; GETs write nothing, so skip them.
+      if (req.method !== 'GET') {
+        await Promise.race([Promise.all([slime.flush(), meter?.flush()]), sleep(FLUSH_LIMIT_MS, undefined, { ref: false })]);
+      }
       await send(res, response);
     } catch (err) {
       console.error(err);
