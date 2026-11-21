@@ -37,5 +37,13 @@ export function isAuthorized(
 ): boolean {
   if (keyMatches(given, endpointKey)) return true;
   const route = method === 'POST' ? CRYSTAL_ROUTE.exec(path) : null;
-  return route ? keyMatches(given, crystalTokens[decodeURIComponent(route[1] ?? '')]) : false;
+  if (!route) return false;
+  let key: string;
+  try {
+    key = decodeURIComponent(route[1] ?? '');
+  } catch {
+    return false; // malformed %-escape: refuse, never a 500
+  }
+  // Own keys only: `constructor` must not resolve to Object.prototype's function.
+  return Object.hasOwn(crystalTokens, key) && keyMatches(given, crystalTokens[key]);
 }

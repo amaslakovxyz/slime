@@ -25,6 +25,10 @@ describe('isAuthorized', () => {
     assert.equal(isAuthorized('POST', '/v0/e/k1', 'nope', 'slm_key', tokens), false);
     assert.equal(isAuthorized('POST', '/v0/e/k3', 'slc_one', 'slm_key', tokens), false);
     assert.equal(isAuthorized('POST', '/v0/query', 'slm_key', undefined, tokens), false);
+    // Names on Object.prototype and malformed escapes are refused, never thrown.
+    for (const path of ['/v0/e/constructor', '/v0/e/__proto__', '/v0/e/toString', '/v0/e/%E0%A4%A']) {
+      assert.equal(isAuthorized('POST', path, 'slc_one', 'slm_key', tokens), false, path);
+    }
   });
 });
 
