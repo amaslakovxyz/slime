@@ -49,11 +49,11 @@ day-1 spike, not here.
 | # | Decision | Choice |
 |---|---|---|
 | 1 | Base architecture | `main` core + build-time pinning; Bun/SQLite spec stays a design record |
-| 2 | Usage model | Hybrid **explore → pin**: agent explores (Gas), pins into a hosted endpoint (reviewed) |
+| 2 | Usage model | Hybrid **explore → pin**: agent explores (Gas), then an **explicit `pin`** plus a passing background review promotes the handler to a hosted endpoint (Liquid). No auto-promotion |
 | 3 | Source access | Live federation; **no customer data stored** (handlers, schemas, tokens, payload-free logs only) |
 | 4 | Operations | Read-only v0; writes are roadmap (SaaS writes have no rollback — needs its own design) |
 | 5 | Reuse mechanics | **Both, phase-split:** `catalog` for explore; `expect`/`contractId` mandatory on pinned endpoints |
-| 6 | "Crystal" naming | **Crystal = the frozen contract** (product name for `contractId`, `cry_` hash). v0 hosts it in slime-cloud; `slime export` (roadmap) takes it as code into the client's repo. Static-host consumption: [crystal_static_host.md](crystal_static_host.md) |
+| 6 | State naming (2026-11-21 quiz) | **One state model: Gas → Liquid → Crystal.** Liquid = reviewed, pinned handler behind a hosted endpoint (identified by `contractId`); Crystal = the handler's code exported into the client's repo via `slime export` — roadmap, not v0. The engine's internal git-tier stays unnamed in product language. Static-host consumption: [crystal_static_host.md](crystal_static_host.md) |
 | 7 | Integration scope | **Core line: Linear + Postgres. Stretch: Notion** with the cross-source join as the demo finale. Fallback is explicit: Notion is cut first |
 
 Rejected alternatives and the full federation research (rate limits, N+1
