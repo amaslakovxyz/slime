@@ -64,7 +64,7 @@ input values. Handlers move up through three tiers:
 
 ### Where this comes from
 
-* [concepts_brief.md](../concepts_brief.md): the v0 concept and the
+* [concepts_brief.md](../docs/product/concepts_brief.md): the v0 concept and the
   benchmark results.
 * `sandbox/`: the first prototype, which core was rebuilt from. It was
   deleted in M6 and stays in git history.
