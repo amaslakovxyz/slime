@@ -90,6 +90,11 @@ always uses its own QuickJS runner.
 - [offline/](./offline/README.md): the offline generator (its own subpath).
 - [postgres/](./postgres/README.md): the Postgres connector (its own
   subpath; needs `pg`).
+- [models/](./models/README.md): prompts and reply schemas shared by the
+  model adapters.
+- [claude/](./claude/README.md): Claude generator and reviewer (its own
+  subpath; needs `@anthropic-ai/sdk`).
+- [groq/](./groq/README.md): Groq generator and reviewer (its own subpath).
 - [request/](./request/README.md): parsing of `{ intent, input?, output }`,
   the output notation, per-handler parameter types, and the cache keys
   (`requestKey`) and handler provenance (`changedProvenance`).

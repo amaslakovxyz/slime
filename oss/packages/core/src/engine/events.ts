@@ -1,4 +1,9 @@
-import type { SlimeEvent } from '../config/options.js';
+import type { ErrorEvent, GeneratedEvent, SlimeEvent } from '../config/options.js';
+import { SlimeError } from '../errors.js';
+import type { ModelUsage } from '../ports.js';
+import type { HandlerRecord } from './types.js';
+
+const BACKGROUND_FAILED = 'BACKGROUND_FAILED';
 
 /** A bug in the app's event handler must not fail a query. */
 export function emitSafely(onEvent: (event: SlimeEvent) => void, event: SlimeEvent): void {
@@ -7,4 +12,21 @@ export function emitSafely(onEvent: (event: SlimeEvent) => void, event: SlimeEve
   } catch {
     // Ignored on purpose: events are observability, not control flow.
   }
+}
+
+export function errorEvent(error: unknown): ErrorEvent {
+  if (error instanceof SlimeError) return { type: 'error', code: error.code, message: error.message };
+  return { type: 'error', code: BACKGROUND_FAILED, message: error instanceof Error ? error.message : String(error) };
+}
+
+export function generatedEvent({ key, artifact }: HandlerRecord, usage: ModelUsage): GeneratedEvent {
+  return {
+    type: 'generated',
+    handlerKey: key,
+    sql: artifact.sql,
+    assumptions: artifact.assumptions,
+    tokens: usage.inputTokens + usage.outputTokens,
+    ms: usage.ms,
+    ...(artifact.shapeJs ? { shapeJs: artifact.shapeJs } : {}),
+  };
 }

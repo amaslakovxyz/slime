@@ -1,6 +1,6 @@
 # @slime-cloud/core: library plan
 
-* **Status:** draft. M0 to M3 are done; M4 is next.
+* **Status:** draft. M0 to M3 are done; M4 is built and waits for its live run.
 * **Date:** 2026-11-20 (review fixes and follow-ups 2026-11-21)
 * **Owner:** Konstantin (core only; server and Slime Cloud are owned by others)
 
@@ -376,7 +376,7 @@ Dependencies:
 | `quickjs-emscripten` | ^0.32.0 | dependency | M2 |
 | `zod` | ^4.6.7 | dependency | M4 (validating model output) |
 | `pg` | ^8.23.1 | optional peer | M3 |
-| `@anthropic-ai/sdk` | ^1.11.0 | optional peer | M4 |
+| `@anthropic-ai/sdk` | ^1.12.0 | optional peer | M4 |
 | `acorn`, `acorn-walk` | ^8.19.0, ^8.3.5 | dependency of `/crystallize` only | M5 |
 
 Groq is called with `fetch`, so it needs no SDK. The main entry depends only
@@ -396,7 +396,7 @@ goal. Before a milestone starts, its row gets the files it creates or changes
 | M1 | **Request, contracts and pure parts.** Request parsing, intent normalization and the request key (§4); output notation with `date`/`datetime`; Ports and `SlimeError`; SQL guard and lint; `SlimeConfig` with defaults, validation and `glossary`. | `request`, `shape`, `params`, `key`, `sql`, `config` and `package` tests pass. | done |
 | M2 | **Engine, Gas path.** `createSlime` and the instance API (`query`, `flush`, `close`, `evict`, `handlers`, `stats`; `onEvent` with `generated`, `warning` and `error`), the `memory` and `file` stores and the shared store contract test, offline generator, the shaping sandbox with the QuickJS worker, coalescing, rate limits, locked mode, typed and nullable parameters (R4, R5), the limit check (R6), the R7 warning. Engine rules below. | The M2 tests below pass with no database; no core test is skipped because a database is missing; no `config` singleton anywhere. | done |
 | M3 | **Postgres connector.** Connector with the startup safety check and enum values from the catalog, which the M2 dictionary renders (§4.4). CI gets a Postgres service using `sandbox/db/init.sql` (roles and seed data). | `postgres.test.ts` cases pass against Postgres in CI (database tests require `REQUIRE_DB=1` in CI rather than skipping); the file and memory stores pass the shared contract test; changing `rules` changes the dictionary and regenerates handlers in explore mode. | done |
-| M4 | **Models and Liquid.** Claude and Groq generators and reviewers with prompts updated for §4 (nullable parameters, the dictionary); the review loop; promotion to Liquid (rule below); `reviewed` and `promoted` events. | Review and promotion tests pass; one live run against Groq or Claude. | planned |
+| M4 | **Models and Liquid.** Claude and Groq generators and reviewers with prompts updated for §4 (nullable parameters, the dictionary); the review loop; promotion to Liquid (rule below); `reviewed` and `promoted` events. | Review and promotion tests pass; one live run against Groq or Claude (`npm run live`). | built; live run pending |
 | M5 | **Crystal.** Serving from an imported registry; the crystallize job writing JS with `.d.ts`; the `check` command. | `crystal*.test.ts` ported; a hand-edited Crystal file fails `check`; the output passes the equivalence test. | planned |
 | M6 | **Use it as a package.** An example app that installs the packed tarball and calls `slime.query()` from an endpoint; docs for the request format; the bench ported to run on core. Publishing to npm is not part of v1. | The example (`oss/examples/express`, its own lockfile, run in CI from the packed tarball) answers a query. The bench, ported to `oss/packages/core/bench/`, gets the 5 cases recorded as correct in `concepts_brief.md` right, and refuses the 2 unsafe ones. | planned |
 | M7 | **Switch `slime-cloud/runtime` to the package** (with its owner). Drop the path mapping to `sandbox/src`; build the engine with `createSlime(new SlimeConfig(…))`; replace `DynamoHandlerStore` with a `SlimeStore` over the existing table that serves the items already there; keep `slime.flush()` before each response (C15). Then delete `sandbox/`: nothing imports it any more. | The runtime's tests pass on the package; a deployed function answers from handlers stored by the new store. Handlers saved before the switch are still served. The previous deploy can be restored. | planned |
@@ -439,12 +439,26 @@ and dev dependency); `scripts/check-pack.mjs`; `.github/workflows/ci.yml`
 (Postgres service, `REQUIRE_DB=1`); tests `postgres` (with `database.ts`),
 `engine` (rules change) and `package`.
 
-**M4 promotion rule.** A Gas handler with `gasToLiquidRuns` successful runs on
-distinct inputs inside `gasWindowMs` goes to the reviewer. Approved: saved as
-Liquid. Rejected: regenerated with the reviewer's notes, up to `maxReviews`
-times; then it stays Gas and an `error` event is emitted. With no reviewer
-configured, handlers are promoted after the runs and marked `review: 'none'`.
-`promptHash` is a hash of the generator's prompt text.
+**M4 promotion rule.** A Gas handler with `gasToLiquidRuns` successful runs
+inside `gasWindowMs` goes to the reviewer. Approved: promoted to Liquid and
+saved. Rejected: revised with the reviewer's notes and reviewed again, up to
+`maxReviews` reviews; a revision must pass the same checks on a recorded
+input, and its runs start over. After `maxReviews` rejections it stays Gas,
+marked `review: 'rejected'`. A review call that fails emits an `error` event
+and is retried after the next run. With no reviewer configured, handlers are
+promoted after the runs and marked `review: 'none'`. Reviews run one at a time
+in the background; `flush()` waits for them and for the store writes.
+`promptHash` is a hash of the provider name and its prompt text.
+
+**M4 files.** `src/models/` (`prompts.ts`, `schemas.ts`); `src/claude/`
+(`structured-call.ts`, `claude-models.ts`, `index.ts`); `src/groq/`
+(`groq-client.ts`, `groq-models.ts`, `index.ts`); `src/engine/`
+(`background.ts`, `review-loop.ts`, `lifecycle.ts`; `generate.ts` takes a
+starting point for revisions); `package.json` (`./claude` and `./groq`
+exports, `zod`, `@anthropic-ai/sdk` as optional peer, `npm run live`);
+`scripts/live-run.mjs` (the live run: the built package, the demo database,
+a real model as generator and reviewer); tests `promotion`, `groq` and
+`package`.
 
 **M7 checklist (with the runtime owner):**
 

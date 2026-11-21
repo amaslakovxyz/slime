@@ -17,13 +17,23 @@ export interface GenerationDeps {
   provenance: HandlerProvenance;
 }
 
+export interface GenerationJob {
+  key: string;
+  request: ParsedRequest;
+  /** A revision starts from the rejected handler and the reviewer's notes. */
+  previous?: PreviousAttempt;
+}
+
 export interface GenerationOutcome {
   record: HandlerRecord;
   execution: Execution;
   usage: ModelUsage;
 }
 
-type PreviousAttempt = { artifact: Artifact; error: string };
+export interface PreviousAttempt {
+  artifact: Artifact;
+  error: string;
+}
 
 // A repair with less time than this left would only time out.
 const MIN_ATTEMPT_MS = 1_000;
@@ -32,11 +42,11 @@ const WRITE_LIKE_REASON = /\b(writ|delet|updat|insert|modif|chang|remov|creat)/i
 const FINAL_CODES = new Set(['WRITE_REFUSED', 'ACCESS_DENIED']);
 
 /** Generates, checks and runs a handler, repairing up to limits.maxRepairs times within the time budget. */
-export async function generateHandler(deps: GenerationDeps, key: string, request: ParsedRequest): Promise<GenerationOutcome> {
+export async function generateHandler(deps: GenerationDeps, { key, request, previous: startingPoint }: GenerationJob): Promise<GenerationOutcome> {
   const paramTypes = checkParamTypes({}, request.input);
   const usage: ModelUsage = { ms: 0, waitMs: 0, inputTokens: 0, outputTokens: 0 };
   let deadline = Date.now() + deps.limits.generationBudgetMs;
-  let previous: PreviousAttempt | undefined;
+  let previous = startingPoint;
   let lastError: SlimeError | undefined;
 
   for (let attempt = 0; attempt <= deps.limits.maxRepairs && deadline - Date.now() >= MIN_ATTEMPT_MS; attempt++) {
@@ -98,7 +108,7 @@ function newRecord({ deps, key, request, artifact, paramTypes }: NewRecordParts)
   };
 }
 
-function forModel(paramTypes: ParamTypes): ParamTypesForModel {
+export function forModel(paramTypes: ParamTypes): ParamTypesForModel {
   return Object.fromEntries(Object.entries(paramTypes).map(([name, type]) => [name, type ?? 'unknown']));
 }
 

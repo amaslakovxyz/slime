@@ -22,6 +22,14 @@
       "types": "./dist/postgres/index.d.ts",
       "default": "./dist/postgres/index.js"
     },
+    "./claude": {
+      "types": "./dist/claude/index.d.ts",
+      "default": "./dist/claude/index.js"
+    },
+    "./groq": {
+      "types": "./dist/groq/index.d.ts",
+      "default": "./dist/groq/index.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
@@ -33,20 +41,27 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "node --import tsx --test 'test/**/*.test.ts'",
     "check:pack": "node scripts/check-pack.mjs",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "live": "npm run build && node scripts/live-run.mjs"
   },
   "dependencies": {
-    "quickjs-emscripten": "^0.32.0"
+    "quickjs-emscripten": "^0.32.0",
+    "zod": "^4.6.7"
   },
   "peerDependencies": {
+    "@anthropic-ai/sdk": "^1.12.0",
     "pg": "^8.23.1"
   },
   "peerDependenciesMeta": {
+    "@anthropic-ai/sdk": {
+      "optional": true
+    },
     "pg": {
       "optional": true
     }
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "^1.12.0",
     "@types/node": "^22.20.5",
     "@types/pg": "^8.23.1",
     "pg": "^8.23.1",

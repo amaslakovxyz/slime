@@ -4,9 +4,9 @@
 
 Maintenance scripts for the `@slime-cloud/core` package. They are not part
 of the published package: `package.json` `files` lists only `dist` and
-`README.md`. Today there is one script, the pack check, which guards what
-`npm pack` would ship (PLAN.md decision C8: compiled JS and types, no
-sources).
+`README.md`. `check-pack.mjs` guards what `npm pack` would ship (PLAN.md
+decision C8: compiled JS and types, no sources). `live-run.mjs` is M4's live
+run against a real model.
 
 ## Interface
 
@@ -15,6 +15,13 @@ sources).
   - It takes no arguments, flags or environment variables.
   - It always checks the package directory one level above the script
     (`pkgDir`), whatever the current directory.
+
+- `live-run.mjs`: run as `GROQ_API_KEY=... npm run live -w @slime-cloud/core`
+  (or with `ANTHROPIC_API_KEY`). It builds the package, then runs five
+  requests through the built `dist/` against the demo database (or
+  `DATABASE_URL`), with `gasToLiquidRuns: 2` so the review and promotion
+  happen in one run, and prints the results and events. It reads its keys
+  from env; core itself never does.
 
 ## Invariants
 

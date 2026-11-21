@@ -40,10 +40,17 @@ test('adapters have their own subpaths, so the main entry never loads them (C7)'
   assert.deepEqual(pkg.exports['./postgres'], { types: './dist/postgres/index.d.ts', default: './dist/postgres/index.js' });
   assert.deepEqual(Object.keys(await import('../src/offline/index.js')), ['offlineGenerator']);
   assert.deepEqual(Object.keys(await import('../src/postgres/index.js')), ['postgresConnector']);
+  for (const provider of ['claude', 'groq'] as const) {
+    assert.deepEqual(pkg.exports[`./${provider}`], { types: `./dist/${provider}/index.d.ts`, default: `./dist/${provider}/index.js` });
+  }
+  assert.deepEqual(Object.keys(await import('../src/claude/index.js')).sort(), ['claude', 'claudeGenerator', 'claudeReviewer']);
+  assert.deepEqual(Object.keys(await import('../src/groq/index.js')).sort(), ['groq', 'groqGenerator', 'groqReviewer']);
 });
 
-test('database drivers are optional peer dependencies (C7)', () => {
-  assert.equal(pkg.peerDependencies.pg, pkg.devDependencies.pg);
-  assert.deepEqual(pkg.peerDependenciesMeta.pg, { optional: true });
-  assert.equal(pkg.dependencies.pg, undefined);
+test('database drivers and model SDKs are optional peer dependencies (C7)', () => {
+  for (const name of ['pg', '@anthropic-ai/sdk']) {
+    assert.equal(pkg.peerDependencies[name], pkg.devDependencies[name], name);
+    assert.deepEqual(pkg.peerDependenciesMeta[name], { optional: true }, name);
+    assert.equal(pkg.dependencies[name], undefined, name);
+  }
 });

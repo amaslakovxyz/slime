@@ -31,12 +31,12 @@ input values. Handlers move up through three tiers:
 * **Crystal:** rewritten by an agent into JS modules (with `.d.ts`) in the app's own
   code, and passed to Slime through the config.
 
-> **Status:** M3 is done: `createSlime()` and `slime.query()` work on the
-> Gas path against Postgres (`@slime-cloud/core/postgres`), with the file and
-> memory stores, the QuickJS shaping sandbox, coalescing, rate limits, locked
-> mode and the offline generator (`@slime-cloud/core/offline`). The Claude
-> and Groq generators arrive with M4, so the example's `generator` doesn't
-> exist yet. Decisions and milestones are in [PLAN.md](PLAN.md).
+> **Status:** M4 is built: Claude and Groq generators and reviewers
+> (`@slime-cloud/core/claude`, `/groq`), background review and promotion to
+> Liquid, on top of the Postgres connector, the stores, the QuickJS shaping
+> sandbox and the offline generator. Its live run against a real model is
+> still pending (`npm run live`). Decisions and milestones are in
+> [PLAN.md](PLAN.md).
 
 ### Scope
 
@@ -83,6 +83,11 @@ input values. Handlers move up through three tiers:
     `@slime-cloud/core/offline` entry;
   - [src/postgres/](./src/postgres/README.md): the Postgres connector, the
     `@slime-cloud/core/postgres` entry;
+  - [src/models/](./src/models/README.md): the prompts and reply schemas the
+    model adapters share;
+  - [src/claude/](./src/claude/README.md) and
+    [src/groq/](./src/groq/README.md): generators and reviewers, the
+    `@slime-cloud/core/claude` and `/groq` entries;
   - [src/config/](./src/config/README.md): `SlimeConfig`'s option types,
     defaults and validation;
   - [src/request/](./src/request/README.md): request parsing, the output
@@ -100,16 +105,17 @@ input values. Handlers move up through three tiers:
 ## Global Invariants
 
 - **One main entry, plus adapter subpaths.** `package.json` `exports` has
-  `.`, `./offline` and `./postgres` (C7). `test/package.test.ts` pins the main entry's
+  `.`, `./offline`, `./postgres`, `./claude` and `./groq` (C7). `test/package.test.ts` pins the main entry's
   value exports and the subpath.
 - **What ships.** ESM only (`type: module`), Node `>=22`, compiled `dist/`
   and `README.md` only (`files`). `scripts/check-pack.mjs` enforces this in
   CI.
 - **Private until go-public.** The package is `private: true`. Tests guard
   this, so nothing is published by accident.
-- **One runtime dependency.** `quickjs-emscripten`, for the shaping
-  sandbox. Drivers and model SDKs are optional peers (C7): `pg` for
-  `./postgres`.
+- **Two runtime dependencies.** `quickjs-emscripten` for the shaping
+  sandbox, and `zod` for checking model replies. Drivers and model SDKs are
+  optional peers (C7): `pg` for `./postgres`, `@anthropic-ai/sdk` for
+  `./claude`. Groq is called with `fetch`.
 - **No environment reading.** Core never reads `process.env` or `.env`. The
   app passes everything in through `SlimeConfig` (`src/config.ts`).
 - **No values in keys or prompts.** Input values are never part of a cache

@@ -3,16 +3,19 @@ import type { SlimeEvent } from '../config/options.js';
 import type { Dictionary } from '../dictionary/dictionary.js';
 import { SlimeError } from '../errors.js';
 import type { Artifact, Generator, SandboxRunner } from '../ports.js';
-import { canonicalJSON, requestKey, type HandlerProvenance } from '../request/key.js';
+import { requestKey, type HandlerProvenance } from '../request/key.js';
 import { literalsInIntent, parseRequest, type InputValues, type ParsedRequest, type SlimeRequest } from '../request/parse.js';
 import { checkParamTypes } from '../request/params.js';
 import type { SlimeStore } from '../store/types.js';
+import { BackgroundTasks } from './background.js';
 import { Coalescer } from './coalescer.js';
-import { emitSafely } from './events.js';
+import { emitSafely, errorEvent, generatedEvent } from './events.js';
 import { executeArtifact, type Execution } from './execute.js';
-import { generateHandler, type GenerationOutcome } from './generate.js';
+import { generateHandler, type GenerationDeps, type GenerationOutcome } from './generate.js';
 import { GenerationLimits } from './generation-limits.js';
 import { HandlerCache } from './handler-cache.js';
+import { HandlerLifecycle } from './lifecycle.js';
+import { reviewUntilSettled, type ReviewOutcome } from './review-loop.js';
 import type { CacheOutcome, HandlerRecord, HandlerSummary, QueryMeta, QueryResult, Slime, SlimeStats } from './types.js';
 
 export interface EngineParts {
@@ -43,6 +46,8 @@ export class SlimeEngine implements Slime {
   readonly #parts: EngineParts;
   readonly #cache: HandlerCache;
   readonly #limits: GenerationLimits;
+  readonly #background: BackgroundTasks;
+  readonly #lifecycle: HandlerLifecycle;
   readonly #generations = new Coalescer<GenerationOutcome>();
 
   constructor(parts: EngineParts) {
@@ -50,13 +55,23 @@ export class SlimeEngine implements Slime {
     this.#parts = parts;
     this.#cache = new HandlerCache({ store, mode: config.mode, provenance, gasWindowMs: config.tiers.gasWindowMs });
     this.#limits = new GenerationLimits({ maxPerHour: config.limits.maxGenerationsPerHour, maxConcurrent: config.limits.maxConcurrentGenerations });
+    this.#background = new BackgroundTasks((error) => this.#emit(errorEvent(error)));
+    this.#lifecycle = new HandlerLifecycle({
+      store,
+      cache: this.#cache,
+      background: this.#background,
+      gasToLiquidRuns: config.tiers.gasToLiquidRuns,
+      fixturesPerHandler: config.tiers.fixturesPerHandler,
+      review: this.#reviewFunction(),
+      emit: (event) => this.#emit(event),
+    });
   }
 
   async query(request: SlimeRequest): Promise<QueryResult> {
     try {
       return await this.#answer(request);
     } catch (error) {
-      if (error instanceof SlimeError) this.#emit({ type: 'error', code: error.code, message: error.message });
+      if (error instanceof SlimeError) this.#emit(errorEvent(error));
       throw error;
     }
   }
@@ -73,8 +88,9 @@ export class SlimeEngine implements Slime {
     return this.#cache.evict(handlerKey);
   }
 
-  // Nothing is written in the background before M4 (reviews and promotion).
-  async flush(): Promise<void> {}
+  flush(): Promise<void> {
+    return this.#background.settled();
+  }
 
   async close(): Promise<void> {
     await this.flush();
@@ -107,11 +123,10 @@ export class SlimeEngine implements Slime {
   async #generate(generator: Generator, key: string, request: ParsedRequest): Promise<GenerationOutcome> {
     const releaseSlot = await this.#limits.acquire();
     try {
-      const { config, runner, dictionary, provenance } = this.#parts;
-      const deps = { generator, connector: config.connector, runner, limits: config.limits, dictionaryText: dictionary.text, provenance };
-      const outcome = await generateHandler(deps, key, request);
+      const outcome = await generateHandler(this.#generationDeps(generator), { key, request });
       this.#cache.addGas(outcome.record);
-      this.#emitGenerated(outcome);
+      this.#emit(generatedEvent(outcome.record, outcome.usage));
+      this.#lifecycle.afterRun(outcome.record);
       return outcome;
     } finally {
       releaseSlot();
@@ -122,8 +137,20 @@ export class SlimeEngine implements Slime {
     record.paramTypes = checkParamTypes(record.paramTypes, input);
     const { config, runner } = this.#parts;
     const execution = await executeArtifact({ connector: config.connector, runner, limits: config.limits }, { artifact: record.artifact, output: record.output, input });
-    recordRun(record, input, config.tiers.fixturesPerHandler);
+    this.#lifecycle.recordRun(record, input);
     return execution;
+  }
+
+  #generationDeps(generator: Generator): GenerationDeps {
+    const { config, runner, dictionary, provenance } = this.#parts;
+    return { generator, connector: config.connector, runner, limits: config.limits, dictionaryText: dictionary.text, provenance };
+  }
+
+  #reviewFunction(): ((record: HandlerRecord) => Promise<ReviewOutcome>) | undefined {
+    const { generator, reviewer, limits } = this.#parts.config;
+    if (!generator || !reviewer) return undefined;
+    const deps = { reviewer, generation: this.#generationDeps(generator), limits: this.#limits, maxReviews: this.#parts.config.tiers.maxReviews, reviewTimeoutMs: limits.reviewTimeoutMs, emit: (event: SlimeEvent) => this.#emit(event) };
+    return (record) => reviewUntilSettled(deps, record);
   }
 
   #meta({ record, cache, generateMs }: ResolvedHandler, execution: Execution, { warnings, totalMs }: MetaExtras): QueryMeta {
@@ -137,21 +164,9 @@ export class SlimeEngine implements Slime {
     return { sql, assumptions, ...(shapeJs ? { shapeJs } : {}) };
   }
 
-  #emitGenerated({ record: { key, artifact }, usage }: GenerationOutcome): void {
-    const tokens = usage.inputTokens + usage.outputTokens;
-    this.#emit({ type: 'generated', handlerKey: key, sql: artifact.sql, assumptions: artifact.assumptions, tokens, ms: usage.ms, ...(artifact.shapeJs ? { shapeJs: artifact.shapeJs } : {}) });
-  }
-
   #emit(event: SlimeEvent): void {
     emitSafely(this.#parts.config.onEvent, event);
   }
-}
-
-function recordRun(record: HandlerRecord, input: InputValues, maxFixtures: number): void {
-  record.runs++;
-  const fixture = canonicalJSON(input);
-  const isNewInput = !record.fixtures.some((saved) => canonicalJSON(saved) === fixture);
-  if (isNewInput && record.fixtures.length < maxFixtures) record.fixtures.push(structuredClone(input));
 }
 
 function literalWarning(label: string): string {

@@ -17,7 +17,14 @@ miss, then run and checked against `output`.
 - `coalescer.ts`: concurrent identical requests share one generation.
 - `generation-limits.ts`: `maxGenerationsPerHour` per instance over a fixed
   hour, and `maxConcurrentGenerations` slots.
-- `events.ts`: `emitSafely`, so a throwing `onEvent` never fails a query.
+- `lifecycle.ts`: counts runs and promotes Gas to Liquid (M4 rule), with a
+  review first when a reviewer is configured.
+- `review-loop.ts`: review, then revise with the reviewer's notes, up to
+  `maxReviews` reviews.
+- `background.ts`: work off the request path (reviews, store writes);
+  `flush()` waits for it.
+- `events.ts`: `emitSafely` (a throwing `onEvent` never fails a query) and
+  the `generated` and `error` event builders.
 - `types.ts`: the public instance API types.
 
 ## Interface
@@ -48,10 +55,17 @@ classes and functions here are internal.
   waits for a slot.
 - **`meta`.** `meta.sql`, `shapeJs` and `assumptions` appear only in explore
   mode (R9, R11). Literals in the intent become `meta.warnings` (R7).
-- **Events.** `onEvent` gets `generated` for each generation and `error` for
-  each failed query.
-- **`flush()`.** It has nothing to wait for until M4 adds reviews and
-  promotion writes.
+- **Events.** `onEvent` gets `generated` for each generation and revision,
+  `reviewed` for each review, `promoted` for each promotion, and `error` for
+  each failed query or background task.
+- **Promotion (M4 rule).** After `gasToLiquidRuns` successful runs, a Gas
+  handler is reviewed (one review at a time) and, once approved, promoted to
+  Liquid and saved. Without a reviewer it is promoted at once, marked
+  `review: 'none'`. A revision passes the same checks on a recorded input and
+  starts its runs over; after `maxReviews` rejections the handler stays Gas,
+  marked `rejected`. A failed review call is retried after the next run.
+- **`flush()`.** It waits for running reviews and store writes, including
+  ones they start (C15).
 - **`close()`.** It closes the shaping sandbox, the store and the connector.
 
 ## Side Effects

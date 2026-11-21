@@ -41,6 +41,12 @@ export class HandlerCache {
     this.#handlers.set(record.key, { record, expiresAt: Date.now() + this.#settings.gasWindowMs });
   }
 
+  /** A promoted handler stays in memory until evicted. */
+  keep(key: string): void {
+    const cached = this.#handlers.get(key);
+    if (cached) cached.expiresAt = Number.POSITIVE_INFINITY;
+  }
+
   async evict(key: string): Promise<boolean> {
     const wasCached = this.#handlers.delete(key);
     const wasSaved = (await this.#settings.store.get(HANDLERS_NS, key)) !== undefined;

@@ -56,6 +56,31 @@ export function stubGenerator(artifactFor: (request: GenerationRequest) => Artif
   };
 }
 
+export type Verdict = 'approve' | 'reject';
+
+export interface StubReviewer extends Reviewer {
+  readonly calls: number;
+}
+
+/** Returns the scripted verdicts in order (the last one repeats); "throw" makes that call fail. */
+export function stubReviewer(verdicts: (Verdict | 'throw')[], delayMs = 0): StubReviewer {
+  let calls = 0;
+  return {
+    model: 'stub-reviewer',
+    get calls() {
+      return calls;
+    },
+    review: async () => {
+      const verdict = verdicts[Math.min(calls, verdicts.length - 1)];
+      calls++;
+      if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
+      if (verdict === 'throw') throw new Error('review call failed');
+      const problems = verdict === 'reject' ? ['ranks the least active accounts first'] : [];
+      return { verdict: verdict ?? 'approve', problems, ms: delayMs, waitMs: 0, inputTokens: 10, outputTokens: 5 };
+    },
+  };
+}
+
 export function fakeGenerator(): Generator {
   return stubGenerator(() => artifact('SELECT 1'));
 }
