@@ -12,6 +12,7 @@ import { changedProvenance, type HandlerProvenance } from '../request/key.js';
 import type { Connector } from '../connectors/types.js';
 import type { Optimizer } from '../models/types.js';
 import { QuickJSRunner } from '../sandbox/quickjs/quickjs-runner.js';
+import type { SandboxRunner } from '../sandbox/types.js';
 import type { SlimeStore } from '../stores/types.js';
 import { verifyCandidate, type EquivalenceDeps } from './equivalence.js';
 import { sha256 } from '../shared/hash.js';
@@ -32,6 +33,8 @@ export interface CrystallizeOptions {
   /** Current provenance; a handler made with another one is not ready. */
   provenance?: HandlerProvenance;
   limits?: Partial<LimitOptions>;
+  /** A sandbox the host shares; the job uses it and leaves it running. Omit for the job's own. */
+  runner?: SandboxRunner;
   optimizeTimeoutMs?: number;
   /** Check everything, write nothing. */
   isDryRun?: boolean;
@@ -67,7 +70,7 @@ const REVIEWS_ALLOWED = new Set(['approved', 'none']);
 const SKIPPED_API_STEPS = 'has API steps, which Crystal does not support yet';
 
 export async function crystallize(options: CrystallizeOptions): Promise<CrystalReport[]> {
-  const runner = new QuickJSRunner();
+  const runner = options.runner ?? new QuickJSRunner();
   const context: JobContext = {
     options,
     deps: { connector: options.connector, runner, limits: { ...DEFAULT_LIMITS, ...options.limits } },
@@ -83,7 +86,7 @@ export async function crystallize(options: CrystallizeOptions): Promise<CrystalR
     if (hasNewCrystal && !options.isDryRun) await writeManifestAndIndex(options.dir, context.manifest);
     return reports;
   } finally {
-    await runner.close();
+    if (!options.runner) await runner.close();
   }
 }
 

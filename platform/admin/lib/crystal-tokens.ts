@@ -1,8 +1,9 @@
 // Each Crystal can have its own token: it opens only that Crystal's route
 // (POST /v0/e/<key>), so it can be handed to a frontend or a partner without
 // giving them the endpoint's key (which can generate new handlers). Tokens live
-// in the endpoint's secrets as one JSON map, CRYSTAL_TOKENS { key: token }; the
-// runner (or SSM, in AWS) passes it to the runtime, which reads it at start.
+// in the endpoint's secrets as one JSON map, CRYSTAL_TOKENS { key: token }. The
+// local runner passes it to the runtime at start; in the cloud the shared runtime
+// re-reads it from SSM within its TTL, and at once after /v0/reload.
 import { randomBytes } from 'node:crypto';
 import { secretStore } from './secrets';
 

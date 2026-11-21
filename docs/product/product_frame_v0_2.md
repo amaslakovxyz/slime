@@ -57,10 +57,10 @@ calls.
 | Handler | Generated code that answers one intent over live sources. |
 | Gas | A handler generated on demand for a new request. Held in memory, per process, for one window (`gasWindowMs` = 1 h from generation, not extended by calls); a restart or another Lambda instance does not see it. Unreviewed. Tokens are spent on generation, review and revision, not on repeat runs (repeat Gas calls run cached code). |
 | Liquid | A handler that passed review (or review is off) and is saved to the store; survives restarts. Served on the dispatch endpoint `POST /v0/query` when a request has the same normalized intent (case, whitespace, trailing punctuation), the same input names and the same output shape. Listed in `catalog` (planned). No own URL. |
-| Crystallize | The only explicit step, the same word everywhere: admin UI, CLI `slime crystallize`, MCP tool `crystallize`, runtime `POST /v0/crystallize`, core `crystallize()`. Today the operator runs it in the admin; later the Dev Agent through slime-client. Only for Liquid handlers with at least 10 runs (`CRYSTAL_MIN_RUNS`) and current provenance. Removal verb `slime uncrystallize <crystal key>` is planned, not built; today a Crystal is removed only by deleting its Endpoint. |
-| Crystal | Frozen plain code: one module per key plus `manifest.json` and `index.mjs` in the endpoint's Crystal folder, checked on recorded fixtures, hosted by Slime and loaded at startup. Has its own Crystal endpoint `POST /v0/e/<crystal key>` with its own `slc_` token; the body is `{"input":{…}}`. Also answers on `/v0/query` for callers holding the endpoint's `slm_` key. Runs without the QuickJS sandbox. Local-only in v0. `slime export` to the client repo is its later form. |
+| Crystallize | The only explicit step, the same word everywhere: admin UI, CLI `slime crystallize`, MCP tool `crystallize`, runtime `POST /v0/crystallize`, core `crystallize()`. Today the operator runs it in the admin; later the Dev Agent through slime-client. Only for Liquid handlers with at least 10 runs (`CRYSTAL_MIN_RUNS`) and current provenance. Local and cloud (S3) as of the cloud MVP. Removal verb `slime uncrystallize <crystal key>` is planned, not built; today a Crystal is removed only by deleting its Endpoint. |
+| Crystal | Frozen plain code: one module per key plus `manifest.json` and `index.mjs` in the endpoint's Crystal folder (locally) or S3 prefix (Slime Cloud), checked on recorded fixtures, hosted by Slime and loaded at startup. Has its own Crystal endpoint `POST /v0/e/<crystal key>` (in Slime Cloud `/ep/<id>/v0/e/<crystal key>`) with its own `slc_` token; the body is `{"input":{…}}`. Also answers on `/v0/query` for callers holding the endpoint's `slm_` key. Runs in the QuickJS sandbox in Slime Cloud; without it in self-hosted apps. `slime export` to the client repo is its later form. |
 | Crystal key | The core handler key of a Crystal: a hash of `KEY_VERSION`, the normalized intent, the sorted input names and the output shape. Stable across migrations; changes when the key version, the input names or the output shape change. |
-| Endpoint | Any URL. The admin object (one runtime, one source connection, one `slm_` key, many handlers) is an Endpoint; its URL is the dispatch endpoint `POST /v0/query`. A Crystal endpoint is `POST /v0/e/<crystal key>`. |
+| Endpoint | Any URL. The admin object (one runtime, one source connection, one `slm_` key, many handlers) is an Endpoint; its URL is the dispatch endpoint `POST /v0/query`. A Crystal endpoint is `POST /v0/e/<crystal key>`. In Slime Cloud both sit under the Endpoint's base URL `https://<runtime host>/ep/<id>/`. |
 | Catalog | Planned slime-client tool listing Liquid and Crystal intents so the agent can resend one for a cache hit. Not built. |
 | Cache hit | A request served without generation: same normalized intent, same input names, same output shape as a Liquid or Crystal handler (or a Gas handler still in its window). |
 | Generator | The model that writes handler code. Spends tokens. |
@@ -193,16 +193,19 @@ A Liquid handler frozen into plain code and hosted by Slime.
   handlers with at least 10 runs (`CRYSTAL_MIN_RUNS`) and current
   provenance; the code is checked on recorded fixtures before it is frozen.
   With review off a Crystal can ship unreviewed.
-* Request in: its own Crystal endpoint `POST /v0/e/<crystal key>` with its
-  own `slc_` token and body `{"input":{…}}`. The route refuses missing and
+* Request in: its own Crystal endpoint `POST /v0/e/<crystal key>` (in Slime
+  Cloud `POST /ep/<id>/v0/e/<crystal key>`) with its own `slc_` token and
+  body `{"input":{…}}`. The route refuses missing and
   unknown input names, so a call can never reach the generator. A Crystal
   also answers on `/v0/query` to callers holding the Endpoint's `slm_` key,
   because the engine checks Crystals first.
 * Runtime: one module per key plus `manifest.json` and `index.mjs`, loaded
-  at startup. Runs without the QuickJS sandbox: guarded by the code
-  allowlist and the equivalence test only. Crystallize is local-only in v0:
-  `POST /v0/crystallize` exists only in the local runtime (when its Crystal
-  folder `SLIME_CRYSTAL_DIR` is set); the Lambda entry has no such route.
+  at startup. Crystallize runs locally and in the cloud (S3) as of the cloud
+  MVP ([2026-11-21-cloud-mvp-design.md](../architecture/2026-11-21-cloud-mvp-design.md)).
+  In Slime Cloud a Crystal module is checked against the manifest's SHA-256
+  and runs as data in the QuickJS sandbox with Liquid's limits. Locally and in
+  self-hosted apps that import `index.mjs` it runs without the sandbox:
+  guarded by the code allowlist and the equivalence test only.
 * Schema drift: a Crystal is served as is after a schema change. The runtime
   logs a startup warning and shows it in the Lifecycle tab. Re-crystallizing
   in place is not built: core answers `already` for a key that is in the
@@ -259,8 +262,9 @@ generation. Two mechanisms:
   tokens and payload-free logs (decision 3).
 * **Security:** open. Sandboxing of generated code in the harness; prompt
   injection from source data into the generator; token storage and rotation.
-  Crystal code runs without the QuickJS sandbox; guarded by the code
-  allowlist and the equivalence test only.
+  Crystal code runs in the QuickJS sandbox in Slime Cloud; locally and in
+  self-hosted apps it runs without it, guarded by the code allowlist and the
+  equivalence test only.
 * **Reliability:** Crystals are served as is after a migration; the runtime
   warns at startup. Open: upstream rate limits and per-handler quotas (429 +
   `Retry-After`).

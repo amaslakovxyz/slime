@@ -1,11 +1,11 @@
-// What the local entry reports when it cannot start or cannot generate, so the
-// admin shows a reason instead of a stack trace's last lines or a READY endpoint
-// that answers every new request with 502.
+// What an endpoint reports when it cannot start or cannot generate, so the admin
+// shows a reason instead of a stack trace's last lines or a READY endpoint that
+// answers every new request with 502.
 import './setup.js';
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { missingProviderKey } from '../src/config.js';
-import { startupErrorMessage } from '../src/local.js';
+import { startupErrorMessage } from '../src/endpoint-runtime.js';
 
 describe('missingProviderKey', () => {
   test('names the variable a model provider needs when it is unset or blank', () => {

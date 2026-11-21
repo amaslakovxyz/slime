@@ -7,21 +7,27 @@ import { issueCrystalTokenAction, revealCrystalTokenAction } from '@/app/actions
 import { CopyButton } from '@/app/ui/copy-button';
 import type { HandlerRow } from '@/lib/lifecycle';
 
+/** Cloud: other warm instances re-read Crystals and tokens within their 30 s TTL. */
+export const CLOUD_CRYSTAL_NOTE = 'Crystal endpoint active on all instances within 30 s';
+
 export function CrystalCard({
   endpointId,
   url,
   crystal,
   tokenHint,
   restarting,
+  cloud,
 }: {
   endpointId: string;
   url: string;
   crystal: HandlerRow;
   tokenHint?: string;
   restarting: boolean;
+  cloud: boolean;
 }) {
   const [token, setToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [issued, setIssued] = useState(false);
   const [pending, startTransition] = useTransition();
   const route = `${url}v0/e/${crystal.key}`;
   const body = crystal.exampleBody ?? '{"input":{}}';
@@ -38,6 +44,7 @@ export function CrystalCard({
     startTransition(async () => {
       const out = await issueCrystalTokenAction(endpointId, crystal.key);
       if (out.error) setError(out.error);
+      else setIssued(true);
     });
 
   return (
@@ -68,6 +75,7 @@ export function CrystalCard({
           )}
         </div>
         {error && <p className="alert">{error}</p>}
+        {cloud && issued && <p className="muted small" role="status">{CLOUD_CRYSTAL_NOTE}</p>}
       </div>
       <div className="lc-route-actions">
         <CopyButton value={route} label="Copy URL" />

@@ -2,3 +2,6 @@
 .data/
 next-env.d.ts
 *.tsbuildinfo
+dist/
+test-results/
+playwright-report/

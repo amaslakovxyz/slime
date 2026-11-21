@@ -6,17 +6,19 @@ Account `025772230981`, home region `eu-central-1`. All state lives in
 | Stack | State key | Applied by |
 |---|---|---|
 | [`bootstrap/`](bootstrap/README.md) | `bootstrap/terraform.tfstate` | A human, `default` (admin) profile |
-| [`platform/`](#platform-slime-runtime) | `platform/terraform.tfstate` | GitHub Actions on merge to `main` |
+| [`platform/`](#platform-slime-cloud) | `platform/terraform.tfstate` | GitHub Actions on merge to `main` |
 | `landing/` (PR #11) | `landing/terraform.tfstate` | GitHub Actions on merge to `main` |
 
 [`terraform.yml`](../../.github/workflows/terraform.yml) picks up every
 directory here except `bootstrap/`: a new stack is deployed by adding it. A
 stack with a `build.sh` gets it run before plan/apply (platform builds the
-runtime bundle). Apply refuses plans with pure deletes; replacements pass.
+runtime bundle and the admin). Apply refuses plans with pure deletes; replacements pass.
 Run it by hand with `allow_destroy` when a delete is intended.
 
 Once a stack is applied by CI, do not apply it from a branch: the next push to
 `main` would plan your branch-only resources away (the delete guard stops it).
+The one planned exception is the cloud MVP cutover below, applied from its
+branch so that the CI apply after merge shows no changes.
 
 ```mermaid
 flowchart LR
@@ -28,65 +30,134 @@ flowchart LR
   H[Human] -->|AWS_PROFILE=default| B[bootstrap: roles, bucket, budgets]
 ```
 
-## Platform: Slime runtime
+## Platform: Slime Cloud
 
-[`platform/runtime.tf`](platform/runtime.tf): Lambda `slime-runtime` (Function
-URL, arm64, Node 22) built from [`platform/runtime`](../runtime/README.md)
-by `npm run build` (it bundles the built `@slime-cloud/core` from
-`core/`), and DynamoDB table `slime-handlers` for reviewed Liquid
-handlers (partition key `tenantId`, sort key `artifactKey`, which holds
-`handlers#<request key>`). Post-deploy CI checks that `/healthz`
-answers 401 without a key.
+Design: [`docs/architecture/2026-11-21-cloud-mvp-design.md`](../../docs/architecture/2026-11-21-cloud-mvp-design.md).
+No AWS resource is created per endpoint: an endpoint is an SSM path, a control
+item, a handler partition and an S3 prefix.
 
-Settings are SSM parameters under `/slime/runtime/`, loaded as env vars at cold
-start. Terraform never manages them, so secrets stay out of state. Set them once
-(and after any change, force a cold start by redeploying or updating the
-function configuration):
+```mermaid
+flowchart LR
+  U[Browser] --> CF[CloudFront admin.amaslakov.com<br/>adds x-slime-origin]
+  CF --> AD[Lambda slime-admin<br/>Next standalone + Web Adapter]
+  AD --> CT[(slime-control)]
+  AD --> SSM[(SSM /slime/endpoints/&lt;id&gt;/)]
+  AD -->|health check, reload,<br/>lifecycle, crystallize| RT
+  C[Agent / app] -->|/ep/&lt;id&gt;/...| RT[Lambda slime-runtime<br/>Function URL]
+  RT --> SSM
+  RT --> HT[(slime-handlers)]
+  RT --> S3[(S3 slime-crystals-&lt;account&gt;)]
+  RT -->|USAGE#&lt;id&gt;| CT
+```
+
+- [`platform/runtime.tf`](platform/runtime.tf): Lambda `slime-runtime`
+  (Function URL, auth in the app, arm64, Node 22, 60 s) built from
+  [`platform/runtime`](../runtime/README.md) by `npm run build` (it bundles the
+  built `@slime-cloud/core` from `core/`). One function serves every endpoint
+  under `/ep/<id>/`; it reads `/slime/endpoints/<id>/` and `/slime/shared/`
+  per endpoint, caches up to 8 endpoint engines per instance and re-reads
+  their settings every 30 s. DynamoDB `slime-handlers` holds reviewed Liquid
+  handlers (partition key `tenantId` = endpoint id, sort key `artifactKey`,
+  which holds `handlers#<request key>`). The role may update only `USAGE#*`
+  items on `slime-control`, and only the usage attributes. One role reads every
+  endpoint: per-endpoint IAM isolation is out of scope for the MVP.
+- [`platform/admin.tf`](platform/admin.tf): Lambda `slime-admin`
+  ([`platform/admin`](../admin/README.md) as a Next standalone build on the AWS
+  Lambda Web Adapter layer), its Function URL, and CloudFront at
+  `https://admin.amaslakov.com/` (ACM certificate in us-east-1, Route 53
+  records in the existing `amaslakov.com` zone). CloudFront adds a random
+  `x-slime-origin` header that the admin's `proxy.ts` requires; OAC is not used
+  because it breaks browser POSTs (server actions). The admin writes endpoint
+  settings to SSM, health-checks endpoints through the runtime URL and tears
+  them down (handlers, Crystal prefix, control item, settings).
+- [`platform/crystals.tf`](platform/crystals.tf): bucket
+  `slime-crystals-<account>` for Crystal modules
+  (`endpoints/<id>/crystal/manifest.json` and `<crystal key>.mjs`): private,
+  SSE-S3, TLS only, versioned (noncurrent versions expire after 30 days).
+- [`platform/control.tf`](platform/control.tf): DynamoDB `slime-control`
+  (users, endpoints, usage), written by the admin and (usage only) the runtime.
+  No stream.
+
+Post-deploy CI checks: runtime `/healthz` → 401, unknown endpoint → 404, admin
+`/login` → 200 through CloudFront, a POST through CloudFront is neither 403 nor
+5xx, the landing links to the admin, the bucket and tables exist; then the
+Playwright cloud smoke (`npm run e2e:cloud` in `platform/admin`) when the
+`SMOKE_EMAIL` / `SMOKE_PASSWORD` repository secrets are set.
+
+The per-endpoint provisioner (`slime-provisioner`, the `slime-gas` layer, the
+`slime-endpoint-boundary` policy and the control-table stream trigger) was
+removed by the cloud MVP; git history keeps it.
+
+### One-time SSM parameters
+
+Terraform never manages these, so secrets stay out of state. Set them by hand
+before the first apply (values are never printed):
 
 ```sh
 export AWS_PROFILE=slime
-put() { aws ssm put-parameter --name "/slime/runtime/$1" --type SecureString --overwrite --value "$2" >/dev/null; }
-put SLIME_API_KEY "$(openssl rand -hex 24)"   # clients send it as x-api-key
-put DATABASE_URL 'postgres://<read-only user>:<pw>@<host>:5432/<db>'
-put SLIME_PROVIDER claude                       # or groq / offline
-put ANTHROPIC_API_KEY '<key>'                   # GROQ_API_KEY for groq
+put() { aws ssm put-parameter --name "$1" --type SecureString --overwrite --value "$2" >/dev/null; }
+put /slime/admin/SESSION_SECRET "$(openssl rand -base64 36)"
+put /slime/admin/ADMIN_ALLOWED_EMAILS 'you@example.com,smoke@example.com'   # comma-separated, invite-only sign-up
+put /slime/shared/ANTHROPIC_API_KEY '<key>'                                  # only if endpoints use claude
+put /slime/shared/GROQ_API_KEY '<key>'                                       # only if endpoints use groq
 ```
 
-Any other variable the runtime's
-[`src/config.ts`](../runtime/src/config.ts) reads (`SLIME_MODE`,
-`MAX_GENERATIONS_PER_HOUR`, ...) can be set the same way. Until `DATABASE_URL` points at a reachable read-only
-Postgres, authenticated requests get `503 NOT_READY`.
+The admin loads `/slime/admin/*` at cold start: after changing one, force a
+cold start (update the function configuration or redeploy). The runtime
+re-reads `/slime/shared/*` within 30 s. Each endpoint's `DATABASE_URL`,
+`SLIME_API_KEY`, `CRYSTAL_TOKENS` and `SLIME_PROVIDER` live under
+`/slime/endpoints/<id>/`, written only by the admin.
 
 ```sh
 URL=$(terraform -chdir=platform/infra/platform output -raw runtime_url)
-curl -s "${URL}healthz" -H "x-api-key: $KEY" | jq
+curl -s "${URL}ep/<id>/healthz" -H "x-api-key: <slm_ key>" | jq
 ```
 
-## Platform: Slime Cloud endpoints
+### Cutover apply order (cloud MVP, ran from the branch on 2026-11-21)
 
-Design: [`docs/architecture/slime-cloud.html`](../../docs/architecture/slime-cloud.html).
+Done once; kept as the record of how the provisioner was retired. Steps 1–6 ran
+from `feat/cloud-mvp`; step 7 runs on merge.
 
-- [`platform/control.tf`](platform/control.tf): DynamoDB `slime-control`
-  (users, endpoints, usage) with a `NEW_IMAGE` stream, used by
-  [`platform/admin`](../admin).
-- [`platform/gas-layer.tf`](platform/gas-layer.tf): layer `slime-gas`, the
-  runtime bundle under `/opt/slime/` (`platform/runtime/dist/layer`).
-- [`platform/provisioner.tf`](platform/provisioner.tf): Lambda
-  `slime-provisioner` ([`platform/provisioner`](../provisioner/README.md)),
-  triggered by endpoint items that turn `pending`, `updating` or `deleting`. It
-  creates, reconfigures and deletes `slime-ep-<id>` functions, roles (bounded by
-  `slime-endpoint-boundary`), Function URLs and log groups at runtime; those are
-  not in Terraform state.
+1. Check that no `slime-ep-*` functions or roles exist and that `slime-control`
+   holds no endpoint items.
+2. Set the one-time SSM parameters above.
+3. `bash platform/infra/platform/build.sh`, then
+   `terraform -chdir=platform/infra/platform plan -out=tfplan`. Expect only
+   the provisioner, layer, boundary and event-source-mapping deletes, and the
+   bucket, admin and CloudFront creates. Then `terraform apply tfplan`.
+4. `aws_lambda_layer_version.gas` had `skip_destroy`, so its versions stay in
+   AWS: delete each with `aws lambda delete-layer-version --layer-name slime-gas
+   --version-number <n>` until `aws lambda list-layer-versions --layer-name
+   slime-gas` returns an empty list.
+5. Run the post-deploy checks and the cloud smoke.
+6. Remove the `aws.untagged` provider alias from `versions.tf` (it existed only
+   to delete the event-source mapping) and apply again: "No changes".
+7. After merge, the first CI apply on `main` re-uploads `slime-runtime` once:
+   the bundle built on macOS and on CI's Linux differs byte-wise for the same
+   code. The next CI plan shows no changes. Build branch applies in Linux
+   (`node:22`) to avoid it; admin (input-hash trigger) and landing already match.
 
-Model keys for every endpoint are shared SSM parameters, set once by hand:
+### Temporary test database (`slime-test-db`, not in Terraform)
 
-```sh
-aws ssm put-parameter --name /slime/shared/ANTHROPIC_API_KEY --type SecureString --value '<key>'
-aws ssm put-parameter --name /slime/shared/GROQ_API_KEY --type SecureString --value '<key>'   # if used
-```
+A throwaway RDS for the cloud end-to-end run, created by hand on 2026-11-22:
+PostgreSQL 16, `db.t4g.micro`, 20 GB gp3, one AZ, no backups, encrypted, public
+(the runtime Lambda has no VPC and no fixed IPs; security group `slime-test-db`
+opens 5432, SSL is forced, passwords are random). It holds the demo schema from
+`examples/express/db/init.sql`.
 
-Each endpoint's own `DATABASE_URL` and `SLIME_API_KEY` live under
-`/slime/endpoints/<id>/`, written by the admin.
+- URLs: SSM `/slime/test-db/READER_URL` (the read-only `slime_reader`, use this
+  for endpoints) and `/slime/test-db/MASTER_URL`. Both end in
+  `?sslmode=require&uselibpqcompat=true`: `pg` 8.x treats plain `sslmode=require`
+  as verify-full, and the RDS CA is not in Node's trust store.
+- Full cloud lifecycle: `SMOKE_DB_URL=$(aws ssm get-parameter --with-decryption
+  --name /slime/test-db/READER_URL --query Parameter.Value --output text) npm run
+  e2e:cloud` in `platform/admin` (with `SMOKE_EMAIL`/`SMOKE_PASSWORD`).
+- Stops on Monday 2026-11-23 20:00 Europe/Berlin (EventBridge Scheduler
+  `slime-test-db-stop-monday`, role `slime-test-db-scheduler`). A stopped RDS
+  starts again by itself after 7 days. Remove it for good with
+  `aws rds delete-db-instance --db-instance-identifier slime-test-db
+  --skip-final-snapshot`, then delete the security group, the schedule, the role
+  and `/slime/test-db/*`.
 
 ## Rules for `platform/`
 

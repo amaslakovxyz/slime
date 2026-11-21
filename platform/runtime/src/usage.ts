@@ -1,7 +1,6 @@
 // Per-endpoint usage counters for the admin's board and bill estimate.
 //
-// One item per endpoint per UTC day in the control table (see
-// docs/architecture/slime-cloud.html):
+// One item per endpoint per UTC day in the control table:
 //   pk USAGE#<tenantId>, sk <YYYY-MM-DD>
 //   ADD requests, generations, <tier>Requests, <tier>Ms, tokens
 //   SET updatedAt, gasHandlers, liquidHandlers, crystalHandlers (snapshot of this instance)
@@ -9,19 +8,38 @@
 // update before the response (Lambda freezes the process afterwards). A failed
 // write is logged and dropped: usage must never fail a request.
 //
-// The endpoint role may only write USAGE_ATTRIBUTES (dynamodb:Attributes in
-// platform/provisioner/src/provision.ts): a new attribute here needs the
-// same name there, or every flush fails with AccessDenied.
+// The runtime role may only write USAGE_ATTRIBUTES (the dynamodb:Attributes
+// condition in platform/infra/platform/runtime.tf): a new attribute here needs
+// the same name there, or every flush fails with AccessDenied.
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import type { QueryMeta, Tier } from '@slime-cloud/core';
+
+/** Every attribute a flush writes on USAGE#<id> day items, plus the key. Mirrored by Terraform's IAM condition. */
+export const USAGE_ATTRIBUTES = [
+  'pk',
+  'sk',
+  'requests',
+  'generations',
+  'gasRequests',
+  'liquidRequests',
+  'crystalRequests',
+  'gasMs',
+  'liquidMs',
+  'crystalMs',
+  'tokens',
+  'gasHandlers',
+  'liquidHandlers',
+  'crystalHandlers',
+  'updatedAt',
+] as const;
 
 /** The slice of DynamoDBDocumentClient the meter uses; tests pass a fake. */
 export interface UsageClient {
   send(command: UpdateCommand): Promise<unknown>;
 }
 
-/** Handler counts by tier as this instance sees them (store-loaded Gas/Liquid, bundled Crystal). */
+/** Handler counts by tier as this instance sees them (store-loaded Gas/Liquid, loaded Crystal). */
 export interface HandlerSnapshot {
   gas: number;
   liquid: number;

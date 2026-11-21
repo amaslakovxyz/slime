@@ -1,6 +1,6 @@
 # Docs index
 
-Project-wide docs. Code-local docs live next to their code and are listed at the bottom. Status: Current (true for main today), Design (proposed, not on main), Vision (pitch, not a contract), Plan (agreed next work), Record (dated snapshot).
+Project-wide docs. Code-local docs live next to their code and are listed at the bottom. Status: Current (true for main today), Design (proposed, not on main), Vision (pitch, not a contract), Plan (agreed next work), Record (dated snapshot), Superseded (replaced by the doc it names; kept as history).
 
 | Doc | Status | Owner | What it is |
 |---|---|---|---|
@@ -9,8 +9,9 @@ Project-wide docs. Code-local docs live next to their code and are listed at the
 | [product/product_frame_v0_2.md](product/product_frame_v0_2.md) | Design | @Tony | Unified product frame (slime-client / slime-cloud): merged decisions from both 2026-11-21 research tracks, demo vertical, risks. |
 | [product/slime_runtime_master_spec.md](product/slime_runtime_master_spec.md) | Vision | — | Pitch and target architecture (V8/Wasm, Redis, connectors). Conflicts in places with the dev spec. |
 | [architecture/architecture-spec.md](architecture/architecture-spec.md), [architecture/architecture.excalidraw](architecture/architecture.excalidraw) | Design | @Tony | Bun/intents/Gatekeeper dev spec and its diagram. Implemented only on unmerged `feat/shop-bench`, `chore/gas-v0-plan`. The engine on main is `core/`. |
-| [architecture/slime-cloud.html](architecture/slime-cloud.html) | Current | @Tony | Slime Cloud admin + endpoint provisioner: topology, lifecycle (create/reconfigure/delete), data model, IAM, pricing. Open in a browser. |
-| [architecture/2026-11-21-endpoint-lifecycle-tab-design.md](architecture/2026-11-21-endpoint-lifecycle-tab-design.md) | Design | @Tony | Admin Lifecycle tab and local runner (local-only for now: the live view and Crystallize are wired under `npm run local`, not on Lambda). Endpoint on a local DB, agent snippet, Gas → Liquid → Crystal with a Crystallize button. |
+| [architecture/slime-cloud.html](architecture/slime-cloud.html) | Superseded | @Tony | Slime Cloud admin + per-endpoint Lambda provisioner (removed): topology, lifecycle, data model, IAM, pricing. Superseded by the cloud MVP design below. Open in a browser. |
+| [architecture/2026-11-21-endpoint-lifecycle-tab-design.md](architecture/2026-11-21-endpoint-lifecycle-tab-design.md) | Design | @Tony | Admin Lifecycle tab and local runner. Endpoint on a local DB, agent snippet, Gas → Liquid → Crystal with a Crystallize button; L20–L23 record how the cloud MVP runs the same flow on Lambda. |
+| [architecture/2026-11-21-cloud-mvp-design.md](architecture/2026-11-21-cloud-mvp-design.md), [architecture/2026-11-21-cloud-mvp-brief.md](architecture/2026-11-21-cloud-mvp-brief.md) | Design | amaslakov | Slime Cloud MVP on AWS: one multi-tenant `slime-runtime` Lambda for all endpoints (`/ep/<id>/…`), hosted admin at admin.amaslakov.com (Lambda + Web Adapter + CloudFront, invite-only), Crystals in S3 run in QuickJS, provisioner removed. The brief records the Goldfish review. |
 | [brand/slime_master_brand_book_agent_design_system.md](brand/slime_master_brand_book_agent_design_system.md) | Current | — | Color tokens, typography, and UI rules for agents generating Slime UI. |
 | [brand/slime_master_brand_book_design_system.html](brand/slime_master_brand_book_design_system.html) | Current | — | Interactive brand book and component kit. |
 | [brand/slime_marketing_positioning_tone_of_voice_use_cases.md](brand/slime_marketing_positioning_tone_of_voice_use_cases.md) | Current | — | Positioning, tone of voice, use cases, and messaging. |
@@ -25,6 +26,5 @@ Project-wide docs. Code-local docs live next to their code and are listed at the
 - [../core/bench/protocol-cases.md](../core/bench/protocol-cases.md) (Design; benchmark material)
 - [../examples/express/README.md](../examples/express/README.md) (Current, example app and demo database)
 - [../platform/runtime/README.md](../platform/runtime/README.md) (Current)
-- [../platform/provisioner/README.md](../platform/provisioner/README.md) (Current)
 - [../platform/infra/README.md](../platform/infra/README.md) and [../platform/infra/FINOPS.md](../platform/infra/FINOPS.md) (Current)
 - [../platform/docs/reviews/2026-11-20-infra-review.md](../platform/docs/reviews/2026-11-20-infra-review.md) (Record)

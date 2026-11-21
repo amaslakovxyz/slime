@@ -20,12 +20,13 @@ test('stays private until go-public, so nothing is published by accident', () =>
   assert.equal(pkg.private, true);
 });
 
-test('the public entry exports createSlime, the config, the stores and errors, and nothing internal', async () => {
+test('the public entry exports createSlime, the config, the stores, the sandbox runner and errors, and nothing internal', async () => {
   const api = await import('../src/index.js');
   assert.deepEqual(Object.keys(api).sort(), [
     'DEFAULT_LIMITS',
     'DEFAULT_STORE_DIR',
     'DEFAULT_TIERS',
+    'QuickJSRunner',
     'SlimeConfig',
     'SlimeConfigError',
     'SlimeError',

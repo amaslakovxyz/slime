@@ -29,6 +29,11 @@ dropped: it is unavailable for private repositories on GitHub Free.)
 [`.github/workflows/terraform.yml`](../../.github/workflows/terraform.yml) applies
 it on every push to `main` that touches `platform/`.
 
+The nav's **Sign in** button links to the hosted Slime Cloud admin at
+https://admin.amaslakov.com/ ([`platform/admin`](../admin/README.md), deployed
+by [`platform/infra/platform/admin.tf`](../infra/platform/admin.tf)). The
+post-deploy CI check fails if the served page loses that link.
+
 ## Where things come from
 
 - Colors, fonts and component styles:

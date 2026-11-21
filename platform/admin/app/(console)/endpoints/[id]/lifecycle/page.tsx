@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { LivePoller } from '@/app/ui/live-poller';
 import { crystalTokenHints } from '@/lib/crystal-tokens';
+import { isCloud } from '@/lib/env';
 import { readLifecycle, stagesOf, toRow } from '@/lib/lifecycle';
 import { loadEndpoint } from '../data';
 import { AgentSnippet } from './agent-snippet';
@@ -13,6 +14,7 @@ export default async function LifecyclePage({ params }: { params: Promise<{ id: 
   const { id } = await params;
   const { ep } = await loadEndpoint(id);
   const [data, tokenHints] = await Promise.all([readLifecycle(ep), crystalTokenHints(ep.endpointId)]);
+  const cloud = isCloud();
   const handlers = data.ok ? data.handlers : [];
   const total = data.ok ? data.total : 0;
   const stages = stagesOf(ep.status, handlers, total, data.ok ? data.thresholds : undefined);
@@ -46,7 +48,8 @@ export default async function LifecyclePage({ params }: { params: Promise<{ id: 
             {ep.status === 'failed' && (
               <span className="muted small">
                 {' '}
-                Fix the connection or provider in <Link href={`/endpoints/${ep.endpointId}/settings`}>Settings</Link>; saving restarts it.
+                Fix the connection or provider in <Link href={`/endpoints/${ep.endpointId}/settings`}>Settings</Link>;
+                {cloud ? ' saving checks it again.' : ' saving restarts it.'}
               </span>
             )}
           </div>
@@ -66,7 +69,9 @@ export default async function LifecyclePage({ params }: { params: Promise<{ id: 
             {total > 0
               ? `${total} request${total === 1 ? '' : 's'}${firstAt ? ` since ${new Date(firstAt).toLocaleTimeString('en-GB')}` : ''}`
               : handlers.length > 0
-                ? 'Restarted · same URL'
+                ? cloud
+                  ? 'No recent requests on this instance'
+                  : 'Restarted · same URL'
                 : 'Waiting for requests…'}
           </span>
         </div>
@@ -79,6 +84,8 @@ export default async function LifecyclePage({ params }: { params: Promise<{ id: 
           rows={rows}
           events={data.events}
           restarting={ep.status === 'updating'}
+          cloud={cloud}
+          instance={data.instance}
           tokenHints={tokenHints}
         />
       )}

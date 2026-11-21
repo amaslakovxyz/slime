@@ -1,10 +1,10 @@
 // UsageMeter against a fake client: per-tier batching per request, the exact
-// attribute set the endpoint IAM policy allows, and never failing a request.
+// attribute set the runtime IAM policy allows, and never failing a request.
 import './setup.js';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { UpdateCommand } from '@aws-sdk/lib-dynamodb';
-import { UsageMeter, type UsageClient } from '../src/usage.js';
+import { USAGE_ATTRIBUTES, UsageMeter, type UsageClient } from '../src/usage.js';
 
 class RecordingClient implements UsageClient {
   sent: UpdateCommand[] = [];
@@ -17,13 +17,9 @@ class RecordingClient implements UsageClient {
 const timings = (total: number) => ({ run: 0, shape: 0, total });
 const snapshot = () => ({ gas: 3, liquid: 5, crystal: 2 });
 
-// Must equal the endpoint role's dynamodb:Attributes list
-// (platform/provisioner/src/provision.ts), minus the keys.
-const ALLOWED = [
-  'requests', 'generations', 'gasRequests', 'liquidRequests', 'crystalRequests',
-  'gasMs', 'liquidMs', 'crystalMs', 'tokens',
-  'gasHandlers', 'liquidHandlers', 'crystalHandlers', 'updatedAt',
-];
+// The runtime role's dynamodb:Attributes list (platform/infra/platform/runtime.tf)
+// mirrors USAGE_ATTRIBUTES; the flush must write exactly those, minus the keys.
+const ALLOWED: string[] = USAGE_ATTRIBUTES.filter((name) => name !== 'pk' && name !== 'sk');
 
 test('flush writes one daily update with per-tier counts, tokens and the handler snapshot', async () => {
   const client = new RecordingClient();

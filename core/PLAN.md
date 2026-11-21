@@ -75,7 +75,7 @@ Status: **Decided**, **Proposed** (default unless someone objects) or
 | C7 | Packaging of adapters | Subpath exports from one package: `@slime-cloud/core/postgres`, `/claude`, `/groq`, `/offline`. Model SDKs and database drivers are optional peer dependencies. | Decided |
 | C8 | What ships | Compiled JS and `.d.ts` in `dist/` (built with `tsc`), plus the shaping sandbox's worker file. Not TS source. | Decided |
 | C9 | HTTP | No HTTP in core. The app calls `slime.query()` from its own endpoint in any framework. A thrown `SlimeError` carries `status` and `toJSON()`, so the endpoint can return it directly. Admin data comes from methods only (`handlers()`, `stats()`, `evict()`); exposing and protecting them over HTTP is up to the app or `@slime-cloud/server`. | Decided |
-| C10 | Crystal | Crystal handlers are ordinary modules in the app's own code. The crystallize job writes JS modules (`.mjs`), plus a generated `index.mjs` with `index.d.mts` and a manifest. The app imports the index and passes it as `crystal` in `SlimeConfig`; leaving it out (or `false`) turns Crystal off. Because the code is compiled with the app, safety is checked when the job writes it (allowlist, SQL lint, equivalence test on recorded runs) and by a `check` command in the app's CI, which re-parses the sources and compares manifest hashes. Core doesn't re-check at startup. The job and `check` are a separate entry (`@slime-cloud/core/crystallize`, plus a bin), so the runtime never imports them. | Decided |
+| C10 | Crystal | Crystal handlers are ordinary modules in the app's own code. The crystallize job writes JS modules (`.mjs`), plus a generated `index.mjs` with `index.d.mts` and a manifest. The app imports the index and passes it as `crystal` in `SlimeConfig`; leaving it out (or `false`) turns Crystal off. Because the code is compiled with the app, safety is checked when the job writes it (allowlist, SQL lint, equivalence test on recorded runs) and by a `check` command in the app's CI, which re-parses the sources and compares manifest hashes. Core doesn't re-check at startup. The job and `check` are a separate entry (`@slime-cloud/core/crystallize`, plus a bin), so an app's serving process never imports them. A host that stores Crystal modules elsewhere (Slime Cloud: S3) imports that entry to parse them as data; their shapes are source strings and run in the shaping sandbox. | Decided |
 | C11 | Observability | An `onEvent(event)` option (the `SlimeEvent` types in §5). Core doesn't log on its own. Metering builds on this later. | Decided |
 | C12 | Out of scope for core v1 | Writes, tenancy (core has no tenant concept; a store isolates tenants if needed), built-in stores other than file and memory, semantic matching. Connectors other than Postgres were out of scope too; MS1 amends that: read-only API sources beside exactly one SQL source (§3.1). | Proposed (amended by MS1) |
 | C13 | Store contract | A small key-value Port, `SlimeStore`: `get(ns, key)`, `put(ns, key, value)`, `list(ns, prefix?)`, `delete(ns, key)`. Values are JSON. Namespace: `handlers`. The engine builds the keys (the request key, §4.7), so a backend is only a mapping to 4 calls. It replaces the sandbox's domain-shaped `HandlerStore`. | Decided |
@@ -363,8 +363,10 @@ Contracts (Ports) that core exports, each in its port folder's `types.ts` (§6):
   Both take `{ timeoutMs, signal }`.
 * `SlimeStore`: the key-value Port (C13). It replaces the sandbox's
   `HandlerStore` and PR #7's `SLIME_META_TABLE`.
-* `SandboxRunner`: exported as a type. In v1 core always uses its own QuickJS
-  runner, and there is no option to pass another.
+* `SandboxRunner`: exported as a type, with `QuickJSRunner`. Core builds its
+  own runner unless the host passes one to `createSlime(config, { runner })` or
+  `crystallize({ runner })`, to share one pool across engines (Slime Cloud's
+  multi-endpoint runtime).
 
 Also exported: `SlimeError`, `SlimeConfigError`, the error codes,
 `DEFAULT_TIERS` and `DEFAULT_LIMITS`.

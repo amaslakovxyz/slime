@@ -4,8 +4,10 @@
 
 The `@slime-cloud/core/crystallize` entry (PLAN.md C10, M5) and the
 `slime-crystal` bin: turn proven Liquid handlers into Crystal modules in the
-app's own code, and check that folder in CI. The runtime never imports this
-folder.
+app's own code, and check that folder in CI. It also exports what a host
+needs to load Crystal modules as data (`parseModule`, `parseManifest`,
+`readManifest`): Slime Cloud's runtime imports it for that. An app that
+imports its generated `index.mjs` never loads this folder.
 
 - `crystallize.ts`: the job.
 - `equivalence.ts`: the equivalence test a candidate must pass.
@@ -19,15 +21,21 @@ folder.
 ## Interface
 
 - `crystallize({ connector, store, dir, optimizer?, minRuns = 10, provenance?,
-  limits?, optimizeTimeoutMs?, isDryRun? }): Promise<CrystalReport[]>`. The app runs it
+  limits?, runner?, optimizeTimeoutMs?, isDryRun? }): Promise<CrystalReport[]>`. The app runs it
   from its own script with its own config; core reads no env. Each report has
   an `outcome` (`crystallized`, `already`, `not-ready`, `failed`) and its
-  reasons.
+  reasons. A `runner` the host passes is used and left running; without one
+  the job builds its own and closes it.
 - `checkCrystalFolder(dir): Promise<string[]>`: every problem, or none.
 - `slime-crystal check <dir>`: exit 0 when clean, 1 with problems, 2 on bad
   usage.
+- Loading modules as data: `parseModule(source)` parses a module, checks its
+  structure and runs the allowlist on its shape, and returns `{ sql, params,
+  shape }` with `shape` as source text; `parseManifest(json)` and
+  `readManifest(dir)` read `manifest.json` (version 1); `MANIFEST_FILE` and
+  `moduleFileFor(key)` name the files.
 - Also exported: `checkShapeSource`, `CrystalCodeError`, `DEFAULT_MIN_RUNS`,
-  and the `Manifest` types.
+  and the `Manifest`, `ManifestEntry` and `CrystalCode` types.
 
 ## Invariants
 
@@ -42,10 +50,13 @@ folder.
 - **A candidate passes when:**
   - its shape function passes the allowlist;
   - its params are inputs of the request;
-  - its module passes the allowlist and the read-only SQL lint;
+  - its module passes the allowlist and the read-only SQL lint, and imports
+    with exports that match its source;
   - on every recorded input it gives the same output as the Liquid handler
     (SQL plus the sandboxed shape), with floats rounded to 9 significant
-    digits, list order included;
+    digits, list order included. The candidate's shape runs as source in the
+    same sandbox and limits as Liquid's, never as a function in the job's
+    process;
   - at least one input could be compared.
 - **The allowlist:**
   - only the listed globals and members (`allowlist-rules.ts`);

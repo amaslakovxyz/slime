@@ -4,6 +4,9 @@
 * **Date:** 2026-11-21
 * **Author:** @Tony (with an agent)
 * **Base:** PR #18 (`feat/slimecloud-admin`): admin, provisioner, runtime
+* **Cloud:** the same flow on AWS (shared runtime Lambda, hosted admin,
+  Crystals in S3) is [2026-11-21-cloud-mvp-design.md](2026-11-21-cloud-mvp-design.md);
+  decisions L20–L23 below record what changes there.
 
 ## 1. Goal
 
@@ -32,13 +35,15 @@ endpoint to your agent*, *Requests taking shape* (handler table + live feed),
 In:
 
 * a **local runner** that turns a `pending` endpoint into a running runtime
-  process on localhost, in place of the AWS provisioner;
+  process on localhost, in place of the AWS provisioner (since removed: in
+  the cloud the admin provisions endpoints itself);
 * runtime additions: a Node server entry, a recent-requests feed, a local-only
   crystallize route;
 * the admin **Lifecycle** tab, wired to a real endpoint.
 
-Out (later): AWS deployment of this flow, a GitHub PR for Crystal, an MCP
-endpoint (`/mcp`), multi-user concurrency, persistence of the feed.
+Out (later): a GitHub PR for Crystal, an MCP endpoint (`/mcp`), multi-user
+concurrency, persistence of the feed. AWS deployment of this flow is the cloud
+MVP design (L20–L23).
 
 ## 3. Decisions
 
@@ -46,8 +51,8 @@ endpoint (`/mcp`), multi-user concurrency, persistence of the feed.
 |---|---|---|
 | L1 | Crystallize writes modules into the endpoint's own folder and restarts it. No PR. | The whole cycle is visible without GitHub; a PR is the next step. |
 | L2 | A separate `local-runner` process supervises runtimes; admin and runner talk only through `slime-control`, like the AWS provisioner. | Next.js dev reloads must not kill or orphan child processes. Same state machine as AWS (`pending → ready`, `updating → ready`). |
-| L3 | Crystallize runs inside the endpoint's runtime (`POST /v0/crystallize`, only in the local entry `src/local.ts` when `SLIME_CRYSTAL_DIR` is set; the Lambda entry never mounts it). | The runtime already holds the store and connector that `crystallize()` needs. |
-| L4 | After crystallizing, the admin sets `status=updating`; the runner restarts the runtime, which loads the new `index.mjs`. | Reuses the existing reconfigure flow; Crystal is read at startup. |
+| L3 | Crystallize runs inside the endpoint's runtime (`POST /v0/crystallize`, only in the local entry `src/local.ts` when `SLIME_CRYSTAL_DIR` is set; the Lambda entry never mounts it). Local entry; cloud: see L20/L22. | The runtime already holds the store and connector that `crystallize()` needs. |
+| L4 | After crystallizing, the admin sets `status=updating`; the runner restarts the runtime, which loads the new `index.mjs`. Local entry; cloud: see L20/L22. | Reuses the existing reconfigure flow; Crystal is read at startup. |
 | L5 | The tab polls the runtime every 2 s through server code (token from the secret store). | No token in the browser; same polling pattern as `StatusPoller`. |
 | L6 | Snippet tabs v1: **Prompt** and **HTTP** only. The MCP tab returns when `/mcp` exists. | Never show a command that does not work. |
 | L7 | Lifecycle is the first tab and where an endpoint opens (list link, after create). | The tab is the endpoint's main view: the dispatch buffer. |
@@ -63,6 +68,10 @@ endpoint (`/mcp`), multi-user concurrency, persistence of the feed.
 | L17 | The Crystal route refuses missing **and unknown** input names, by own properties only (`toString`, `constructor`, `__proto__` count as unknown), and the same 16 KB body limit as `/v0/query`. | The key hashes the input names; an unknown name would miss the Crystal and generate. The route is the one a public page calls. |
 | L18 | In explore mode, saved handlers with another provenance are marked stale, rank below live Gas, and `crystallize()` refuses them. Locked mode does neither: it serves them as is and has no generator, so its provenance never matches a saved record. | Stale code must not be frozen. |
 | L19 | Engine `warning` events are logged by both runtimes and shown in the Lifecycle tab. | The Crystal schema warning was dropped. |
+| L20 | In the cloud, Crystallize also runs in the shared `slime-runtime` Lambda (`POST /ep/<id>/v0/crystallize`): it works in a private `/tmp` folder, uploads the modules to S3 (`endpoints/<id>/crystal/`), then the manifest with an ETag condition, and swaps its own engine. | Lambda has no persistent disk; the condition makes a concurrent Crystallize fail with a reason instead of overwriting. |
+| L21 | Cloud Crystals run as data in the engine's QuickJS runner with Liquid's time and memory limits, after a SHA-256 check against the manifest; they are never `import()`ed. Self-hosted apps that import `index.mjs` keep running Crystal functions in-process. | One process holds every endpoint's settings: a heavy or hostile Crystal must not stall or read them. |
+| L22 | In the cloud, `POST /v0/reload` replaces the restart: after Crystallize or a settings change the admin calls it on the instance it reaches; other warm instances pick up changes within the 30 s settings TTL. Locally `/v0/reload` is a no-op (204). | There is no process to restart, and per-endpoint functions are gone. |
+| L23 | The live feed (`/v0/events`), Gas rows and live run counts are per Lambda instance in the cloud, so the cloud Lifecycle view is approximate. | Durable counters and a shared feed need a store; out of scope for the MVP. |
 
 ## 4. Components
 
@@ -116,9 +125,9 @@ endpoint (`/mcp`), multi-user concurrency, persistence of the feed.
   lines.
 * **Updating:** stop, start, health check, `ready`.
 * **Deleting:** stop the process, delete the endpoint's Liquid handlers and
-  its `.data/endpoints/<id>/` folder (as the provisioner's teardown does on
-  AWS; ids are never reused, so a kept folder was only litter), then the item,
-  then the secrets.
+  its `.data/endpoints/<id>/` folder (the cloud deletes the S3 prefix with the
+  same shared teardown; ids are never reused, so a kept folder was only
+  litter), then the item, then the secrets.
 * **One command:** `npm run local` in `platform/admin` starts `next dev` and
   the runner together, so the operator still runs a single process.
 
@@ -209,8 +218,8 @@ sequenceDiagram
   endpoint and create a new one, which also changes its URL, `slm_` key and
   every `slc_` token (agents and pages holding them break). The core warning text ("run
   crystallize again") overstates this.
-* Crystal code runs without the QuickJS sandbox (allowlist and equivalence
-  test only), and Crystallize is local-only (L3).
+* Locally, Crystal code runs without the QuickJS sandbox (allowlist and
+  equivalence test only); in the cloud it runs in QuickJS (L21).
 * With `SLIME_REVIEW=off` a Crystal can ship unreviewed.
 * DynamoDB Local runs `-inMemory`: restarting its container drops Liquid
   handlers and endpoints.
@@ -241,8 +250,8 @@ The Lifecycle tab implements the v0 main flow and vocabulary of the frame
 |---|---|
 | Gas | A new request on `POST /v0/query` generates a handler; shown as a Gas row with `n/3 to Liquid`. |
 | Liquid | Automatic promotion after 3 runs and the review; the saved row survives restarts. |
-| Crystallize | The Crystallize button → `POST /v0/crystallize` (local entry only, L3), then a restart. |
-| Crystal | Its own route `POST /v0/e/<crystal key>` with an `slc_` token. |
+| Crystallize | The Crystallize button → `POST /v0/crystallize`, then a restart (local, L3/L4) or `/v0/reload` (cloud, L20/L22). |
+| Crystal | Its own route `POST /v0/e/<crystal key>` (in the cloud `/ep/<id>/v0/e/<crystal key>`) with an `slc_` token. |
 
 Not here yet: `catalog`, slime-client, `/mcp`, `slime uncrystallize`, origin
 allowlist, CORS.

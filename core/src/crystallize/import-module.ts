@@ -3,14 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { assertReadOnlySql } from '../engine/checks/sql.js';
-import type { ShapeFunction } from '../engine/crystal/types.js';
 import { sha256 } from '../shared/hash.js';
 import { parseModule, type CrystalCode } from './module-format.js';
-
-export interface ImportedModule {
-  code: CrystalCode;
-  shape: ShapeFunction | null;
-}
 
 interface ModuleExports {
   sql?: unknown;
@@ -21,11 +15,13 @@ interface ModuleExports {
 const IMPORT_DIR = join(tmpdir(), 'slime-crystal');
 
 /**
- * Checks a module's text, then imports exactly those bytes: a module that fails
- * the allowlist or the read-only lint never runs. The temporary copy is named
- * by its hash, so a changed module never hits Node's import cache.
+ * Checks a module's text, then imports exactly those bytes, as an app that imports
+ * `index.mjs` will: a module that fails the allowlist or the read-only lint never
+ * loads, and one whose exports differ from its parsed source is refused. Importing
+ * runs no shape code (the module only declares it). The temporary copy is named by
+ * its hash, so a changed module never hits Node's import cache.
  */
-export async function importCheckedModule(text: string): Promise<ImportedModule> {
+export async function importCheckedModule(text: string): Promise<CrystalCode> {
   const code = parseModule(text);
   assertReadOnlySql(code.sql);
   await mkdir(IMPORT_DIR, { recursive: true });
@@ -34,7 +30,7 @@ export async function importCheckedModule(text: string): Promise<ImportedModule>
   try {
     const exports = (await import(pathToFileURL(file).href)) as ModuleExports;
     assertExportsMatch(exports, code);
-    return { code, shape: (exports.shape as ShapeFunction | null) ?? null };
+    return code;
   } finally {
     await rm(file, { force: true });
   }

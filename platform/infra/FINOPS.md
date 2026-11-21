@@ -16,6 +16,17 @@ Free Tier API.
 Baseline is ~$2/month; renewal months reach ~$21-23. WAF cost $7-8/month in
 May-June 2026 and is gone now.
 
+The cloud MVP (2026-11-21) adds only resources that are free when idle: the
+`slime-admin` Lambda, its CloudFront distribution, an ACM certificate, the
+`slime-crystals-<account>` bucket and two Route 53 records in the existing
+zone. No WAF on the admin distribution, for the same reason as the landing
+(see `.trivyignore.yaml`).
+
+**Model spend is outside the AWS budget.** Every endpoint spends the shared
+`/slime/shared/` model keys, and the budgets and the freeze below see none of
+it. Set a spend limit on the Anthropic workspace (and Groq, if used) by hand
+before inviting anyone; sign-up is invite-only (`ADMIN_ALLOWED_EMAILS`).
+
 Always Free usage (all far below limits): Lambda 1.6k / 1M requests and
 183 / 400k GB-s, CloudFront 3k / 10M requests and 0.02 / 1024 GB out,
 CloudWatch 0.05 / 5 GB. The account is on the legacy free tier (no free-plan
@@ -23,8 +34,10 @@ credits); 12-month offers no longer apply, only Always Free.
 
 ### What would leave the free tier first
 
-- **Lambda concurrency, not cost:** the account limit is 10 for every function
-  together. The landing URL is CloudFront-only (OAC), so cache misses alone hit it.
+- **Lambda concurrency, not cost:** the account limit is 1000 for every
+  function together (checked 2026-11-21; it was 10 earlier in 2026). Nothing is
+  reserved: `slime-runtime` serves every Slime Cloud endpoint, so a burst on one
+  endpoint shares the pool with the admin and the landing.
 - **DynamoDB PITR** (planned `slime-handlers` table): not free, billed per GB of
   table size; trivial at hackathon size.
 - **WAF, NAT Gateway, KMS CMKs, provisioned concurrency, RDS**: no free tier;

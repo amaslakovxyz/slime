@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>slime cloud · admin + endpoint provisioner · architecture</title>
+<title>slime cloud · admin + endpoint provisioner · architecture (superseded)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Oi&family=Titan+One&family=Plus+Jakarta+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -186,6 +186,7 @@ footer { text-align: center; font: 400 12px/1.5 var(--font-mono); color: var(--w
 <main>
 
 <header class="hero">
+  <p class="note gas" role="note"><strong>Superseded for the provisioner</strong> by <a href="2026-11-21-cloud-mvp-design.md">2026-11-21-cloud-mvp-design.md</a> (Slime Cloud MVP on AWS): one multi-tenant <code>slime-runtime</code> Lambda serves every endpoint under <code>/ep/&lt;id&gt;/</code>, the admin is hosted at <code>admin.amaslakov.com</code> and provisions endpoints itself, and Crystals live in S3. <code>slime-provisioner</code>, the <code>slime-gas</code> layer, the endpoint boundary policy and the per-endpoint <code>slime-ep-*</code> functions described below are removed. The diagrams are kept as a record and not redrawn; the design doc is the source.</p>
   <h1 class="wordmark"><span class="slime-gradient-text">slime</span><span class="suffix">cloud</span></h1>
   <p><strong>Admin + endpoint provisioner.</strong> A local Next.js admin where users sign up, create and reconfigure endpoints and watch usage by tier; a stream-driven worker that deploys one Lambda per endpoint on a shared <strong style="color:var(--gas-accent)">Gas</strong> layer, with <strong style="color:var(--plasma-highlight)">Liquid</strong> handlers in DynamoDB partitioned by endpoint.</p>
   <nav class="toc" aria-label="Sections">

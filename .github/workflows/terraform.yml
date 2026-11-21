@@ -15,7 +15,8 @@ name: Terraform AWS
 #
 # Stacks: every platform/infra/<name>/ except bootstrap (which owns the CI roles and
 # is applied by a human). A stack with a build.sh gets it run first, from the
-# repo root, so Terraform can zip its artifact (platform builds the runtime).
+# repo root, so Terraform can zip its artifact (platform builds the runtime and
+# the admin).
 # Every stack is planned/applied on every run; unchanged stacks are no-ops.
 
 on:
@@ -165,6 +166,16 @@ jobs:
       - name: Build artifacts
         if: hashFiles(format('platform/infra/{0}/build.sh', matrix.stack)) != ''
         run: bash "$STACK_DIR/build.sh"
+      # Browser for the admin cloud smoke below; build.sh already ran npm ci
+      # in platform/admin. Also before credentials.
+      - name: Install Playwright browser
+        if: matrix.stack == 'platform'
+        working-directory: platform/admin
+        env:
+          SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}
+        run: |
+          if [ -z "$SMOKE_EMAIL" ]; then echo "No SMOKE_EMAIL secret; cloud smoke will be skipped."; exit 0; fi
+          npx playwright install --with-deps chromium
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: ${{ env.TF_VERSION }}
@@ -198,14 +209,64 @@ jobs:
       - name: Post-deploy
         run: |
           outputs=$(terraform -chdir="$STACK_DIR" output -json)
+          # HTTP status of a request, retried while a fresh distribution, DNS
+          # record or cold function is still settling: expect <want> <curl args...>.
+          expect() {
+            local want=$1 code
+            shift
+            for _ in $(seq 10); do
+              code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$@" || true)
+              [ "$code" = "$want" ] && break
+              sleep 15
+            done
+            echo "$* -> $code (want $want)"
+            [ "$code" = "$want" ]
+          }
           dist=$(jq -r '.cloudfront_distribution_id.value // empty' <<<"$outputs")
           if [ -n "$dist" ]; then
             aws cloudfront create-invalidation --distribution-id "$dist" --paths '/*' --query Invalidation.Id --output text
           fi
           url=$(jq -r '.runtime_url.value // empty' <<<"$outputs")
           if [ -n "$url" ]; then
-            # The function answers 401 without x-api-key once it has started.
-            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "${url%/}/healthz")
-            echo "runtime /healthz without key -> $code"
-            [ "$code" = 401 ]
+            # The function answers 401 outside /ep/<id>/ (no key is possible there).
+            expect 401 "${url%/}/healthz"
+            # A well-formed id with no settings in SSM.
+            expect 404 "${url%/}/ep/ep-0000000000/healthz"
           fi
+          admin=$(jq -r '.admin_url.value // empty' <<<"$outputs")
+          if [ -n "$admin" ]; then
+            expect 200 "${admin}login"
+            # A server action through CloudFront: neither the origin-header check
+            # (403) nor Next's origin check or the function (5xx) may refuse it.
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 -X POST --data '' "${admin}login")
+            echo "POST ${admin}login -> $code"
+            case "$code" in 403 | 5* | 000) exit 1 ;; esac
+            # The landing (apex of the admin's domain, landing stack) links here.
+            host=${admin#https://}
+            landing="https://${host#*.}"
+            for _ in $(seq 10); do
+              curl -s --max-time 30 "$landing" | grep -qF "href=\"$admin\"" && found=1 && break
+              sleep 15
+            done
+            echo "landing $landing links to $admin: ${found:-no}"
+            [ -n "${found:-}" ]
+            aws s3api head-bucket --bucket "$(jq -r '.crystals_bucket.value' <<<"$outputs")"
+            for table in $(jq -r '.control_table.value, .handlers_table.value' <<<"$outputs"); do
+              aws dynamodb describe-table --table-name "$table" --query Table.TableStatus --output text
+            done
+          fi
+      # Goal 10 of docs/architecture/2026-11-21-cloud-mvp-design.md: sign-in,
+      # create -> failed (no cloud database), keyless 401, unknown id 404,
+      # delete. Runs without the AWS credentials: it only talks HTTPS.
+      - name: Admin cloud smoke
+        if: matrix.stack == 'platform'
+        working-directory: platform/admin
+        env:
+          SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}
+          SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
+        run: |
+          if [ -z "$SMOKE_EMAIL" ] || [ -z "$SMOKE_PASSWORD" ]; then
+            echo "::notice::Admin cloud smoke skipped: set the SMOKE_EMAIL and SMOKE_PASSWORD secrets (an allowlisted user)."
+            exit 0
+          fi
+          env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN npm run e2e:cloud

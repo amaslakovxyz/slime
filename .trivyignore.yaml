@@ -16,3 +16,19 @@ misconfigurations:
       per-request fees (this account already paid $7-8/month for WAF earlier
       in 2026); the origin is a cached static page behind an IAM-locked
       Function URL.
+  - id: AWS-0011
+    paths:
+      - "platform/infra/platform/admin.tf"
+    statement: >-
+      No WAF on the admin distribution, for the same cost reason as the
+      landing (about $5/month plus per-request fees). Every admin page needs
+      a session, sign-up is invite-only, and the Function URL refuses
+      requests without the CloudFront origin header.
+  - id: AWS-0132
+    paths:
+      - "platform/infra/platform/crystals.tf"
+    statement: >-
+      Crystal bucket uses SSE-S3, as the state bucket does. A customer-managed
+      KMS key costs $1/month plus requests; TLS-only policy, versioning and
+      blocked public access protect the modules, and the runtime checks each
+      module's SHA-256 against the manifest before running it in QuickJS.

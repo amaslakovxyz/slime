@@ -3,7 +3,7 @@ output "account_id" {
 }
 
 output "runtime_url" {
-  description = "Slime runtime Function URL (send x-api-key)."
+  description = "Slime runtime Function URL; endpoints live under ep/<id>/ (send x-api-key)."
   value       = aws_lambda_function_url.runtime.function_url
 }
 
@@ -19,11 +19,17 @@ output "control_table" {
   value = aws_dynamodb_table.control.name
 }
 
-output "gas_layer_arn" {
-  description = "Gas layer version new endpoints are provisioned with."
-  value       = aws_lambda_layer_version.gas.arn
+output "crystals_bucket" {
+  description = "S3 bucket holding Crystal modules under endpoints/<id>/crystal/."
+  value       = aws_s3_bucket.crystals.bucket
 }
 
-output "provisioner_function_name" {
-  value = aws_lambda_function.provisioner.function_name
+output "admin_url" {
+  description = "Public admin URL on the custom domain (CloudFront), with trailing slash."
+  value       = "https://${var.admin_domain}/"
+}
+
+output "cloudfront_distribution_id" {
+  description = "Admin distribution; CI invalidates it after each apply."
+  value       = aws_cloudfront_distribution.admin.id
 }

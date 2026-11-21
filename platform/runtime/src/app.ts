@@ -1,6 +1,7 @@
-// HTTP routes of the hosted runtime, on @slime-cloud/core's Slime API (PLAN.md §5).
+// HTTP routes of one endpoint, on @slime-cloud/core's Slime API (PLAN.md §5).
 // Same routes as before M7, so clients don't change; once @slime-cloud/server
-// exists this file becomes an import of its route factory.
+// exists this file becomes an import of its route factory. Both entries mount
+// every part (endpoint-runtime.ts); the Lambda router serves these under /ep/<id>/.
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { SlimeError, type Connector, type CrystalRegistry, type QueryMeta, type Slime } from '@slime-cloud/core';
@@ -35,18 +36,25 @@ export interface RuntimeParts {
   slime: Slime;
   connector: Connector;
   crystal: CrystalRegistry | false;
-  /** Sees every answered query (the Lambda entry meters usage with it). */
+  /** Sees every answered query (usage metering). */
   onQuery?: (meta: QueryMeta) => void;
-  /** Local runtime only: the live feed behind `GET /v0/events`. */
+  /** One JSON line per answered query; defaults to stdout. */
+  log?: (line: Record<string, unknown>) => void;
+  /** The live feed behind `GET /v0/events`. Absent means the route does not exist. */
   events?: RecentRequests;
-  /** Local runtime only: saved handlers, so Liquid ones show before their first hit after a restart. */
+  /** Saved handlers, so Liquid ones show before their first hit after a restart. Mounts `GET /v0/lifecycle`. */
   savedHandlers?: () => Promise<SavedHandler[]>;
-  /** Local runtime only: `POST /v0/crystallize`. Absent means the route does not exist. */
+  /** `POST /v0/crystallize`. Absent means the route does not exist. */
   crystallize?: (keys?: string[]) => Promise<CrystallizeOutcome[]>;
   /** Runs needed for Gas → Liquid and for Crystal readiness, shown as progress. */
   thresholds?: { liquidRuns: number; crystalRuns: number };
-  /** Local runtime only: startup and engine warnings, shown in the Lifecycle tab. */
+  /** Startup and engine warnings, shown in the Lifecycle tab. */
   warnings?: () => string[];
+  /**
+   * The feed and Gas rows are this process's only, one of several (the shared Lambda):
+   * `/v0/lifecycle` says `instance: true` so the admin labels them.
+   */
+  isPerInstance?: boolean;
 }
 
 const TIER_RANK = { gas: 0, liquid: 1, crystal: 2 } as const;
@@ -83,8 +91,9 @@ export function mergeHandlers(lists: LifecycleHandler[][]): LifecycleHandler[] {
 
 const MAX_BODY_BYTES = 16 * 1024;
 
-export function createApp({ slime, connector, crystal, onQuery, events, savedHandlers, crystallize, thresholds, warnings }: RuntimeParts): Hono {
+export function createApp({ slime, connector, crystal, onQuery, log, events, savedHandlers, crystallize, thresholds, warnings, isPerInstance }: RuntimeParts): Hono {
   const app = new Hono();
+  const logLine = log ?? ((line: Record<string, unknown>) => console.log(JSON.stringify(line)));
 
   const limitBody = bodyLimit({
     maxSize: MAX_BODY_BYTES,
@@ -109,12 +118,12 @@ export function createApp({ slime, connector, crystal, onQuery, events, savedHan
       onQuery?.(meta);
       events?.record(meta);
       c.header('Server-Timing', `total;dur=${meta.timingsMs.total}, generate;dur=${meta.timingsMs.generate ?? 0}`);
-      console.log(JSON.stringify({ at: new Date().toISOString(), handler: meta.handlerKey, tier: meta.tier, cache: meta.cache, ms: meta.timingsMs }));
+      logLine({ at: new Date().toISOString(), handler: meta.handlerKey, tier: meta.tier, cache: meta.cache, ms: meta.timingsMs });
       return c.json({ data, meta });
     },
   );
 
-  // Admin views (behind the API key in the Lambda entry).
+  // Admin views, behind the endpoint key in both entries.
   app.get('/healthz', async (c) => {
     const safety = await connector.safetyCheck();
     return c.json({ ok: safety.ok, database: safety, ...slime.stats() }, safety.ok ? 200 : 503);
@@ -172,6 +181,7 @@ export function createApp({ slime, connector, crystal, onQuery, events, savedHan
         stats: slime.stats(),
         thresholds,
         warnings: warnings?.() ?? [],
+        ...(isPerInstance ? { instance: true } : {}),
       });
     });
   }

@@ -39,7 +39,6 @@ export async function createDevTables(
           { AttributeName: 'pk', KeyType: 'HASH' },
           { AttributeName: 'sk', KeyType: 'RANGE' },
         ],
-        StreamSpecification: { StreamEnabled: true, StreamViewType: 'NEW_IMAGE' },
       }),
     );
     created.push(tables.control);

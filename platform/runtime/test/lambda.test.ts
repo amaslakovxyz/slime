@@ -1,11 +1,19 @@
-// The Lambda entry and the env config, with no AWS and no database.
+// The deployed Lambda app and the env config, with no AWS and no database.
+// The router and tenant cache with fakes are in tenants.test.ts.
 import './setup.js';
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
+import { SlimeConfigError, type CrystalRegistry } from '@slime-cloud/core';
+import { keyMatches } from '../src/auth.js';
 import { slimeConfigFromEnv } from '../src/config.js';
-import { app, envNameFor, keyMatches } from '../src/lambda.js';
+import { app } from '../src/lambda.js';
 
-const BASE_ENV = { SLIME_HANDLERS_TABLE: 'slime-handlers', SLIME_TENANT_ID: 'tenant-a', SLIME_PROVIDER: 'offline' };
+const BASE_ENV = {
+  DATABASE_URL: 'postgres://reader:reader@localhost:1/none',
+  SLIME_HANDLERS_TABLE: 'slime-handlers',
+  SLIME_TENANT_ID: 'ep-0123456789',
+  SLIME_PROVIDER: 'offline',
+};
 
 describe('Lambda entry', () => {
   test('keyMatches needs both keys and an exact match', () => {
@@ -16,45 +24,26 @@ describe('Lambda entry', () => {
     assert.equal(keyMatches('', ''), false);
   });
 
-  test('SSM parameter names map to their last path segment', () => {
-    assert.equal(envNameFor('/slime/runtime/DATABASE_URL'), 'DATABASE_URL');
-  });
-
-  test('refuses requests without the API key, and with no key configured at all', async () => {
-    delete process.env.SLIME_API_KEY;
-    assert.equal((await app.request('/healthz', { headers: { 'x-api-key': '' } })).status, 401);
-    process.env.SLIME_API_KEY = 'k';
-    assert.equal((await app.request('/healthz')).status, 401);
-    assert.equal((await app.request('/healthz', { headers: { 'x-api-key': 'wrong' } })).status, 401);
-  });
-
-  test("a Crystal token gets past auth only on that Crystal's route", async () => {
-    process.env.SLIME_API_KEY = 'k';
-    process.env.CRYSTAL_TOKENS = JSON.stringify({ abc: 'slc_abc' });
-    delete process.env.SLIME_HANDLERS_TABLE;
-    const as = (path: string, method = 'POST') => app.request(path, { method, headers: { 'x-api-key': 'slc_abc' }, body: method === 'POST' ? '{}' : undefined });
-    assert.equal((await as('/v0/query')).status, 401);
-    assert.equal((await as('/healthz', 'GET')).status, 401);
-    assert.equal((await as('/v0/e/other')).status, 401);
-    // Past auth, the (unconfigured) runtime answers 503: the token was accepted.
-    assert.equal((await as('/v0/e/abc')).status, 503);
-    delete process.env.CRYSTAL_TOKENS;
-  });
-
-  test('answers 503 NOT_READY when the runtime cannot start, and retries on the next request', async () => {
-    process.env.SLIME_API_KEY = 'k';
-    delete process.env.SLIME_HANDLERS_TABLE;
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const response = await app.request('/healthz', { headers: { 'x-api-key': 'k' } });
-      assert.equal(response.status, 503);
-      const body = (await response.json()) as { error: { code: string; message: string } };
-      assert.equal(body.error.code, 'NOT_READY');
-      assert.match(body.error.message, /table name/);
+  test('every path outside /ep/<id>/ is 401, root /healthz included, whatever key is sent', async () => {
+    for (const path of ['/healthz', '/', '/v0/query', '/epx/ep-0123456789/healthz']) {
+      const response = await app.request(path, { headers: { 'x-api-key': 'anything' } });
+      assert.equal(response.status, 401, path);
+      assert.equal(((await response.json()) as { error: { code: string } }).error.code, 'UNAUTHORIZED');
     }
   });
 });
 
 describe('config from env (the sandbox variable names)', () => {
+  test('a missing or empty DATABASE_URL is a config error naming it, never a fallback database', async () => {
+    for (const DATABASE_URL of [undefined, '']) {
+      await assert.rejects(slimeConfigFromEnv({ ...BASE_ENV, DATABASE_URL }), (error: unknown) => {
+        assert.ok(error instanceof SlimeConfigError);
+        assert.deepEqual(error.problems, ['DATABASE_URL is not set']);
+        return true;
+      });
+    }
+  });
+
   test('SLIME_MODE=locked means no generator', async () => {
     const config = await slimeConfigFromEnv({ ...BASE_ENV, SLIME_MODE: 'locked' });
     assert.equal(config.mode, 'locked');
@@ -82,5 +71,14 @@ describe('config from env (the sandbox variable names)', () => {
     assert.deepEqual([withReview.generator?.model, withReview.reviewer?.model], ['claude-haiku-5-5', 'claude-opus-5-5']);
     assert.equal(withoutReview.reviewer, undefined);
     await Promise.all([withReview.connector.close(), withoutReview.connector.close()]);
+  });
+
+  test('the Crystals the store loaded are served unless SLIME_CRYSTAL=off', async () => {
+    const crystal = { k1: { intent: 'i' } } as unknown as CrystalRegistry;
+    const served = await slimeConfigFromEnv(BASE_ENV, { crystal });
+    const switchedOff = await slimeConfigFromEnv({ ...BASE_ENV, SLIME_CRYSTAL: 'off' }, { crystal });
+    assert.deepEqual(Object.keys(served.crystal || {}), ['k1']);
+    assert.equal(switchedOff.crystal, false);
+    await Promise.all([served.connector.close(), switchedOff.connector.close()]);
   });
 });

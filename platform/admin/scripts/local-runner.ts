@@ -1,10 +1,13 @@
-// Local stand-in for slime-provisioner: runs each endpoint as a runtime process
-// on localhost (platform/runtime/src/local.ts) instead of a Lambda. Talks to the
-// admin only through slime-control, with the same state machine:
+// Local stand-in for the cloud admin flows: runs each endpoint as a runtime
+// process on localhost (platform/runtime/src/local.ts) instead of a path on the
+// shared runtime Lambda. Talks to the admin only through slime-control:
 //   pending  -> start, health check -> ready (+ url) | failed (+ error)
-//   updating -> restart (loads new Crystal modules)  -> ready | failed
-//   deleting -> stop, remove handlers, Crystal folder, the item, then secrets
-//   ready but not running (runner restarted)         -> start again, new url
+//   updating -> restart (loads new settings and Crystal modules) -> ready | failed
+//   deleting -> stop, then the shared teardown (lib/teardown.ts): handlers,
+//               Crystal folder, the item, then secrets
+//   ready but not running (runner restarted)         -> start again, same url
+// In the cloud the admin's server actions make these transitions themselves
+// (lib/cloud-endpoints.ts); this runner is only for local mode.
 // Refuses to run without AWS_ENDPOINT_URL_DYNAMODB so it never touches real AWS.
 // The model key (ANTHROPIC_API_KEY or GROQ_API_KEY) comes from this process's
 // environment and is passed to the children; nothing here reads it.
@@ -12,16 +15,15 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { resolve } from 'node:path';
-import { DeleteCommand, ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { ddb } from '../lib/ddb';
 import { env } from '../lib/env';
-import { removeLocalEndpointData } from '../lib/local-teardown';
 import { startupFailure } from '../lib/runtime-output';
 import { secretStore } from '../lib/secrets';
+import { removeEndpoint } from '../lib/teardown';
 
 const RUNTIME_DIR = resolve(import.meta.dirname, '../../runtime');
 const DATA_DIR = resolve(import.meta.dirname, '../.data/endpoints');
-const handlersTable = () => process.env.SLIME_HANDLERS_TABLE || 'slime-handlers';
 const POLL_MS = 2000;
 const HEALTH_TIMEOUT_MS = 20_000;
 const FIRST_PORT = 8700;
@@ -30,6 +32,7 @@ interface Item {
   pk: string;
   sk: string;
   endpointId: string;
+  owner: string;
   provider: string;
   status: string;
   url?: string;
@@ -85,10 +88,11 @@ async function portFor(endpointId: string, previous: number | undefined): Promis
 
 async function start(item: Item): Promise<string> {
   const secrets = secretStore();
-  const [databaseUrl, apiKey, crystalTokens] = await Promise.all([
+  const [databaseUrl, apiKey, crystalTokens, provider] = await Promise.all([
     secrets.get(item.endpointId, 'DATABASE_URL'),
     secrets.get(item.endpointId, 'SLIME_API_KEY'),
     secrets.get(item.endpointId, 'CRYSTAL_TOKENS'),
+    secrets.get(item.endpointId, 'SLIME_PROVIDER'),
   ]);
   if (!databaseUrl || !apiKey) throw new Error('Endpoint secrets are missing');
   const port = await portFor(item.endpointId, portFromUrl(item.url));
@@ -104,10 +108,11 @@ async function start(item: Item): Promise<string> {
       DATABASE_URL: databaseUrl,
       SLIME_API_KEY: apiKey,
       CRYSTAL_TOKENS: crystalTokens ?? '',
-      SLIME_PROVIDER: item.provider,
+      // Endpoints created before the provider secret existed keep it only on the item.
+      SLIME_PROVIDER: provider ?? item.provider,
       SLIME_TENANT_ID: item.endpointId,
-      SLIME_HANDLERS_TABLE: handlersTable(),
-      // Usage counters live in the control table, as with provisioned Lambdas.
+      SLIME_HANDLERS_TABLE: env().handlersTable,
+      // Usage counters live in the control table, as on the shared runtime Lambda.
       SLIME_USAGE_TABLE: env().controlTable,
       SLIME_CRYSTAL_DIR: crystalDir,
     },
@@ -215,13 +220,16 @@ async function handle(item: Item): Promise<void> {
   } else if (item.status === 'deleting') {
     await stop(id);
     ports.delete(id);
-    // Handlers and the Crystal folder before the item: if this fails, the item stays
-    // `deleting` and the next tick retries (still ours: the secrets are kept until the end).
-    await removeLocalEndpointData({ endpointId: id, handlersTable: handlersTable(), dataDir: DATA_DIR });
-    // Item first, secrets last: if removing secrets fails, the item is already gone, so the
-    // next tick does not treat a half-deleted endpoint as "not ours" and leave it stuck.
-    await ddb().send(new DeleteCommand({ TableName: env().controlTable, Key: { pk: item.pk, sk: item.sk } }));
-    await secretStore().removeAll(id);
+    // Teardown keeps the secrets until the end: if a step fails, the item stays `deleting`
+    // and the next tick retries (still ours). The item goes before the secrets, so a failed
+    // secrets removal never leaves a half-deleted endpoint that looks "not ours" and sticks.
+    await removeEndpoint({
+      endpointId: id,
+      owner: item.owner,
+      handlersTable: env().handlersTable,
+      crystals: { kind: 'dir', dataDir: DATA_DIR },
+      secrets: secretStore(),
+    });
     log('deleted', { endpointId: id });
   }
 }

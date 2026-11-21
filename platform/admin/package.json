@@ -7,9 +7,12 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:lambda": "node scripts/build-lambda.mjs",
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test 'test/**/*.test.ts'",
+    "e2e": "playwright test -c e2e/playwright.config.ts --project=local",
+    "e2e:cloud": "playwright test -c e2e/playwright.config.ts --project=cloud",
     "infra:up": "docker compose up -d --wait",
     "infra:down": "docker compose down -v",
     "tables": "node --import tsx scripts/dev-tables.ts",
@@ -22,6 +25,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.1174.0",
+    "@aws-sdk/client-s3": "^3.1175.0",
     "@aws-sdk/client-ssm": "^3.1174.0",
     "@aws-sdk/lib-dynamodb": "^3.1174.0",
     "@opentelemetry/api": "^1.9.1",
@@ -32,6 +36,7 @@
     "react-dom": "^19.3.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
     "@types/node": "^22.20.5",
     "@types/pg": "^8.23.1",
     "@types/react": "^19.3.0",

@@ -8,6 +8,7 @@ import { SlimeConfigError } from './shared/errors.js';
 import type { Connector } from './connectors/types.js';
 import type { HandlerProvenance } from './request/key.js';
 import { QuickJSRunner } from './sandbox/quickjs/quickjs-runner.js';
+import type { SandboxRunner } from './sandbox/types.js';
 import { startApiSources } from './sources/start-api-sources.js';
 import type { ApiSchema } from './sources/types.js';
 import { savedHandlerProblem } from './engine/saved-handler-check.js';
@@ -19,8 +20,17 @@ const LOCKED_MARKER = 'locked';
 const HANDLER_KEY_PREFIX = 12;
 const UNSAFE_CREDENTIALS = 'the connector refused to start: its database user can write or is too powerful';
 
+export interface CreateSlimeOptions {
+  /**
+   * A sandbox shared with other engines in the process (one pool for many tenants). The
+   * engine uses it and leaves it running on close(); the host closes it. Omit for the
+   * engine's own runner, which close() stops.
+   */
+  runner?: SandboxRunner;
+}
+
 /** Startup order (§7, M2): safety check, store init, dictionary. */
-export async function createSlime(config: SlimeConfig): Promise<Slime> {
+export async function createSlime(config: SlimeConfig, options: CreateSlimeOptions = {}): Promise<Slime> {
   // The SQL source keeps today's calls and error text, so a setup without API sources starts exactly as before (MS3).
   await assertSafeCredentials(config.connector);
   const apiSchemas = await startApiSources(config);
@@ -33,7 +43,8 @@ export async function createSlime(config: SlimeConfig): Promise<Slime> {
   if (config.mode === 'locked') await warnAboutUnfitHandlers(config, store, apiSchemas);
   // Crystal is SQL only, so an API source's change must not flag it (MS17).
   warnAboutOtherSchemaCrystals(config, dictionary.sourceHashes?.[config.sqlSourceName] ?? dictionary.schemaHash);
-  return new SlimeEngine({ config, store, runner: new QuickJSRunner(), dictionary, provenance, apiSchemas });
+  const runner = options.runner ?? new QuickJSRunner();
+  return new SlimeEngine({ config, store, runner, ownsRunner: !options.runner, dictionary, provenance, apiSchemas });
 }
 
 async function assertSafeCredentials(connector: Connector): Promise<void> {

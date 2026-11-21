@@ -10,6 +10,10 @@ terraform {
       source  = "hashicorp/archive"
       version = "~> 2.7"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
   }
 
   backend "s3" {
@@ -23,21 +27,29 @@ terraform {
 
 # Credentials come from the environment: OIDC roles in CI
 # (slime-gha-plan / slime-gha-apply), AWS_PROFILE=slime locally.
+locals {
+  tags = {
+    Project   = var.project
+    ManagedBy = "terraform"
+    Stack     = "aws-platform"
+  }
+}
+
 provider "aws" {
   region = var.region
 
   default_tags {
-    tags = {
-      Project   = var.project
-      ManagedBy = "terraform"
-      Stack     = "aws-platform"
-    }
+    tags = local.tags
   }
 }
 
-# Same account and region, no default_tags: for resources whose tag-on-create
-# the CI apply role may not perform (the provisioner's event source mapping).
+# CloudFront only accepts ACM certificates from us-east-1 (admin.tf). The CI
+# roles' region guard exempts acm:*, and the Project tag lets them manage it.
 provider "aws" {
-  alias  = "untagged"
-  region = var.region
+  alias  = "us_east_1"
+  region = "us-east-1"
+
+  default_tags {
+    tags = local.tags
+  }
 }

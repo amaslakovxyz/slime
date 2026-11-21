@@ -21,15 +21,20 @@ export interface EquivalenceDeps {
 const SIGNIFICANT_DIGITS = 9;
 
 /**
- * Every check a candidate must pass: the allowlist, the read-only lint, and the
- * same output as the Liquid handler on every recorded input. Returns the module text.
+ * Every check a candidate must pass: the allowlist, the read-only lint, an import of the
+ * module text (apps import it), and the same output as the Liquid handler on every recorded
+ * input. Returns the module text.
+ *
+ * The comparison runs the module's shape as source in the sandbox, with Liquid's limits:
+ * Liquid runs there too, so like is compared with like, and a candidate that loops cannot
+ * stall the job's process, which may be serving other endpoints.
  */
 export async function verifyCandidate(deps: EquivalenceDeps, record: HandlerRecord, code: CrystalCode): Promise<string> {
   if (code.shape) checkShapeSource(code.shape);
   const unknownParam = code.params.find((name) => !(name in record.paramTypes));
   if (unknownParam) throw new Error(`param "${unknownParam}" is not an input of this request`);
   const text = renderModule(code);
-  const candidate = asCrystal(record, code, (await importCheckedModule(text)).shape);
+  const candidate = asCrystal(record, await importCheckedModule(text));
 
   let comparedCount = 0;
   for (const input of record.fixtures) {
@@ -54,9 +59,9 @@ async function liquidOutput(deps: EquivalenceDeps, { artifact, output }: Handler
   }
 }
 
-function asCrystal(record: HandlerRecord, code: CrystalCode, shape: CrystalHandler['shape']): CrystalHandler {
+function asCrystal(record: HandlerRecord, code: CrystalCode): CrystalHandler {
   const { intent, output, paramTypes, provenance, review } = record;
-  return { sql: code.sql, params: code.params, shape, intent, output, paramTypes, schemaHash: provenance.schemaHash, review };
+  return { sql: code.sql, params: code.params, shape: code.shape, intent, output, paramTypes, schemaHash: provenance.schemaHash, review };
 }
 
 function normalized(value: unknown): string {

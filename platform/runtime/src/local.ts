@@ -1,157 +1,42 @@
-// Local entry: the same runtime as Lambda, as a plain Node HTTP server on PORT.
-// Started by the admin's local runner (platform/admin/scripts/local-runner.ts) in
-// place of a provisioned Lambda. Env is the Lambda's (config.ts) plus:
+// Local entry: one endpoint per process, as a plain Node HTTP server on PORT.
+// Started by the admin's local runner (platform/admin/scripts/local-runner.ts).
+// The endpoint is composed exactly as in the Lambda (endpoint-runtime.ts), from
+// this process's env (config.ts) plus:
 //   PORT               listen port
 //   SLIME_CRYSTAL_DIR  where Crystallize writes modules; read again on restart
-// Adds what only a laptop needs: the live feed, saved handlers for the
-// Lifecycle tab, and POST /v0/crystallize. Every route needs x-api-key: the
-// endpoint key, or for POST /v0/e/<key> that Crystal's own token (CRYSTAL_TOKENS).
+// Every route needs x-api-key: the endpoint key, or for POST /v0/e/<key> that
+// Crystal's own token (CRYSTAL_TOKENS). POST /v0/reload is a no-op here (the
+// runner restarts the process instead), so the admin calls the same routes in
+// both modes.
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { changedProvenance, createSlime, type HandlerProvenance, type SlimeStore } from '@slime-cloud/core';
-import { crystallize, DEFAULT_MIN_RUNS } from '@slime-cloud/core/crystallize';
-import { createApp, type SavedHandler } from './app.js';
-import { isAuthorized, parseCrystalTokens } from './auth.js';
-import { missingProviderKey, slimeConfigFromEnv } from './config.js';
-import { RecentRequests } from './events.js';
-import { UsageMeter } from './usage.js';
-import { syncLiveRuns } from './live-runs.js';
+import { isAuthorized } from './auth.js';
+import { DirCrystalStore } from './crystal-store.js';
+import { endpointRuntime, startupErrorMessage } from './endpoint-runtime.js';
 
-export { syncLiveRuns };
-
-const HANDLERS_NS = 'handlers';
 const MAX_BODY_BYTES = 64 * 1024;
 /** Same knob and default as the Lambda entry. */
 const FLUSH_LIMIT_MS = Number(process.env.SLIME_FLUSH_LIMIT_MS || 5_000);
 /** The runner SIGKILLs 3 s after SIGTERM. */
 const STOP_SAVE_LIMIT_MS = 2_000;
 
-/**
- * A read-only view whose list() returns only `keys`: crystallize() has no key
- * filter. crystallize() only reads (store.list / store.get), so the view refuses
- * writes rather than quietly letting a job mutate the real store through it.
- */
-export function storeLimitedTo(store: SlimeStore, keys: readonly string[]): SlimeStore {
-  const wanted = new Set(keys);
-  const readonly = () => {
-    throw new Error('storeLimitedTo is a read-only view');
-  };
-  return {
-    get: (ns, key) => store.get(ns, key),
-    put: readonly,
-    delete: readonly,
-    list: async (ns, prefix) => (await store.list(ns, prefix)).filter(({ key }) => ns !== HANDLERS_NS || wanted.has(key)),
-  };
-}
-
-type RecordLike = {
-  key: string;
-  intent: string;
-  tier: 'gas' | 'liquid';
-  runs: number;
-  review: string;
-  fixtures: unknown[];
-  createdAt: string;
-  provenance: HandlerProvenance;
-};
-
-/** `current` is the provenance new handlers are made with; pass none when drifted records are still served (locked mode). */
-export function toSavedHandler(value: unknown, current?: HandlerProvenance): SavedHandler {
-  const r = value as RecordLike;
-  const isStale = current !== undefined && changedProvenance(r.provenance, current).length > 0;
-  return {
-    key: r.key,
-    intent: r.intent,
-    tier: r.tier,
-    runs: r.runs,
-    review: r.review,
-    fixtures: r.fixtures?.length ?? 0,
-    createdAt: r.createdAt,
-    ...(isStale ? { stale: true } : {}),
-  };
-}
-
 async function main(): Promise<void> {
   const port = Number(process.env.PORT || 8700);
   const crystalDir = process.env.SLIME_CRYSTAL_DIR;
-  // Same usage counters as Lambda (USAGE#<tenant> items), so the admin's Usage, Billing and
-  // list show real numbers locally too. Set by the runner; absent means no metering.
-  let meter: UsageMeter | undefined;
-  // Engine warnings (for example Crystals made against another schema) go to the log and the Lifecycle tab.
-  const warnings: string[] = [];
-  const keyWarning = missingProviderKey(process.env);
-  if (keyWarning) {
-    warnings.push(keyWarning);
-    console.warn(JSON.stringify({ warning: keyWarning }));
-  }
-  const config = await slimeConfigFromEnv(process.env, {
-    onEvent: (event) => {
-      if (event.type === 'generated') meter?.recordTokens(event.tokens);
-      if (event.type === 'warning') {
-        warnings.push(event.message);
-        console.warn(JSON.stringify({ warning: event.message }));
-      }
-    },
-  });
-  const slime = await createSlime(config);
-  if (process.env.SLIME_USAGE_TABLE) {
-    const crystalCount = Object.keys(config.crystal || {}).length;
-    meter = new UsageMeter(process.env.SLIME_USAGE_TABLE, process.env.SLIME_TENANT_ID ?? '', () => ({
-      ...slime.stats().handlers,
-      crystal: crystalCount,
-    }));
-  }
-  const store = config.store;
-  const events = new RecentRequests();
-  const crystalTokens = parseCrystalTokens(process.env.CRYSTAL_TOKENS);
-  const crystalRuns = Number(process.env.CRYSTAL_MIN_RUNS || DEFAULT_MIN_RUNS);
-
-  const app = createApp({
-    slime,
-    connector: config.connector,
-    crystal: config.crystal,
-    events,
-    onQuery: (meta) => meter?.record(meta),
-    thresholds: { liquidRuns: config.tiers.gasToLiquidRuns, crystalRuns },
-    warnings: () => [...warnings],
-    // Explore mode regenerates drifted records, so they show as stale; locked mode serves them as is.
-    savedHandlers: async () => {
-      const current = config.mode === 'explore' ? slime.provenance() : undefined;
-      return store ? (await store.list(HANDLERS_NS)).map(({ value }) => toSavedHandler(value, current)) : [];
-    },
-    ...(store && crystalDir
-      ? {
-          crystallize: async (keys?: string[]) => {
-            // Liquid run counts and fixtures must be in the store before the job reads them. Every
-            // handler's, not only the picked ones: the restart that follows drops the live counts.
-            await slime.flush();
-            await syncLiveRuns(store, slime.handlers());
-            return crystallize({
-              connector: config.connector,
-              store: keys ? storeLimitedTo(store, keys) : store,
-              dir: crystalDir,
-              minRuns: crystalRuns,
-              // Locked mode has no generator, so its provenance never matches a saved record.
-              ...(config.mode === 'explore' ? { provenance: slime.provenance() } : {}),
-            });
-          },
-        }
-      : {}),
-  });
+  const runtime = await endpointRuntime(process.env, crystalDir ? { crystalStore: new DirCrystalStore(crystalDir) } : {});
 
   const server = createServer(async (req, res) => {
     try {
       const path = new URL(req.url ?? '/', 'http://localhost').pathname;
-      if (!isAuthorized(req.method ?? 'GET', path, header(req, 'x-api-key'), process.env.SLIME_API_KEY, crystalTokens)) {
+      if (!isAuthorized(req.method ?? 'GET', path, header(req, 'x-api-key'), runtime.apiKey, runtime.crystalTokens)) {
         return send(res, Response.json({ error: { code: 'UNAUTHORIZED', message: 'Missing or wrong x-api-key.', retryable: false } }, { status: 401 }));
       }
-      const response = await app.fetch(await toRequest(req, port));
+      if (req.method === 'POST' && path === '/v0/reload') return send(res, new Response(null, { status: 204 }));
+      const response = await runtime.app.fetch(await toRequest(req, port));
       // Same as Lambda: finish store writes and usage before answering, so the admin reads current
       // numbers. Capped like Lambda, because flush also waits for a running review (tens of seconds
       // with a real model) and the admin polls with a 3 s timeout; GETs write nothing, so skip them.
-      if (req.method !== 'GET') {
-        await Promise.race([Promise.all([slime.flush(), meter?.flush()]), sleep(FLUSH_LIMIT_MS, undefined, { ref: false })]);
-      }
+      if (req.method !== 'GET') await Promise.race([runtime.flush(), sleep(FLUSH_LIMIT_MS, undefined, { ref: false })]);
       await send(res, response);
     } catch (err) {
       console.error(err);
@@ -159,26 +44,23 @@ async function main(): Promise<void> {
     }
   });
   server.listen(port, '127.0.0.1', () => {
-    const crystals = Object.keys(config.crystal || {}).length;
-    console.log(JSON.stringify({ listening: `http://localhost:${port}/`, crystals, mode: config.mode }));
+    console.log(JSON.stringify({ listening: `http://localhost:${port}/`, crystals: runtime.crystalCount, mode: runtime.slime.stats().mode }));
   });
   server.on('error', (err) => {
     console.error(JSON.stringify({ fatal: startupErrorMessage(err) }));
     process.exit(1);
   });
-  // The runner restarts this process for every provider, connector or Crystal change. The core
-  // saves a handler's runs only when it turns Liquid, so save the live counts first, or every
-  // restart sets Liquid progress back. Capped below the runner's 3 s SIGKILL.
+  // The runner restarts this process for every provider, connector or Crystal change. close()
+  // saves the live run counts first, or every restart sets Liquid progress back. Capped below
+  // the runner's 3 s SIGKILL.
   let stopping = false;
   const stop = async () => {
     if (stopping) return;
     stopping = true;
     server.close();
-    if (store) {
-      await Promise.race([slime.flush().then(() => syncLiveRuns(store, slime.handlers())), sleep(STOP_SAVE_LIMIT_MS, undefined, { ref: false })]).catch(
-        (err) => console.error(JSON.stringify({ warning: `Could not save live run counts: ${startupErrorMessage(err)}` })),
-      );
-    }
+    await Promise.race([runtime.close(), sleep(STOP_SAVE_LIMIT_MS, undefined, { ref: false })]).catch((err) =>
+      console.error(JSON.stringify({ warning: `Could not save live run counts: ${startupErrorMessage(err)}` })),
+    );
     process.exit(0);
   };
   process.on('SIGTERM', stop);
@@ -212,14 +94,6 @@ async function send(res: ServerResponse, response: Response): Promise<void> {
   res.statusCode = response.status;
   response.headers.forEach((value, key) => res.setHeader(key, value));
   res.end(Buffer.from(await response.arrayBuffer()));
-}
-
-/** One line for the runner to show as the failure reason (the stack trace goes to stderr before it). */
-export function startupErrorMessage(err: unknown): string {
-  // pg reports a refused connection as an AggregateError with an empty message, one error per address.
-  if (err instanceof AggregateError && !err.message && err.errors.length > 0) return startupErrorMessage(err.errors[0]);
-  const text = err instanceof Error ? err.message || (err as { code?: string }).code || err.name : String(err);
-  return text.replace(/\s+/g, ' ').trim();
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

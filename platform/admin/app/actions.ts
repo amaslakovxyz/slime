@@ -2,10 +2,13 @@
 
 // Every action records one span; redirect() throws, so it always runs outside
 // withSpan to keep redirects from being recorded as errors. Span attributes
-// carry ids, providers and connector types only.
+// carry ids, providers and connector types only. In cloud mode (SLIME_RUNTIME_URL)
+// the endpoint actions also finish the state transition in the request
+// (lib/cloud-endpoints.ts); locally the runner does it.
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { endSession, requireUser, startSession } from '@/lib/auth';
+import { check, provision, reconfigure, remove } from '@/lib/cloud-endpoints';
 import { isConnectorType } from '@/lib/connectors';
 import { testConnection, type ConnectionTest } from '@/lib/connectors/postgres';
 import {
@@ -18,10 +21,12 @@ import {
   revealToken,
   updateConnector,
   updateSettings,
+  type Endpoint,
 } from '@/lib/endpoints';
+import { isCloud } from '@/lib/env';
 import { CodedError, hasCode } from '@/lib/errors';
 import { crystalToken, issueCrystalTokens } from '@/lib/crystal-tokens';
-import { crystallizeOn, type CrystallizeReport } from '@/lib/lifecycle';
+import { crystallizeOn, reloadOn, type CrystallizeReport } from '@/lib/lifecycle';
 import { withSpan } from '@/lib/telemetry';
 import { checkLogin, createUser } from '@/lib/users';
 
@@ -34,7 +39,12 @@ const userFacing = (err: unknown) =>
 // Layouts survive same-route redirects; the endpoint header (name, status) must re-render.
 const refreshEndpoint = () => revalidatePath('/endpoints/[id]', 'layout');
 
-const SIGNUP_ERRORS: Record<string, string> = { EMAIL_TAKEN: 'taken', WEAK_PASSWORD: 'weak', INVALID_EMAIL: 'email' };
+const SIGNUP_ERRORS: Record<string, string> = {
+  EMAIL_TAKEN: 'taken',
+  WEAK_PASSWORD: 'weak',
+  INVALID_EMAIL: 'email',
+  NOT_INVITED: 'invite',
+};
 
 export async function signup(form: FormData): Promise<void> {
   let email: string;
@@ -86,6 +96,8 @@ export async function createEndpointAction(_prev: FormState, form: FormData): Pr
           databaseUrl: field(form, 'databaseUrl'),
         });
         span.setAttribute('slime.endpoint.id', id);
+        // Cloud: health-check the new path now; the page opens on ready or failed.
+        if (isCloud()) await provision(owner, id);
         return id;
       },
     );
@@ -128,7 +140,10 @@ export async function updateConnectorAction(form: FormData): Promise<void> {
     await withSpan(
       'endpoint.update_connector',
       { 'slime.endpoint.id': endpointId, ...(isConnectorType(connectorType) ? { 'slime.connector.type': connectorType } : {}) },
-      () => updateConnector(owner, endpointId, { connectorType, databaseUrl: field(form, 'databaseUrl') }),
+      async () => {
+        const updating = await updateConnector(owner, endpointId, { connectorType, databaseUrl: field(form, 'databaseUrl') });
+        if (updating && isCloud()) await reconfigure(owner, endpointId);
+      },
     );
   } catch (err) {
     if (userFacing(err)) redirect(withParam(page, 'error', (err as Error).message));
@@ -147,7 +162,10 @@ export async function updateSettingsAction(form: FormData): Promise<void> {
     await withSpan(
       'endpoint.update_settings',
       { 'slime.endpoint.id': endpointId, ...(isProvider(provider) ? { 'slime.endpoint.provider': provider } : {}) },
-      () => updateSettings(owner, endpointId, { name: field(form, 'name'), provider }),
+      async () => {
+        const updating = await updateSettings(owner, endpointId, { name: field(form, 'name'), provider });
+        if (updating && isCloud()) await reconfigure(owner, endpointId);
+      },
     );
   } catch (err) {
     if (userFacing(err)) redirect(withParam(page, 'error', (err as Error).message));
@@ -161,15 +179,31 @@ export async function deleteEndpointAction(form: FormData): Promise<void> {
   const owner = await requireUser();
   const endpointId = field(form, 'endpointId');
   try {
-    await withSpan('endpoint.delete', { 'slime.endpoint.id': endpointId }, () => requestDelete(owner, endpointId));
+    await withSpan('endpoint.delete', { 'slime.endpoint.id': endpointId }, () =>
+      isCloud() ? remove(owner, endpointId) : requestDelete(owner, endpointId),
+    );
   } catch (err) {
-    if (hasCode(err, 'NOT_DELETABLE')) {
+    if (hasCode(err, 'NOT_DELETABLE') || hasCode(err, 'DELETE_FAILED')) {
       redirect(withParam(`/endpoints/${endpointId}/settings`, 'error', (err as Error).message));
     }
     throw err;
   }
   refreshEndpoint();
   redirect('/endpoints');
+}
+
+/** Cloud, Settings: re-runs the health check an interrupted create or change left pending. */
+export async function retryCheckAction(endpointId: string): Promise<void> {
+  const owner = await requireUser();
+  const page = `/endpoints/${endpointId}/settings`;
+  try {
+    await withSpan('endpoint.retry_check', { 'slime.endpoint.id': endpointId }, () => check(owner, endpointId));
+  } catch (err) {
+    if (userFacing(err)) redirect(withParam(page, 'error', (err as Error).message));
+    throw err;
+  }
+  refreshEndpoint();
+  redirect(page);
 }
 
 export async function revealTokenAction(endpointId: string): Promise<string | null> {
@@ -182,7 +216,20 @@ export async function revealTokenAction(endpointId: string): Promise<string | nu
 
 export type CrystallizeResult = { reports: CrystallizeReport[]; restarting: boolean } | { error: string };
 
-/** Lifecycle tab: crystallize the picked handlers, then restart the endpoint so they serve as Crystal. */
+/**
+ * After new Crystal tokens: locally the runner restarts the endpoint, so it loads the modules and
+ * tokens; in the cloud the answering instance reloads now and the others within their TTL.
+ */
+async function deliverCrystals(owner: string, ep: Endpoint): Promise<boolean> {
+  if (isCloud()) {
+    await reloadOn(ep);
+    return false;
+  }
+  await requestRestart(owner, ep.endpointId);
+  return true;
+}
+
+/** Lifecycle tab: crystallize the picked handlers, then hand the new Crystals and their tokens to the runtime. */
 export async function crystallizeAction(endpointId: string, keys: string[]): Promise<CrystallizeResult> {
   const email = await requireUser();
   const ep = await getEndpoint(email, endpointId);
@@ -193,11 +240,11 @@ export async function crystallizeAction(endpointId: string, keys: string[]): Pro
       crystallizeOn(ep, keys),
     );
     const crystallized = reports.filter((r) => r.outcome === 'crystallized').map((r) => r.key);
-    const restarting = crystallized.length > 0;
-    if (restarting) {
-      // Each new Crystal gets its own token; the restart hands the tokens to the runtime.
+    let restarting = false;
+    if (crystallized.length > 0) {
+      // Each new Crystal gets its own token.
       await issueCrystalTokens(endpointId, crystallized);
-      await requestRestart(email, endpointId);
+      restarting = await deliverCrystals(email, ep);
     }
     refreshEndpoint();
     return { reports, restarting };
@@ -206,13 +253,14 @@ export async function crystallizeAction(endpointId: string, keys: string[]): Pro
   }
 }
 
-/** A Crystal made before tokens existed: issue its own token and restart so the runtime accepts it. */
+/** A Crystal made before tokens existed: issue its own token and hand it to the runtime. */
 export async function issueCrystalTokenAction(endpointId: string, key: string): Promise<{ error?: string }> {
   const email = await requireUser();
-  if (!(await getEndpoint(email, endpointId))) return { error: 'Endpoint not found.' };
+  const ep = await getEndpoint(email, endpointId);
+  if (!ep) return { error: 'Endpoint not found.' };
   try {
     const issued = await withSpan('endpoint.crystal_token.issue', { 'slime.endpoint.id': endpointId }, () => issueCrystalTokens(endpointId, [key]));
-    if (issued.length) await requestRestart(email, endpointId);
+    if (issued.length) await deliverCrystals(email, ep);
     refreshEndpoint();
     return {};
   } catch (err) {

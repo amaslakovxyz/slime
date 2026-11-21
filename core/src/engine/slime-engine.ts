@@ -30,6 +30,8 @@ export interface EngineParts {
   config: SlimeConfig;
   store: SlimeStore;
   runner: SandboxRunner;
+  /** False when the host injected the runner and shares it: close() then leaves it running. */
+  ownsRunner: boolean;
   dictionary: Dictionary;
   provenance: HandlerProvenance;
   /** API sources' schemas by name; empty without API sources. */
@@ -103,7 +105,7 @@ export class SlimeEngine implements Slime {
 
   async close(): Promise<void> {
     await this.flush();
-    await this.#parts.runner.close();
+    if (this.#parts.ownsRunner) await this.#parts.runner.close();
     await this.#parts.store.close?.();
     await this.#parts.config.connector.close();
     await closeApiSources(this.#parts.config);
@@ -122,6 +124,7 @@ export class SlimeEngine implements Slime {
     const meta = queryMeta({ handlerKey: key, tier, cache, review, execution, code: { sql: sqlOf(artifact), shapeJs: artifact.shapeJs, assumptions: artifact.assumptions }, mode: this.#parts.config.mode, intent, totalMs: performance.now() - startedAt, ...(generateMs === undefined ? {} : { generateMs }) });
     return { data: execution.data, meta };
   }
+
 
 
   async #resolve(key: string, request: ParsedRequest): Promise<ResolvedHandler> {

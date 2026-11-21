@@ -11,7 +11,8 @@ The repository has two halves:
   [examples/express](./examples/express/README.md) shows it behind an app's
   endpoints.
 - `platform/` (see [the map below](#subdirectories--system-boundaries)) is the hosted Slime Cloud:
-  landing page, AWS infrastructure, and the Lambda runtime that runs the core.
+  landing page, AWS infrastructure, the admin, and the Lambda runtime that
+  runs the core for every endpoint.
 
 The specs in `docs/` describe intent, not implemented behaviour; see
 [docs/README.md](./docs/README.md) for the status of each.
@@ -46,25 +47,24 @@ Backend -- Slime runtime:
   - [platform/infra/](./platform/infra/README.md) - Terraform stacks:
     `bootstrap/` (human-applied roles, state bucket, budgets) and the
     CI-applied `landing/` (CloudFront + Lambda) and `platform/` (Slime runtime
-    on Lambda + DynamoDB).
+    and admin on Lambda, admin CloudFront, DynamoDB, Crystal bucket).
   - [platform/runtime/](./platform/runtime/README.md) - `@slime-cloud/runtime`:
-    the Lambda entry and DynamoDB handler store around the core. Imports
-    `@slime-cloud/core` (`core/`); the core never imports it.
+    one multi-tenant Lambda serving every endpoint under `/ep/<id>/`, the
+    local per-endpoint entry, the DynamoDB handler store and S3 Crystals
+    around the core. Imports `@slime-cloud/core` (`core/`); the core never
+    imports it.
   - `platform/docs/` - dated reviews.
-  - [platform/provisioner/](./platform/provisioner/README.md) -
-    `slime-provisioner` Lambda: turns `pending` endpoints in `slime-control`
-    into `slime-ep-<id>` functions on the shared Gas layer, reconfigures and
-    deletes them.
-  - [platform/admin/](./platform/admin/README.md) - slime cloud admin (Next.js, runs
-    locally): sign-up, endpoints, connector settings, tier usage and bill
-    estimate, OpenTelemetry. Design:
-    [docs/architecture/slime-cloud.html](./docs/architecture/slime-cloud.html).
+  - [platform/admin/](./platform/admin/README.md) - slime cloud admin
+    (Next.js; hosted at admin.amaslakov.com, also runs locally): invite-only
+    sign-up, endpoints, connector settings, the Lifecycle tab with Crystallize,
+    tier usage and bill estimate. Design:
+    [docs/architecture/2026-11-21-cloud-mvp-design.md](./docs/architecture/2026-11-21-cloud-mvp-design.md).
 - **`docs/`** - project-wide docs, indexed with statuses in
   [docs/README.md](./docs/README.md): `product/`, `architecture/`, `brand/`.
 - `.github/workflows/` (no contract file) - [ci.yml](./.github/workflows/ci.yml)
-  runs pre-commit, the core, example and runtime tests, and the Lambda bundle
-  build on every push and
-  pull request; [terraform.yml](./.github/workflows/terraform.yml) plans every
+  runs pre-commit, the core, example, runtime and admin tests, the admin's
+  Playwright E2E against the local stack, and the Lambda bundle build on every
+  push and pull request; [terraform.yml](./.github/workflows/terraform.yml) plans every
   `platform/infra/` stack on pull requests and applies them on `main` (the landing
   page included); [terraform-quality.yml](./.github/workflows/terraform-quality.yml)
   runs tflint and trivy.

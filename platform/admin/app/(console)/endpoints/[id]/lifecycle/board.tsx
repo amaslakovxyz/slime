@@ -2,11 +2,12 @@
 
 // Every request that came through the dispatch endpoint, as handlers keyed by
 // hash. A proven Liquid row has its own Crystallize button; a Crystal row opens
-// its own endpoint (URL, token, curl) right under it.
+// its own endpoint (URL, token, curl) right under it. In the cloud the feed is
+// the answering Lambda instance's, so it is labelled as such.
 import { Fragment, useState, useTransition } from 'react';
 import { crystallizeAction, type CrystallizeResult } from '@/app/actions';
 import type { HandlerRow, RuntimeEvent } from '@/lib/lifecycle';
-import { CrystalCard } from './crystal-card';
+import { CLOUD_CRYSTAL_NOTE, CrystalCard } from './crystal-card';
 
 const time = (iso: string) => new Date(iso).toLocaleTimeString('en-GB');
 
@@ -16,6 +17,8 @@ export function LifecycleBoard({
   rows,
   events,
   restarting,
+  cloud,
+  instance,
   tokenHints,
 }: {
   endpointId: string;
@@ -23,6 +26,8 @@ export function LifecycleBoard({
   rows: HandlerRow[];
   events: RuntimeEvent[];
   restarting: boolean;
+  cloud: boolean;
+  instance: boolean;
   tokenHints: Record<string, string>;
 }) {
   const [result, setResult] = useState<CrystallizeResult | null>(null);
@@ -41,7 +46,7 @@ export function LifecycleBoard({
     <section className="card lc-card">
       <h2 className="lc-h">
         <span className="lc-num">2</span>Requests
-        {restarting && <span className="muted small lc-restarting">Restarting…</span>}
+        {restarting && !cloud && <span className="muted small lc-restarting">Restarting…</span>}
       </h2>
       {result && 'error' in result && <p className="alert">{result.error}</p>}
       {result && 'reports' in result && (
@@ -53,6 +58,9 @@ export function LifecycleBoard({
             </li>
           ))}
         </ul>
+      )}
+      {cloud && result && 'reports' in result && result.reports.some((r) => r.outcome === 'crystallized') && (
+        <p className="muted small" role="status">{CLOUD_CRYSTAL_NOTE}</p>
       )}
       {rows.length === 0 ? (
         <p className="lc-empty">No requests yet.</p>
@@ -92,7 +100,14 @@ export function LifecycleBoard({
                   {r.tier === 'crystal' && (
                     <tr className="lc-sub">
                       <td colSpan={5}>
-                        <CrystalCard endpointId={endpointId} url={url} crystal={r} tokenHint={tokenHints[r.key]} restarting={restarting} />
+                        <CrystalCard
+                          endpointId={endpointId}
+                          url={url}
+                          crystal={r}
+                          tokenHint={tokenHints[r.key]}
+                          restarting={restarting}
+                          cloud={cloud}
+                        />
                       </td>
                     </tr>
                   )}
@@ -102,8 +117,9 @@ export function LifecycleBoard({
           </table>
         </div>
       )}
+      {events.length > 0 && instance && <p className="muted small">Recent requests · this instance</p>}
       {events.length > 0 && (
-        <div className="lc-feed" aria-label="Recent requests">
+        <div className="lc-feed" aria-label={instance ? 'Recent requests on this instance' : 'Recent requests'}>
           {events.slice(0, 6).map((e, i) => (
             <div key={`${e.at}-${i}`}>
               <span>{time(e.at)}</span>

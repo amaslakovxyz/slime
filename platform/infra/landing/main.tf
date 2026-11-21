@@ -90,8 +90,8 @@ resource "aws_lambda_function" "landing" {
   memory_size      = 256
   timeout          = 5
 
-  # No reserved concurrency: the account limit is 10, and AWS keeps at least
-  # 10 unreserved, so nothing can be reserved until a quota increase.
+  # No reserved concurrency: the account limit (1000, checked 2026-11-21) is
+  # shared by every function and the landing needs none of it reserved.
 
   logging_config {
     log_format = "JSON"
