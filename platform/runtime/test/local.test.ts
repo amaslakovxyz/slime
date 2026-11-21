@@ -111,13 +111,15 @@ describe('local routes', () => {
       connector,
       crystal,
       savedHandlers: async () => [{ key: 'k1', intent: 'accounts per plan', tier: 'liquid', runs: 12, createdAt: '2026-01-01' }],
+      warnings: () => ['w1'],
       crystallize: async (keys) => {
         gotKeys = keys;
         return [];
       },
     });
-    const body = (await (await app.request('/v0/lifecycle')).json()) as { handlers: { key: string; tier: string; runs: number }[] };
+    const body = (await (await app.request('/v0/lifecycle')).json()) as { handlers: { key: string; tier: string; runs: number }[]; warnings: string[] };
     assert.deepEqual(body.handlers.map((h) => [h.key, h.tier, h.runs]), [['k1', 'crystal', 12], ['k2', 'gas', 2]]);
+    assert.deepEqual(body.warnings, ['w1']);
     await app.request('/v0/crystallize', { method: 'POST', body: JSON.stringify({ keys: ['k1', 7] }) });
     assert.deepEqual(gotKeys, ['k1']);
   });

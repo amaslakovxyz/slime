@@ -63,6 +63,7 @@ function boot(): Promise<Runtime> {
     const config = await slimeConfigFromEnv(process.env, {
       onEvent: (event) => {
         if (event.type === 'generated') meter?.recordTokens(event.tokens);
+        if (event.type === 'warning') console.warn(JSON.stringify({ warning: event.message }));
       },
     });
     const slime = await createSlime(config);

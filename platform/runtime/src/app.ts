@@ -45,6 +45,8 @@ export interface RuntimeParts {
   crystallize?: (keys?: string[]) => Promise<CrystallizeOutcome[]>;
   /** Runs needed for Gas → Liquid and for Crystal readiness, shown as progress. */
   thresholds?: { liquidRuns: number; crystalRuns: number };
+  /** Local runtime only: startup and engine warnings, shown in the Lifecycle tab. */
+  warnings?: () => string[];
 }
 
 const TIER_RANK = { gas: 0, liquid: 1, crystal: 2 } as const;
@@ -78,7 +80,7 @@ export function mergeHandlers(lists: LifecycleHandler[][]): LifecycleHandler[] {
 
 const MAX_BODY_BYTES = 16 * 1024;
 
-export function createApp({ slime, connector, crystal, onQuery, events, savedHandlers, crystallize, thresholds }: RuntimeParts): Hono {
+export function createApp({ slime, connector, crystal, onQuery, events, savedHandlers, crystallize, thresholds, warnings }: RuntimeParts): Hono {
   const app = new Hono();
 
   app.onError((error, c) => {
@@ -157,7 +159,12 @@ export function createApp({ slime, connector, crystal, onQuery, events, savedHan
         review: h.review,
         inputs: { ...h.paramTypes },
       }));
-      return c.json({ handlers: mergeHandlers([await savedHandlers(), live, crystals]), stats: slime.stats(), thresholds });
+      return c.json({
+        handlers: mergeHandlers([await savedHandlers(), live, crystals]),
+        stats: slime.stats(),
+        thresholds,
+        warnings: warnings?.() ?? [],
+      });
     });
   }
 

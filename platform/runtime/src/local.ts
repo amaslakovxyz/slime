@@ -72,9 +72,15 @@ async function main(): Promise<void> {
   // Same usage counters as Lambda (USAGE#<tenant> items), so the admin's Usage, Billing and
   // list show real numbers locally too. Set by the runner; absent means no metering.
   let meter: UsageMeter | undefined;
+  // Engine warnings (for example Crystals made against another schema) go to the log and the Lifecycle tab.
+  const warnings: string[] = [];
   const config = await slimeConfigFromEnv(process.env, {
     onEvent: (event) => {
       if (event.type === 'generated') meter?.recordTokens(event.tokens);
+      if (event.type === 'warning') {
+        warnings.push(event.message);
+        console.warn(JSON.stringify({ warning: event.message }));
+      }
     },
   });
   const slime = await createSlime(config);
@@ -97,6 +103,7 @@ async function main(): Promise<void> {
     events,
     onQuery: (meta) => meter?.record(meta),
     thresholds: { liquidRuns: config.tiers.gasToLiquidRuns, crystalRuns },
+    warnings: () => [...warnings],
     // Explore mode regenerates drifted records, so they show as stale; locked mode serves them as is.
     savedHandlers: async () => {
       const current = config.mode === 'explore' ? slime.provenance() : undefined;
