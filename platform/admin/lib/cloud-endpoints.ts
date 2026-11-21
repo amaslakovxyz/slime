@@ -56,6 +56,9 @@ async function healthz(ep: Endpoint, timing: CheckTiming): Promise<Outcome> {
   const token = await secretStore().get(ep.endpointId, 'SLIME_API_KEY');
   if (!ep.url || !token) return { ok: false, error: 'Endpoint URL or key is missing' };
   const deadline = Date.now() + timing.windowMs;
+  // The runtime's own reason (e.g. the database error) beats ours: a last try cut short by the
+  // window must not replace "Database unreachable" with "did not answer".
+  let lastAnswer: string | undefined;
   for (;;) {
     let error: string;
     try {
@@ -65,10 +68,10 @@ async function healthz(ep: Endpoint, timing: CheckTiming): Promise<Outcome> {
         signal: AbortSignal.timeout(Math.max(deadline - Date.now(), timing.retryMs)),
       });
       if (res.ok) return { ok: true };
-      error = reasonFrom(res.status, await res.text());
+      error = lastAnswer = reasonFrom(res.status, await res.text());
       if (res.status < 500) return { ok: false, error };
     } catch (err) {
-      error = `Endpoint runtime did not answer: ${(err as Error).message}`;
+      error = lastAnswer ?? `Endpoint runtime did not answer: ${(err as Error).message}`;
     }
     if (Date.now() + timing.retryMs >= deadline) return { ok: false, error };
     await sleep(timing.retryMs);
