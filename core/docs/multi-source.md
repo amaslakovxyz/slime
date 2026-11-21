@@ -323,19 +323,22 @@ source is configured.
 Slime renders the dictionary for every source in one format, with no model
 (D2). API operations use the same column format as tables today
 (`name type null|not null [primary key] [one of: …] [-- comment]`). With API
-sources configured, the database heading names the SQL source
-(`Database db: postgresql 16` instead of today's `Database: postgresql 16`):
-in the P0 spike, without the name the model used `postgresql` as the step's
-source. With no API source the heading stays as today. Example for the demo:
+sources configured, the database heading names the SQL source in quotes
+(`Database source "db": postgresql 16` instead of today's
+`Database: postgresql 16`). In the P0 spike, without the name the model used
+`postgresql` as the step's source; in the P3.4 live run, with the name but
+unquoted, it took the whole heading (including Postgres' long version string)
+as the name. API headings quote the name the same way. With no API source the
+heading stays as today. Example for the demo:
 
 ```
-Database db: postgresql 16
+Database source "db": postgresql 16
 Table accounts
   id integer not null primary key
   name text not null
   ...
 
-API source notion: Notion API 2025-09-03 (read-only access)
+API source "notion": Notion API 2025-09-03 (read-only access)
 Operation feedback.query: Customer feedback entries, newest first
   params (all optional; null = not given):
     sentiment string one of: positive, neutral, negative
@@ -352,7 +355,7 @@ Operation feedback.query: Customer feedback entries, newest first
 Operation movieNights.query: Movie nights, newest first
   ...
 
-API source films: Studio Ghibli API (public, read-only)
+API source "films": Studio Ghibli API (public, read-only)
 Operation films.list: Studio Ghibli feature films
   params (all optional; null = not given):
     director string -- exact director name

@@ -270,9 +270,10 @@ multi-source". If P0 changes one, update the steps that cite it.
     - one section per source after the tables (design §3.4);
     - columns reuse `renderColumn`;
     - param lines are `name type [one of: …] [-- comment]`;
-    - the database heading names the SQL source:
-      `Database <sqlSourceName>: <dialect>` (P0.3 finding: without it the
-      model named the step's source `postgresql`).
+    - the database heading names the SQL source in quotes:
+      `Database source "<sqlSourceName>": <dialect>`, and API headings are
+      `API source "<name>": <service>` (P0.3 and P3.4 findings: without the
+      name the model used `postgresql`; unquoted, it took the whole heading).
   - `schemaHash` without API schemas is today's. With them it is
     `sha256(canonicalJSON({ sql: schema, api: apiSchemas }))`.
   - `buildDictionary` also returns
