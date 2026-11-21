@@ -29,6 +29,7 @@ interface Item {
   endpointId: string;
   provider: string;
   status: string;
+  url?: string;
 }
 
 interface Running {
@@ -38,19 +39,35 @@ interface Running {
 }
 
 const running = new Map<string, Running>();
+/** Each endpoint keeps its port for the runner's lifetime, so its URL survives restarts (the agent holds it). */
+const ports = new Map<string, number>();
 const busy = new Set<string>();
 
 const log = (msg: string, extra: Record<string, unknown> = {}) => console.log(JSON.stringify({ runner: msg, ...extra }));
 
-async function freePort(from: number): Promise<number> {
-  const taken = new Set([...running.values()].map((r) => r.port));
-  for (let port = from; port < from + 200; port++) {
-    if (taken.has(port)) continue;
-    const ok = await new Promise<boolean>((done) => {
-      const s = createServer().once('error', () => done(false));
-      s.listen(port, '127.0.0.1', () => s.close(() => done(true)));
-    });
-    if (ok) return port;
+const isFree = (port: number) =>
+  new Promise<boolean>((done) => {
+    const s = createServer().once('error', () => done(false));
+    s.listen(port, '127.0.0.1', () => s.close(() => done(true)));
+  });
+
+const portFromUrl = (url: string | undefined): number | undefined => {
+  const port = url ? Number(new URL(url).port) : NaN;
+  return Number.isInteger(port) && port > 0 ? port : undefined;
+};
+
+/** The endpoint's own port when it has one (waiting briefly for the old process to release it); else a port no other endpoint holds. */
+async function portFor(endpointId: string, previous: number | undefined): Promise<number> {
+  const own = ports.get(endpointId) ?? previous;
+  if (own !== undefined) {
+    for (let i = 0; i < 20; i++) {
+      if (await isFree(own)) return own;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+  }
+  const held = new Set([...ports.entries()].filter(([id]) => id !== endpointId).map(([, port]) => port));
+  for (let port = FIRST_PORT; port < FIRST_PORT + 200; port++) {
+    if (!held.has(port) && (await isFree(port))) return port;
   }
   throw new Error('No free port');
 }
@@ -62,7 +79,8 @@ async function start(item: Item): Promise<string> {
     secrets.get(item.endpointId, 'SLIME_API_KEY'),
   ]);
   if (!databaseUrl || !apiKey) throw new Error('Endpoint secrets are missing');
-  const port = await freePort(FIRST_PORT);
+  const port = await portFor(item.endpointId, portFromUrl(item.url));
+  ports.set(item.endpointId, port);
   const crystalDir = resolve(DATA_DIR, item.endpointId, 'crystal');
   mkdirSync(crystalDir, { recursive: true });
 
@@ -178,6 +196,7 @@ async function handle(item: Item): Promise<void> {
     }
   } else if (item.status === 'deleting') {
     await stop(id);
+    ports.delete(id);
     await secretStore().removeAll(id);
     await ddb().send(new DeleteCommand({ TableName: env().controlTable, Key: { pk: item.pk, sk: item.sk } }));
     log('deleted', { endpointId: id });
@@ -198,6 +217,9 @@ async function tick(): Promise<void> {
     );
     for (const raw of page.Items ?? []) {
       const item = raw as Item;
+      // Reserve every port already in a URL (ours or not), so no other endpoint takes it.
+      const known = portFromUrl(item.url);
+      if (known !== undefined && item.status !== 'deleting' && !ports.has(item.endpointId)) ports.set(item.endpointId, known);
       if (busy.has(item.endpointId)) continue;
       busy.add(item.endpointId);
       void handle(item).finally(() => busy.delete(item.endpointId));
