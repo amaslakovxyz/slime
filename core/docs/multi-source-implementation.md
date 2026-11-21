@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | **In progress**: P0–P6 done on `chore/multi-source-plan` (PR #26), in one branch at the owner's request. Waiting on a Notion workspace: P5.0, P5.5 (seed script and recorded fixtures) and P6.5 (live run; script ready). |
+| Status | **Merged to `main`** (PR #26, one branch at the owner's request): P0–P6 done, including P5.0 and P5.5 (workspace seeded, fixtures recorded). Pending: P6.5 (live run; script ready). |
 | Design | [multi-source.md](./multi-source.md), revised together with this plan |
 | Owner | Konstantin |
 | Date | 2026-11-21 |
