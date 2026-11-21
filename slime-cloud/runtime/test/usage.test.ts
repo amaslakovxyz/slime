@@ -3,36 +3,33 @@
 import './setup.js';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { UpdateCommand, type PutCommand, type QueryCommand } from '@aws-sdk/lib-dynamodb';
-import type { QueryMeta } from '@slime-cloud/core/engine.js';
-import type { DocClient } from '../src/store-dynamodb.js';
-import { UsageMeter } from '../src/usage.js';
+import { UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { UsageMeter, type UsageClient } from '../src/usage.js';
 
-class RecordingClient implements DocClient {
-  sent: Array<PutCommand | QueryCommand | UpdateCommand> = [];
-  async send(cmd: PutCommand | QueryCommand | UpdateCommand): Promise<any> {
+class RecordingClient implements UsageClient {
+  sent: UpdateCommand[] = [];
+  async send(cmd: UpdateCommand): Promise<unknown> {
     this.sent.push(cmd);
     return {};
   }
 }
 
-const timings = (total: number) => ({ generate: 0, check: 0, execute: 0, shape: 0, total });
-const generation = (inputTokens: number, outputTokens: number) =>
-  ({ ms: 0, waitMs: 0, attempts: 1, inputTokens, outputTokens, cacheReadTokens: 0 }) as QueryMeta['generation'];
-const snapshot = () => ({ gas: 3, crystal: 2 });
+const timings = (total: number) => ({ run: 0, shape: 0, total });
+const snapshot = () => ({ gas: 3, liquid: 5, crystal: 2 });
 
 // Must equal the endpoint role's dynamodb:Attributes list
 // (slime-cloud/provisioner/src/provision.ts), minus the keys.
 const ALLOWED = [
   'requests', 'generations', 'gasRequests', 'liquidRequests', 'crystalRequests',
-  'gasMs', 'liquidMs', 'crystalMs', 'inputTokens', 'outputTokens',
-  'gasHandlers', 'crystalHandlers', 'updatedAt',
+  'gasMs', 'liquidMs', 'crystalMs', 'tokens',
+  'gasHandlers', 'liquidHandlers', 'crystalHandlers', 'updatedAt',
 ];
 
 test('flush writes one daily update with per-tier counts, tokens and the handler snapshot', async () => {
   const client = new RecordingClient();
   const meter = new UsageMeter('slime-control', 'ep-a1b2c3d4e5', snapshot, client);
-  meter.record({ cache: 'miss', tier: 'gas', timingsMs: timings(310.4), generation: generation(1200, 300) });
+  meter.record({ cache: 'miss', tier: 'gas', timingsMs: timings(310.4) });
+  meter.recordTokens(1500);
   meter.record({ cache: 'hit', tier: 'liquid', timingsMs: timings(4.6) });
   meter.record({ cache: 'hit', tier: 'liquid', timingsMs: timings(3.2) });
   meter.record({ cache: 'coalesced', tier: 'crystal', timingsMs: timings(0.4) });
@@ -48,8 +45,8 @@ test('flush writes one daily update with per-tier counts, tokens and the handler
   assert.deepEqual(names.sort(), [...ALLOWED].sort());
   const v = input.ExpressionAttributeValues!;
   assert.deepEqual(
-    [v[':r'], v[':g'], v[':gr'], v[':lr'], v[':cr'], v[':gm'], v[':lm'], v[':cm'], v[':it'], v[':ot'], v[':gh'], v[':ch']],
-    [4, 1, 1, 2, 1, 310, 8, 0, 1200, 300, 3, 2],
+    [v[':r'], v[':g'], v[':gr'], v[':lr'], v[':cr'], v[':gm'], v[':lm'], v[':cm'], v[':t'], v[':gh'], v[':lh'], v[':ch']],
+    [4, 1, 1, 2, 1, 310, 8, 0, 1500, 3, 5, 2],
   );
 
   await meter.flush();
@@ -57,7 +54,7 @@ test('flush writes one daily update with per-tier counts, tokens and the handler
 });
 
 test('a failing write is logged, not thrown', async () => {
-  const failing: DocClient = {
+  const failing: UsageClient = {
     send: async () => {
       throw new Error('throttled');
     },

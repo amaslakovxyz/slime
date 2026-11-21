@@ -1,110 +1,11 @@
-// Lambda runtime pieces that need no AWS: the DynamoDB store against an
-// in-memory fake client, and the entry's auth and not-ready paths.
+// The Lambda entry and the env config, with no AWS and no database.
 import './setup.js';
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { slimeConfigFromEnv } from '../src/config.js';
 import { app, envNameFor, keyMatches } from '../src/lambda.js';
-import { DynamoHandlerStore, type DocClient } from '../src/store-dynamodb.js';
-import type { Artifact } from '@slime-cloud/core/generator.js';
-import { codeHash, type StoredHandler } from '@slime-cloud/core/store.js';
 
-/** Just enough DynamoDB: one table keyed by tenantId + artifactKey, pages of `pageSize`. */
-class FakeDynamo implements DocClient {
-  items = new Map<string, Record<string, any>>();
-  constructor(private readonly pageSize = 100) {}
-
-  async send(cmd: PutCommand | QueryCommand | UpdateCommand): Promise<any> {
-    const input = cmd.input as any;
-    if (cmd instanceof PutCommand) {
-      this.items.set(`${input.Item.tenantId}|${input.Item.artifactKey}`, structuredClone(input.Item));
-      return {};
-    }
-    if (cmd instanceof UpdateCommand) {
-      const row = this.items.get(`${input.Key.tenantId}|${input.Key.artifactKey}`);
-      if (!row) throw Object.assign(new Error('conditional'), { name: 'ConditionalCheckFailedException' });
-      const v = input.ExpressionAttributeValues;
-      Object.assign(row, { fixtures: v[':f'], runs: v[':r'], lastUsedAt: v[':l'] });
-      return {};
-    }
-    const v = input.ExpressionAttributeValues;
-    const all = [...this.items.values()]
-      .filter((r) => r.tenantId === v[':t'])
-      .sort((a, b) => a.artifactKey.localeCompare(b.artifactKey));
-    const start = input.ExclusiveStartKey ? all.findIndex((r) => r.artifactKey === input.ExclusiveStartKey.artifactKey) + 1 : 0;
-    const page = all.slice(start, start + this.pageSize);
-    const last = start + this.pageSize < all.length ? { tenantId: v[':t'], artifactKey: page.at(-1)!.artifactKey } : undefined;
-    return {
-      Items: page
-        .filter((r) => r.schemaHash === v[':s'] && r.promptHash === v[':p'] && r.model === v[':m'])
-        .map((r) => structuredClone(r)),
-      LastEvaluatedKey: last,
-    };
-  }
-}
-
-const artifact = (sql: string): Artifact => ({ unsatisfiable: null, sql, params: [], shapeJs: null, assumptions: [] });
-
-function handler(key: string, scope = { schemaHash: 's1', promptHash: 'p1', model: 'm1' }): StoredHandler {
-  const a = artifact('SELECT 1 AS one');
-  return {
-    artifactKey: key,
-    fingerprint: `fp-${key}`,
-    intent: 'one',
-    inputSig: {},
-    output: { one: 'integer' },
-    artifact: a,
-    codeHash: codeHash(a),
-    ...scope,
-    revision: 1,
-    review: { status: 'approved', reviews: 1, problems: [] },
-    history: [],
-    fixtures: [{ input: {}, output: { one: 1 }, at: '2026-11-20T00:00:00.000Z' }],
-    runs: 3,
-    createdAt: '2026-11-20T00:00:00.000Z',
-    promotedAt: '2026-11-20T00:00:01.000Z',
-    lastUsedAt: '2026-11-20T00:00:02.000Z',
-  };
-}
-
-describe('DynamoHandlerStore', () => {
-  const scope = { schemaHash: 's1', promptHash: 'p1', model: 'm1' };
-
-  test('round-trips a handler and loads only the matching scope and tenant', async () => {
-    const db = new FakeDynamo();
-    const store = new DynamoHandlerStore('slime-handlers', 'tenant-a', db);
-    await store.saveLiquid(handler('k1'));
-    await store.saveLiquid(handler('k2', { ...scope, model: 'other' }));
-    await new DynamoHandlerStore('slime-handlers', 'tenant-b', db).saveLiquid(handler('k3'));
-
-    assert.deepEqual(await store.loadLiquid(scope), [handler('k1')]);
-  });
-
-  test('follows pagination', async () => {
-    const store = new DynamoHandlerStore('slime-handlers', 'tenant-a', new FakeDynamo(2));
-    for (const k of ['k1', 'k2', 'k3', 'k4', 'k5']) await store.saveLiquid(handler(k));
-    assert.deepEqual((await store.loadLiquid(scope)).map((h) => h.artifactKey), ['k1', 'k2', 'k3', 'k4', 'k5']);
-  });
-
-  test('updateRuns rewrites runs and fixtures, and ignores a handler that is not stored', async () => {
-    const store = new DynamoHandlerStore('slime-handlers', 'tenant-a', new FakeDynamo());
-    await store.saveLiquid(handler('k1'));
-    const fixtures = [{ input: { a: 1 }, output: [], at: '2026-11-21T00:00:00.000Z' }];
-    await store.updateRuns('k1', fixtures, 9, '2026-11-21T00:00:00.000Z');
-    await store.updateRuns('missing', fixtures, 1, '2026-11-21T00:00:00.000Z');
-
-    const [h] = await store.loadLiquid(scope);
-    assert.equal(h.runs, 9);
-    assert.deepEqual(h.fixtures, fixtures);
-    assert.equal(h.lastUsedAt, '2026-11-21T00:00:00.000Z');
-    assert.equal((await store.loadLiquid(scope)).length, 1);
-  });
-
-  test('requires a table and a tenant', () => {
-    assert.throws(() => new DynamoHandlerStore('', 't', new FakeDynamo()), /table name/);
-    assert.throws(() => new DynamoHandlerStore('t', '', new FakeDynamo()), /tenant id/);
-  });
-});
+const BASE_ENV = { SLIME_HANDLERS_TABLE: 'slime-handlers', SLIME_TENANT_ID: 'tenant-a', SLIME_PROVIDER: 'offline' };
 
 describe('Lambda entry', () => {
   test('keyMatches needs both keys and an exact match', () => {
@@ -130,12 +31,43 @@ describe('Lambda entry', () => {
   test('answers 503 NOT_READY when the runtime cannot start, and retries on the next request', async () => {
     process.env.SLIME_API_KEY = 'k';
     delete process.env.SLIME_HANDLERS_TABLE;
-    for (let i = 0; i < 2; i++) {
-      const res = await app.request('/healthz', { headers: { 'x-api-key': 'k' } });
-      assert.equal(res.status, 503);
-      const body = (await res.json()) as { error: { code: string; message: string } };
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const response = await app.request('/healthz', { headers: { 'x-api-key': 'k' } });
+      assert.equal(response.status, 503);
+      const body = (await response.json()) as { error: { code: string; message: string } };
       assert.equal(body.error.code, 'NOT_READY');
       assert.match(body.error.message, /table name/);
     }
+  });
+});
+
+describe('config from env (the sandbox variable names)', () => {
+  test('SLIME_MODE=locked means no generator', async () => {
+    const config = await slimeConfigFromEnv({ ...BASE_ENV, SLIME_MODE: 'locked' });
+    assert.equal(config.mode, 'locked');
+    await config.connector.close();
+  });
+
+  test('the offline provider explores with the bundled handlers, without a reviewer', async () => {
+    const config = await slimeConfigFromEnv(BASE_ENV);
+    assert.deepEqual([config.mode, config.generator?.model, config.reviewer], ['explore', 'offline', undefined]);
+    await config.connector.close();
+  });
+
+  test('limits and tiers come from their variables; unset ones keep the core defaults', async () => {
+    const config = await slimeConfigFromEnv({ ...BASE_ENV, MAX_GENERATIONS_PER_HOUR: '50', GAS_TO_LIQUID_HITS: '5', SHAPE_MEMORY_MB: '16', ROW_CAP: '' });
+    assert.deepEqual(
+      [config.limits.maxGenerationsPerHour, config.tiers.gasToLiquidRuns, config.limits.shapeMemoryBytes, config.limits.rowCap],
+      [50, 5, 16 * 1024 * 1024, 1_000],
+    );
+    await config.connector.close();
+  });
+
+  test('claude is the default provider, with a reviewer unless SLIME_REVIEW=off', async () => {
+    const withReview = await slimeConfigFromEnv({ ...BASE_ENV, SLIME_PROVIDER: '', ANTHROPIC_API_KEY: 'test' });
+    const withoutReview = await slimeConfigFromEnv({ ...BASE_ENV, SLIME_PROVIDER: '', ANTHROPIC_API_KEY: 'test', SLIME_REVIEW: 'off' });
+    assert.deepEqual([withReview.generator?.model, withReview.reviewer?.model], ['claude-haiku-5-5', 'claude-opus-5-5']);
+    assert.equal(withoutReview.reviewer, undefined);
+    await Promise.all([withReview.connector.close(), withoutReview.connector.close()]);
   });
 });

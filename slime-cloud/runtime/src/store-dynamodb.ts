@@ -1,99 +1,76 @@
-// Liquid handler store on DynamoDB, used by the Lambda runtime (Slime Cloud D6).
+// The core's SlimeStore Port on the existing DynamoDB table (C13, M7).
 //
-// Item: partition key `tenantId`, sort key `artifactKey`. The scope fields
-// (schemaHash, promptHash, model) are plain attributes that loadLiquid filters
-// on; one tenant holds few handlers, so a filtered Query is fine. The handler
-// body is a JSON string so its nested shapes never meet DynamoDB's type rules;
-// fixtures/runs/lastUsedAt sit outside it because updateRuns rewrites only them.
-// Integrity stays with the engine, which re-checks codeHash on load.
+// Item: partition key `tenantId` (one partition per tenant, so an IAM
+// LeadingKeys condition can fence a tenant), sort key `artifactKey` set to
+// `${ns}#${key}`, and the value as a JSON string so nested shapes never meet
+// DynamoDB's type rules. Items the sandbox engine wrote have sort keys with
+// no '#'; they are never listed here, so a rollback to the old runtime still
+// finds them (see legacy-handlers.ts for copying them over).
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
-import type { Fixture, HandlerStore, StoredHandler, StoreScope } from '@slime-cloud/core/store.js';
+import { DeleteCommand, DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import type { SlimeStore, StoreEntry } from '@slime-cloud/core';
 
-/** The slice of DynamoDBDocumentClient this store uses; tests pass a fake. */
+/** The slice of DynamoDBDocumentClient the store uses; tests pass a fake. */
 export interface DocClient {
-  send(command: PutCommand | QueryCommand | UpdateCommand): Promise<any>;
+  send(command: GetCommand | PutCommand | QueryCommand | DeleteCommand): Promise<any>;
 }
 
-type Body = Omit<StoredHandler, 'fixtures' | 'runs' | 'lastUsedAt'>;
+export interface DynamoStoreOptions {
+  table: string;
+  tenantId: string;
+  client?: DocClient;
+}
 
-export class DynamoHandlerStore implements HandlerStore {
-  readonly kind = 'dynamodb';
-  private readonly client: DocClient;
+const KEY_SEPARATOR = '#';
 
-  constructor(
-    private readonly table: string,
-    private readonly tenantId: string,
-    client?: DocClient,
-  ) {
-    if (!table) throw new Error('DynamoHandlerStore needs a table name');
-    if (!tenantId) throw new Error('DynamoHandlerStore needs a tenant id');
-    this.client = client ?? DynamoDBDocumentClient.from(new DynamoDBClient({}));
+export class DynamoSlimeStore implements SlimeStore {
+  readonly #table: string;
+  readonly #tenantId: string;
+  readonly #client: DocClient;
+
+  constructor({ table, tenantId, client }: DynamoStoreOptions) {
+    if (!table) throw new Error('DynamoSlimeStore needs a table name (SLIME_HANDLERS_TABLE)');
+    if (!tenantId) throw new Error('DynamoSlimeStore needs a tenant id (SLIME_TENANT_ID)');
+    this.#table = table;
+    this.#tenantId = tenantId;
+    this.#client = client ?? DynamoDBDocumentClient.from(new DynamoDBClient({}));
   }
 
-  // The table is created by Terraform (infra/aws/platform), not at runtime.
-  async init() {}
+  async get(ns: string, key: string): Promise<unknown | undefined> {
+    const { Item } = await this.#client.send(new GetCommand({ TableName: this.#table, Key: this.#key(ns, key), ConsistentRead: true }));
+    return Item ? JSON.parse(Item.value) : undefined;
+  }
 
-  async loadLiquid(scope: StoreScope): Promise<StoredHandler[]> {
-    const out: StoredHandler[] = [];
+  async put(ns: string, key: string, value: unknown): Promise<void> {
+    const item = { ...this.#key(ns, key), value: JSON.stringify(value), updatedAt: new Date().toISOString() };
+    await this.#client.send(new PutCommand({ TableName: this.#table, Item: item }));
+  }
+
+  async list(ns: string, prefix = ''): Promise<StoreEntry[]> {
+    const namespacePrefix = `${ns}${KEY_SEPARATOR}`;
+    const entries: StoreEntry[] = [];
     let ExclusiveStartKey: Record<string, unknown> | undefined;
     do {
-      const res = await this.client.send(
+      const page = await this.#client.send(
         new QueryCommand({
-          TableName: this.table,
-          KeyConditionExpression: 'tenantId = :t',
-          FilterExpression: 'schemaHash = :s AND promptHash = :p AND #model = :m',
-          ExpressionAttributeNames: { '#model': 'model' },
-          ExpressionAttributeValues: { ':t': this.tenantId, ':s': scope.schemaHash, ':p': scope.promptHash, ':m': scope.model },
+          TableName: this.#table,
+          KeyConditionExpression: 'tenantId = :tenant AND begins_with(artifactKey, :prefix)',
+          ExpressionAttributeValues: { ':tenant': this.#tenantId, ':prefix': `${namespacePrefix}${prefix}` },
           ConsistentRead: true,
           ExclusiveStartKey,
         }),
       );
-      for (const item of res.Items ?? []) {
-        const body = JSON.parse(item.handler) as Body;
-        out.push({ ...body, fixtures: JSON.parse(item.fixtures), runs: Number(item.runs), lastUsedAt: item.lastUsedAt });
-      }
-      ExclusiveStartKey = res.LastEvaluatedKey;
+      for (const item of page.Items ?? []) entries.push({ key: item.artifactKey.slice(namespacePrefix.length), value: JSON.parse(item.value) });
+      ExclusiveStartKey = page.LastEvaluatedKey;
     } while (ExclusiveStartKey);
-    return out;
+    return entries;
   }
 
-  async saveLiquid(h: StoredHandler) {
-    const { fixtures, runs, lastUsedAt, ...body } = h;
-    await this.client.send(
-      new PutCommand({
-        TableName: this.table,
-        Item: {
-          tenantId: this.tenantId,
-          artifactKey: h.artifactKey,
-          schemaHash: h.schemaHash,
-          promptHash: h.promptHash,
-          model: h.model,
-          handler: JSON.stringify(body),
-          fixtures: JSON.stringify(fixtures),
-          runs,
-          lastUsedAt,
-        },
-      }),
-    );
+  async delete(ns: string, key: string): Promise<void> {
+    await this.#client.send(new DeleteCommand({ TableName: this.#table, Key: this.#key(ns, key) }));
   }
 
-  async updateRuns(artifactKey: string, fixtures: Fixture[], runs: number, lastUsedAt: string) {
-    try {
-      await this.client.send(
-        new UpdateCommand({
-          TableName: this.table,
-          Key: { tenantId: this.tenantId, artifactKey },
-          UpdateExpression: 'SET fixtures = :f, runs = :r, lastUsedAt = :l',
-          // Like the Postgres UPDATE: a handler that is not stored stays not stored.
-          ConditionExpression: 'attribute_exists(artifactKey)',
-          ExpressionAttributeValues: { ':f': JSON.stringify(fixtures), ':r': runs, ':l': lastUsedAt },
-        }),
-      );
-    } catch (err) {
-      if ((err as { name?: string }).name !== 'ConditionalCheckFailedException') throw err;
-    }
+  #key(ns: string, key: string): { tenantId: string; artifactKey: string } {
+    return { tenantId: this.#tenantId, artifactKey: `${ns}${KEY_SEPARATOR}${key}` };
   }
-
-  async close() {}
 }

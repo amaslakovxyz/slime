@@ -1,0 +1,16 @@
+{
+  "name": "slime",
+  "private": true,
+  "description": "Slime monorepo root. Workspaces cover the open-source packages only; the example app and slime-cloud/runtime keep their own lockfiles.",
+  "workspaces": [
+    "oss/packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm test --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

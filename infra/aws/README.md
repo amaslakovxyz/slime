@@ -32,9 +32,10 @@ flowchart LR
 
 [`platform/runtime.tf`](platform/runtime.tf): Lambda `slime-runtime` (Function
 URL, arm64, Node 22) built from [`slime-cloud/runtime`](../../slime-cloud/runtime/README.md)
-by `npm run build` (it compiles the core from `sandbox/`), and
-DynamoDB table `slime-handlers` for reviewed Liquid handlers (partition key
-`tenantId`, sort key `artifactKey`). Post-deploy CI checks that `/healthz`
+by `npm run build` (it bundles the built `@slime-cloud/core` from
+`oss/packages/core`), and DynamoDB table `slime-handlers` for reviewed Liquid
+handlers (partition key `tenantId`, sort key `artifactKey`, which holds
+`handlers#<request key>`). Post-deploy CI checks that `/healthz`
 answers 401 without a key.
 
 Settings are SSM parameters under `/slime/runtime/`, loaded as env vars at cold
@@ -51,8 +52,9 @@ put SLIME_PROVIDER claude                       # or groq / offline
 put ANTHROPIC_API_KEY '<key>'                   # GROQ_API_KEY for groq
 ```
 
-Any other `config.ts` variable (`SLIME_MODE`, `MAX_GENERATIONS_PER_HOUR`, ...)
-can be set the same way. Until `DATABASE_URL` points at a reachable read-only
+Any other variable the runtime's
+[`src/config.ts`](../../slime-cloud/runtime/src/config.ts) reads (`SLIME_MODE`,
+`MAX_GENERATIONS_PER_HOUR`, ...) can be set the same way. Until `DATABASE_URL` points at a reachable read-only
 Postgres, authenticated requests get `503 NOT_READY`.
 
 ```sh

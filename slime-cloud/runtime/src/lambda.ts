@@ -7,10 +7,9 @@
 //      later one overrides an earlier one: provisioned endpoints use
 //      "/slime/shared/,/slime/endpoints/<id>/" (shared model keys, then their own).
 //      Secrets therefore never pass through Terraform state or the function config.
-//   2. Only then are config.ts and the engine imported: config reads env at import.
-//   3. The engine starts on the first request and is retried on the next one if
-//      it fails (e.g. DATABASE_URL not set yet), so a broken DB is a 503, not a
-//      crash loop.
+//   2. The Slime instance is built from those env vars (config.ts) on the first
+//      request, and rebuilt on the next one if that fails (e.g. DATABASE_URL not
+//      set yet), so a broken DB is a 503, not a crash loop.
 // Every route needs the `x-api-key` header to equal SLIME_API_KEY; with no key
 // configured the runtime refuses everything.
 import { createHash, timingSafeEqual } from 'node:crypto';
@@ -48,29 +47,39 @@ for (const prefix of (process.env.SLIME_SSM_PREFIX ?? '').split(',')) {
 }
 
 type Runtime = { app: Hono; flush: () => Promise<void> };
+
+// flush() also waits for background reviews, which can outlast the 30 s function
+// timeout. Past this cap the response goes out; an unfinished review continues
+// when the instance is next woken, or is retried after a later run.
+const FLUSH_LIMIT_MS = Number(process.env.SLIME_FLUSH_LIMIT_MS || 5_000);
 let booting: Promise<Runtime> | null = null;
 
 function boot(): Promise<Runtime> {
   booting ??= (async () => {
-    const { config } = await import('@slime-cloud/core/config.js');
-    const { PostgresConnector } = await import('@slime-cloud/core/connectors/postgres.js');
-    const { Engine } = await import('@slime-cloud/core/engine.js');
-    const { DynamoHandlerStore } = await import('./store-dynamodb.js');
-    const { UsageMeter } = await import('./usage.js');
+    const { createSlime } = await import('@slime-cloud/core');
+    const { slimeConfigFromEnv } = await import('./config.js');
     const { createApp } = await import('./app.js');
-    const connector = new PostgresConnector(config.databaseUrl);
-    const store = new DynamoHandlerStore(process.env.SLIME_HANDLERS_TABLE ?? '', process.env.SLIME_TENANT_ID ?? '');
-    const engine = await Engine.create(connector, { store });
+    const { UsageMeter } = await import('./usage.js');
     // Only provisioned endpoints meter usage (slime-runtime has no usage table).
-    const meter = process.env.SLIME_USAGE_TABLE
-      ? new UsageMeter(process.env.SLIME_USAGE_TABLE, process.env.SLIME_TENANT_ID ?? '', () => {
-          const s = engine.stats();
-          return { gas: s.handlers.gas, crystal: s.crystal.loaded };
-        })
-      : undefined;
+    // The meter needs slime for its snapshot, so it is assigned after
+    // createSlime; startup events emitted before that are not generations.
+    let meter: InstanceType<typeof UsageMeter> | undefined;
+    const config = await slimeConfigFromEnv(process.env, {
+      onEvent: (event) => {
+        if (event.type === 'generated') meter?.recordTokens(event.tokens);
+      },
+    });
+    const slime = await createSlime(config);
+    const crystals = Object.keys(config.crystal || {}).length;
+    if (process.env.SLIME_USAGE_TABLE) {
+      meter = new UsageMeter(process.env.SLIME_USAGE_TABLE, process.env.SLIME_TENANT_ID ?? '', () => ({
+        ...slime.stats().handlers,
+        crystal: crystals,
+      }));
+    }
     return {
-      app: createApp(engine, connector, (m) => meter?.record(m)),
-      flush: () => Promise.all([engine.flush(), meter?.flush()]).then(() => {}),
+      app: createApp({ slime, connector: config.connector, crystal: config.crystal, onQuery: (meta) => meter?.record(meta) }),
+      flush: () => Promise.all([slime.flush(), meter?.flush()]).then(() => {}),
     };
   })().catch((err) => {
     booting = null;
@@ -97,8 +106,8 @@ app.all('*', async (c) => {
     return c.json({ error: { code: 'NOT_READY', message: `Runtime is not ready: ${(err as Error).message}`, retryable: true } }, 503);
   }
   const res = await runtime.app.fetch(c.req.raw);
-  // Lambda freezes the process after the response; persist store writes first.
-  await runtime.flush();
+  // Lambda freezes the process after the response; finish store writes and reviews first (C15).
+  await Promise.race([runtime.flush(), new Promise((resolve) => setTimeout(resolve, FLUSH_LIMIT_MS).unref())]);
   return res;
 });
 

@@ -39,7 +39,7 @@ data "aws_iam_policy_document" "endpoint_boundary" {
 
   statement {
     sid       = "HandlerStore"
-    actions   = ["dynamodb:Query", "dynamodb:PutItem", "dynamodb:UpdateItem"]
+    actions   = ["dynamodb:Query", "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:DeleteItem"]
     resources = [aws_dynamodb_table.handlers.arn]
   }
 

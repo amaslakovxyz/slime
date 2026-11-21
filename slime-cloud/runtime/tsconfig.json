@@ -7,13 +7,9 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "noEmit": true,
-    // The core is consumed from source until sandbox/ becomes the published
-    // @slime-cloud/core package; then delete this mapping and add the dependency.
-    // esbuild (scripts/build.mjs) and tsx (tests) read the same mapping.
-    "paths": {
-      "@slime-cloud/core/*": ["../../sandbox/src/*"]
-    }
+    // TypeScript 7 no longer includes every @types package by default.
+    "types": ["node"],
+    "noEmit": true
   },
   "include": ["src/**/*", "test/**/*"]
 }

@@ -1,7 +1,7 @@
 # Gas: the Slime engine as a Lambda layer, shared by every provisioned endpoint.
 #
 #   layer  slime-gas   <- slime-cloud/runtime/dist/layer (build.sh), extracts to /opt/slime/
-#   shim   index.mjs   <- slime-cloud/provisioner/shim: re-exports /opt/slime/index.mjs
+#   shim   index.mjs   <- slime-cloud/provisioner/shim: re-exports /opt/slime/index.js
 #
 # Each endpoint function is the shim plus the layer version that was current
 # when it was provisioned; a new layer version reaches new endpoints only.

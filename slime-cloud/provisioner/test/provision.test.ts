@@ -124,6 +124,8 @@ describe('provision', () => {
     const liquid = policy.Statement.find((s: any) => s.Sid === 'Liquid');
     assert.equal(liquid.Resource, 'arn:aws:dynamodb:eu-central-1:123456789012:table/slime-handlers');
     assert.deepEqual(liquid.Condition['ForAllValues:StringEquals']['dynamodb:LeadingKeys'], ['ep-a1b2c3d4e5']);
+    // What the runtime's DynamoSlimeStore sends (slime-cloud/runtime/src/store-dynamodb.ts).
+    assert.deepEqual(liquid.Action, ['dynamodb:Query', 'dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:DeleteItem']);
     const usage = policy.Statement.find((s: any) => s.Sid === 'Usage');
     assert.deepEqual(usage.Condition['ForAllValues:StringEquals']['dynamodb:LeadingKeys'], ['USAGE#ep-a1b2c3d4e5']);
     assert.deepEqual(usage.Condition['ForAllValues:StringEquals']['dynamodb:Attributes'], [...USAGE_ATTRIBUTES]);
@@ -241,9 +243,9 @@ describe('provision', () => {
         'gasMs',
         'liquidMs',
         'crystalMs',
-        'inputTokens',
-        'outputTokens',
+        'tokens',
         'gasHandlers',
+        'liquidHandlers',
         'crystalHandlers',
         'updatedAt',
       ].sort(),

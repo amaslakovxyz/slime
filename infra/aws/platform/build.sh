@@ -4,8 +4,9 @@
 # and slime-cloud/provisioner/dist/lambda/.
 set -euo pipefail
 repo="$(cd "$(dirname "$0")/../../.." && pwd)"
-# The runtime compiles @slime-cloud/core from sandbox/src: both need their deps.
-npm ci --no-audit --no-fund --prefix "$repo/sandbox"
+# The runtime links @slime-cloud/core (oss/packages/core) and bundles its built dist/.
+npm ci --no-audit --no-fund --prefix "$repo"
+npm run build --prefix "$repo" -w @slime-cloud/core
 npm ci --no-audit --no-fund --prefix "$repo/slime-cloud/runtime"
 npm run build --prefix "$repo/slime-cloud/runtime"
 npm ci --no-audit --no-fund --prefix "$repo/slime-cloud/provisioner"

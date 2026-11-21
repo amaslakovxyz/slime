@@ -10,6 +10,7 @@
 .worktrees/
 .superpowers/
 .remember/
+.egm/
 
 # Node
 node_modules/

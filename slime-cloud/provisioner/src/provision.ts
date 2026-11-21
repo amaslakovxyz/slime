@@ -45,9 +45,9 @@ export const USAGE_ATTRIBUTES = [
   'gasMs',
   'liquidMs',
   'crystalMs',
-  'inputTokens',
-  'outputTokens',
+  'tokens',
   'gasHandlers',
+  'liquidHandlers',
   'crystalHandlers',
   'updatedAt',
 ] as const;
@@ -122,7 +122,7 @@ async function deploy(ep: Endpoint, deps: Deps): Promise<string> {
       {
         Sid: 'Liquid',
         Effect: 'Allow',
-        Action: ['dynamodb:Query', 'dynamodb:PutItem', 'dynamodb:UpdateItem'],
+        Action: ['dynamodb:Query', 'dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:DeleteItem'],
         Resource: tableArn(config.handlersTable),
         Condition: { 'ForAllValues:StringEquals': { 'dynamodb:LeadingKeys': [id] } },
       },

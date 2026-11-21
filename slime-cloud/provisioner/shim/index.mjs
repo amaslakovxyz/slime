@@ -1,1 +1,1 @@
-export { handler } from '/opt/slime/index.mjs';
+export { handler } from '/opt/slime/index.js';

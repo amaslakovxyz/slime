@@ -1,38 +1,42 @@
 // Bundles the runtime for AWS Lambda into dist/lambda/ (zipped by Terraform,
-// infra/aws/platform/runtime.tf). @slime-cloud/core is compiled from sandbox/src
-// through the tsconfig `paths` mapping, which esbuild applies itself. Output must be deterministic: the same source
-// gives the same zip hash, so Terraform plans show no change for no change.
+// infra/aws/platform/runtime.tf). @slime-cloud/core comes from its built dist/
+// (build it first: npm run build -w @slime-cloud/core). Output must be
+// deterministic: the same source gives the same zip hash, so Terraform plans
+// show no change for no change.
 //
-//   index.mjs              src/lambda.ts, the core and every dependency
-//   shape-worker.mjs       the core's sandbox worker (sandbox.ts loads it by URL, same dir)
+//   index.js               src/lambda.ts, the core and every dependency
+//   shape-worker.js        the core's shaping worker; the core resolves it as ./shape-worker.js
 //   emscripten-module.wasm QuickJS release-sync build, found by URL next to the worker
+//   package.json           { "type": "module" }, so both .js files load as ES modules
 //   offline/handlers.json  canned handlers for SLIME_PROVIDER=offline (read from cwd)
-//   crystal/               Crystal folder, if the repo has one
+//   crystal/               Crystal folder (index.mjs and modules), if the runtime has one
 //
 // dist/layer/slime/ is the same bundle laid out as the Gas Lambda layer
 // (infra/aws/platform/gas-layer.tf): it extracts to /opt/slime/, and provisioned
 // endpoints run it through a one-line shim (slime-cloud/provisioner/shim). The
 // worker and wasm resolve by import.meta.url, so they load from /opt/slime/ too.
 import { build } from 'esbuild';
-import { cpSync, existsSync, mkdirSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const core = join(root, '../../sandbox'); // keep in sync with tsconfig.json `paths`
 const out = join(root, 'dist/lambda');
-// Core assets resolve from the core's own node_modules (npm ci in sandbox/).
-const coreRequire = createRequire(join(core, 'package.json'));
+const runtimeRequire = createRequire(join(root, 'package.json'));
+const coreRoot = dirname(runtimeRequire.resolve('@slime-cloud/core/package.json'));
+const worker = join(coreRoot, 'dist/shaping/shape-worker.js');
+if (!existsSync(worker)) throw new Error(`${worker} is missing: build the core first (npm run build -w @slime-cloud/core)`);
+// QuickJS's wasm resolves from the core's own dependencies.
+const coreRequire = createRequire(join(coreRoot, 'package.json'));
 
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
 
 await build({
   absWorkingDir: root,
-  entryPoints: { index: 'src/lambda.ts', 'shape-worker': join(core, 'src/shape-worker.mjs') },
+  entryPoints: { index: 'src/lambda.ts', 'shape-worker': worker },
   outdir: out,
-  outExtension: { '.js': '.mjs' },
   bundle: true,
   platform: 'node',
   target: 'node22',
@@ -45,10 +49,11 @@ await build({
   logLevel: 'warning',
 });
 
+writeFileSync(join(out, 'package.json'), '{ "type": "module" }\n');
 const wasm = join(dirname(coreRequire.resolve('@jitl/quickjs-wasmfile-release-sync')), 'emscripten-module.wasm');
 cpSync(wasm, join(out, 'emscripten-module.wasm'));
-cpSync(join(core, 'offline'), join(out, 'offline'), { recursive: true });
-if (existsSync(join(core, 'crystal'))) cpSync(join(core, 'crystal'), join(out, 'crystal'), { recursive: true });
+cpSync(join(root, 'offline'), join(out, 'offline'), { recursive: true });
+if (existsSync(join(root, 'crystal'))) cpSync(join(root, 'crystal'), join(out, 'crystal'), { recursive: true });
 
 const layer = join(root, 'dist/layer');
 rmSync(layer, { recursive: true, force: true });
