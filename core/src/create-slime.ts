@@ -8,6 +8,7 @@ import { SlimeConfigError } from './shared/errors.js';
 import type { Connector } from './connectors/types.js';
 import type { HandlerProvenance } from './request/key.js';
 import { QuickJSRunner } from './sandbox/quickjs/quickjs-runner.js';
+import { startApiSources } from './sources/start-api-sources.js';
 import { fileStore } from './stores/file-store.js';
 import type { SlimeStore } from './stores/types.js';
 
@@ -17,13 +18,17 @@ const UNSAFE_CREDENTIALS = 'the connector refused to start: its database user ca
 
 /** Startup order (§7, M2): safety check, store init, dictionary. */
 export async function createSlime(config: SlimeConfig): Promise<Slime> {
+  // The SQL source keeps today's calls and error text, so a setup without API sources starts exactly as before (MS3).
   await assertSafeCredentials(config.connector);
+  const apiSchemas = await startApiSources(config);
   const store = config.store ?? fileStore();
   await store.init?.();
-  const dictionary = buildDictionary({ schema: await config.connector.describe(), glossary: config.glossary, rules: config.rules });
+  const schema = await config.connector.describe();
+  const dictionary = buildDictionary({ schema, glossary: config.glossary, rules: config.rules, apiSchemas, sqlSourceName: config.sqlSourceName });
   const provenance = currentProvenance(config, dictionary);
   if (config.mode === 'locked') await warnAboutOtherSchemas(config, store, provenance.schemaHash);
-  warnAboutOtherSchemaCrystals(config, provenance.schemaHash);
+  // Crystal is SQL only, so an API source's change must not flag it (MS17).
+  warnAboutOtherSchemaCrystals(config, dictionary.sourceHashes?.[config.sqlSourceName] ?? dictionary.schemaHash);
   return new SlimeEngine({ config, store, runner: new QuickJSRunner(), dictionary, provenance });
 }
 
@@ -39,6 +44,7 @@ function currentProvenance({ generator }: SlimeConfig, dictionary: Dictionary): 
     dictionaryHash: dictionary.hash,
     promptHash: generator?.promptHash ?? LOCKED_MARKER,
     model: generator?.model ?? LOCKED_MARKER,
+    ...(dictionary.sourceHashes ? { sourceHashes: dictionary.sourceHashes } : {}),
   };
 }
 
