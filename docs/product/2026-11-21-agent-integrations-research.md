@@ -32,6 +32,7 @@ The proposed product changes three things:
 | D5 | Where does execution run? | **All in slime-cloud** (tokens and execution in our Lambda). | Execution in slime-client (control/data plane split); explore local + pinned in cloud. |
 | D6 | Agent-facing surface | **MCP server + `slime` CLI.** CLI: `login`, `connect`, `pin`. MCP tools: `query`, `catalog`, `pin`. Internally the existing `{intent, input, output}`. | Own protocol + SDK; CLI only. |
 | D7 | How does the agent reuse handlers? | **Catalog first** (§4.1). The agent looks up existing handlers before writing a new intent. | Semantic intent matching (risk of serving a handler with a different meaning); both (largest scope). |
+| D8 | Whose credentials read the sources? | **The developer's personal OAuth**, for explore and pinned endpoints alike (§4.2). | One workspace connection per source (needs a workspace admin); personal for explore + workspace app for pinned (two connections, different data in Gas and Liquid). |
 
 The hybrid maps the existing tiers onto user actions:
 
@@ -142,10 +143,26 @@ Never stored, not even as a response cache: rows and content.
      catalog"`.
    * **Known limit:** reuse depends on the agent following instructions.
      Semantic matching stays a later option if the measured hit rate is low.
-2. **Identity and permissions.** Whose token reads Linear: the developer's or a
-   workspace's? A pinned production endpoint needs a service identity, scopes
-   and token refresh. The rule "never take authorization from `input`"
-   (request format) moves to the cloud layer.
+2. **Identity and permissions (decided: D8, personal OAuth).**
+   `slime connect <source>` stores the developer's own OAuth token
+   (encrypted, §3.5), and every handler of that developer runs with it.
+   Consequences to handle:
+   * **A pinned endpoint inherits one person's permissions.** The catalog and
+     dashboard show the token owner on every handler.
+   * **Revoked or narrowed access must fail loudly.** A source 401/403
+     returns a dedicated error (e.g. `SOURCE_AUTH_REVOKED`), never an empty or
+     partial result that looks valid.
+   * **Production traffic spends the developer's personal quota.** Linear
+     counts requests per user (2,500/hour with an API key, 5,000/hour with an
+     OAuth app, §3.3), shared with that person's own Linear usage. A busy
+     pinned endpoint can rate-limit the developer.
+   * **Token refresh** runs in slime-cloud; a failed refresh is the same loud
+     error.
+   * **Later:** transferring a handler to a workspace connection. Out of scope
+     for v0.
+   * The rule "never take authorization from `input`" (request format) still
+     holds: callers of a pinned endpoint authenticate to Slime with an API key
+     and cannot pick whose source token is used.
 3. **Semantic layer across sources.** Business terms ("customer", "blocked",
    "sprint") need a dictionary (`core`'s startup dictionary, PLAN.md §4.4)
    plus entity mapping across sources (Linear issue ↔ Notion page by link or
@@ -165,5 +182,5 @@ Never stored, not even as a response cache: rows and content.
 
 ## 5. Next decision
 
-Identity (gap 2): whose credentials read Linear and Notion, in explore and
-in a pinned endpoint.
+ICP and demo (gap 7): it fixes which sources, entities and business terms the
+semantic layer (gap 3) must cover first.
