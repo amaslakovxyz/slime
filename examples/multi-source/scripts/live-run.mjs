@@ -4,6 +4,7 @@
 // model key in .env, and the demo database.
 //
 //   node --env-file=.env scripts/live-run.mjs
+//   NO_REVIEWER=1 npm run live   (promotion on runs alone: faster, no review verdict)
 import { readFileSync } from 'node:fs';
 import { createSlime, memoryStore } from '@slime-cloud/core';
 import { slimeConfigFromEnv } from '../src/config.mjs';
@@ -18,7 +19,8 @@ const INTENTS = [
 ];
 
 const events = [];
-const config = await slimeConfigFromEnv(process.env, { store: memoryStore(), tiers: { gasToLiquidRuns: RUNS }, limits: { generationBudgetMs: 90_000, reviewTimeoutMs: 120_000 }, onEvent: (event) => events.push(event) });
+const withoutReviewer = process.env.NO_REVIEWER === '1' ? { reviewer: undefined } : {};
+const config = await slimeConfigFromEnv(process.env, { ...withoutReviewer, store: memoryStore(), tiers: { gasToLiquidRuns: RUNS }, limits: { generationBudgetMs: 90_000, reviewTimeoutMs: 120_000 }, onEvent: (event) => events.push(event) });
 const slime = await createSlime(config);
 try {
   for (const request of INTENTS) {
