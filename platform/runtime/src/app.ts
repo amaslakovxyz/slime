@@ -17,6 +17,8 @@ export interface LifecycleHandler {
   createdAt?: string;
   /** Crystal only: the input names (and types, when known) its own route takes. */
   inputs?: Record<string, string | null>;
+  /** Saved with another schema, dictionary, prompt or model: regenerates on next request; cannot be crystallized. */
+  stale?: boolean;
 }
 
 /** A saved handler record, reduced to what the Lifecycle tab needs. */
@@ -47,7 +49,15 @@ export interface RuntimeParts {
 
 const TIER_RANK = { gas: 0, liquid: 1, crystal: 2 } as const;
 
-/** One row per handler key; the most mature tier wins and runs never go backwards. */
+/** A stale saved row ranks below live Gas, so the live row with the same key replaces it. */
+function rank(handler: LifecycleHandler): number {
+  return handler.stale ? -1 : TIER_RANK[handler.tier];
+}
+
+/**
+ * One row per handler key; the most mature tier wins. Runs never go backwards
+ * between rows of equal staleness; a live row that replaces a stale one keeps its own runs.
+ */
 export function mergeHandlers(lists: LifecycleHandler[][]): LifecycleHandler[] {
   const byKey = new Map<string, LifecycleHandler>();
   for (const handler of lists.flat()) {
@@ -56,9 +66,12 @@ export function mergeHandlers(lists: LifecycleHandler[][]): LifecycleHandler[] {
       byKey.set(handler.key, { ...handler });
       continue;
     }
-    const winner = TIER_RANK[handler.tier] > TIER_RANK[seen.tier] ? { ...seen, ...handler } : { ...handler, ...seen };
-    winner.runs = Math.max(seen.runs, handler.runs);
-    byKey.set(handler.key, winner);
+    const isNewer = rank(handler) > rank(seen);
+    const [winner, loser] = isNewer ? [handler, seen] : [seen, handler];
+    const merged: LifecycleHandler = { ...loser, ...winner };
+    if (!winner.stale) delete merged.stale;
+    if (Boolean(seen.stale) === Boolean(handler.stale)) merged.runs = Math.max(seen.runs, handler.runs);
+    byKey.set(handler.key, merged);
   }
   return [...byKey.values()].sort((a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? ''));
 }

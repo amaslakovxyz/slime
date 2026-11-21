@@ -18,8 +18,8 @@ folder.
 
 ## Interface
 
-- `crystallize({ connector, store, dir, optimizer?, minRuns = 10, limits?,
-  optimizeTimeoutMs?, isDryRun? }): Promise<CrystalReport[]>`. The app runs it
+- `crystallize({ connector, store, dir, optimizer?, minRuns = 10, provenance?,
+  limits?, optimizeTimeoutMs?, isDryRun? }): Promise<CrystalReport[]>`. The app runs it
   from its own script with its own config; core reads no env. Each report has
   an `outcome` (`crystallized`, `already`, `not-ready`, `failed`) and its
   reasons.
@@ -33,7 +33,9 @@ folder.
 
 - **Ready means:** a Liquid handler whose review is `approved` (or `none`,
   when no reviewer was configured), with at least `minRuns` successful runs
-  and at least one recorded input, and not already in the manifest.
+  and at least one recorded input, made with the given `provenance` (when
+  passed; otherwise "made with another schemaHash, …"), and not already in
+  the manifest.
 - **Candidates:** the optimizer's version first (when there is an
   optimizer), then the unchanged Liquid code. The first that passes is
   written.

@@ -293,8 +293,9 @@ The instance, its results and its events:
 ```ts
 interface Slime {
   query(request: SlimeRequest): Promise<QueryResult>;
-  handlers(): HandlerSummary[];             // Liquid and Crystal; replaces runtime listHandlers()/listCrystals()
+  handlers(): HandlerSummary[];             // live Gas and Liquid: key, intent, tier, runs, review, createdAt
   stats(): SlimeStats;                       // counts per tier, generations this hour, queue length
+  provenance(): HandlerProvenance;           // what new handlers are made with; saved ones that differ are stale
   evict(handlerKey: string): Promise<boolean>; // removes from memory and the store; false if unknown
   flush(): Promise<void>;                    // waits for queued store writes and running reviews
   close(): Promise<void>;

@@ -6,7 +6,7 @@ import { describe, test } from 'node:test';
 import { memoryStore, type CrystalRegistry, type QueryMeta, type Slime } from '@slime-cloud/core';
 import { createApp, mergeHandlers } from '../src/app.js';
 import { RecentRequests } from '../src/events.js';
-import { storeLimitedTo, syncLiveRuns } from '../src/local.js';
+import { storeLimitedTo, syncLiveRuns, toSavedHandler } from '../src/local.js';
 
 const meta = (handlerKey: string, tier: QueryMeta['tier']): QueryMeta =>
   ({ handlerKey, tier, cache: 'hit', timingsMs: { total: 3, run: 2, shape: 0 } }) as unknown as QueryMeta;
@@ -48,6 +48,15 @@ describe('mergeHandlers', () => {
     assert.equal(merged[0]?.tier, 'crystal');
     assert.equal(merged[0]?.runs, 7);
     assert.equal(merged[0]?.createdAt, '1');
+  });
+
+  test('a stale saved row loses to the live Gas row with the same key, runs included', () => {
+    const merged = mergeHandlers([
+      [{ key: 'x', intent: 'i', tier: 'liquid', runs: 9, review: 'approved', stale: true, createdAt: '1' }],
+      [{ key: 'x', intent: 'i', tier: 'gas', runs: 1, review: 'none', createdAt: '2' }],
+    ]);
+    assert.equal(merged.length, 1);
+    assert.deepEqual([merged[0]?.tier, merged[0]?.runs, merged[0]?.review, 'stale' in merged[0]!], ['gas', 1, 'none', false]);
   });
 });
 
@@ -137,6 +146,14 @@ describe('store helpers', () => {
     assert.equal(((await store.get('handlers', 'a')) as { runs: number }).runs, 11);
     assert.equal(((await store.get('handlers', 'b')) as { runs: number }).runs, 9);
     assert.equal(await store.get('handlers', 'gas-only'), undefined);
+  });
+
+  test('toSavedHandler marks a record made with another provenance as stale, only when given the current one', () => {
+    const provenance = { schemaHash: 'old', dictionaryHash: 'd', promptHash: 'p', model: 'm' };
+    const record = { key: 'a', intent: 'i', tier: 'liquid', runs: 12, review: 'approved', fixtures: [{}], createdAt: '1', provenance };
+    assert.equal(toSavedHandler(record, { ...provenance, schemaHash: 'new' }).stale, true);
+    assert.equal('stale' in toSavedHandler(record, { ...provenance }), false);
+    assert.equal('stale' in toSavedHandler(record), false);
   });
 });
 

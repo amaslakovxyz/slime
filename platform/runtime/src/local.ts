@@ -7,7 +7,7 @@
 // Lifecycle tab, and POST /v0/crystallize. Every route needs x-api-key: the
 // endpoint key, or for POST /v0/e/<key> that Crystal's own token (CRYSTAL_TOKENS).
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { createSlime, type SlimeStore } from '@slime-cloud/core';
+import { changedProvenance, createSlime, type HandlerProvenance, type SlimeStore } from '@slime-cloud/core';
 import { crystallize, DEFAULT_MIN_RUNS } from '@slime-cloud/core/crystallize';
 import { createApp, type SavedHandler } from './app.js';
 import { isAuthorized, parseCrystalTokens } from './auth.js';
@@ -39,11 +39,31 @@ export function storeLimitedTo(store: SlimeStore, keys: readonly string[]): Slim
   };
 }
 
-type RecordLike = { key: string; intent: string; tier: 'gas' | 'liquid'; runs: number; review: string; fixtures: unknown[]; createdAt: string };
+type RecordLike = {
+  key: string;
+  intent: string;
+  tier: 'gas' | 'liquid';
+  runs: number;
+  review: string;
+  fixtures: unknown[];
+  createdAt: string;
+  provenance: HandlerProvenance;
+};
 
-export function toSavedHandler(value: unknown): SavedHandler {
+/** `current` is the provenance new handlers are made with; pass none when drifted records are still served (locked mode). */
+export function toSavedHandler(value: unknown, current?: HandlerProvenance): SavedHandler {
   const r = value as RecordLike;
-  return { key: r.key, intent: r.intent, tier: r.tier, runs: r.runs, review: r.review, fixtures: r.fixtures?.length ?? 0, createdAt: r.createdAt };
+  const isStale = current !== undefined && changedProvenance(r.provenance, current).length > 0;
+  return {
+    key: r.key,
+    intent: r.intent,
+    tier: r.tier,
+    runs: r.runs,
+    review: r.review,
+    fixtures: r.fixtures?.length ?? 0,
+    createdAt: r.createdAt,
+    ...(isStale ? { stale: true } : {}),
+  };
 }
 
 async function main(): Promise<void> {
@@ -77,7 +97,11 @@ async function main(): Promise<void> {
     events,
     onQuery: (meta) => meter?.record(meta),
     thresholds: { liquidRuns: config.tiers.gasToLiquidRuns, crystalRuns },
-    savedHandlers: async () => (store ? (await store.list(HANDLERS_NS)).map(({ value }) => toSavedHandler(value)) : []),
+    // Explore mode regenerates drifted records, so they show as stale; locked mode serves them as is.
+    savedHandlers: async () => {
+      const current = config.mode === 'explore' ? slime.provenance() : undefined;
+      return store ? (await store.list(HANDLERS_NS)).map(({ value }) => toSavedHandler(value, current)) : [];
+    },
     ...(store && crystalDir
       ? {
           crystallize: async (keys?: string[]) => {
@@ -89,6 +113,7 @@ async function main(): Promise<void> {
               store: keys ? storeLimitedTo(store, keys) : store,
               dir: crystalDir,
               minRuns: crystalRuns,
+              provenance: slime.provenance(),
             });
           },
         }

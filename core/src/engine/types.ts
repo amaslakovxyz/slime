@@ -59,6 +59,7 @@ export interface HandlerSummary {
   intent: string;
   tier: StoredTier;
   runs: number;
+  review: ReviewStatus;
   createdAt: string;
 }
 
@@ -73,6 +74,8 @@ export interface Slime {
   query(request: SlimeRequest): Promise<QueryResult>;
   handlers(): HandlerSummary[];
   stats(): SlimeStats;
+  /** The provenance new handlers are made with; saved ones that differ are regenerated in explore mode. */
+  provenance(): HandlerProvenance;
   /** Removes the handler from memory and the store; false if it was unknown. */
   evict(handlerKey: string): Promise<boolean>;
   /** Waits for queued store writes and running reviews; call it before each response on Lambda (C15). */
