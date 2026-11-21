@@ -79,10 +79,10 @@ right types and date formats. A result that doesn't match fails with
 | `handlerKey` | The handler's key (use it with `slime.evict()`). |
 | `tier` | `gas` (new, in memory), `liquid` (saved) or `crystal` (code in your app). |
 | `cache` | `miss` (generated now), `hit` or `coalesced` (shared a generation with a concurrent request). |
-| `truncated` | `rowCap` cut the rows. |
+| `truncated` | `rowCap` cut the rows; `warnings` then says so too. |
 | `timingsMs` | `total`, `run`, `shape`, and `generate` on a miss. |
 | `warnings` | For example, a value written into the intent. |
-| `review` | `none`, `pending`, `approved` or `rejected`. |
+| `review` | Where the handler is on its way to Liquid: `none` until it has had enough successful runs (`gasToLiquidRuns`, 3 by default), `pending` while a model reviews it in the background, then `approved` (saved as Liquid) or `rejected`. It changes between calls of one handler; a client can ignore it. |
 | `sql`, `shapeJs`, `assumptions` | **Explore mode only:** what was generated, and how the model read the intent. |
 
 ## Errors

@@ -57,6 +57,13 @@ describe('example app in explore mode (offline handlers)', { skip: !hasDatabase 
     assert.equal((await response.json()).error.code, 'INVALID_REQUEST');
   });
 
+  test('a malformed JSON body is a 400 that is not retryable', async () => {
+    const response = await fetch(`${app.baseUrl}/dev/query`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{intent:' });
+    assert.equal(response.status, 400);
+    const { error } = await response.json();
+    assert.deepEqual([error.code, error.retryable], ['INVALID_REQUEST', false]);
+  });
+
   test('POST /dev/query answers any request in explore mode', async () => {
     const response = await fetch(`${app.baseUrl}/dev/query`, {
       method: 'POST',
