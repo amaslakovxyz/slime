@@ -1,6 +1,8 @@
 # Slime for coding agents: integrations research
 
-* **Status:** Design (brainstorm in progress, not a contract)
+* **Status:** Record (research behind
+  [product_frame_v0_2.md](product_frame_v0_2.md), which unifies this track's
+  decisions; not a contract)
 * **Date:** 2026-11-21
 * **Author:** @Tony (with an agent)
 
