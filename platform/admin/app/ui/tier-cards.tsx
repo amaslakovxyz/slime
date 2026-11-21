@@ -2,30 +2,10 @@ import { formatCount, formatMs, formatShare } from '@/app/format';
 import type { Usage } from '@/lib/endpoints';
 import type { Tier } from '@/lib/pricing';
 
-const WARM = 'warm, last seen instance';
-
-const TIER_COPY: Record<Tier, { tag: string; name: string; desc: string; handlersLabel: string; handlersTitle: string }> = {
-  gas: {
-    tag: 'TIER 0 · GAS',
-    name: 'Gas',
-    desc: 'Intent synthesis with the LLM in the loop',
-    handlersLabel: 'warm handlers',
-    handlersTitle: WARM,
-  },
-  liquid: {
-    tag: 'TIER 1 · LIQUID',
-    name: 'Liquid',
-    desc: 'Stored plasma handlers, no generation',
-    handlersLabel: 'stored handlers',
-    handlersTitle: WARM,
-  },
-  crystal: {
-    tag: 'TIER 2 · CRYSTAL',
-    name: 'Crystal',
-    desc: 'Compiled hot paths, sub-millisecond',
-    handlersLabel: 'crystals',
-    handlersTitle: WARM,
-  },
+const TIER_COPY: Record<Tier, { tag: string; name: string; handlersLabel: string }> = {
+  gas: { tag: 'TIER 0 · GAS', name: 'Gas', handlersLabel: 'handlers' },
+  liquid: { tag: 'TIER 1 · LIQUID', name: 'Liquid', handlersLabel: 'handlers' },
+  crystal: { tag: 'TIER 2 · CRYSTAL', name: 'Crystal', handlersLabel: 'crystals' },
 };
 
 function handlerCount(usage: Usage, tier: Tier): number | null {
@@ -49,28 +29,23 @@ export function TierCards({ usage }: { usage: Usage }) {
               <span className="tier-share mono">{formatShare(t.requests, total)}</span>
             </div>
             <h3 className="tier-name">{copy.name}</h3>
-            <p className="tier-desc">{copy.desc}</p>
             <div className="tier-latency">
               <span className="mono">{formatMs(t.avgMs)}</span>
-              <span className="tier-latency-label">avg latency</span>
+              <span className="tier-latency-label">avg</span>
             </div>
             <dl className="tier-metrics">
               <div>
-                <dt>requests this month</dt>
+                <dt>requests</dt>
                 <dd className="mono">{formatCount(t.requests)}</dd>
               </div>
-              <div title={copy.handlersTitle}>
-                <dt>
-                  {copy.handlersLabel}
-                  {copy.handlersTitle === WARM && <sup aria-hidden="true">*</sup>}
-                </dt>
+              <div>
+                <dt>{copy.handlersLabel}</dt>
                 <dd className="mono">{handlers === null ? '—' : formatCount(handlers)}</dd>
               </div>
             </dl>
           </article>
         );
       })}
-      <p className="tiers-foot">* {WARM}: the handler counts the runtime instance that flushed last reported.</p>
     </div>
   );
 }

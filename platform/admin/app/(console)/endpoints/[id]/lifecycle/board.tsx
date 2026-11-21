@@ -50,18 +50,13 @@ export function LifecycleBoard({
   return (
     <>
       <section className="card lc-card">
-        <h2 className="lc-h"><span className="lc-num">2</span>Requests taking shape</h2>
-        <p className="card-sub">
-          Every request to this endpoint lands here as a handler, keyed by its hash. New ones start as{' '}
-          <b className="lc-gas">Gas</b>; after {thresholds.liquidRuns} runs (and a review, when a reviewer is set) they turn{' '}
-          <b className="lc-liquid">Liquid</b> and stop calling the model.
-        </p>
+        <h2 className="lc-h"><span className="lc-num">2</span>Requests</h2>
         {rows.length === 0 ? (
           <p className="lc-empty">No requests yet.</p>
         ) : (
           <table className="lc-table">
             <thead>
-              <tr><th aria-label="Pick" /><th>Handler</th><th>Intent</th><th>Stage</th><th>Progress</th><th>Review</th></tr>
+              <tr><th aria-label="Pick" /><th>Hash</th><th>Intent</th><th>Stage</th><th>Progress</th></tr>
             </thead>
             <tbody>
               {rows.map((r) => (
@@ -84,10 +79,9 @@ export function LifecycleBoard({
                   <td>
                     <div className="lc-prog">
                       <div className="lc-bar"><i className={`lc-fill-${r.canCrystallize ? 'crystal' : r.tier}`} style={{ width: `${r.progressPct}%` }} /></div>
-                      <span>{r.progressLabel}</span>
+                      <span className={r.review.tone === 'run' ? 'lc-review-run' : undefined}>{r.review.tone === 'run' ? r.review.label : r.progressLabel}</span>
                     </div>
                   </td>
-                  <td className={`lc-review lc-review-${r.review.tone}`}>{r.review.label}</td>
                 </tr>
               ))}
             </tbody>
@@ -110,15 +104,13 @@ export function LifecycleBoard({
 
       <section className="card lc-card lc-crys">
         <h2 className="lc-h"><span className="lc-num">3</span>Crystallize</h2>
-        <p className="card-sub">
-          Pick a proven Liquid request ({thresholds.crystalRuns}+ runs). Slime turns it into plain code, checks it gives the same
-          answers on recorded inputs, and restarts the endpoint. The request becomes its own endpoint, served without the sandbox.
-        </p>
         <div className="lc-crys-row">
-          <span className="muted small">{ready.length ? `${ready.length} ready` : 'Nothing ready yet.'}</span>
-          <button className="btn lc-btn-crystal" type="button" onClick={crystallize} disabled={pending || restarting || picked.length === 0}>
-            {pending ? 'Crystallizing…' : restarting ? 'Restarting endpoint…' : `Crystallize ${picked.length} → own endpoint${picked.length === 1 ? '' : 's'}`}
-          </button>
+          <span className="muted small">{ready.length ? `${ready.length} ready` : `Needs ${thresholds.crystalRuns}+ runs`}</span>
+          {(ready.length > 0 || pending || restarting) && (
+            <button className="btn lc-btn-crystal" type="button" onClick={crystallize} disabled={pending || restarting || picked.length === 0}>
+              {pending ? 'Crystallizing…' : restarting ? 'Restarting…' : `Crystallize ${picked.length}`}
+            </button>
+          )}
         </div>
         {result && 'error' in result && <p className="alert">{result.error}</p>}
         {result && 'reports' in result && (

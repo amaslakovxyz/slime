@@ -1985,7 +1985,7 @@ code.inline {
 .lc-seg button { background: none; border: 0; color: var(--text-muted); font: inherit; font-size: 12px; padding: 5px 12px; border-radius: 7px; cursor: pointer; }
 .lc-seg button.on { background: var(--bg-surface-hover); color: var(--text-pure); }
 .lc-copy { display: flex; align-items: flex-start; gap: 10px; background: var(--bg-canvas); border: 1px solid var(--border-color); border-radius: var(--radius-control); padding: 12px 14px; }
-.lc-copy pre { margin: 0; flex: 1; white-space: pre-wrap; word-break: break-all; font-family: var(--font-code); font-size: 12.5px; color: var(--plasma-highlight); }
+.lc-copy pre { margin: 0; flex: 1; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-code); font-size: 12.5px; color: var(--plasma-highlight); }
 .lc-wait { display: flex; align-items: center; gap: 10px; margin-top: 14px; color: var(--text-muted); font-size: 13px; }
 .lc-wait i { width: 8px; height: 8px; border-radius: 50%; background: var(--plasma-primary); animation: lc-pulse 1.4s infinite; }
 .lc-wait.ok { color: var(--gas-accent); }
@@ -2032,3 +2032,4 @@ code.inline {
 .lc-route-token { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
 .lc-route-actions { display: flex; gap: 6px; align-self: flex-start; }
 .lc-route > .lc-route-actions { flex: 0 0 auto; }
+.form-narrow { max-width: 720px; }

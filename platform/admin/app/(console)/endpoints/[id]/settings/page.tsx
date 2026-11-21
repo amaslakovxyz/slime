@@ -36,7 +36,6 @@ export default async function SettingsPage({
           <label className="field">
             <span className="field-label">Name</span>
             <input name="name" maxLength={40} required defaultValue={ep.name} disabled={!renamable} />
-            <span className="field-hint">Only shown here; the URL and ID never change.</span>
           </label>
           <label className="field">
             <span className="field-label">LLM provider</span>
@@ -45,14 +44,12 @@ export default async function SettingsPage({
             <select name="provider" defaultValue={ep.provider} disabled={!settled}>
               {PROVIDERS.map((p) => (
                 <option key={p} value={p}>
-                  {PROVIDER_INFO[p].label} · {PROVIDER_INFO[p].blurb}
+                  {PROVIDER_INFO[p].label}
                 </option>
               ))}
             </select>
             <span className="field-hint">
-              {settled
-                ? 'Changing the provider redeploys the endpoint (status updating).'
-                : `The provider can change once the endpoint is ready or failed (now ${ep.status}).`}
+              {settled ? 'Change restarts the endpoint.' : `Locked while ${ep.status}.`}
             </span>
           </label>
           <div className="form-actions">
@@ -64,13 +61,11 @@ export default async function SettingsPage({
       </section>
 
       <section className="section card danger-zone settings-card">
-        <h2 className="card-title">Danger zone</h2>
+        <h2 className="card-title">Delete</h2>
         <div className="danger-row">
           <div>
-            <strong>Delete this endpoint</strong>
             <p className="card-sub">
-              Removes the function, its role, logs, secrets and Liquid handlers. Usage history stays for billing.
-              {!settled && ` Available once the endpoint is ready or failed (now ${ep.status}).`}
+              Removes the endpoint, its secrets and handlers.{!settled && ` Locked while ${ep.status}.`}
             </p>
           </div>
           <form action={deleteEndpointAction}>

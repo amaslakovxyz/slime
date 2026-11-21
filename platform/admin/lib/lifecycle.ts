@@ -107,31 +107,33 @@ function reviewOf(h: RuntimeHandler, t: Thresholds): HandlerRow['review'] {
   return { label: '—', tone: 'none' };
 }
 
-export function stagesOf(status: Endpoint['status'], handlers: RuntimeHandler[], total: number): Stage[] {
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+export function stagesOf(status: Endpoint['status'], handlers: RuntimeHandler[], total: number, t: Thresholds = DEFAULT_THRESHOLDS): Stage[] {
   const ready = status === 'ready' || status === 'updating';
   const linked = handlers.length > 0;
   const liquid = handlers.filter((h) => h.tier !== 'gas').length;
   const crystal = handlers.filter((h) => h.tier === 'crystal').length;
   const state = (done: boolean, reachable: boolean): StageState => (done ? 'done' : reachable ? 'now' : 'todo');
   return [
-    { id: 'connected', label: 'Connected', state: state(ready, true), note: ready ? 'database reachable, read-only' : `endpoint is ${status}` },
+    { id: 'connected', label: 'Connected', state: state(ready, true), note: ready ? 'read-only' : status },
     {
       id: 'linked',
       label: 'Agent linked',
       state: state(linked, ready),
-      note: linked ? `${total} requests · ${handlers.length} handlers` : 'waiting for the first request',
+      note: linked ? `${plural(handlers.length, 'handler')} · ${plural(total, 'request')}` : 'waiting',
     },
     {
       id: 'liquid',
       label: 'Liquid',
       state: state(liquid > 0, linked),
-      note: liquid ? `${liquid} handlers stopped calling the model` : 'a request repeats and passes review',
+      note: liquid ? `${liquid} saved` : `after ${t.liquidRuns} runs`,
     },
     {
       id: 'crystal',
       label: 'Crystal',
       state: state(crystal > 0, liquid > 0),
-      note: crystal ? `${crystal} handlers are their own endpoints` : 'pick a proven request, make it an endpoint',
+      note: crystal ? plural(crystal, 'own endpoint') : 'pick one',
     },
   ];
 }

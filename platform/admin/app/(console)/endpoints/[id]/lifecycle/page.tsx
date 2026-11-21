@@ -14,7 +14,7 @@ export default async function LifecyclePage({ params }: { params: Promise<{ id: 
   const [data, tokenHints] = await Promise.all([readLifecycle(ep), crystalTokenHints(ep.endpointId)]);
   const handlers = data.ok ? data.handlers : [];
   const total = data.ok ? data.total : 0;
-  const stages = stagesOf(ep.status, handlers, total);
+  const stages = stagesOf(ep.status, handlers, total, data.ok ? data.thresholds : undefined);
   const rows = data.ok ? handlers.map((h) => toRow(h, data.thresholds)) : [];
   const firstAt = data.ok && data.events.length ? data.events[data.events.length - 1]?.at : undefined;
 
@@ -35,27 +35,26 @@ export default async function LifecyclePage({ params }: { params: Promise<{ id: 
         <div className="note" role="status">
           <div>
             <strong>{data.reason}</strong>
-            <span className="muted small"> The tab reads the endpoint every 2 s.</span>
+
           </div>
         </div>
       )}
 
       <section className="card lc-card">
-        <h2 className="lc-h"><span className="lc-num">1</span>Give this endpoint to your agent</h2>
-        <p className="card-sub">One URL for every request. The agent asks for data in words and the shape it wants; Slime writes the API.</p>
+        <h2 className="lc-h"><span className="lc-num">1</span>Connect your agent</h2>
         {ep.url ? (
           <AgentSnippet endpointId={ep.endpointId} url={ep.url} tokenHint={ep.tokenHint} />
         ) : (
-          <p className="muted small">The URL appears once the endpoint is ready.</p>
+          <p className="muted small">Starting…</p>
         )}
         <div className={`lc-wait ${total > 0 ? 'ok' : ''}`}>
           <i aria-hidden="true" />
           <span>
             {total > 0
-              ? `Agent connected · ${total} requests${firstAt ? ` since ${new Date(firstAt).toLocaleTimeString('en-GB')}` : ''}`
+              ? `${total} requests${firstAt ? ` since ${new Date(firstAt).toLocaleTimeString('en-GB')}` : ''}`
               : handlers.length > 0
-                ? 'Endpoint restarted · same URL, counters start over'
-                : 'Waiting for the first request from your agent…'}
+                ? 'Restarted · same URL'
+                : 'Waiting for requests…'}
           </span>
         </div>
       </section>

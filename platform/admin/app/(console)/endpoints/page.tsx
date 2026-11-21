@@ -13,7 +13,6 @@ export default async function EndpointsPage() {
         <div>
           <div className="eyebrow">{rows.length === 1 ? '1 endpoint' : `${rows.length} endpoints`}</div>
           <h1 className="page-title">Endpoints</h1>
-          <p className="page-sub">Each endpoint is its own Lambda on the shared Gas layer, reading one database.</p>
         </div>
         <Link className="btn" href="/endpoints/new">
           New endpoint

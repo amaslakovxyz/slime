@@ -27,29 +27,25 @@ export default async function BillingPage() {
         <div>
           <div className="eyebrow">{monthLabel(o.month)}</div>
           <h1 className="page-title">Billing</h1>
-          <p className="page-sub">Usage-based estimate. There is no payment method and nothing is charged.</p>
+          <p className="page-sub">Estimate only. Nothing is charged.</p>
         </div>
       </header>
 
       <div className="split">
         <section className="card bill-hero">
           <div className="stat-label">
-            Estimated bill this month <span className="tag tag-estimate">estimate</span>
+            This month
           </div>
           <div className="bill-total mono">{formatUsd(o.estimatedUsd)}</div>
           <p className="card-sub">
-            {formatCount(o.requests)} requests and {formatCount(o.generations)} generations across {o.total}{' '}
-            {o.total === 1 ? 'endpoint' : 'endpoints'}, month to date (UTC).
+            {formatCount(o.requests)} requests · {formatCount(o.generations)} generations
           </p>
         </section>
         <section className="card savings-card">
-          <h2 className="card-title">Crystallization savings</h2>
+          <h2 className="card-title">Savings</h2>
           <div className="savings-value mono">{formatUsd(o.savingsUsd)}</div>
           <p className="card-sub">
-            Every request is priced by the tier that served it. As intents repeat, Slime digests them from Gas into
-            stored Liquid handlers and then compiled Crystal, which cost a fraction per request. Had all{' '}
-            {formatCount(o.requests)} requests run as Gas, this month would cost {formatUsd(counterfactual)}
-            {savedShare > 0 ? `; crystallization cut that by ${savedShare}%` : ''}.
+            vs. {formatUsd(counterfactual)} all-Gas{savedShare > 0 ? ` · −${savedShare}%` : ''}
           </p>
         </section>
       </div>
@@ -57,7 +53,6 @@ export default async function BillingPage() {
       <section className="section">
         <div className="section-head">
           <h2 className="section-title">Rate card</h2>
-          <span className="muted small">Illustrative prices</span>
         </div>
         <div className="card table-card">
           <div className="table-wrap">
@@ -75,7 +70,6 @@ export default async function BillingPage() {
                   <tr key={tier}>
                     <td>
                       <span className={`tier-pill tier-pill-${tier}`}>{TIER_ROWS[tier].label}</span>
-                      <span className="cell-sub cell-sub-sans">{TIER_ROWS[tier].note}</span>
                     </td>
                     <td className="num">{formatUsd(TIER_PRICE_PER_1K_USD[tier])} / 1k requests</td>
                     <td className="num">{formatCount(o.tiers[tier].requests)}</td>
@@ -85,7 +79,6 @@ export default async function BillingPage() {
                 <tr>
                   <td>
                     Generation
-                    <span className="cell-sub cell-sub-sans">One LLM synthesis of a new handler</span>
                   </td>
                   <td className="num">{formatUsd(PRICE_PER_GENERATION_USD)} each</td>
                   <td className="num">{formatCount(o.generations)}</td>
@@ -105,13 +98,6 @@ export default async function BillingPage() {
         </div>
       </section>
 
-      <section className="section stats">
-        <div className="card stat">
-          <div className="stat-label">LLM tokens</div>
-          <div className="stat-value">{formatCount(o.tokens)}</div>
-          <div className="stat-note">Input + output; included in the generation price</div>
-        </div>
-      </section>
     </>
   );
 }

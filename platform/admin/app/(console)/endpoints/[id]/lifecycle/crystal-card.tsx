@@ -46,10 +46,10 @@ export function CrystalCard({
       <div className="lc-route-body">
         <div>{crystal.intent}</div>
         <code className="mono small">
-          POST {url}v0/e/{crystal.shortKey}… body {body}
+          POST {url}v0/e/{crystal.shortKey}…  {body}
         </code>
         <div className="lc-route-token">
-          <span className="muted small">Own token</span>
+          <span className="muted small">Token</span>
           {tokenHint ? (
             <>
               <code className="mono small" data-testid="crystal-token">{shownToken}</code>
@@ -60,11 +60,9 @@ export function CrystalCard({
                   {pending ? 'Revealing…' : 'Reveal'}
                 </button>
               )}
-              <span className="muted small">opens only this route</span>
             </>
           ) : (
             <>
-              <span className="muted small">none yet — calls need the endpoint key</span>
               <button className="btn-ghost btn-sm" type="button" onClick={issue} disabled={pending || restarting}>
                 {pending ? 'Issuing…' : 'Issue token'}
               </button>

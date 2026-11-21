@@ -47,7 +47,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             Create account
           </button>
         </div>
-        <p className="field-hint auth-hint">New here? Enter an email and a password of 8+ characters, then Create account.</p>
+        <p className="field-hint auth-hint">Password: 8+ characters.</p>
       </form>
     </main>
   );

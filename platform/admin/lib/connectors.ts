@@ -13,7 +13,7 @@ export interface ConnectorInfo {
 }
 
 export const CONNECTORS: ConnectorInfo[] = [
-  { type: 'postgres', label: 'PostgreSQL', blurb: 'Any Postgres 12+ through a read-only role', available: true },
+  { type: 'postgres', label: 'PostgreSQL', blurb: 'Postgres 12+', available: true },
   { type: 'mysql', label: 'MySQL', blurb: 'MySQL 8 and MariaDB', available: false },
   { type: 'clickhouse', label: 'ClickHouse', blurb: 'Analytical warehouses', available: false },
   { type: 'rest', label: 'REST / OpenAPI', blurb: 'Any API described by an OpenAPI spec', available: false },

@@ -52,6 +52,6 @@ describe('stagesOf', () => {
     assert.deepEqual(states(stagesOf('ready', [h({ tier: 'liquid', runs: 4 })], 4)), ['done', 'done', 'done', 'now']);
     const all = stagesOf('ready', [h({ tier: 'crystal', runs: 12 })], 12);
     assert.deepEqual(states(all), ['done', 'done', 'done', 'done']);
-    assert.match(all[1]!.note, /12 requests · 1 handlers/);
+    assert.equal(all[1]!.note, '1 handler · 12 requests');
   });
 });
