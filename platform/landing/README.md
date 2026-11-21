@@ -14,8 +14,10 @@ Slime's own.
 ## Preview locally
 
 ```bash
-just landing          # serves platform/landing/ at http://localhost:8000
+just landing  # serves platform/landing/ at http://localhost:8090
 ```
+
+:8000 is taken by DynamoDB Local of the admin stack.
 
 Or open `index.html` directly in a browser.
 
