@@ -101,6 +101,44 @@ jobs:
       - run: npm run check:crystal
         working-directory: examples/express
 
+  example-multi-source:
+    name: Multi-source example
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: slime_admin
+          POSTGRES_PASSWORD: slime_admin
+          POSTGRES_DB: slime
+        ports:
+          - 54329:5432
+        options: >-
+          --health-cmd "pg_isready -U slime_admin -d slime"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            examples/multi-source/package-lock.json
+      - run: psql "postgres://slime_admin:slime_admin@localhost:54329/slime" -v ON_ERROR_STOP=1 -f examples/express/db/init.sql
+      # Runs on the packed tarball, as an app installing the package would; Notion and the films API are replayed from fixtures.
+      - run: npm ci
+      - run: npm pack -w @slime-cloud/core --pack-destination "$RUNNER_TEMP"
+      - run: npm ci
+        working-directory: examples/multi-source
+      - run: npm install --no-save "$RUNNER_TEMP"/slime-cloud-core-*.tgz
+        working-directory: examples/multi-source
+      - run: npm test
+        working-directory: examples/multi-source
+        env:
+          REQUIRE_DB: "1"
+
   runtime:
     name: Slime Cloud runtime
     runs-on: ubuntu-latest

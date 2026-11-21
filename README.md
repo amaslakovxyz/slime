@@ -38,6 +38,9 @@ Backend -- Slime runtime:
   also holds the demo database (`db/init.sql`) that core's tests and CI use.
 - [examples/hono/](./examples/hono/README.md) - the smallest app around
   the core: one Hono file with `/health` and `POST /slime`.
+- [examples/multi-source/](./examples/multi-source/README.md) - one instance
+  over Postgres, Notion and a public films API; runs offline on recorded
+  responses, and in CI.
 - **`platform/` — hosted Slime Cloud**
   - [platform/landing/](./platform/landing/README.md) - Static marketing page
     (one `index.html`, no build step). Preview with `just landing`.

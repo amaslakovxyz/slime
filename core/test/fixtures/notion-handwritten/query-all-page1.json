@@ -1,0 +1,105 @@
+{
+  "request": {
+    "method": "POST",
+    "url": "https://api.notion.com/v1/data_sources/1f2e3d4c-5b6a-4789-8abc-def012345678/query",
+    "body": {
+      "page_size": 100,
+      "sorts": [
+        {
+          "timestamp": "created_time",
+          "direction": "descending"
+        }
+      ]
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "object": "list",
+      "results": [
+        {
+          "object": "page",
+          "id": "page-1",
+          "properties": {
+            "Title": {
+              "type": "title",
+              "title": [
+                {
+                  "plain_text": "Export is slow"
+                }
+              ]
+            },
+            "Account": {
+              "type": "rich_text",
+              "rich_text": [
+                {
+                  "plain_text": "Acme"
+                }
+              ]
+            },
+            "Sentiment": {
+              "type": "select",
+              "select": {
+                "name": "negative"
+              }
+            },
+            "Status": {
+              "type": "status",
+              "status": {
+                "name": "Open"
+              }
+            },
+            "Created": {
+              "type": "date",
+              "date": {
+                "start": "2026-11-03"
+              }
+            }
+          }
+        },
+        {
+          "object": "page",
+          "id": "page-2",
+          "properties": {
+            "Title": {
+              "type": "title",
+              "title": [
+                {
+                  "plain_text": "Love the dashboard"
+                }
+              ]
+            },
+            "Account": {
+              "type": "rich_text",
+              "rich_text": [
+                {
+                  "plain_text": "Globex"
+                }
+              ]
+            },
+            "Sentiment": {
+              "type": "select",
+              "select": {
+                "name": "positive"
+              }
+            },
+            "Status": {
+              "type": "status",
+              "status": {
+                "name": "Done"
+              }
+            },
+            "Created": {
+              "type": "date",
+              "date": {
+                "start": "2026-11-02"
+              }
+            }
+          }
+        }
+      ],
+      "has_more": true,
+      "next_cursor": "cursor-2"
+    }
+  }
+}

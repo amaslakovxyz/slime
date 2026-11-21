@@ -15,3 +15,12 @@ test('the Claude generator prompt hash is pinned', () => {
 test('the Groq generator prompt hash is pinned', () => {
   assert.equal(groq.generator(OPTIONS).promptHash, 'b83cde5142c04958');
 });
+
+// Multi-source handlers record multiSourcePromptHash instead (MS3); the same rule applies.
+test('the Claude multi-source prompt hash is pinned', () => {
+  assert.equal(claude.generator(OPTIONS).multiSourcePromptHash, 'e8d58ce885f0a33f');
+});
+
+test('the Groq multi-source prompt hash is pinned', () => {
+  assert.equal(groq.generator(OPTIONS).multiSourcePromptHash, '6855d4110b0b4bc5');
+});
