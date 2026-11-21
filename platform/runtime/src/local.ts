@@ -13,6 +13,7 @@ import { createApp, type SavedHandler } from './app.js';
 import { isAuthorized, parseCrystalTokens } from './auth.js';
 import { slimeConfigFromEnv } from './config.js';
 import { RecentRequests } from './events.js';
+import { UsageMeter } from './usage.js';
 import { syncLiveRuns } from './live-runs.js';
 
 export { syncLiveRuns };
@@ -41,8 +42,22 @@ export function toSavedHandler(value: unknown): SavedHandler {
 async function main(): Promise<void> {
   const port = Number(process.env.PORT || 8700);
   const crystalDir = process.env.SLIME_CRYSTAL_DIR;
-  const config = await slimeConfigFromEnv(process.env);
+  // Same usage counters as Lambda (USAGE#<tenant> items), so the admin's Usage, Billing and
+  // list show real numbers locally too. Set by the runner; absent means no metering.
+  let meter: UsageMeter | undefined;
+  const config = await slimeConfigFromEnv(process.env, {
+    onEvent: (event) => {
+      if (event.type === 'generated') meter?.recordTokens(event.tokens);
+    },
+  });
   const slime = await createSlime(config);
+  if (process.env.SLIME_USAGE_TABLE) {
+    const crystalCount = Object.keys(config.crystal || {}).length;
+    meter = new UsageMeter(process.env.SLIME_USAGE_TABLE, process.env.SLIME_TENANT_ID ?? '', () => ({
+      ...slime.stats().handlers,
+      crystal: crystalCount,
+    }));
+  }
   const store = config.store;
   const events = new RecentRequests();
   const crystalTokens = parseCrystalTokens(process.env.CRYSTAL_TOKENS);
@@ -53,6 +68,7 @@ async function main(): Promise<void> {
     connector: config.connector,
     crystal: config.crystal,
     events,
+    onQuery: (meta) => meter?.record(meta),
     thresholds: { liquidRuns: config.tiers.gasToLiquidRuns, crystalRuns },
     savedHandlers: async () => (store ? (await store.list(HANDLERS_NS)).map(({ value }) => toSavedHandler(value)) : []),
     ...(store && crystalDir
@@ -79,8 +95,8 @@ async function main(): Promise<void> {
         return send(res, Response.json({ error: { code: 'UNAUTHORIZED', message: 'Missing or wrong x-api-key.', retryable: false } }, { status: 401 }));
       }
       const response = await app.fetch(await toRequest(req, port));
-      // Same as Lambda: finish store writes before answering, so the admin reads current runs.
-      await slime.flush();
+      // Same as Lambda: finish store writes and usage before answering, so the admin reads current numbers.
+      await Promise.all([slime.flush(), meter?.flush()]);
       await send(res, response);
     } catch (err) {
       console.error(err);

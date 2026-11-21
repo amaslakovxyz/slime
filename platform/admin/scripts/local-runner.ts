@@ -103,6 +103,8 @@ async function start(item: Item): Promise<string> {
       SLIME_PROVIDER: item.provider,
       SLIME_TENANT_ID: item.endpointId,
       SLIME_HANDLERS_TABLE: process.env.SLIME_HANDLERS_TABLE || 'slime-handlers',
+      // Usage counters live in the control table, as with provisioned Lambdas.
+      SLIME_USAGE_TABLE: env().controlTable,
       SLIME_CRYSTAL_DIR: crystalDir,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
