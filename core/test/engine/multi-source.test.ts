@@ -8,6 +8,7 @@ import { after, describe, test } from 'node:test';
 import { SlimeConfig, type SlimeOptions } from '../../src/config/slime-config.js';
 import { postgresConnector } from '../../src/connectors/postgres/index.js';
 import { createSlime } from '../../src/create-slime.js';
+import { changedProvenance } from '../../src/request/key.js';
 import { crystallize } from '../../src/crystallize/index.js';
 import type { Slime } from '../../src/engine/types.js';
 import type { ArtifactV2, SqlStep } from '../../src/models/artifact-v2.js';
@@ -88,6 +89,7 @@ describe('multi-source handlers in the engine', () => {
     const dirs: string[] = [];
     after(() => Promise.all(dirs.map((dir) => rm(dir, { recursive: true, force: true }))));
 
+    // With main's provenance check (M.2): the job compares against the instance's current provenance.
     async function crystalOutcome(artifact: ArtifactV2): Promise<string | undefined> {
       const store = memoryStore();
       const slime = await start({ generator: stubGenerator(() => artifact), store, tiers: { gasToLiquidRuns: 1 } });
@@ -95,7 +97,7 @@ describe('multi-source handlers in the engine', () => {
       await slime.flush();
       const dir = await mkdtemp(join(tmpdir(), 'slime-crystal-'));
       dirs.push(dir);
-      const [report] = await crystallize({ connector: fakeConnector({ rows: ROWS }), store, dir, minRuns: 1, isDryRun: true });
+      const [report] = await crystallize({ connector: fakeConnector({ rows: ROWS }), store, dir, minRuns: 1, isDryRun: true, provenance: slime.provenance() });
       return report?.outcome;
     }
 
@@ -107,6 +109,14 @@ describe('multi-source handlers in the engine', () => {
     test('a handler with an API step is skipped', async () => {
       assert.equal(await crystalOutcome(COMBINED), 'skipped');
     });
+  });
+
+  test('provenance() carries the multi-source prompt hash and per-source hashes (M.2)', async () => {
+    const slime = await start({ generator: stubGenerator(() => COMBINED) });
+    const provenance = slime.provenance();
+    assert.equal(provenance.promptHash, 'stub-multi-source-prompt');
+    assert.deepEqual(Object.keys(provenance.sourceHashes ?? {}), ['db', 'notion']);
+    assert.deepEqual(changedProvenance({ ...provenance, sourceHashes: { db: 'other' } }, provenance), [], 'sourceHashes alone never make a handler stale');
   });
 
   test('against the demo database: SQL step on Postgres, API step on a fake source', async (context) => {
