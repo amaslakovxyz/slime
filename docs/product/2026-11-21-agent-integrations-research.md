@@ -32,6 +32,7 @@ The proposed product changes three things:
 | D5 | Where does execution run? | **All in slime-cloud** (tokens and execution in our Lambda). | Execution in slime-client (control/data plane split); explore local + pinned in cloud. |
 | D6 | Agent-facing surface | **MCP server + `slime` CLI.** CLI: `login`, `connect`, `pin`. MCP tools: `query`, `catalog`, `pin`. Internally the existing `{intent, input, output}`. | Own protocol + SDK; CLI only. |
 | D7 | How does the agent reuse handlers? | **Catalog first** (§4.1). The agent looks up existing handlers before writing a new intent. | Semantic intent matching (risk of serving a handler with a different meaning); both (largest scope). |
+| D11 | Does Slime own business meaning? | **No. Slime is only the liquid backend API.** It turns `{intent, input, output}` into a handler over the connected sources' schemas. Business terms and cross-source links are the agent's job: the agent clarifies with its user and writes a precise intent. Slime returns its reading in `meta.assumptions` (already in `core`). | Inferred meaning + clarifying questions + tenant glossary; a glossary page in Notion; hard-coded demo conventions. |
 | D10 | How does the D9 user connect? (revises D6) | **A remote MCP server added by URL is the main path; the `slime` CLI is optional.** The user pastes the Slime URL into their agent, signs in with OAuth, and connects Linear/Notion on a web page. Tools stay `query`, `catalog`, `pin` (D6, D7). | Keep an installed slime-client as the main path (terminal, Node and JSON configs lose much of the D9 audience); two equal paths (double onboarding and tests). |
 | D9 | Who is the user? | **PM, manager or vibecoder: not tech-savvy, needs fast iteration** (§4.7). | Engineer/tech lead; ops analytics across all three sources as the ICP. |
 | D8 | Whose credentials read the sources? | **The developer's personal OAuth**, for explore and pinned endpoints alike (§4.2). | One workspace connection per source (needs a workspace admin); personal for explore + workspace app for pinned (two connections, different data in Gas and Liquid). |
@@ -165,18 +166,19 @@ Never stored, not even as a response cache: rows and content.
    * The rule "never take authorization from `input`" (request format) still
      holds: callers of a pinned endpoint authenticate to Slime with an API key
      and cannot pick whose source token is used.
-3. **Semantic layer across sources.** Business terms ("customer", "blocked",
-   "sprint") need a dictionary (`core`'s startup dictionary, PLAN.md §4.4)
-   plus entity mapping across sources (Linear issue ↔ Notion page by link or
-   id).
-4. **Trust in answers.** The agent cannot verify a plan. Return `assumptions`
-   and provenance (which source and fields), and mark Gas answers as
-   unreviewed.
-5. **Economics and metering.** Generation cost (model) differs from request
-   cost (source calls). Needed: a per-tenant generation cap and a visible cost
-   of a pin.
-6. **DX path.** `slime login` → `slime connect linear` → MCP registered → first
-   answer, plus a dashboard of handlers (plan, tier, cost, review state).
+3. **Semantic layer across sources (decided: D11, none in Slime).** No
+   glossary or entity mapping in v0. If the intent does not name the link
+   ("the Notion page linked in the issue's attachments"), the handler may
+   guess, and `meta.assumptions` shows the guess to the agent.
+4. **Trust in answers (default).** `meta` carries `assumptions`, provenance
+   (sources and fields read) and the tier. Gas answers are marked unreviewed.
+   Wording them for a non-technical user is the agent's job (D11).
+5. **Economics and metering (default for v0).** A per-tenant hourly
+   generation cap (`GENERATION_RATE_LIMITED` already exists in `core`) and the
+   source call count in `meta`. No billing in v0.
+6. **DX path (follows D10).** Paste the MCP URL → OAuth sign-in → connect
+   Linear/Notion on a web page → first answer. A dashboard of handlers (plan,
+   tier, token owner, call cost, review state) comes after the demo path.
 7. **ICP (decided: D9) and demo.** The user is a PM, manager or vibecoder:
    not tech-savvy, iterating fast in an AI chat or app builder. This puts
    pressure on earlier decisions:
@@ -203,6 +205,5 @@ Never stored, not even as a response cache: rows and content.
 
 ## 5. Next decision
 
-Semantic layer (gap 3) for the D9 demo: how business terms ("blocked",
-"release", "spec") and the Linear issue ↔ Notion page link get defined
-without asking a non-technical user to write a dictionary.
+All gaps have a decision or a v0 default. Next: approve the design summary
+and turn it into a spec and an implementation plan.
