@@ -1,0 +1,85 @@
+{
+  "name": "@slime-cloud/core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The Slime engine as a library: answers { intent, input, output } requests with model-generated, cached, read-only SQL.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./offline": {
+      "types": "./dist/offline/index.d.ts",
+      "default": "./dist/offline/index.js"
+    },
+    "./postgres": {
+      "types": "./dist/postgres/index.d.ts",
+      "default": "./dist/postgres/index.js"
+    },
+    "./claude": {
+      "types": "./dist/claude/index.d.ts",
+      "default": "./dist/claude/index.js"
+    },
+    "./groq": {
+      "types": "./dist/groq/index.d.ts",
+      "default": "./dist/groq/index.js"
+    },
+    "./crystallize": {
+      "types": "./dist/crystallize/index.d.ts",
+      "default": "./dist/crystallize/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "default": "./dist/testing/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "slime-crystal": "./dist/crystallize/bin.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --import tsx --test 'test/**/*.test.ts'",
+    "check:pack": "node scripts/check-pack.mjs",
+    "prepack": "npm run build",
+    "live": "npm run build && node scripts/live-run.mjs",
+    "bench": "npm run build && node bench/run.mjs"
+  },
+  "dependencies": {
+    "acorn": "^8.19.0",
+    "acorn-walk": "^8.3.5",
+    "quickjs-emscripten": "^0.32.0",
+    "zod": "^4.6.7"
+  },
+  "peerDependencies": {
+    "@anthropic-ai/sdk": "^1.12.0",
+    "pg": "^8.23.1"
+  },
+  "peerDependenciesMeta": {
+    "@anthropic-ai/sdk": {
+      "optional": true
+    },
+    "pg": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@anthropic-ai/sdk": "^1.12.0",
+    "@types/node": "^22.20.5",
+    "@types/pg": "^8.23.1",
+    "pg": "^8.23.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}
