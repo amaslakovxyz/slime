@@ -30,8 +30,6 @@ interface Item {
   provider: string;
   status: string;
   url?: string;
-  /** Set when this runner has started the endpoint: it stays ours even after its secrets are gone. */
-  localRunner?: boolean;
 }
 
 interface Running {
@@ -72,9 +70,12 @@ async function portFor(endpointId: string, previous: number | undefined): Promis
     }
     throw new Error(`Port ${own} is busy (another process holds it); free it so the endpoint keeps its URL`);
   }
-  const held = new Set([...ports.entries()].filter(([id]) => id !== endpointId).map(([, port]) => port));
   for (let port = FIRST_PORT; port < FIRST_PORT + 200; port++) {
-    if (!held.has(port) && (await isFree(port))) return port;
+    if ([...ports.entries()].some(([id, held]) => id !== endpointId && held === port)) continue;
+    // Claim before awaiting: endpoints started in the same tick must not both pick this port.
+    ports.set(endpointId, port);
+    if (await isFree(port)) return port;
+    ports.delete(endpointId);
   }
   throw new Error('No free port');
 }
@@ -155,8 +156,7 @@ function stop(endpointId: string): Promise<void> {
 async function setStatus(item: Item, status: 'ready' | 'failed', extra: { url?: string; error?: string }): Promise<void> {
   const names: Record<string, string> = { '#s': 'status' };
   const values: Record<string, unknown> = { ':s': status, ':now': new Date().toISOString(), ':from': item.status };
-  let set = 'SET #s = :s, updatedAt = :now, localRunner = :lr';
-  values[':lr'] = true;
+  let set = 'SET #s = :s, updatedAt = :now';
   if (extra.url) {
     set += ', #u = :u';
     names['#u'] = 'url';
@@ -195,7 +195,10 @@ async function isOurs(endpointId: string): Promise<boolean> {
 
 async function handle(item: Item): Promise<void> {
   const id = item.endpointId;
-  if (!running.has(id) && !item.localRunner && !(await isOurs(id))) return;
+  // Every item may belong to another checkout's runner (shared DynamoDB Local): a child we run, or
+  // secrets we hold, is the only proof it is ours. Only this runner removes secrets, and it deletes
+  // the item first, so an endpoint of ours never loses its secrets while its item still exists.
+  if (!running.has(id) && !(await isOurs(id))) return;
   if (item.status === 'pending' || item.status === 'updating' || (item.status === 'ready' && !running.has(id))) {
     await stop(id);
     try {

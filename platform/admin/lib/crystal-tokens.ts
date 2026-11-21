@@ -19,14 +19,26 @@ async function read(endpointId: string): Promise<Record<string, string>> {
   }
 }
 
+/**
+ * Read-change-write of the token map, one at a time per endpoint. Only the admin's server actions
+ * write it (Crystallize and Issue token can run together), so a queue in this process is enough.
+ */
+const issuing = new Map<string, Promise<unknown>>();
+
 /** Issues a token for each key that has none; returns the keys that got one. Existing tokens are kept. */
-export async function issueCrystalTokens(endpointId: string, keys: readonly string[]): Promise<string[]> {
-  const tokens = await read(endpointId);
-  const issued = keys.filter((key) => !tokens[key]);
-  if (issued.length === 0) return [];
-  for (const key of issued) tokens[key] = 'slc_' + randomBytes(24).toString('base64url');
-  await secretStore().put(endpointId, CRYSTAL_TOKENS, JSON.stringify(tokens), { overwrite: true });
-  return issued;
+export function issueCrystalTokens(endpointId: string, keys: readonly string[]): Promise<string[]> {
+  const next = (issuing.get(endpointId) ?? Promise.resolve())
+    .catch(() => {})
+    .then(async () => {
+      const tokens = await read(endpointId);
+      const issued = keys.filter((key) => !tokens[key]);
+      if (issued.length === 0) return [];
+      for (const key of issued) tokens[key] = 'slc_' + randomBytes(24).toString('base64url');
+      await secretStore().put(endpointId, CRYSTAL_TOKENS, JSON.stringify(tokens), { overwrite: true });
+      return issued;
+    });
+  issuing.set(endpointId, next);
+  return next;
 }
 
 /** Last four characters per Crystal key, safe to render. */
