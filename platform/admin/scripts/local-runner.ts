@@ -3,7 +3,7 @@
 // admin only through slime-control, with the same state machine:
 //   pending  -> start, health check -> ready (+ url) | failed (+ error)
 //   updating -> restart (loads new Crystal modules)  -> ready | failed
-//   deleting -> stop, remove secrets and the item
+//   deleting -> stop, remove handlers, Crystal folder, the item, then secrets
 //   ready but not running (runner restarted)         -> start again, new url
 // Refuses to run without AWS_ENDPOINT_URL_DYNAMODB so it never touches real AWS.
 // The model key (ANTHROPIC_API_KEY or GROQ_API_KEY) comes from this process's
@@ -15,10 +15,12 @@ import { resolve } from 'node:path';
 import { DeleteCommand, ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { ddb } from '../lib/ddb';
 import { env } from '../lib/env';
+import { removeLocalEndpointData } from '../lib/local-teardown';
 import { secretStore } from '../lib/secrets';
 
 const RUNTIME_DIR = resolve(import.meta.dirname, '../../runtime');
 const DATA_DIR = resolve(import.meta.dirname, '../.data/endpoints');
+const handlersTable = () => process.env.SLIME_HANDLERS_TABLE || 'slime-handlers';
 const POLL_MS = 2000;
 const HEALTH_TIMEOUT_MS = 20_000;
 const FIRST_PORT = 8700;
@@ -103,7 +105,7 @@ async function start(item: Item): Promise<string> {
       CRYSTAL_TOKENS: crystalTokens ?? '',
       SLIME_PROVIDER: item.provider,
       SLIME_TENANT_ID: item.endpointId,
-      SLIME_HANDLERS_TABLE: process.env.SLIME_HANDLERS_TABLE || 'slime-handlers',
+      SLIME_HANDLERS_TABLE: handlersTable(),
       // Usage counters live in the control table, as with provisioned Lambdas.
       SLIME_USAGE_TABLE: env().controlTable,
       SLIME_CRYSTAL_DIR: crystalDir,
@@ -212,6 +214,9 @@ async function handle(item: Item): Promise<void> {
   } else if (item.status === 'deleting') {
     await stop(id);
     ports.delete(id);
+    // Handlers and the Crystal folder before the item: if this fails, the item stays
+    // `deleting` and the next tick retries (still ours: the secrets are kept until the end).
+    await removeLocalEndpointData({ endpointId: id, handlersTable: handlersTable(), dataDir: DATA_DIR });
     // Item first, secrets last: if removing secrets fails, the item is already gone, so the
     // next tick does not treat a half-deleted endpoint as "not ours" and leave it stuck.
     await ddb().send(new DeleteCommand({ TableName: env().controlTable, Key: { pk: item.pk, sk: item.sk } }));
