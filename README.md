@@ -51,7 +51,14 @@ Backend -- Slime runtime:
     the Lambda entry and DynamoDB handler store around the core. Imports
     `@slime-cloud/core` (`core/`); the core never imports it.
   - `platform/docs/` - dated reviews.
-  - `platform/admin/` and `platform/provisioner/` arrive with PR #18.
+  - [platform/provisioner/](./platform/provisioner/README.md) -
+    `slime-provisioner` Lambda: turns `pending` endpoints in `slime-control`
+    into `slime-ep-<id>` functions on the shared Gas layer, reconfigures and
+    deletes them.
+  - [platform/admin/](./platform/admin) - slime cloud admin (Next.js, runs
+    locally): sign-up, endpoints, connector settings, tier usage and bill
+    estimate, OpenTelemetry. Design:
+    [docs/architecture/slime-cloud.html](./docs/architecture/slime-cloud.html).
 - **`docs/`** - project-wide docs, indexed with statuses in
   [docs/README.md](./docs/README.md): `product/`, `architecture/`, `brand/`.
 - `.github/workflows/` (no contract file) - [ci.yml](./.github/workflows/ci.yml)
@@ -61,6 +68,7 @@ Backend -- Slime runtime:
   `platform/infra/` stack on pull requests and applies them on `main` (the landing
   page included); [terraform-quality.yml](./.github/workflows/terraform-quality.yml)
   runs tflint and trivy.
+
 
 Root files: [AGENTS.md](./AGENTS.md) (repository contract for agents),
 [justfile](./justfile) (task runner),

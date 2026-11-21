@@ -89,6 +89,10 @@ export class SlimeEngine implements Slime {
     return { mode: this.#parts.config.mode, handlers: this.#cache.countByTier(), generationsThisHour: this.#limits.generationsThisHour, generationsInFlight: this.#limits.inFlight };
   }
 
+  provenance(): HandlerProvenance {
+    return { ...this.#parts.provenance };
+  }
+
   evict(handlerKey: string): Promise<boolean> {
     return this.#cache.evict(handlerKey);
   }

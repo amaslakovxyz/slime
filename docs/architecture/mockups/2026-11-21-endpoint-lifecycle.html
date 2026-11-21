@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slime Cloud — Endpoint · Lifecycle (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Titan+One&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-canvas:#0B070C; --bg-surface:#161019; --bg-hover:#211825;
+    --border:#2D1F33; --border-bright:#442D4D;
+    --plasma:#FF1476; --plasma-shadow:#8F0043; --plasma-hi:#FF85C0;
+    --gas:#38F8B8; --gas-bg:rgba(56,248,184,.1); --gas-border:rgba(56,248,184,.35);
+    --crystal:#F2EAFF; --crystal-glow:#C4B5FD; --crystal-bg:rgba(196,181,253,.12); --crystal-border:rgba(196,181,253,.35);
+    --grey:#6E5C77; --text:#F8F6FC; --muted:#A396AC;
+    --r-card:20px; --r-ctl:12px;
+    --sans:'Plus Jakarta Sans',system-ui,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace; --title:'Titan One',var(--sans);
+  }
+  *{box-sizing:border-box} html,body{margin:0}
+  body{background:var(--bg-canvas);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.5}
+  code,.mono{font-family:var(--mono)}
+  .shell{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
+  aside{border-right:1px solid var(--border);padding:22px 18px}
+  .wordmark{font-family:var(--title);font-size:26px;background:linear-gradient(135deg,#FF85C0,#FF1476 55%,#8F0043);-webkit-background-clip:text;color:transparent;margin-bottom:28px}
+  aside a{display:block;color:var(--muted);text-decoration:none;padding:8px 10px;border-radius:10px;margin-bottom:2px}
+  aside a.on{background:var(--bg-surface);color:var(--text)}
+  main{padding:26px 40px 80px;max-width:1080px}
+  .crumbs{color:var(--muted);font-size:13px}.crumbs span{margin:0 6px}
+  .title-row{display:flex;align-items:center;gap:12px;margin:6px 0 10px}
+  h1{font-family:var(--title);font-weight:400;font-size:30px;margin:0}
+  .badge{font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:3px 9px;border-radius:999px;border:1px solid var(--gas-border);color:var(--gas);background:var(--gas-bg)}
+  .meta{display:flex;gap:8px;align-items:center;color:var(--muted);font-size:13px}
+  .chip{border:1px solid var(--border-bright);border-radius:999px;padding:2px 10px}
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin:20px 0 26px}
+  .tabs a{color:var(--muted);text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;margin-bottom:-1px}
+  .tabs a.on{color:var(--text);border-color:var(--plasma)}
+  .tabs .new{font-size:10px;color:var(--plasma-hi);margin-left:6px;vertical-align:top}
+
+  /* stage rail */
+  .rail{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-bottom:28px;position:relative}
+  .stage{position:relative;padding-top:30px;color:var(--grey);transition:color .4s}
+  .stage::before{content:"";position:absolute;top:11px;left:0;right:0;height:2px;background:var(--border)}
+  .stage:first-child::before{left:12px}.stage:last-child::before{right:calc(100% - 12px)}
+  .stage .dot{position:absolute;top:0;left:0;width:24px;height:24px;border-radius:50%;border:2px solid var(--border-bright);background:var(--bg-canvas);display:grid;place-items:center;font-size:11px;transition:all .4s}
+  .stage b{display:block;font-size:13px;font-weight:600}
+  .stage small{font-size:12px;color:var(--grey)}
+  .stage.done{color:var(--text)}
+  .stage.done .dot{border-color:var(--plasma);background:var(--plasma);color:#fff;box-shadow:0 0 14px rgba(255,20,118,.5)}
+  .stage.done::before{background:linear-gradient(90deg,var(--plasma),var(--plasma-shadow))}
+  .stage.s-gas.done .dot{border-color:var(--gas);background:var(--gas);color:#000;box-shadow:0 0 14px rgba(56,248,184,.5)}
+  .stage.s-crystal.done .dot{border-color:var(--crystal-glow);background:var(--crystal);color:#000;box-shadow:0 0 16px rgba(196,181,253,.7)}
+  .stage.now .dot{animation:pulse 1.4s infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,20,118,.5)}50%{box-shadow:0 0 0 7px rgba(255,20,118,0)}}
+
+  .card{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--r-card);padding:22px 24px;margin-bottom:18px}
+  .card h2{font-size:15px;font-weight:600;margin:0 0 2px;display:flex;align-items:center;gap:10px}
+  .card .sub{color:var(--muted);margin:0 0 16px;font-size:13px}
+  .num{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--bg-hover);border:1px solid var(--border-bright);font-size:11px;color:var(--muted)}
+
+  .seg{display:inline-flex;background:var(--bg-canvas);border:1px solid var(--border);border-radius:10px;padding:3px;margin-bottom:10px}
+  .seg button{background:none;border:0;color:var(--muted);font:inherit;font-size:12px;padding:5px 12px;border-radius:7px;cursor:pointer}
+  .seg button.on{background:var(--bg-hover);color:var(--text)}
+  .copy{display:flex;align-items:flex-start;gap:10px;background:var(--bg-canvas);border:1px solid var(--border);border-radius:var(--r-ctl);padding:12px 14px}
+  .copy pre{margin:0;flex:1;white-space:pre-wrap;word-break:break-all;font-family:var(--mono);font-size:12.5px;color:var(--plasma-hi)}
+  .btn{font:inherit;font-size:13px;font-weight:600;border-radius:10px;padding:8px 14px;cursor:pointer;border:1px solid var(--border-bright);background:var(--bg-hover);color:var(--text);white-space:nowrap}
+  .btn:hover{border-color:var(--plasma-hi)}
+  .btn-plasma{background:linear-gradient(135deg,#FF1476,#8F0043);border-color:transparent;color:#fff;box-shadow:0 6px 20px rgba(255,20,118,.35)}
+  .btn-crystal{background:var(--crystal);color:#1a1020;border-color:transparent;box-shadow:0 0 22px rgba(196,181,253,.45)}
+  .btn:disabled{opacity:.35;cursor:not-allowed;box-shadow:none}
+  .wait{display:flex;align-items:center;gap:10px;margin-top:14px;color:var(--muted);font-size:13px}
+  .wait i{width:8px;height:8px;border-radius:50%;background:var(--plasma);animation:pulse 1.4s infinite}
+  .wait.ok{color:var(--gas)} .wait.ok i{background:var(--gas);animation:none}
+
+  table{width:100%;border-collapse:collapse}
+  th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--grey);font-weight:600;text-align:left;padding:0 10px 10px}
+  td{padding:12px 10px;border-top:1px solid var(--border);vertical-align:middle}
+  tr.flash td{animation:flash 1s}
+  @keyframes flash{from{background:rgba(255,20,118,.12)}to{background:transparent}}
+  .hash{font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .intent{max-width:360px}
+  .pill{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;padding:3px 9px;border-radius:999px;font-weight:600;white-space:nowrap}
+  .p-gas{color:var(--gas);background:var(--gas-bg);border:1px solid var(--gas-border)}
+  .p-liquid{color:#fff;background:rgba(255,20,118,.2);border:1px solid rgba(255,20,118,.6);box-shadow:0 0 14px rgba(255,20,118,.25)}
+  .p-crystal{color:#1a1020;background:var(--crystal);border:1px solid var(--crystal-glow);box-shadow:0 0 14px rgba(196,181,253,.45)}
+  .prog{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+  .bar{width:90px;height:5px;border-radius:5px;background:var(--bg-hover);overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:5px;transition:width .4s}
+  .review{font-size:12px;color:var(--muted)}
+  .review.ok{color:var(--gas)} .review.run{color:var(--plasma-hi)}
+  .empty{color:var(--grey);text-align:center;padding:26px 0 8px}
+  .chk{accent-color:var(--crystal-glow);width:16px;height:16px}
+
+  .feed{margin-top:14px;font-family:var(--mono);font-size:12px;color:var(--grey);max-height:110px;overflow:hidden}
+  .feed div{display:grid;grid-template-columns:80px 70px 64px 1fr 70px;gap:8px;padding:2px 0}
+  .feed .t-gas{color:var(--gas)} .feed .t-liquid{color:var(--plasma-hi)} .feed .t-crystal{color:var(--crystal-glow)}
+
+  .crys{border-color:var(--crystal-border);background:radial-gradient(500px 200px at 100% 0%,rgba(196,181,253,.10),transparent 70%),var(--bg-surface)}
+  .crys-row{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+  .repo{display:flex;gap:8px;align-items:center;color:var(--muted);font-size:13px}
+  .steps{margin:16px 0 0;padding:0;list-style:none;font-size:13px}
+  .steps li{padding:4px 0;color:var(--grey)} .steps li.ok{color:var(--text)} .steps li.ok::before{content:"✓ ";color:var(--gas)}
+  .steps li.run::before{content:"◌ ";color:var(--plasma-hi)}
+  .pr{display:none;margin-top:14px;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--crystal-border);border-radius:var(--r-ctl);background:var(--crystal-bg)}
+  .pr.show{display:flex}
+  .pr a{color:var(--crystal);font-weight:600}
+
+  .sim{position:fixed;right:22px;bottom:22px;display:flex;gap:8px;background:rgba(22,16,25,.92);border:1px solid var(--border-bright);padding:10px;border-radius:14px;backdrop-filter:blur(6px)}
+  .sim span{color:var(--grey);font-size:11px;align-self:center;margin-right:4px;letter-spacing:.06em;text-transform:uppercase}
+  .hyp{font-size:11px;color:var(--plasma-hi);border:1px dashed var(--plasma-shadow);border-radius:8px;padding:2px 8px;margin-left:auto}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside>
+    <div class="wordmark">slime</div>
+    <a href="#">Dashboard</a><a href="#" class="on">Endpoints</a><a href="#">Billing</a>
+  </aside>
+  <main>
+    <div style="margin-bottom:18px;padding:12px 16px;border:1px dashed var(--plasma-shadow);border-radius:12px;background:rgba(255,20,118,.08);color:var(--muted);font-size:13px;line-height:1.55">
+      <b style="color:var(--plasma-hi)">Aspirational mockup — diverges from the shipped tab.</b>
+      As built (<code class="mono">feat/local-admin</code>): Crystallize writes modules into the endpoint's own folder and <b>restarts it (no pull request)</b>; the <b>MCP</b> snippet tab is deferred until <code class="mono">/mcp</code> exists. The “→ open PR”, repo chips and MCP tab below show the intended direction, not current behaviour. See the design note (decisions L1, L6).
+    </div>
+    <div class="crumbs">Endpoints<span>/</span><span class="mono">ep-3f9a1c07d2</span></div>
+    <div class="title-row"><h1>shop</h1><span class="badge">ready</span><span class="hyp">mockup · hypothesis</span></div>
+    <div class="meta"><span class="chip">Claude</span><span class="chip">Postgres · localhost:54329</span><code>http://localhost:8787/</code></div>
+
+    <nav class="tabs">
+      <a href="#">Overview</a><a href="#" class="on">Lifecycle<span class="new">NEW</span></a><a href="#">Connector</a><a href="#">Usage</a><a href="#">Settings</a>
+    </nav>
+
+    <!-- stage rail -->
+    <div class="rail">
+      <div class="stage done" id="st1"><div class="dot">✓</div><b>Connected</b><small>database reachable, read-only</small></div>
+      <div class="stage s-gas now" id="st2"><div class="dot">2</div><b>Agent linked</b><small id="st2s">waiting for the first request</small></div>
+      <div class="stage" id="st3"><div class="dot">3</div><b>Liquid</b><small id="st3s">a request repeats and passes review</small></div>
+      <div class="stage s-crystal" id="st4"><div class="dot">4</div><b>Crystal</b><small id="st4s">proven code lands in your repo</small></div>
+    </div>
+
+    <!-- 1. hand to agent -->
+    <section class="card">
+      <h2><span class="num">1</span>Give this endpoint to your agent</h2>
+      <p class="sub">Paste one of these into the agent that builds your app. It asks for data in words; Slime writes the API.</p>
+      <div class="seg" id="seg">
+        <button class="on" data-k="mcp">Claude Code / Cursor (MCP)</button>
+        <button data-k="prompt">Prompt</button>
+        <button data-k="curl">HTTP</button>
+      </div>
+      <div class="copy"><pre id="snippet"></pre><button class="btn" onclick="copySnippet(this)">Copy</button></div>
+      <div class="wait" id="wait"><i></i><span>Waiting for the first request from your agent…</span></div>
+    </section>
+
+    <!-- 2. requests take shape -->
+    <section class="card">
+      <h2><span class="num">2</span>Requests taking shape</h2>
+      <p class="sub">Every distinct request becomes a handler. New ones start as <b style="color:var(--gas)">Gas</b>; after 3 runs and a review they turn <b style="color:var(--plasma-hi)">Liquid</b> and stop calling the model.</p>
+      <table>
+        <thead><tr><th style="width:28px"></th><th>Handler</th><th>Intent</th><th>Stage</th><th>Progress</th><th>Review</th></tr></thead>
+        <tbody id="rows"><tr><td colspan="6" class="empty">No requests yet.</td></tr></tbody>
+      </table>
+      <div class="feed" id="feed"></div>
+    </section>
+
+    <!-- 3. crystallize -->
+    <section class="card crys">
+      <h2><span class="num">3</span>Crystallize</h2>
+      <p class="sub">Liquid handlers with 10+ runs are proven. Crystallize turns them into plain code, checks it returns the same answers on recorded inputs, and opens a pull request. Merged = Crystal, no sandbox.</p>
+      <div class="crys-row">
+        <div class="repo">Target repo <span class="chip mono">acme/shop-api</span> <span class="chip mono">slime/crystal/</span></div>
+        <button class="btn btn-crystal" id="crysBtn" disabled onclick="crystallize()">Crystallize 0 handlers → open PR</button>
+      </div>
+      <ul class="steps" id="steps"></ul>
+      <div class="pr" id="pr"><span>⬡</span><div style="flex:1"><a href="#">#14 crystal: <span id="prN"></span></a><div class="hash" id="prState">open · waiting for review</div></div><button class="btn" id="mergeBtn" onclick="merge()">Simulate merge</button></div>
+    </section>
+  </main>
+</div>
+
+<div class="sim"><span>Demo</span><button class="btn btn-plasma" id="simBtn" onclick="toggleSim()">▶ Simulate agent traffic</button><button class="btn" onclick="location.reload()">Reset</button></div>
+
+<script>
+const URL_ = 'http://localhost:8787/', KEY = 'slm_…OBTx';
+const SNIP = {
+  mcp: `claude mcp add --transport http slime ${URL_}mcp --header "x-api-key: ${KEY}"`,
+  prompt: `Use Slime for all data this app needs. POST ${URL_}v0/query with x-api-key: ${KEY}\nbody: { "intent": "<what you need, in words>", "input": { ...values }, "output": <JSON shape you want back> }\nReuse the exact same intent text for the same need.`,
+  curl: `curl -X POST ${URL_}v0/query -H "x-api-key: ${KEY}" -H "content-type: application/json" \\\n  -d '{"intent":"top N accounts by total paid invoice amount","input":{"limit":5},"output":[{"name":"string","totalPaidCents":"integer"}]}'`
+};
+const seg = document.getElementById('seg'), snippet = document.getElementById('snippet');
+function setSnip(k){ snippet.textContent = SNIP[k]; [...seg.children].forEach(b=>b.classList.toggle('on', b.dataset.k===k)); }
+seg.onclick = e => e.target.dataset.k && setSnip(e.target.dataset.k); setSnip('mcp');
+function copySnippet(b){ navigator.clipboard?.writeText(snippet.textContent); b.textContent='Copied'; setTimeout(()=>b.textContent='Copy',1200); }
+
+const LIQ = 3, CRY = 10;
+const H = [
+  {key:'a3f9c2e1', intent:'top N accounts by total paid invoice amount, highest first', w:5},
+  {key:'7be01493', intent:'paid revenue per month since a date', w:4},
+  {key:'c41d88a0', intent:'failed invoices since a date', w:2},
+  {key:'19f0ab5d', intent:'plans with accounts in a country', w:3},
+  {key:'e2210c7f', intent:'accounts per plan', w:1},
+];
+const state = {}; let total = 0, timer = null, crystalStarted = false;
+
+function tierOf(h){ return h.crystal ? 'crystal' : h.liquid ? 'liquid' : 'gas'; }
+function pick(){ const pool = H.flatMap(h => Array(h.w).fill(h)); return pool[Math.floor(Math.random()*pool.length)]; }
+
+function hit(){
+  const def = pick(); let h = state[def.key];
+  const first = !h;
+  if (first) h = state[def.key] = {...def, runs:0, review:'none', liquid:false, crystal:false, ready:false};
+  h.runs++; total++;
+  if (!h.liquid && h.runs >= LIQ && h.review === 'none') { h.review = 'reviewing'; setTimeout(()=>{ h.review='approved'; h.liquid=true; render(h.key); }, 900); }
+  if (h.liquid && !h.crystal && h.runs >= CRY) h.ready = true;
+  const t = tierOf(h);
+  const ms = first ? (900+Math.random()*600).toFixed(0)+' ms' : t==='crystal' ? '0.4 ms' : (3+Math.random()*4).toFixed(1)+' ms';
+  feed(h, t, first ? 'miss' : 'hit', ms);
+  render(h.key);
+  if (total > 70) toggleSim(false);
+}
+
+function feed(h, t, c, ms){
+  const f = document.getElementById('feed'), d = document.createElement('div');
+  d.innerHTML = `<span>${new Date().toLocaleTimeString()}</span><span>#${h.key.slice(0,6)}</span><span class="t-${t}">${t}</span><span>${c}</span><span style="text-align:right">${ms}</span>`;
+  f.prepend(d); while (f.children.length > 5) f.lastChild.remove();
+}
+
+function render(flashKey){
+  const hs = Object.values(state), rows = document.getElementById('rows');
+  if (!hs.length) return;
+  rows.innerHTML = hs.map(h => {
+    const t = tierOf(h);
+    let target = t==='gas' ? LIQ : CRY, pct = Math.min(100, h.runs/target*100), color = t==='gas' ? 'var(--gas)' : 'var(--plasma)';
+    let label = t==='gas' ? `${Math.min(h.runs,LIQ)}/${LIQ} to Liquid` : t==='liquid' ? (h.ready ? 'ready to crystallize' : `${h.runs}/${CRY} to Crystal`) : `${h.runs} runs`;
+    if (t==='crystal'){ pct = 100; color = 'var(--crystal-glow)'; }
+    if (h.ready) color = 'var(--crystal-glow)';
+    const rv = {none:['—',''], reviewing:['reviewing…','run'], approved:['approved','ok']}[h.review];
+    const box = h.ready && !h.crystal ? `<input type="checkbox" class="chk" ${h.sel!==false?'checked':''} ${crystalStarted?'disabled':''} onchange="state['${h.key}'].sel=this.checked;updBtn()">` : '';
+    return `<tr class="${h.key===flashKey?'flash':''}"><td>${box}</td><td class="hash">#${h.key.slice(0,6)}</td><td class="intent">${h.intent}</td>
+      <td><span class="pill p-${t}">${t}</span></td>
+      <td><div class="prog"><div class="bar"><i style="width:${pct}%;background:${color}"></i></div>${label}</div></td>
+      <td class="review ${rv[1]}">${rv[0]}</td></tr>`;
+  }).join('');
+  stages(); updBtn();
+}
+
+function stages(){
+  const hs = Object.values(state);
+  const set = (id, done, now, txt) => { const el = document.getElementById(id); el.classList.toggle('done', done); el.classList.toggle('now', now && !done); if (txt) document.getElementById(id+'s').textContent = txt; if (done) el.querySelector('.dot').textContent='✓'; };
+  const linked = hs.length > 0, liq = hs.filter(h=>h.liquid&&!h.crystal).length, cry = hs.filter(h=>h.crystal).length;
+  set('st2', linked, true, linked ? `${total} requests · ${hs.length} handlers` : null);
+  set('st3', liq+cry > 0, linked, liq+cry ? `${liq+cry} handlers stopped calling the model` : null);
+  set('st4', cry > 0, liq > 0, cry ? `${cry} handlers in acme/shop-api` : null);
+  const w = document.getElementById('wait');
+  if (linked){ w.classList.add('ok'); w.querySelector('span').textContent = `Agent connected · first request at ${firstAt}`; }
+}
+let firstAt = null;
+
+function selected(){ return Object.values(state).filter(h => h.ready && !h.crystal && h.sel !== false); }
+function updBtn(){ const b = document.getElementById('crysBtn'), n = selected().length; b.disabled = !n || crystalStarted; b.textContent = `Crystallize ${n} handler${n===1?'':'s'} → open PR`; }
+
+function crystallize(){
+  const hs = selected(); crystalStarted = true; updBtn(); render();
+  const ul = document.getElementById('steps');
+  const steps = [`Optimizer rewrites ${hs.length} handler${hs.length>1?'s':''}`, 'Equivalence check on recorded inputs (same output, same order)', 'Allowlist + read-only SQL lint', `Write slime/crystal/*.mjs + manifest.json`, 'Open pull request'];
+  ul.innerHTML = steps.map(s=>`<li>${s}</li>`).join('');
+  [...ul.children].forEach((li,i)=>{ setTimeout(()=>{ li.className='run'; }, i*700); setTimeout(()=>{ li.className='ok'; if(i===steps.length-1){ const pr=document.getElementById('pr'); pr.classList.add('show'); document.getElementById('prN').textContent = hs.map(h=>'#'+h.key.slice(0,6)).join(', '); pr._hs = hs.map(h=>h.key); } }, i*700+600); });
+}
+function merge(){
+  const pr = document.getElementById('pr');
+  pr._hs.forEach(k => { state[k].crystal = true; state[k].ready = false; });
+  document.getElementById('prState').textContent = 'merged · deployed — served without the sandbox';
+  document.getElementById('mergeBtn').remove(); crystalStarted = false; render();
+}
+
+function toggleSim(force){
+  const b = document.getElementById('simBtn'), on = force ?? !timer;
+  if (on && !timer){ if(!firstAt) firstAt = new Date().toLocaleTimeString(); hit(); timer = setInterval(hit, 550); b.textContent = '❚❚ Pause'; }
+  else { clearInterval(timer); timer = null; b.textContent = '▶ Simulate agent traffic'; }
+}
+</script>
+</body>
+</html>

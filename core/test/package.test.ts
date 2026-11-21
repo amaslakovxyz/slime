@@ -30,6 +30,7 @@ test('the public entry exports createSlime, the config, the stores and errors, a
     'SlimeConfigError',
     'SlimeError',
     'SourceError',
+    'changedProvenance',
     'createSlime',
     'defineApiSource',
     'fileStore',

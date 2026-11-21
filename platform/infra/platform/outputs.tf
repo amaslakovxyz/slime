@@ -14,3 +14,16 @@ output "runtime_function_name" {
 output "handlers_table" {
   value = aws_dynamodb_table.handlers.name
 }
+
+output "control_table" {
+  value = aws_dynamodb_table.control.name
+}
+
+output "gas_layer_arn" {
+  description = "Gas layer version new endpoints are provisioned with."
+  value       = aws_lambda_layer_version.gas.arn
+}
+
+output "provisioner_function_name" {
+  value = aws_lambda_function.provisioner.function_name
+}

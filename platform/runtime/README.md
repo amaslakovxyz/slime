@@ -17,12 +17,17 @@ replace the `file:` path with a version; nothing else changes.
 
 | File | Role |
 |---|---|
-| [src/lambda.ts](src/lambda.ts) | Lambda entry: SSM settings at cold start, `x-api-key` auth, lazy `createSlime()` (503 `NOT_READY` and retry), a capped `flush()` before each response |
+| [src/lambda.ts](src/lambda.ts) | Lambda entry: SSM settings at cold start (comma-separated `SLIME_SSM_PREFIX` paths, later overrides earlier), `x-api-key` auth, lazy `createSlime()` (503 `NOT_READY` and retry), a capped `flush()` (store, reviews, usage) before each response |
 | [src/config.ts](src/config.ts) | `SlimeConfig` from env, with the same variable names the sandbox runtime read |
-| [src/app.ts](src/app.ts) | HTTP routes on the core's `Slime` API (`/v0/query`, `/healthz`, `/v0/handlers`) |
+| [src/app.ts](src/app.ts) | HTTP routes on the core's `Slime` API (`/v0/query`, `/healthz`, `/v0/handlers`, a Crystal's own route `/v0/e/<key>`; local-only `/v0/events`, `/v0/lifecycle`, `/v0/crystallize` when their parts are given); the Crystal route refuses missing and unknown input names |
+| [src/local.ts](src/local.ts) | Local entry: the same runtime as a Node HTTP server on `PORT`, started by the admin's local runner; flushes before each response, crystallizes into `SLIME_CRYSTAL_DIR`; marks stale saved handlers; collects `warning` events for `/v0/lifecycle` |
+| [src/events.ts](src/events.ts) | The last 50 answered requests (handler, tier, cache, ms), memory only |
+| [src/auth.ts](src/auth.ts) | `keyMatches` and `isAuthorized`, shared by both entries: the endpoint key opens every route; a Crystal's own token (`CRYSTAL_TOKENS`, JSON `{key: token}`) opens only `POST /v0/e/<its key>` |
+| [src/live-runs.ts](src/live-runs.ts) | Copies live Liquid run counts to the store (the core saves a handler only when it turns Liquid): before Crystallize locally, at most every `SLIME_RUNS_SYNC_MS` (default 60 s) on Lambda flush |
 | [src/store-dynamodb.ts](src/store-dynamodb.ts) | The core's `SlimeStore` Port on the existing table; one partition per tenant |
+| [src/usage.ts](src/usage.ts) | Daily usage counters (`USAGE#<tenant>` / `YYYY-MM-DD` in `SLIME_USAGE_TABLE`): requests and latency per tier, generations, LLM tokens, handler snapshot per tier. Set only on provisioned endpoints |
 | [src/legacy-handlers.ts](src/legacy-handlers.ts), [src/migrate-cli.ts](src/migrate-cli.ts) | One-off copy of the sandbox runtime's handlers into the core's format |
-| [scripts/build.mjs](scripts/build.mjs) | Deterministic bundle into `dist/lambda/` (same source, same zip hash) |
+| [scripts/build.mjs](scripts/build.mjs) | Deterministic bundle into `dist/lambda/` (same source, same zip hash), copied to `dist/layer/slime/` for the Gas layer |
 | `offline/handlers.json` | Canned handlers for `SLIME_PROVIDER=offline` |
 
 ## Commands
@@ -31,7 +36,7 @@ replace the `file:` path with a version; nothing else changes.
 (cd ../.. && npm ci && npm run build -w @slime-cloud/core) && npm ci
 npm run typecheck
 npm test              # no AWS, no database
-npm run build         # dist/lambda/, zipped by Terraform
+npm run build         # dist/lambda/ and dist/layer/, zipped by Terraform
 ```
 
 ## Settings
@@ -52,9 +57,10 @@ are the sandbox runtime's, so existing parameters keep working:
 | `MAX_GENERATIONS_PER_HOUR`, `ROW_CAP`, `STATEMENT_TIMEOUT_MS`, ... | limits and tiers (`src/config.ts` lists them) |
 | `SLIME_FLUSH_LIMIT_MS` | how long a response waits for background work (default 5000) |
 | `SLIME_HANDLERS_TABLE`, `SLIME_TENANT_ID` | set by Terraform |
+| `CRYSTAL_TOKENS` | JSON `{ "<crystal key>": "slc_…" }`: each Crystal's own token for `POST /v0/e/<key>` |
+| `PORT`, `CRYSTAL_MIN_RUNS` | local entry only (set by the admin's runner): listen port; runs a Liquid handler needs before Crystallize (default 10). With `SLIME_CRYSTAL_DIR` set, the local entry also mounts `POST /v0/crystallize` and writes Crystal modules there |
 
-No longer read: `META_DATABASE_URL`, `SLIME_META_TABLE`, `SLIME_THINKING`,
-`CRYSTAL_MIN_RUNS` (now `crystallize()`'s `minRuns`), `PORT`.
+No longer read: `META_DATABASE_URL`, `SLIME_META_TABLE`, `SLIME_THINKING`.
 
 ## Switching a deployed runtime to the core (M7)
 

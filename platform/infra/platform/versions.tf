@@ -34,3 +34,10 @@ provider "aws" {
     }
   }
 }
+
+# Same account and region, no default_tags: for resources whose tag-on-create
+# the CI apply role may not perform (the provisioner's event source mapping).
+provider "aws" {
+  alias  = "untagged"
+  region = var.region
+}
