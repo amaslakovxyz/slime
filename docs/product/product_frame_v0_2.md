@@ -207,9 +207,11 @@ A Liquid handler frozen into plain code and hosted by Slime.
   logs a startup warning and shows it in the Lifecycle tab. Re-crystallizing
   in place is not built: core answers `already` for a key that is in the
   manifest, and the saved Liquid record behind it keeps its old provenance.
-  Today the fix is to delete the Endpoint, let the handler regenerate and
-  turn Liquid again, then crystallize (same Crystal key); `slime
-  uncrystallize` would make this one step. A breaking migration gives a
+  Today the only supported fix is to delete the Endpoint and create a new
+  one, let the handler regenerate and turn Liquid again, then crystallize
+  (same Crystal key). That also changes the URL, the `slm_` key and every
+  `slc_` token, so pages and agent snippets holding them break; `slime
+  uncrystallize` would make this one step on the same Endpoint. A breaking migration gives a
   database error at call time; a semantic one gives a silently wrong answer —
   a stated limit.
 * Removal: `slime uncrystallize <crystal key>` is planned, not built. Today a
