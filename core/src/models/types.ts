@@ -54,6 +54,8 @@ export interface Generator {
   /** `model` and `promptHash` are recorded in each handler's provenance (§4.7). */
   readonly model: string;
   readonly promptHash: string;
+  /** Hash of the multi-source prompts, recorded instead of promptHash when API sources are configured (MS3). Optional so existing custom generators compile. */
+  readonly multiSourcePromptHash?: string;
   generate(request: GenerationRequest, options: ModelCallOptions): Promise<GenerationResult>;
 }
 
