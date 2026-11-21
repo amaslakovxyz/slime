@@ -1,0 +1,17 @@
+// Every saved handler records its generator's promptHash; a changed hash
+// regenerates all of them in explore mode (§4.7). These pins make any change
+// to prompt text, or to how a provider assembles it, a deliberate one.
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { claude } from '../src/claude/index.js';
+import { groq } from '../src/groq/index.js';
+
+const OPTIONS = { apiKey: 'unused', model: 'any-model' };
+
+test('the Claude generator prompt hash is pinned', () => {
+  assert.equal(claude.generator(OPTIONS).promptHash, '313a77512d9f381c');
+});
+
+test('the Groq generator prompt hash is pinned', () => {
+  assert.equal(groq.generator(OPTIONS).promptHash, 'b83cde5142c04958');
+});
