@@ -3,6 +3,11 @@
 * **Status:** Record (research behind
   [product_frame_v0_2.md](product_frame_v0_2.md), which unifies this track's
   decisions; not a contract)
+* **Vocabulary superseded (2026-11-21):** "pin", "pinned endpoint",
+  `expect`/`contractId`, and D10's remote-MCP-first path are superseded by the
+  calibrated vocabulary and admin-first flow in
+  [product_frame_v0_2.md](product_frame_v0_2.md). This record is kept as
+  written.
 * **Date:** 2026-11-21
 * **Author:** @Tony (with an agent)
 
