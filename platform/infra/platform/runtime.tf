@@ -142,10 +142,12 @@ data "aws_iam_policy_document" "runtime" {
   }
 
   # Crystal manifests and modules: read on every tenant build, written by
-  # Crystallize (conditional PUT on the manifest's ETag).
+  # Crystallize (conditional PUT on the manifest's ETag). No delete: teardown is
+  # the admin's, and this role runs generated code for every endpoint, so it must
+  # not be able to erase the versions that undo a bad Crystallize.
   statement {
     sid       = "CrystalObjects"
-    actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:DeleteObjectVersion"]
+    actions   = ["s3:GetObject", "s3:PutObject"]
     resources = ["${aws_s3_bucket.crystals.arn}/endpoints/*"]
   }
 
@@ -158,18 +160,6 @@ data "aws_iam_policy_document" "runtime" {
     sid       = "CrystalList"
     actions   = ["s3:ListBucket"]
     resources = [aws_s3_bucket.crystals.arn]
-  }
-
-  statement {
-    sid       = "CrystalVersions"
-    actions   = ["s3:ListBucketVersions"]
-    resources = [aws_s3_bucket.crystals.arn]
-
-    condition {
-      test     = "StringLike"
-      variable = "s3:prefix"
-      values   = ["endpoints/*"]
-    }
   }
 }
 

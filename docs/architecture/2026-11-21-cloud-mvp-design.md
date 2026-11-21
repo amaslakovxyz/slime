@@ -220,7 +220,7 @@ All customer and admin traffic goes to the one `slime-runtime` Function URL. `<i
 |---|---|---|---|
 | `/ep/<id>/v0/query` POST | endpoint `slm_` key | Gas / Liquid / Crystal answer | Gas: this instance; Liquid: DynamoDB; Crystal: S3 |
 | `/ep/<id>/v0/e/<crystal key>` POST | that Crystal's `slc_` token, or the `slm_` key | Crystal answer only; refuses missing/unknown input names (as today) | S3 |
-| `/ep/<id>/healthz` GET | `slm_` | `{ok, database, …stats}`, 503 when the DB safety check fails | per instance |
+| `/ep/<id>/healthz` GET | `slm_` | `{ok, database, …stats}`, 503 when the DB safety check fails; `?fresh=1` re-reads the endpoint's settings first, in the same call (the admin's check after a change) | per instance |
 | `/ep/<id>/v0/handlers` GET, `/ep/<id>/v0/handlers/<key>` DELETE | `slm_` | as today | per instance + DynamoDB |
 | `/ep/<id>/v0/lifecycle` GET | `slm_` | live + saved + Crystal rows, thresholds, warnings | merges this instance's Gas with DynamoDB and S3 |
 | `/ep/<id>/v0/events` GET | `slm_` | recent requests feed | **this instance only** (approximate in the cloud) |
@@ -263,10 +263,10 @@ The status set stays `pending | provisioning | ready | failed | updating | delet
 | Event | Local mode (runner) | Cloud mode (admin, synchronous) |
 |---|---|---|
 | Create | item `pending` → runner starts process → `ready`+url / `failed` | SSM puts → item `provisioning` with url → `GET <url>healthz` (retry every 1 s up to 20 s) → `ready` / `failed`+error |
-| Connector or provider change | item `updating` → runner restarts → `ready` / `failed` | SSM put → item `updating` → `POST <url>v0/reload` → `GET <url>healthz` → `ready` / `failed`+error |
+| Connector or provider change | item `updating` → runner restarts → `ready` / `failed` | SSM put → item `updating` → `GET <url>healthz?fresh=1` (reload and check in one invocation, so another instance's cache cannot answer) → `ready` / `failed`+error |
 | Crystallize | runtime writes the folder → admin issues tokens → `requestRestart` (`updating`) → runner restarts → `ready` | runtime writes S3 and swaps its own engine → admin issues tokens → `POST <url>v0/reload` → status stays `ready`; other instances catch up within the TTL |
-| Delete | item `deleting` → runner stops the process, tears down → item removed | item `deleting` → shared teardown (handlers partition, S3 prefix, SSM path) → item removed; any error → `failed`+error, deletable again |
-| Interrupted action (admin Lambda timeout or crash) | n/a | item can stay `provisioning` or `updating`. Cloud mode lets **Delete** start from any status except `deleting`, and the settings page offers **Retry check** (healthz → `ready`/`failed`) |
+| Delete | item `deleting` → runner stops the process, tears down → item removed | item `deleting` → shared teardown (SSM path first, so the endpoint stops serving within one TTL; then handlers partition, S3 prefix) → item removed; any error → `failed`+error, deletable again |
+| Interrupted action (admin Lambda timeout or crash) | n/a | item can stay `provisioning`, `updating` or `deleting`. Cloud mode lets **Delete** start from any status, including a `deleting` older than 90 s (the admin timeout is 60 s); the settings page offers **Retry check** (healthz → `ready`/`failed`) |
 
 ### Runtime: one Lambda, many endpoints
 
@@ -359,11 +359,7 @@ s3://slime-crystals-025772230981/endpoints/<id>/crystal/<crystal key>.mjs
   - `readLifecycle` uses an 8 s timeout instead of 3 s and drops the "Is `npm run local` up?" copy;
   - delete uses the shared teardown with `SsmSecretStore` and an S3 prefix remover.
 - **Invite-only.** `createUser` checks the lower-cased email against `ADMIN_ALLOWED_EMAILS` (comma-separated, lower-cased, trimmed) when the variable is set, and throws `NOT_INVITED` otherwise. The login page maps it to "This email is not invited". Existing users can still sign in.
-- **Shared teardown.** `lib/teardown.ts` replaces `local-teardown.ts` and the provisioner's `teardown.ts`. It removes, in order:
-  1. the handlers partition (BatchWrite, with retries);
-  2. the Crystal storage (folder locally, S3 prefix in the cloud);
-  3. the control item;
-  4. the secrets (file or SSM).
+- **Shared teardown.** `lib/teardown.ts` replaces `local-teardown.ts` and the provisioner's `teardown.ts`. Locally it removes, in order: the handlers partition (BatchWrite, with retries), the Crystal folder, the control item, the secrets (the runner treats held secrets as ownership). In the cloud the SSM secrets go first (the shared runtime serves an id exactly as long as its SSM path exists, so access is revoked even if a later step fails), then handlers, every S3 object version, the control item.
 
   Usage items stay. The local runner calls it in local mode and the delete action calls it in cloud mode.
 
