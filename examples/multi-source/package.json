@@ -1,0 +1,16 @@
+{
+  "name": "slime-example-multi-source",
+  "private": true,
+  "description": "One Slime instance over Postgres, Notion and a public films API (core/docs/multi-source.md).",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test 'test/**/*.test.mjs'"
+  },
+  "dependencies": {
+    "@slime-cloud/core": "file:../../core"
+  }
+}
