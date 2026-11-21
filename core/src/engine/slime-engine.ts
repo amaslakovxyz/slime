@@ -1,22 +1,26 @@
 import type { SlimeConfig } from '../config/slime-config.js';
+import { sqlOf } from '../models/artifact-v2.js';
 import type { SlimeEvent } from '../config/options.js';
 import type { Dictionary } from '../dictionary/dictionary.js';
 import { SlimeError } from '../shared/errors.js';
-import { runCrystal } from './crystal/run-crystal.js';
-import type { CrystalHandler } from './crystal/types.js';
+import { answerFromCrystal } from './crystal-answer.js';
+import { executionDeps, generationDeps } from './engine-deps.js';
 import type { Generator } from '../models/types.js';
 import type { SandboxRunner } from '../sandbox/types.js';
 import { requestKey, type HandlerProvenance } from '../request/key.js';
 import { parseRequest, type InputValues, type ParsedRequest, type SlimeRequest } from '../request/parse.js';
 import { checkParamTypes } from '../request/params.js';
 import type { SlimeStore } from '../stores/types.js';
+import type { ApiSchema } from '../sources/types.js';
+import { closeApiSources } from '../sources/close-sources.js';
 import { BackgroundTasks } from './background.js';
 import { Coalescer } from './coalescer.js';
 import { emitSafely, errorEvent, generatedEvent } from './events.js';
 import { executeArtifact, type Execution } from './execute.js';
-import { generateHandler, type GenerationDeps, type GenerationOutcome } from './generate.js';
+import { generateHandler, type GenerationOutcome } from './generate.js';
 import { GenerationLimits } from './generation-limits.js';
 import { HandlerCache } from './handler-cache.js';
+import { savedHandlerProblem } from './saved-handler-check.js';
 import { HandlerLifecycle } from './lifecycle.js';
 import { queryMeta } from './meta.js';
 import { reviewUntilSettled, type ReviewOutcome } from './review-loop.js';
@@ -28,13 +32,8 @@ export interface EngineParts {
   runner: SandboxRunner;
   dictionary: Dictionary;
   provenance: HandlerProvenance;
-}
-
-interface CrystalAnswer {
-  key: string;
-  crystal: CrystalHandler;
-  request: ParsedRequest;
-  startedAt: number;
+  /** API sources' schemas by name; empty without API sources. */
+  apiSchemas: Readonly<Record<string, ApiSchema>>;
 }
 
 interface ResolvedHandler {
@@ -58,7 +57,8 @@ export class SlimeEngine implements Slime {
   constructor(parts: EngineParts) {
     const { config, store, provenance } = parts;
     this.#parts = parts;
-    this.#cache = new HandlerCache({ store, mode: config.mode, provenance, gasWindowMs: config.tiers.gasWindowMs });
+    const savedContext = { sqlSourceName: config.sqlSourceName, apiSchemas: parts.apiSchemas, maxSteps: config.limits.maxSteps };
+    this.#cache = new HandlerCache({ store, mode: config.mode, provenance, gasWindowMs: config.tiers.gasWindowMs, savedHandlerProblem: (record) => savedHandlerProblem(record, savedContext) });
     this.#limits = new GenerationLimits({ maxPerHour: config.limits.maxGenerationsPerHour, maxConcurrent: config.limits.maxConcurrentGenerations });
     this.#background = new BackgroundTasks((error) => this.#emit(errorEvent(error)));
     this.#lifecycle = new HandlerLifecycle({
@@ -106,6 +106,7 @@ export class SlimeEngine implements Slime {
     await this.#parts.runner.close();
     await this.#parts.store.close?.();
     await this.#parts.config.connector.close();
+    await closeApiSources(this.#parts.config);
   }
 
   async #answer(raw: unknown): Promise<QueryResult> {
@@ -113,24 +114,15 @@ export class SlimeEngine implements Slime {
     const request = parseRequest(raw);
     const key = requestKey(request);
     const crystal = this.#parts.config.crystal ? this.#parts.config.crystal[key] : undefined;
-    if (crystal) return this.#answerFromCrystal({ key, crystal, request, startedAt });
+    if (crystal) return answerFromCrystal(this.#parts, { key, crystal, request, startedAt });
 
     const { record, cache, firstRun, generateMs } = await this.#resolve(key, request);
     const execution = firstRun ?? (await this.#runSaved(record, request.input));
     const { tier, review, artifact, intent } = record;
-    const meta = queryMeta({ handlerKey: key, tier, cache, review, execution, code: artifact, mode: this.#parts.config.mode, intent, totalMs: performance.now() - startedAt, ...(generateMs === undefined ? {} : { generateMs }) });
+    const meta = queryMeta({ handlerKey: key, tier, cache, review, execution, code: { sql: sqlOf(artifact), shapeJs: artifact.shapeJs, assumptions: artifact.assumptions }, mode: this.#parts.config.mode, intent, totalMs: performance.now() - startedAt, ...(generateMs === undefined ? {} : { generateMs }) });
     return { data: execution.data, meta };
   }
 
-  // Crystal comes first: reviewed, equivalence-tested code that ships with the app (C10).
-  async #answerFromCrystal({ key, crystal, request, startedAt }: CrystalAnswer): Promise<QueryResult> {
-    checkParamTypes(crystal.paramTypes, request.input);
-    const { connector, limits, mode } = this.#parts.config;
-    const execution = await runCrystal({ connector, limits }, crystal, request.input);
-    const code = { sql: crystal.sql, shapeJs: crystal.shape ? String(crystal.shape) : null, assumptions: [] };
-    const meta = queryMeta({ handlerKey: key, tier: 'crystal', cache: 'hit', review: crystal.review, execution, code, mode, intent: request.intent, totalMs: performance.now() - startedAt });
-    return { data: execution.data, meta };
-  }
 
   async #resolve(key: string, request: ParsedRequest): Promise<ResolvedHandler> {
     const found = await this.#cache.find(key);
@@ -147,7 +139,7 @@ export class SlimeEngine implements Slime {
   async #generate(generator: Generator, key: string, request: ParsedRequest): Promise<GenerationOutcome> {
     const releaseSlot = await this.#limits.acquire();
     try {
-      const outcome = await generateHandler(this.#generationDeps(generator), { key, request });
+      const outcome = await generateHandler(generationDeps(this.#parts, generator), { key, request });
       this.#cache.addGas(outcome.record);
       this.#emit(generatedEvent(outcome.record, outcome.usage));
       this.#lifecycle.afterRun(outcome.record);
@@ -159,21 +151,16 @@ export class SlimeEngine implements Slime {
 
   async #runSaved(record: HandlerRecord, input: InputValues): Promise<Execution> {
     record.paramTypes = checkParamTypes(record.paramTypes, input);
-    const { config, runner } = this.#parts;
-    const execution = await executeArtifact({ connector: config.connector, runner, limits: config.limits }, { artifact: record.artifact, output: record.output, input });
+    const execution = await executeArtifact(executionDeps(this.#parts), { artifact: record.artifact, output: record.output, input });
     this.#lifecycle.recordRun(record, input);
     return execution;
   }
 
-  #generationDeps(generator: Generator): GenerationDeps {
-    const { config, runner, dictionary, provenance } = this.#parts;
-    return { generator, connector: config.connector, runner, limits: config.limits, dictionaryText: dictionary.text, provenance };
-  }
 
   #reviewFunction(): ((record: HandlerRecord) => Promise<ReviewOutcome>) | undefined {
     const { generator, reviewer, limits } = this.#parts.config;
     if (!generator || !reviewer) return undefined;
-    const deps = { reviewer, generation: this.#generationDeps(generator), limits: this.#limits, maxReviews: this.#parts.config.tiers.maxReviews, reviewTimeoutMs: limits.reviewTimeoutMs, emit: (event: SlimeEvent) => this.#emit(event) };
+    const deps = { reviewer, generation: generationDeps(this.#parts, generator), limits: this.#limits, maxReviews: this.#parts.config.tiers.maxReviews, reviewTimeoutMs: limits.reviewTimeoutMs, emit: (event: SlimeEvent) => this.#emit(event) };
     return (record) => reviewUntilSettled(deps, record);
   }
 

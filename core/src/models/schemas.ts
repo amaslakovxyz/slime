@@ -9,6 +9,19 @@ export const ArtifactSchema = z.object({
   assumptions: z.array(z.string()),
 });
 
+// Every object is closed: Claude's structured output accepts only closed objects (MS4, P0.3).
+const SqlStepSchema = z.strictObject({ name: z.string(), source: z.string(), sql: z.string(), params: z.array(z.string()) });
+const ApiArgSchema = z.strictObject({ param: z.string(), input: z.string().nullable(), value: z.union([z.string(), z.number(), z.boolean()]).nullable() });
+const ApiStepSchema = z.strictObject({ name: z.string(), source: z.string(), operation: z.string(), args: z.array(ApiArgSchema) });
+
+export const ArtifactV2Schema = z.strictObject({
+  version: z.literal(2),
+  unsatisfiable: z.string().nullable(),
+  steps: z.array(z.union([SqlStepSchema, ApiStepSchema])),
+  shapeJs: z.string().nullable(),
+  assumptions: z.array(z.string()),
+});
+
 export const OptimizedCodeSchema = z.object({
   sql: z.string(),
   params: z.array(z.string()),

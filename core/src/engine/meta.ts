@@ -32,7 +32,8 @@ export function queryMeta({ handlerKey, tier, cache, review, execution, code, mo
     ...(generateMs === undefined ? {} : { generate: roundMs(generateMs) }),
   };
   const warnings = literalsInIntent(intent).map(literalWarning);
-  return { handlerKey, tier, cache, truncated: execution.truncated, timingsMs, warnings, review, ...generatedCodeFor(mode, code) };
+  const steps = mode === 'explore' && execution.steps ? { steps: execution.steps } : {};
+  return { handlerKey, tier, cache, truncated: execution.truncated, timingsMs, warnings, review, ...steps, ...generatedCodeFor(mode, code) };
 }
 
 // R9, R11: generated code is shown in explore mode only.

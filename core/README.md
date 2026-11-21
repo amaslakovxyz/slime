@@ -31,6 +31,25 @@ input values. Handlers move up through three tiers:
 * **Crystal:** rewritten by an agent into JS modules (with `.d.ts`) in the app's own
   code, and passed to Slime through the config.
 
+**Multi-source handlers.** Besides its one SQL source, an instance can read
+read-only API sources, and one handler can combine them. Notion ships as
+`@slime-cloud/core/notion`; any other REST API becomes a source with
+`defineApiSource`. The engine calls the sources and the model only plans:
+model code never does I/O or sees credentials. With no API source configured
+nothing changes. The design and threat model are in
+[docs/multi-source.md](docs/multi-source.md), and the example in
+[examples/multi-source](../examples/multi-source/README.md).
+
+```ts
+const slime = await createSlime(new SlimeConfig({
+  sources: {
+    db: postgresConnector({ url: process.env.READER_URL! }),
+    notion: notionSource({ token, dataSources: { feedback: '<data source id>' }, comments: { feedback: { account: 'matches db.accounts.name' } } }),
+  },
+  generator,
+}));
+```
+
 > **Status:** M5 is done: Crystal. `crystallize()` (`@slime-cloud/core/crystallize`)
 > turns proven Liquid handlers into `.mjs` modules in the app's code, and the
 > app passes the generated `index.mjs` as `crystal`. `slime-crystal check`
@@ -49,7 +68,8 @@ input values. Handlers move up through three tiers:
   shaping sandbox, the background review and Crystal loading;
 * the contracts (Ports) for connectors, generators, reviewers and stores;
 * their first implementations:
-  * the Postgres connector;
+  * the Postgres connector, the Notion API source and `defineApiSource` for
+    other REST APIs (read-only, through a constrained HTTP client);
   * Claude, Groq and offline generators;
   * stores for Slime's own state: files (the default) and memory, with no
     extra packages. Any other backend (Postgres, DynamoDB, Redis) is a custom
@@ -92,7 +112,11 @@ input values. Handlers move up through three tiers:
   `test/support/` holds the database helpers.
 - `docs/`: [request-format.md](./docs/request-format.md) is the request
   format for app developers: fields, output notation, parameters, `meta`,
-  errors and modes.
+  errors and modes. [multi-source.md](./docs/multi-source.md) is the
+  multi-source design and [multi-source-implementation.md](./docs/multi-source-implementation.md)
+  its step-by-step plan.
+- `src/sources/`: the `ApiSource` port, the redacting `callSource` wrapper,
+  `api/` (`defineApiSource` and the constrained HTTP client) and `notion/`.
 
 ## Global Invariants
 

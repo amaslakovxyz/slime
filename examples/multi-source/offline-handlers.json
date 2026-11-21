@@ -1,0 +1,80 @@
+{
+  "accounts on a given plan with their total paid revenue in cents and their number of open negative feedback items, most open items first": {
+    "version": 2,
+    "unsatisfiable": null,
+    "steps": [
+      {
+        "name": "accounts",
+        "source": "db",
+        "sql": "SELECT a.name, COALESCE(SUM(i.amount_cents), 0)::int AS \"paidCents\" FROM accounts a JOIN plans p ON p.id = a.plan_id LEFT JOIN invoices i ON i.account_id = a.id AND i.status = 'paid' WHERE ($1::text IS NULL OR p.name = $1::text) GROUP BY a.id, a.name",
+        "params": [
+          "plan"
+        ]
+      },
+      {
+        "name": "feedback",
+        "source": "notion",
+        "operation": "feedback.query",
+        "args": [
+          {
+            "param": "sentiment",
+            "input": null,
+            "value": "negative"
+          },
+          {
+            "param": "status",
+            "input": null,
+            "value": "Open"
+          }
+        ]
+      }
+    ],
+    "shapeJs": "function shape(data, input) { const open = new Map(); for (const f of data.feedback) if (f.account) open.set(f.account, (open.get(f.account) ?? 0) + 1); const rows = data.accounts.map((a) => ({ name: a.name, paidCents: a.paidCents, openNegative: open.get(a.name) ?? 0 })); rows.sort((x, y) => y.openNegative - x.openNegative || y.paidCents - x.paidCents); return rows; }",
+    "assumptions": [
+      "Feedback is matched to accounts by exact account name.",
+      "Revenue counts only paid invoices."
+    ]
+  },
+  "movie nights with each film's director and running time in minutes, newest first": {
+    "version": 2,
+    "unsatisfiable": null,
+    "steps": [
+      {
+        "name": "nights",
+        "source": "notion",
+        "operation": "movieNights.query",
+        "args": []
+      },
+      {
+        "name": "films",
+        "source": "films",
+        "operation": "films.list",
+        "args": []
+      }
+    ],
+    "shapeJs": "function shape(data) { const byTitle = new Map(data.films.map((f) => [f.title, f])); const rows = data.nights.map((n) => { const film = byTitle.get(n.film); return { film: n.film, date: n.date, director: film ? film.director : null, runningTimeMin: film ? film.runningTimeMin : null }; }); rows.sort((x, y) => (y.date ?? '').localeCompare(x.date ?? '')); return rows; }",
+    "assumptions": [
+      "Movie nights are matched to films by exact title."
+    ]
+  },
+  "films by a given director with their Rotten Tomatoes score, highest first": {
+    "version": 2,
+    "unsatisfiable": null,
+    "steps": [
+      {
+        "name": "films",
+        "source": "films",
+        "operation": "films.list",
+        "args": [
+          {
+            "param": "director",
+            "input": "director",
+            "value": null
+          }
+        ]
+      }
+    ],
+    "shapeJs": "function shape(data) { return data.films.map((f) => ({ title: f.title, rtScore: f.rtScore })).sort((x, y) => y.rtScore - x.rtScore); }",
+    "assumptions": []
+  }
+}

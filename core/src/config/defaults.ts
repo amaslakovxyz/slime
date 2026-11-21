@@ -21,4 +21,6 @@ export const DEFAULT_LIMITS: Readonly<LimitOptions> = Object.freeze({
   maxQueryCost: 1_000_000,
   shapeTimeoutMs: 200,
   shapeMemoryBytes: 32 * MEBIBYTE,
+  maxSteps: 4,
+  apiTimeoutMs: 10_000,
 });

@@ -77,10 +77,39 @@ Status: **Decided**, **Proposed** (default unless someone objects) or
 | C9 | HTTP | No HTTP in core. The app calls `slime.query()` from its own endpoint in any framework. A thrown `SlimeError` carries `status` and `toJSON()`, so the endpoint can return it directly. Admin data comes from methods only (`handlers()`, `stats()`, `evict()`); exposing and protecting them over HTTP is up to the app or `@slime-cloud/server`. | Decided |
 | C10 | Crystal | Crystal handlers are ordinary modules in the app's own code. The crystallize job writes JS modules (`.mjs`), plus a generated `index.mjs` with `index.d.mts` and a manifest. The app imports the index and passes it as `crystal` in `SlimeConfig`; leaving it out (or `false`) turns Crystal off. Because the code is compiled with the app, safety is checked when the job writes it (allowlist, SQL lint, equivalence test on recorded runs) and by a `check` command in the app's CI, which re-parses the sources and compares manifest hashes. Core doesn't re-check at startup. The job and `check` are a separate entry (`@slime-cloud/core/crystallize`, plus a bin), so the runtime never imports them. | Decided |
 | C11 | Observability | An `onEvent(event)` option (the `SlimeEvent` types in §5). Core doesn't log on its own. Metering builds on this later. | Decided |
-| C12 | Out of scope for core v1 | Writes, tenancy (core has no tenant concept; a store isolates tenants if needed), connectors other than Postgres, built-in stores other than file and memory, semantic matching. | Proposed |
+| C12 | Out of scope for core v1 | Writes, tenancy (core has no tenant concept; a store isolates tenants if needed), built-in stores other than file and memory, semantic matching. Connectors other than Postgres were out of scope too; MS1 amends that: read-only API sources beside exactly one SQL source (§3.1). | Proposed (amended by MS1) |
 | C13 | Store contract | A small key-value Port, `SlimeStore`: `get(ns, key)`, `put(ns, key, value)`, `list(ns, prefix?)`, `delete(ns, key)`. Values are JSON. Namespace: `handlers`. The engine builds the keys (the request key, §4.7), so a backend is only a mapping to 4 calls. It replaces the sandbox's domain-shaped `HandlerStore`. | Decided |
 | C14 | Choosing a store | The `store` option takes any object that implements `SlimeStore`. Core ships two that need no extra packages: `fileStore(dir)` (the default, `./.slime`) and `memoryStore()`. Other backends (Postgres, DynamoDB, Redis) are custom stores; Slime Cloud brings its own (M7). | Decided |
 | C15 | Background work on serverless | Core runs store writes and background reviews off the request path. On Lambda the process is frozen after each response, so `slime.flush()` must be awaited before every response. It waits for queued writes and running reviews. Work that never ran is redone on a later request. | Proposed |
+
+### 3.1 Multi-source decisions (MS)
+
+One Slime instance reads from one SQL source and any number of read-only API
+sources (Notion first), and a handler can combine them. Why, the threat model
+and the alternatives are in [docs/multi-source.md](./docs/multi-source.md); the
+work is in [docs/multi-source-implementation.md](./docs/multi-source-implementation.md).
+None of this is implemented yet. With no API source configured, Slime stays
+byte-identical to today (MS3).
+
+| # | Decision | Status |
+|---|---|---|
+| MS1 | `sources` config: a map of named sources with exactly one SQL source and any number of API sources. `connector: x` means `sources: { db: x }`, and `config.connector` stays a required `Connector`. | Proposed |
+| MS2 | API source port: `describe({ timeoutMs, signal })`, `call(operation, args, { timeoutMs, rowCap, signal })`, `safetyCheck({ timeoutMs, signal })`, `close()`, `secrets`. Rows are flat plain JSON in output-notation leaf types, nullable where declared, with no list columns. | Proposed |
+| MS3 | v2 artifact `{ version: 2, unsatisfiable, steps, shapeJs, assumptions }`, produced only when an API source is configured. A v2 artifact whose only step is SQL is converted to v1 before its first run by nesting the model's `shape` inside a v1 `shape(rows, input)`. | Proposed |
+| MS4 | An API step's `args` is a list of `{ param, input, value }` with exactly one of `input` and `value` set (a list, because model structured output accepts only closed objects). Constants are checked against the parameter's type and `values`. | Proposed |
+| MS5 | New limits: `maxSteps` (default 4) and `apiTimeoutMs` (default 10 000). SQL steps keep `statementTimeoutMs`; every step keeps `rowCap`. | Proposed |
+| MS6 | A truncated step in a handler with more than one step fails the run with `QUERY_TOO_LARGE` (422). During generation it is repairable. | Proposed |
+| MS7 | API failures become `SOURCE_ERROR` (502): retryable for 429, 5xx and timeouts, not retryable for other 4xx. Final during generation. Details carry source, operation, status and attempts, never secrets. | Proposed |
+| MS8 | Startup fails if any source fails `describe()` or `safetyCheck()`, in explore and locked mode. | Proposed |
+| MS9 | Handlers with an API step are not crystallized. | Proposed |
+| MS10 | API adapters reach the network only through the constrained HTTP client: fixed base URL, origin check, no `//` or `..` in paths, same-origin redirects only, 10 MB response cap. | Proposed |
+| MS11 | New code lives in `core/src/sources/`. | Proposed |
+| MS12 | Notion: schema discovered at startup; generated equality and range parameters; metadata sanitized; property descriptions opt-in; at most 2 requests in flight per source; `people`, `relation`, `files`, `formula` and `rollup` excluded. | Proposed |
+| MS13 | Cross-source join hints are column comments (`matches db.accounts.name`); there is no separate links config. | Proposed |
+| MS14 | Saved v2 handlers are linted against today's sources on load and at locked startup. A failing handler is not served: explore mode regenerates it, locked mode answers `HANDLER_NOT_FOUND`. | Proposed |
+| MS15 | For v2, repair messages sent to the model carry error codes, paths and types, never values. | Proposed |
+| MS16 | Every source method is called through one wrapper that applies the timeout and redacts the source's secrets; the HTTP client adds every header value it sends to the secrets. | Proposed |
+| MS17 | Provenance records one hash per source (`sourceHashes`, additive). Crystal's schema warning compares only the SQL source's hash. | Proposed |
 
 ## 4. Request format and matching
 
@@ -404,6 +433,7 @@ goal. Before a milestone starts, its row gets the files it creates or changes
 | M5 | **Crystal.** Serving from an imported registry; the crystallize job writing `.mjs` modules with a generated index; the `check` command. | `crystal*.test.ts` ported; a hand-edited Crystal file fails `check`; the output passes the equivalence test. | done |
 | M6 | **Use it as a package, and retire `sandbox/`.** An example app that installs the packed tarball and calls `slime.query()` from an endpoint; docs for the request format; the bench ported to run on core. The example takes over what `sandbox/` still provides: the demo server, the demo database (`db/init.sql` and its Docker Compose file, used by core's tests and CI) and the offline handlers. Then `sandbox/` is deleted, with its CI job. Publishing to npm is not part of v1. | The example (`examples/express`, its own lockfile, run in CI from the packed tarball) answers a query. The bench, ported to `core/bench/`, gets the 5 cases recorded as correct in `docs/product/concepts_brief.md` right, and refuses the 2 unsafe ones. Core's tests and CI use the moved demo database. `sandbox/` and its CI job are gone. | built; bench with a model pending |
 | M7 | **Switch `platform/runtime` to the package** (with its owner). Drop the path mapping to `sandbox/src`; build the engine with `createSlime(new SlimeConfig(…))`; replace `DynamoHandlerStore` with a `SlimeStore` over the existing table that serves the items already there; keep `slime.flush()` before each response (C15). After the switch nothing compiles `sandbox/src`, so M6 can delete `sandbox/`. | The runtime's tests pass on the package; a deployed function answers from handlers stored by the new store. Handlers saved before the switch are still served. The previous deploy can be restored. | built; handler copy and deploy pending (runtime owner) |
+| M8 | **Multi-source handlers** (MS1–MS17, [docs/multi-source.md](docs/multi-source.md)): `sources` config, the `ApiSource` port, v2 step handlers, the step executor, `defineApiSource`, the constrained HTTP client, `@slime-cloud/core/notion`, `examples/multi-source`. | v1 pins unchanged; contract, security (S1–S10) and engine tests pass in CI; the example answers three demo intents on recorded responses; one live run against seeded Notion and a real model. | built; real Notion fixtures and the live run pending (needs a Notion workspace) |
 
 **M2 engine rules.** `createSlime()` awaits `connector.safetyCheck()` (unsafe
 credentials throw `SlimeConfigError`), `store.init()` and the dictionary, in

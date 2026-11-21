@@ -52,3 +52,29 @@ describe('shaping sandbox (C3)', () => {
     assert.match((await sandboxFailure('function shape() {}')).message, /returned nothing/);
   });
 });
+
+describe('shape(data, input) for multi-source handlers (MS3)', () => {
+  test('the first argument may be an object of step rows', async () => {
+    const runner = new QuickJSRunner();
+    try {
+      const code = 'function shape(data, input) { const open = new Map(); for (const f of data.feedback) open.set(f.account, (open.get(f.account) ?? 0) + 1); return data.accounts.map((a) => ({ name: a.name, open: open.get(a.name) ?? 0 })); }';
+      const data = { accounts: [{ name: 'Acme' }, { name: 'Globex' }], feedback: [{ account: 'Acme' }, { account: 'Acme' }] };
+      assert.deepEqual(await runner.run({ code, rows: data, input: {} }, { timeoutMs: 1_000, memoryBytes: 32 * 1024 * 1024 }), [
+        { name: 'Acme', open: 2 },
+        { name: 'Globex', open: 0 },
+      ]);
+    } finally {
+      await runner.close();
+    }
+  });
+
+  test('a pg Date in v1 rows still becomes an ISO string', async () => {
+    const runner = new QuickJSRunner();
+    try {
+      const rows = [{ at: new Date('2026-11-21T10:00:00Z') }];
+      assert.deepEqual(await runner.run({ code: 'function shape(rows) { return rows; }', rows, input: {} }, { timeoutMs: 1_000, memoryBytes: 32 * 1024 * 1024 }), [{ at: '2026-11-21T10:00:00.000Z' }]);
+    } finally {
+      await runner.close();
+    }
+  });
+});

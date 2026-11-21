@@ -1,13 +1,18 @@
 import { lintArtifact } from './checks/sql.js';
+import { isArtifactV2, type AnyArtifact, type ArtifactV2 } from '../models/artifact-v2.js';
+import { lintSteps } from './checks/steps.js';
+import { normalizeArtifact } from './normalize-artifact.js';
+import type { ApiSchema, Source } from '../sources/types.js';
 import type { LimitOptions } from '../config/options.js';
 import { SlimeError } from '../shared/errors.js';
 import type { Connector } from '../connectors/types.js';
-import type { Artifact, Generator, ModelUsage, ParamTypesForModel } from '../models/types.js';
+import type { ArtifactFormat, Generator, ModelUsage, ParamTypesForModel } from '../models/types.js';
 import type { SandboxRunner } from '../sandbox/types.js';
 import type { HandlerProvenance } from '../request/key.js';
 import type { ParsedRequest } from '../request/parse.js';
 import { checkParamTypes, type ParamTypes } from '../request/params.js';
 import { bindParams, executeArtifact, queryLimits, type Execution } from './execute.js';
+import { repairMessage } from './repair-message.js';
 import type { HandlerRecord } from './types.js';
 
 export interface GenerationDeps {
@@ -17,6 +22,11 @@ export interface GenerationDeps {
   limits: Readonly<LimitOptions>;
   dictionaryText: string;
   provenance: HandlerProvenance;
+  /** 'v2' when the instance has API sources (MS3); missing means 'v1'. */
+  format?: ArtifactFormat;
+  sqlSourceName?: string;
+  sources?: Readonly<Record<string, Source>>;
+  apiSchemas?: Readonly<Record<string, ApiSchema>>;
 }
 
 export interface GenerationJob {
@@ -33,7 +43,7 @@ export interface GenerationOutcome {
 }
 
 export interface PreviousAttempt {
-  artifact: Artifact;
+  artifact: AnyArtifact;
   error: string;
 }
 
@@ -41,7 +51,8 @@ export interface PreviousAttempt {
 const MIN_ATTEMPT_MS = 1_000;
 const WRITE_LIKE_REASON = /\b(writ|delet|updat|insert|modif|chang|remov|creat)/i;
 // Retrying can't make a write or a denied table allowed.
-const FINAL_CODES = new Set(['WRITE_REFUSED', 'ACCESS_DENIED']);
+// MS7: the model can't fix a source outage. QUERY_TOO_LARGE stays repairable: a filter may fix it (MS6).
+const FINAL_CODES = new Set(['WRITE_REFUSED', 'ACCESS_DENIED', 'SOURCE_ERROR']);
 
 /** Generates, checks and runs a handler, repairing up to limits.maxRepairs times within the time budget. */
 export async function generateHandler(deps: GenerationDeps, { key, request, previous: startingPoint }: GenerationJob): Promise<GenerationOutcome> {
@@ -53,34 +64,52 @@ export async function generateHandler(deps: GenerationDeps, { key, request, prev
 
   for (let attempt = 0; attempt <= deps.limits.maxRepairs && deadline - Date.now() >= MIN_ATTEMPT_MS; attempt++) {
     const generation = await deps.generator.generate(
-      { context: deps.dictionaryText, intent: request.intent, params: forModel(paramTypes), output: request.output, ...(previous ? { previous } : {}) },
+      // format is set only for v2, so a v1 request is the same object as before (MS3).
+      { context: deps.dictionaryText, intent: request.intent, params: forModel(paramTypes), output: request.output, ...(previous ? { previous } : {}), ...(deps.format === 'v2' ? { format: deps.format } : {}) },
       { timeoutMs: deadline - Date.now() },
     );
     addUsage(usage, generation);
     deadline += generation.waitMs; // provider rate-limit waits don't count against the budget
     assertSatisfiable(generation.artifact);
+    const artifact = normalizeArtifact(generation.artifact);
     try {
-      const execution = await tryArtifact(deps, generation.artifact, request);
-      return { record: newRecord({ deps, key, request, artifact: generation.artifact, paramTypes }), execution, usage };
+      const execution = await tryArtifact(deps, artifact, request);
+      return { record: newRecord({ deps, key, request, artifact, paramTypes }), execution, usage };
     } catch (error) {
       lastError = asSlimeError(error);
       if (FINAL_CODES.has(lastError.code)) throw lastError;
-      previous = { artifact: generation.artifact, error: `${lastError.code}: ${lastError.message}` };
+      previous = { artifact, error: repairMessage(lastError, deps.format ?? 'v1') };
     }
   }
   throw lastError ?? new SlimeError('GENERATION_TIMEOUT', 'Ran out of generation time budget.', { retryable: true });
 }
 
-async function tryArtifact(deps: GenerationDeps, artifact: Artifact, request: ParsedRequest): Promise<Execution> {
+async function tryArtifact(deps: GenerationDeps, artifact: AnyArtifact, request: ParsedRequest): Promise<Execution> {
+  if (isArtifactV2(artifact)) return tryArtifactV2(deps, artifact, request);
   lintArtifact(artifact, request.input);
-  const plan = await deps.connector.check(artifact.sql, bindParams(artifact.params, request.input), queryLimits(deps.limits));
-  if (plan.cost !== null && plan.cost > deps.limits.maxQueryCost) {
-    throw new SlimeError('QUERY_TOO_EXPENSIVE', `Query cost ${plan.cost} is above the limit of ${deps.limits.maxQueryCost}.`);
+  await assertAffordable(deps, artifact.sql, bindParams(artifact.params, request.input));
+  return executeArtifact(deps, { artifact, output: request.output, input: request.input });
+}
+
+async function tryArtifactV2(deps: GenerationDeps, artifact: ArtifactV2, request: ParsedRequest): Promise<Execution> {
+  const { sqlSourceName, apiSchemas } = deps;
+  if (sqlSourceName === undefined || !apiSchemas) throw new SlimeError('INVALID_HANDLER', 'This instance has no API sources, so it cannot run a multi-source handler.');
+  lintSteps(artifact, { sqlSourceName, apiSchemas, input: request.input, maxSteps: deps.limits.maxSteps });
+  for (const step of artifact.steps) {
+    if (!('sql' in step)) continue;
+    await assertAffordable(deps, step.sql, bindParams(step.params, request.input));
   }
   return executeArtifact(deps, { artifact, output: request.output, input: request.input });
 }
 
-function assertSatisfiable({ unsatisfiable }: Artifact): void {
+async function assertAffordable(deps: GenerationDeps, sql: string, params: unknown[]): Promise<void> {
+  const plan = await deps.connector.check(sql, params, queryLimits(deps.limits));
+  if (plan.cost !== null && plan.cost > deps.limits.maxQueryCost) {
+    throw new SlimeError('QUERY_TOO_EXPENSIVE', `Query cost ${plan.cost} is above the limit of ${deps.limits.maxQueryCost}.`);
+  }
+}
+
+function assertSatisfiable({ unsatisfiable }: AnyArtifact): void {
   if (!unsatisfiable) return;
   const code = WRITE_LIKE_REASON.test(unsatisfiable) ? 'WRITE_REFUSED' : 'INTENT_UNSATISFIABLE';
   throw new SlimeError(code, unsatisfiable, { details: { enforcedBy: 'model' } });
@@ -90,7 +119,7 @@ interface NewRecordParts {
   deps: GenerationDeps;
   key: string;
   request: ParsedRequest;
-  artifact: Artifact;
+  artifact: AnyArtifact;
   paramTypes: ParamTypes;
 }
 
