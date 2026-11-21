@@ -122,3 +122,26 @@ describe('store helpers', () => {
     assert.equal(await store.get('handlers', 'gas-only'), undefined);
   });
 });
+
+describe('LiveRunsSync', () => {
+  test('syncs Liquid handlers at most once per interval', async () => {
+    const { LiveRunsSync } = await import('../src/live-runs.js');
+    const store = memoryStore();
+    await store.put('handlers', 'liq', { key: 'liq', runs: 3 });
+    await store.put('handlers', 'gas', { key: 'gas', runs: 1 });
+    let now = 0;
+    let live = [{ key: 'liq', tier: 'liquid', runs: 8 }, { key: 'gas', tier: 'gas', runs: 5 }];
+    const sync = new LiveRunsSync(store, () => live, 60_000, () => now);
+    now = 60_000;
+    assert.equal(await sync.maybeSync(), true);
+    assert.equal(((await store.get('handlers', 'liq')) as { runs: number }).runs, 8);
+    assert.equal(((await store.get('handlers', 'gas')) as { runs: number }).runs, 1);
+    live = [{ key: 'liq', tier: 'liquid', runs: 20 }];
+    now = 90_000;
+    assert.equal(await sync.maybeSync(), false);
+    assert.equal(((await store.get('handlers', 'liq')) as { runs: number }).runs, 8);
+    now = 120_000;
+    assert.equal(await sync.maybeSync(), true);
+    assert.equal(((await store.get('handlers', 'liq')) as { runs: number }).runs, 20);
+  });
+});

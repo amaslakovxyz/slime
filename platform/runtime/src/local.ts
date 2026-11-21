@@ -4,14 +4,18 @@
 //   PORT               listen port
 //   SLIME_CRYSTAL_DIR  where Crystallize writes modules; read again on restart
 // Adds what only a laptop needs: the live feed, saved handlers for the
-// Lifecycle tab, and POST /v0/crystallize. Every route needs x-api-key.
+// Lifecycle tab, and POST /v0/crystallize. Every route needs x-api-key: the
+// endpoint key, or for POST /v0/e/<key> that Crystal's own token (CRYSTAL_TOKENS).
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { createSlime, type SlimeStore } from '@slime-cloud/core';
 import { crystallize, DEFAULT_MIN_RUNS } from '@slime-cloud/core/crystallize';
 import { createApp, type SavedHandler } from './app.js';
-import { keyMatches } from './auth.js';
+import { isAuthorized, parseCrystalTokens } from './auth.js';
 import { slimeConfigFromEnv } from './config.js';
 import { RecentRequests } from './events.js';
+import { syncLiveRuns } from './live-runs.js';
+
+export { syncLiveRuns };
 
 const HANDLERS_NS = 'handlers';
 const MAX_BODY_BYTES = 64 * 1024;
@@ -25,20 +29,6 @@ export function storeLimitedTo(store: SlimeStore, keys: readonly string[]): Slim
     delete: (ns, key) => store.delete(ns, key),
     list: async (ns, prefix) => (await store.list(ns, prefix)).filter(({ key }) => ns !== HANDLERS_NS || wanted.has(key)),
   };
-}
-
-/**
- * The core saves a handler once, when it turns Liquid; later runs only count in
- * memory. Crystallize reads runs from the store, so copy the live counts there
- * first (never lowering a saved count).
- */
-export async function syncLiveRuns(store: SlimeStore, live: readonly { key: string; runs: number }[], keys?: readonly string[]): Promise<void> {
-  const wanted = keys ? new Set(keys) : undefined;
-  for (const { key, runs } of live) {
-    if (wanted && !wanted.has(key)) continue;
-    const saved = (await store.get(HANDLERS_NS, key)) as { runs?: number } | undefined;
-    if (saved && typeof saved.runs === 'number' && runs > saved.runs) await store.put(HANDLERS_NS, key, { ...saved, runs });
-  }
 }
 
 type RecordLike = { key: string; intent: string; tier: 'gas' | 'liquid'; runs: number; review: string; fixtures: unknown[]; createdAt: string };
@@ -55,6 +45,7 @@ async function main(): Promise<void> {
   const slime = await createSlime(config);
   const store = config.store;
   const events = new RecentRequests();
+  const crystalTokens = parseCrystalTokens(process.env.CRYSTAL_TOKENS);
   const crystalRuns = Number(process.env.CRYSTAL_MIN_RUNS || DEFAULT_MIN_RUNS);
 
   const app = createApp({
@@ -83,7 +74,8 @@ async function main(): Promise<void> {
 
   const server = createServer(async (req, res) => {
     try {
-      if (!keyMatches(header(req, 'x-api-key'), process.env.SLIME_API_KEY)) {
+      const path = new URL(req.url ?? '/', 'http://localhost').pathname;
+      if (!isAuthorized(req.method ?? 'GET', path, header(req, 'x-api-key'), process.env.SLIME_API_KEY, crystalTokens)) {
         return send(res, Response.json({ error: { code: 'UNAUTHORIZED', message: 'Missing or wrong x-api-key.', retryable: false } }, { status: 401 }));
       }
       const response = await app.fetch(await toRequest(req, port));
