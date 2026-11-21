@@ -36,7 +36,7 @@ Backend -- Slime runtime:
   whose endpoints are answered by `@slime-cloud/core`; its own lockfile. It
   also holds the demo database (`db/init.sql`) that core's tests and CI use.
 - [examples/hono/](./examples/hono/README.md) - the smallest app around
-  the core: one Hono file with `/health` and one Slime endpoint.
+  the core: one Hono file with `/health` and `POST /slime`.
 - **`platform/` — hosted Slime Cloud**
   - [platform/landing/](./platform/landing/README.md) - Static marketing page
     (one `index.html`, no build step). Preview with `just landing`.
