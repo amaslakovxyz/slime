@@ -32,6 +32,7 @@ The proposed product changes three things:
 | D5 | Where does execution run? | **All in slime-cloud** (tokens and execution in our Lambda). | Execution in slime-client (control/data plane split); explore local + pinned in cloud. |
 | D6 | Agent-facing surface | **MCP server + `slime` CLI.** CLI: `login`, `connect`, `pin`. MCP tools: `query`, `catalog`, `pin`. Internally the existing `{intent, input, output}`. | Own protocol + SDK; CLI only. |
 | D7 | How does the agent reuse handlers? | **Catalog first** (§4.1). The agent looks up existing handlers before writing a new intent. | Semantic intent matching (risk of serving a handler with a different meaning); both (largest scope). |
+| D9 | Who is the user? | **PM, manager or vibecoder: not tech-savvy, needs fast iteration** (§4.7). | Engineer/tech lead; ops analytics across all three sources as the ICP. |
 | D8 | Whose credentials read the sources? | **The developer's personal OAuth**, for explore and pinned endpoints alike (§4.2). | One workspace connection per source (needs a workspace admin); personal for explore + workspace app for pinned (two connections, different data in Gas and Liquid). |
 
 The hybrid maps the existing tiers onto user actions:
@@ -175,12 +176,26 @@ Never stored, not even as a response cache: rows and content.
    of a pin.
 6. **DX path.** `slime login` → `slime connect linear` → MCP registered → first
    answer, plus a dashboard of handlers (plan, tier, cost, review state).
-7. **ICP and demo.** Who pays: the solo vibecoder or a team with a BFF ticket
-   queue? Proposed demo: an agent in Cursor asks in one request for "Linear
-   issues blocking the release plus their Notion specs", pins it, and gets an
-   endpoint for a dashboard.
+7. **ICP (decided: D9) and demo.** The user is a PM, manager or vibecoder:
+   not tech-savvy, iterating fast in an AI chat or app builder. This puts
+   pressure on earlier decisions:
+   * **D6 assumed a developer machine.** A CLI and a locally installed MCP
+     server are friction for this user. A remote MCP server added by URL with
+     OAuth sign-in needs no install (support per client still to verify:
+     Claude, Cursor, ChatGPT, Lovable).
+   * **Trust (gap 4) gets harder.** The user cannot read a plan or SQL, so
+     `assumptions` and provenance must be plain language ("counted issues in
+     the *Blocked* state of project *Release 2.1*").
+   * **Crystal (export to a repo) matters less.** Pin → hosted endpoint is the
+     payoff; the user's app builder consumes the URL.
+   * **D8 fits.** Personal OAuth needs no workspace admin.
+   * **Errors must say what to do** ("reconnect Linear"), not show codes.
+
+   Proposed demo: in an AI chat, the user asks for "issues blocking the
+   release with their Notion specs", gets a table, pins it, and asks the app
+   builder for a release dashboard on the pinned endpoint.
 
 ## 5. Next decision
 
-ICP and demo (gap 7): it fixes which sources, entities and business terms the
-semantic layer (gap 3) must cover first.
+Agent-facing surface for D9: keep slime-client as an installed devtool, or
+lead with a remote MCP server added by URL.
