@@ -1,15 +1,34 @@
 'use server';
 
 // Every action records one span; redirect() throws, so it always runs outside
-// withSpan to keep redirects from being recorded as errors.
+// withSpan to keep redirects from being recorded as errors. Span attributes
+// carry ids, providers and connector types only.
+import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { endSession, requireUser, startSession } from '@/lib/auth';
-import { createEndpoint, isProvider, requestDelete, revealToken } from '@/lib/endpoints';
+import { isConnectorType } from '@/lib/connectors';
+import { testConnection, type ConnectionTest } from '@/lib/connectors/postgres';
+import {
+  connectionUrl,
+  createEndpoint,
+  isProvider,
+  requestDelete,
+  revealToken,
+  updateConnector,
+  updateSettings,
+} from '@/lib/endpoints';
 import { CodedError, hasCode } from '@/lib/errors';
 import { withSpan } from '@/lib/telemetry';
 import { checkLogin, createUser } from '@/lib/users';
 
 const field = (form: FormData, name: string) => String(form.get(name) ?? '');
+const withParam = (path: string, key: string, value: string) => `${path}?${key}=${encodeURIComponent(value)}`;
+/** Errors a form shows to the user; anything else is a bug and propagates. */
+const userFacing = (err: unknown) =>
+  err instanceof CodedError && ['INVALID', 'NOT_UPDATABLE', 'NOT_DELETABLE', 'NOT_FOUND'].includes(err.code);
+
+// Layouts survive same-route redirects; the endpoint header (name, status) must re-render.
+const refreshEndpoint = () => revalidatePath('/endpoints/[id]', 'layout');
 
 const SIGNUP_ERRORS: Record<string, string> = { EMAIL_TAKEN: 'taken', WEAK_PASSWORD: 'weak', INVALID_EMAIL: 'email' };
 
@@ -38,18 +57,28 @@ export async function logout(): Promise<void> {
   redirect('/login');
 }
 
-export async function createEndpointAction(form: FormData): Promise<void> {
+export interface FormState {
+  error?: string;
+}
+
+/** useActionState action: returns a validation error, or redirects to the new endpoint. */
+export async function createEndpointAction(_prev: FormState, form: FormData): Promise<FormState> {
   const owner = await requireUser();
   const provider = field(form, 'provider');
+  const connectorType = field(form, 'connectorType') || 'postgres';
   let endpointId: string;
   try {
     endpointId = await withSpan(
       'endpoint.create',
-      isProvider(provider) ? { 'slime.endpoint.provider': provider } : {},
+      {
+        ...(isProvider(provider) ? { 'slime.endpoint.provider': provider } : {}),
+        ...(isConnectorType(connectorType) ? { 'slime.connector.type': connectorType } : {}),
+      },
       async (span) => {
         const id = await createEndpoint(owner, {
           name: field(form, 'name'),
           provider,
+          connectorType,
           databaseUrl: field(form, 'databaseUrl'),
         });
         span.setAttribute('slime.endpoint.id', id);
@@ -57,10 +86,71 @@ export async function createEndpointAction(form: FormData): Promise<void> {
       },
     );
   } catch (err) {
-    if (hasCode(err, 'INVALID')) redirect(`/?error=${encodeURIComponent((err as Error).message)}`);
+    if (userFacing(err)) return { error: (err as Error).message };
     throw err;
   }
   redirect(`/endpoints/${endpointId}`);
+}
+
+/** Tests a URL typed into the create form; the URL already travels to the server for create. */
+export async function testConnectionAction(databaseUrl: string): Promise<ConnectionTest> {
+  await requireUser();
+  return withSpan('connector.test', { 'slime.connector.type': 'postgres' }, async (span) => {
+    const result = await testConnection(databaseUrl);
+    span.setAttribute('slime.connector.ok', result.ok);
+    return result;
+  });
+}
+
+/** Re-tests the stored URL server-side, so it never reaches the browser. */
+export async function testStoredConnectionAction(endpointId: string): Promise<ConnectionTest> {
+  const owner = await requireUser();
+  return withSpan('connector.test', { 'slime.endpoint.id': endpointId, 'slime.connector.type': 'postgres' }, async (span) => {
+    const url = await connectionUrl(owner, endpointId);
+    const result: ConnectionTest = url
+      ? await testConnection(url)
+      : { ok: false, user: null, database: null, serverVersion: null, tables: null, problems: [], error: 'No stored connection URL' };
+    span.setAttribute('slime.connector.ok', result.ok);
+    return result;
+  });
+}
+
+export async function updateConnectorAction(form: FormData): Promise<void> {
+  const owner = await requireUser();
+  const endpointId = field(form, 'endpointId');
+  const connectorType = field(form, 'connectorType') || 'postgres';
+  const page = `/endpoints/${endpointId}/connector`;
+  try {
+    await withSpan(
+      'endpoint.update_connector',
+      { 'slime.endpoint.id': endpointId, ...(isConnectorType(connectorType) ? { 'slime.connector.type': connectorType } : {}) },
+      () => updateConnector(owner, endpointId, { connectorType, databaseUrl: field(form, 'databaseUrl') }),
+    );
+  } catch (err) {
+    if (userFacing(err)) redirect(withParam(page, 'error', (err as Error).message));
+    throw err;
+  }
+  refreshEndpoint();
+  redirect(`${page}?saved=1`);
+}
+
+export async function updateSettingsAction(form: FormData): Promise<void> {
+  const owner = await requireUser();
+  const endpointId = field(form, 'endpointId');
+  const provider = field(form, 'provider');
+  const page = `/endpoints/${endpointId}/settings`;
+  try {
+    await withSpan(
+      'endpoint.update_settings',
+      { 'slime.endpoint.id': endpointId, ...(isProvider(provider) ? { 'slime.endpoint.provider': provider } : {}) },
+      () => updateSettings(owner, endpointId, { name: field(form, 'name'), provider }),
+    );
+  } catch (err) {
+    if (userFacing(err)) redirect(withParam(page, 'error', (err as Error).message));
+    throw err;
+  }
+  refreshEndpoint();
+  redirect(`${page}?saved=1`);
 }
 
 export async function deleteEndpointAction(form: FormData): Promise<void> {
@@ -70,11 +160,12 @@ export async function deleteEndpointAction(form: FormData): Promise<void> {
     await withSpan('endpoint.delete', { 'slime.endpoint.id': endpointId }, () => requestDelete(owner, endpointId));
   } catch (err) {
     if (hasCode(err, 'NOT_DELETABLE')) {
-      redirect(`/endpoints/${endpointId}?error=${encodeURIComponent((err as Error).message)}`);
+      redirect(withParam(`/endpoints/${endpointId}/settings`, 'error', (err as Error).message));
     }
     throw err;
   }
-  redirect('/');
+  refreshEndpoint();
+  redirect(`/endpoints/${endpointId}`);
 }
 
 export async function revealTokenAction(endpointId: string): Promise<string | null> {

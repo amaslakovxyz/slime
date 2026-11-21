@@ -13,8 +13,13 @@ import {
 } from '@aws-sdk/client-ssm';
 import { env } from './env';
 
+export interface PutOptions {
+  /** Replace an existing value; without it a second put of the same name fails. */
+  overwrite?: boolean;
+}
+
 export interface SecretStore {
-  put(endpointId: string, name: string, value: string): Promise<void>;
+  put(endpointId: string, name: string, value: string, options?: PutOptions): Promise<void>;
   get(endpointId: string, name: string): Promise<string | undefined>;
   removeAll(endpointId: string): Promise<void>;
 }
@@ -25,9 +30,14 @@ export const secretPath = (endpointId: string, name: string) => prefixFor(endpoi
 class SsmSecretStore implements SecretStore {
   private readonly client = new SSMClient({});
 
-  async put(endpointId: string, name: string, value: string): Promise<void> {
+  async put(endpointId: string, name: string, value: string, options: PutOptions = {}): Promise<void> {
     await this.client.send(
-      new PutParameterCommand({ Name: secretPath(endpointId, name), Value: value, Type: 'SecureString', Overwrite: false }),
+      new PutParameterCommand({
+        Name: secretPath(endpointId, name),
+        Value: value,
+        Type: 'SecureString',
+        Overwrite: options.overwrite === true,
+      }),
     );
   }
 
@@ -75,9 +85,12 @@ class FileSecretStore implements SecretStore {
     await chmod(this.file, 0o600);
   }
 
-  async put(endpointId: string, name: string, value: string): Promise<void> {
+  async put(endpointId: string, name: string, value: string, options: PutOptions = {}): Promise<void> {
     const data = await this.load();
-    data[secretPath(endpointId, name)] = value;
+    const path = secretPath(endpointId, name);
+    // Same contract as SSM's Overwrite:false (ParameterAlreadyExists).
+    if (path in data && !options.overwrite) throw new Error(`Secret ${path} already exists`);
+    data[path] = value;
     await this.save(data);
   }
 

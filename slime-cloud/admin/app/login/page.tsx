@@ -17,26 +17,29 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const { error } = await searchParams;
   const message = error ? ERRORS[error] : undefined;
   return (
-    <main className="shell">
-      <header className="header">
-        <span className="wordmark">slime cloud</span>
-      </header>
-      <form action={login} className="card stack login-card">
-        <h2>Sign in</h2>
+    <main className="auth">
+      <div className="goo goo-a" aria-hidden="true" />
+      <div className="goo goo-b" aria-hidden="true" />
+      <form action={login} className="auth-card form-stack">
+        <div className="auth-brand">
+          <span className="wordmark wordmark-xl">slime</span>
+          <span className="brand-sub">cloud</span>
+        </div>
+        <p className="auth-tagline">Feed the Slime. Endpoints that crystallize.</p>
         {message && (
           <div className="alert" role="alert">
             {message}
           </div>
         )}
-        <label>
-          Email
+        <label className="field">
+          <span className="field-label">Email</span>
           <input name="email" type="email" autoComplete="email" required />
         </label>
-        <label>
-          Password
+        <label className="field">
+          <span className="field-label">Password</span>
           <input name="password" type="password" autoComplete="current-password" required />
         </label>
-        <div className="login-actions">
+        <div className="auth-actions">
           <button className="btn" type="submit">
             Log in
           </button>
@@ -44,7 +47,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             Create account
           </button>
         </div>
-        <p className="muted">New here? Enter an email and a password of 8+ characters, then Create account.</p>
+        <p className="field-hint auth-hint">New here? Enter an email and a password of 8+ characters, then Create account.</p>
       </form>
     </main>
   );

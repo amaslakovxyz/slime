@@ -13,12 +13,15 @@ import { createDevTables } from '../scripts/dev-tables';
 import { ddb } from '../lib/ddb';
 import {
   createEndpoint,
-  currentMonth,
+  endpointStats,
   getEndpoint,
   listEndpoints,
   overview,
   requestDelete,
   revealToken,
+  updateConnector,
+  updateSettings,
+  type Status,
 } from '../lib/endpoints';
 import { hasCode } from '../lib/errors';
 import { secretPath, secretStore } from '../lib/secrets';
@@ -117,49 +120,155 @@ describe('users and endpoints (DynamoDB Local)', { skip }, () => {
     await assert.rejects(requestDelete(owner, id), (err) => hasCode(err, 'NOT_DELETABLE'));
     assert.equal((await getEndpoint(owner, id))?.status, 'pending');
 
-    await ddb().send(
-      new UpdateCommand({
-        TableName: tables.control,
-        Key: { pk: `USER#${owner}`, sk: `ENDPOINT#${id}` },
-        UpdateExpression: 'SET #s = :ready',
-        ExpressionAttributeNames: { '#s': 'status' },
-        ExpressionAttributeValues: { ':ready': 'ready' },
-      }),
-    );
+    await setStatus(owner, id, 'ready');
     await requestDelete(owner, id);
     assert.equal((await getEndpoint(owner, id))?.status, 'deleting');
     // Another user's request cannot touch it.
     await assert.rejects(requestDelete(email('intruder'), id), (err) => hasCode(err, 'NOT_DELETABLE'));
   });
 
-  test('overview sums this month usage and Liquid handlers into an estimate', async () => {
-    const owner = email('usage');
+  test('endpointStats sums a month of day items into tier totals, a daily series and an estimate', async () => {
+    const owner = email('stats');
     const id = await createEndpoint(owner, { name: 'billed', provider: 'offline', databaseUrl: DB_URL });
-    await ddb().send(
-      new PutCommand({
-        TableName: tables.control,
-        Item: { pk: `USAGE#${id}`, sk: currentMonth(), requests: 2000, generations: 10, updatedAt: new Date().toISOString() },
-      }),
-    );
-    // Last month's usage is history, not this month's bill.
-    await ddb().send(
-      new PutCommand({
-        TableName: tables.control,
-        Item: { pk: `USAGE#${id}`, sk: '2000-01', requests: 99999, generations: 999 },
-      }),
-    );
+    const day = (sk: string, item: Record<string, unknown>) =>
+      ddb().send(new PutCommand({ TableName: tables.control, Item: { pk: `USAGE#${id}`, sk, ...item } }));
+    await day('2025-03-02', {
+      requests: 1950, generations: 5,
+      gasRequests: 50, liquidRequests: 500, crystalRequests: 1400,
+      gasMs: 10000, liquidMs: 2250, crystalMs: 700,
+      inputTokens: 10000, outputTokens: 2500, gasHandlers: 3, crystalHandlers: 4,
+    });
+    await day('2025-03-01', {
+      requests: 1000, generations: 10,
+      gasRequests: 100, liquidRequests: 300, crystalRequests: 600,
+      gasMs: 25000, liquidMs: 1200, crystalMs: 300,
+      inputTokens: 20000, outputTokens: 5000, gasHandlers: 5, crystalHandlers: 2,
+    });
+    // A later day without snapshots must not erase the last reported ones.
+    await day('2025-03-03', { updatedAt: '2025-03-03T10:00:00Z' });
+    // Other months, and a v1 monthly item, are not part of March.
+    await day('2025-04-01', { requests: 99999, gasRequests: 99999, generations: 999 });
+    await day('2025-03', { requests: 2000, generations: 10 });
     for (let i = 0; i < 3; i++) {
       await ddb().send(new PutCommand({ TableName: tables.handlers, Item: { tenantId: id, artifactKey: `k${i}` } }));
     }
     await ddb().send(new PutCommand({ TableName: tables.handlers, Item: { tenantId: 'ep-someoneelse', artifactKey: 'k' } }));
 
+    const s = await endpointStats(id, '2025-03');
+    assert.equal(s.requests, 2950);
+    assert.equal(s.generations, 15);
+    assert.deepEqual(
+      [s.tiers.gas.requests, s.tiers.liquid.requests, s.tiers.crystal.requests],
+      [150, 800, 2000],
+    );
+    assert.equal(s.tiers.gas.avgMs?.toFixed(2), '233.33');
+    assert.equal(s.tiers.liquid.avgMs, 4.3125);
+    assert.equal(s.tiers.crystal.avgMs, 0.5);
+    assert.deepEqual([s.inputTokens, s.outputTokens], [30000, 7500]);
+    assert.deepEqual([s.gasHandlers, s.crystalHandlers, s.liquidHandlers], [3, 4, 3]);
+    assert.equal(s.daily.length, 31);
+    assert.deepEqual(s.daily[0], { day: '2025-03-01', gas: 100, liquid: 300, crystal: 600 });
+    assert.deepEqual(s.daily[2], { day: '2025-03-03', gas: 0, liquid: 0, crystal: 0 });
+    assert.deepEqual(s.daily[30], { day: '2025-03-31', gas: 0, liquid: 0, crystal: 0 });
+    // 150 Gas ($0.30) + 800 Liquid ($0.40) + 2000 Crystal ($0.20) + 15 generations ($0.30).
+    assert.equal(s.estimatedUsd, 1.2);
+    // All 2950 as Gas would be $5.90 + $0.30.
+    assert.equal(s.savingsUsd, 5);
+
+    const empty = await endpointStats(id, '2025-05');
+    assert.equal(empty.requests, 0);
+    assert.equal(empty.tiers.gas.avgMs, null);
+    assert.equal(empty.gasHandlers, null);
+    assert.equal(empty.estimatedUsd, 0);
+  });
+
+  test('overview adds up endpoints for the current month, day by day', async () => {
+    const owner = email('overview');
+    const today = new Date().toISOString().slice(0, 10);
+    const a = await createEndpoint(owner, { name: 'a', provider: 'offline', databaseUrl: DB_URL });
+    const b = await createEndpoint(owner, { name: 'b', provider: 'offline', databaseUrl: DB_URL });
+    await setStatus(owner, b, 'updating');
+    const usage = { requests: 1000, generations: 2, gasRequests: 100, liquidRequests: 400, crystalRequests: 500, gasMs: 20000 };
+    for (const id of [a, b]) {
+      await ddb().send(new PutCommand({ TableName: tables.control, Item: { pk: `USAGE#${id}`, sk: today, ...usage } }));
+    }
+    await ddb().send(new PutCommand({ TableName: tables.handlers, Item: { tenantId: a, artifactKey: 'k' } }));
+
     const o = await overview(owner);
-    assert.equal(o.total, 1);
+    assert.equal(o.total, 2);
     assert.equal(o.byStatus.pending, 1);
+    assert.equal(o.byStatus.updating, 1);
     assert.equal(o.requests, 2000);
-    assert.equal(o.generations, 10);
-    assert.equal(o.liquidHandlers, 3);
-    assert.equal(o.estimatedUsd, 1.2);
+    assert.equal(o.tiers.gas.avgMs, 200);
+    assert.equal(o.liquidHandlers, 1);
+    assert.deepEqual(o.daily.at(-1), { day: today, gas: 200, liquid: 800, crystal: 1000 });
+    // 200 Gas ($0.40) + 800 Liquid ($0.40) + 1000 Crystal ($0.10) + 4 generations ($0.08).
+    assert.equal(o.estimatedUsd, 0.98);
+  });
+
+  test('updateConnector overwrites the secret, and redeploys only a ready or failed endpoint', async () => {
+    const owner = email('connector');
+    const id = await createEndpoint(owner, { name: 'conn', provider: 'offline', databaseUrl: DB_URL });
+    const url = (n: number) => `postgres://reader:pw${n}@db.example.com:5432/app`;
+    const stored = () => secretStore().get(id, 'DATABASE_URL');
+
+    await updateConnector(owner, id, { connectorType: 'postgres', databaseUrl: url(1) });
+    assert.equal(await stored(), url(1));
+    assert.equal((await getEndpoint(owner, id))?.status, 'pending');
+
+    await setStatus(owner, id, 'ready');
+    await updateConnector(owner, id, { connectorType: 'postgres', databaseUrl: url(2) });
+    assert.equal(await stored(), url(2));
+    const updating = await getEndpoint(owner, id);
+    assert.equal(updating?.status, 'updating');
+    assert.equal(updating?.connectorType, 'postgres');
+
+    for (const status of ['updating', 'provisioning', 'deleting'] as const) {
+      await setStatus(owner, id, status);
+      await assert.rejects(updateConnector(owner, id, { connectorType: 'postgres', databaseUrl: url(3) }), (err) =>
+        hasCode(err, 'NOT_UPDATABLE'),
+      );
+      assert.equal(await stored(), url(2));
+    }
+
+    await setStatus(owner, id, 'failed');
+    await assert.rejects(updateConnector(owner, id, { connectorType: 'postgres', databaseUrl: 'mysql://x/y' }), (err) =>
+      hasCode(err, 'INVALID'),
+    );
+    await assert.rejects(updateConnector(owner, id, { connectorType: 'mysql', databaseUrl: url(4) }), (err) =>
+      hasCode(err, 'INVALID'),
+    );
+    await assert.rejects(updateConnector(email('stranger'), id, { connectorType: 'postgres', databaseUrl: url(4) }), (err) =>
+      hasCode(err, 'NOT_FOUND'),
+    );
+    assert.equal(await stored(), url(2));
+    assert.equal((await getEndpoint(owner, id))?.status, 'failed');
+  });
+
+  test('updateSettings renames in place; a provider change needs ready or failed and redeploys', async () => {
+    const owner = email('settings');
+    const id = await createEndpoint(owner, { name: 'before', provider: 'offline', databaseUrl: DB_URL });
+
+    await updateSettings(owner, id, { name: 'renamed', provider: 'offline' });
+    let ep = await getEndpoint(owner, id);
+    assert.deepEqual([ep?.name, ep?.status], ['renamed', 'pending']);
+
+    await assert.rejects(updateSettings(owner, id, { name: 'renamed', provider: 'claude' }), (err) =>
+      hasCode(err, 'NOT_UPDATABLE'),
+    );
+    assert.equal((await getEndpoint(owner, id))?.provider, 'offline');
+
+    await setStatus(owner, id, 'ready');
+    await updateSettings(owner, id, { name: 'switched', provider: 'groq' });
+    ep = await getEndpoint(owner, id);
+    assert.deepEqual([ep?.name, ep?.provider, ep?.status], ['switched', 'groq', 'updating']);
+
+    await setStatus(owner, id, 'deleting');
+    await assert.rejects(updateSettings(owner, id, { name: 'late', provider: 'groq' }), (err) =>
+      hasCode(err, 'NOT_UPDATABLE'),
+    );
+    assert.equal((await getEndpoint(owner, id))?.name, 'switched');
+    await assert.rejects(updateSettings(owner, id, { name: '', provider: 'groq' }), (err) => hasCode(err, 'INVALID'));
   });
 
   test('invalid input throws before any write', async () => {
@@ -171,6 +280,7 @@ describe('users and endpoints (DynamoDB Local)', { skip }, () => {
       { name: '   ', provider: 'offline', databaseUrl: DB_URL },
       { name: 'y'.repeat(41), provider: 'offline', databaseUrl: DB_URL },
       { name: 'x', provider: 'openai', databaseUrl: DB_URL },
+      { name: 'x', provider: 'offline', databaseUrl: DB_URL, connectorType: 'clickhouse' },
     ];
     for (const input of cases) {
       await assert.rejects(createEndpoint(owner, input), (err) => hasCode(err, 'INVALID'));
@@ -178,4 +288,16 @@ describe('users and endpoints (DynamoDB Local)', { skip }, () => {
     assert.deepEqual(await listEndpoints(owner), []);
     assert.equal(await readSecrets(), before);
   });
+
+  async function setStatus(owner: string, id: string, status: Status) {
+    await ddb().send(
+      new UpdateCommand({
+        TableName: tables.control,
+        Key: { pk: `USER#${owner}`, sk: `ENDPOINT#${id}` },
+        UpdateExpression: 'SET #s = :s',
+        ExpressionAttributeNames: { '#s': 'status' },
+        ExpressionAttributeValues: { ':s': status },
+      }),
+    );
+  }
 });
