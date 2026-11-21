@@ -22,7 +22,8 @@ replace the `file:` path with a version; nothing else changes.
 | [src/app.ts](src/app.ts) | HTTP routes on the core's `Slime` API (`/v0/query`, `/healthz`, `/v0/handlers`, a Crystal's own route `/v0/e/<key>`; local-only `/v0/events`, `/v0/lifecycle`, `/v0/crystallize` when their parts are given) |
 | [src/local.ts](src/local.ts) | Local entry: the same runtime as a Node HTTP server on `PORT`, started by the admin's local runner; flushes before each response, crystallizes into `SLIME_CRYSTAL_DIR` |
 | [src/events.ts](src/events.ts) | The last 50 answered requests (handler, tier, cache, ms), memory only |
-| [src/auth.ts](src/auth.ts) | `keyMatches`, the constant-time `x-api-key` check shared by both entries |
+| [src/auth.ts](src/auth.ts) | `keyMatches` and `isAuthorized`, shared by both entries: the endpoint key opens every route; a Crystal's own token (`CRYSTAL_TOKENS`, JSON `{key: token}`) opens only `POST /v0/e/<its key>` |
+| [src/live-runs.ts](src/live-runs.ts) | Copies live Liquid run counts to the store (the core saves a handler only when it turns Liquid): before Crystallize locally, at most every `SLIME_RUNS_SYNC_MS` (default 60 s) on Lambda flush |
 | [src/store-dynamodb.ts](src/store-dynamodb.ts) | The core's `SlimeStore` Port on the existing table; one partition per tenant |
 | [src/usage.ts](src/usage.ts) | Daily usage counters (`USAGE#<tenant>` / `YYYY-MM-DD` in `SLIME_USAGE_TABLE`): requests and latency per tier, generations, LLM tokens, handler snapshot per tier. Set only on provisioned endpoints |
 | [src/legacy-handlers.ts](src/legacy-handlers.ts), [src/migrate-cli.ts](src/migrate-cli.ts) | One-off copy of the sandbox runtime's handlers into the core's format |

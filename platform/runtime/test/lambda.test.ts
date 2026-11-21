@@ -28,6 +28,19 @@ describe('Lambda entry', () => {
     assert.equal((await app.request('/healthz', { headers: { 'x-api-key': 'wrong' } })).status, 401);
   });
 
+  test("a Crystal token gets past auth only on that Crystal's route", async () => {
+    process.env.SLIME_API_KEY = 'k';
+    process.env.CRYSTAL_TOKENS = JSON.stringify({ abc: 'slc_abc' });
+    delete process.env.SLIME_HANDLERS_TABLE;
+    const as = (path: string, method = 'POST') => app.request(path, { method, headers: { 'x-api-key': 'slc_abc' }, body: method === 'POST' ? '{}' : undefined });
+    assert.equal((await as('/v0/query')).status, 401);
+    assert.equal((await as('/healthz', 'GET')).status, 401);
+    assert.equal((await as('/v0/e/other')).status, 401);
+    // Past auth, the (unconfigured) runtime answers 503: the token was accepted.
+    assert.equal((await as('/v0/e/abc')).status, 503);
+    delete process.env.CRYSTAL_TOKENS;
+  });
+
   test('answers 503 NOT_READY when the runtime cannot start, and retries on the next request', async () => {
     process.env.SLIME_API_KEY = 'k';
     delete process.env.SLIME_HANDLERS_TABLE;
