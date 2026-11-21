@@ -4,7 +4,7 @@ import { ConfirmSubmit } from '@/app/ui/confirm-submit';
 import { PROVIDER_INFO } from '@/app/ui/providers';
 import { TestConnection } from '@/app/ui/test-connection';
 import { CONNECTOR_SPECS, maskConnectionUrl } from '@/lib/connectors';
-import { connectionUrl, PROVIDERS } from '@/lib/endpoints';
+import { connectionUrl, isStaleDelete, PROVIDERS } from '@/lib/endpoints';
 import { isCloud } from '@/lib/env';
 import { loadEndpoint } from '../data';
 
@@ -24,8 +24,8 @@ export default async function SettingsPage({
   const settled = ep.status === 'ready' || ep.status === 'failed';
   const renamable = ep.status !== 'deleting';
   const cloud = isCloud();
-  // Cloud: an interrupted action can leave provisioning/updating behind; Delete and Retry check get out of it.
-  const deletable = cloud ? ep.status !== 'deleting' : settled;
+  // Cloud: an interrupted action can leave provisioning/updating/deleting behind; Delete and Retry check get out of it.
+  const deletable = cloud ? ep.status !== 'deleting' || isStaleDelete(ep) : settled;
   const recheckable = cloud && (ep.status === 'provisioning' || ep.status === 'updating');
   const spec = CONNECTOR_SPECS[ep.connectorType];
   // Masked on the server: the password never reaches the browser.

@@ -15,7 +15,7 @@ import { GetCommand, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/li
 import { createDevTables } from '../scripts/dev-tables';
 import { check, provision, reconfigure, remove, type CheckTiming } from '../lib/cloud-endpoints';
 import { ddb } from '../lib/ddb';
-import { createEndpoint, endpointKey, getEndpoint, updateConnector, updateSettings, type Status } from '../lib/endpoints';
+import { createEndpoint, endpointKey, getEndpoint, STALE_DELETE_MS, updateConnector, updateSettings, type Status } from '../lib/endpoints';
 import { hasCode } from '../lib/errors';
 import { secretStore } from '../lib/secrets';
 import { FakeS3 } from './fake-s3';
@@ -58,7 +58,7 @@ class FakeRuntime {
   private server: Server = createServer((req, res) => {
     const path = req.url ?? '';
     this.requests.push(`${req.method} ${path} ${req.headers['x-api-key'] ?? ''}`);
-    const match = /^\/ep\/(ep-[0-9a-f]{10})\/(healthz|v0\/reload)$/.exec(path);
+    const match = /^\/ep\/(ep-[0-9a-f]{10})\/(healthz|v0\/reload)(\?fresh=1)?$/.exec(path);
     if (!match) return void res.writeHead(404).end();
     if (match[2] === 'v0/reload') return void res.writeHead(204).end();
     const queue = this.healthz.get(match[1]!) ?? [];
@@ -171,7 +171,7 @@ describe('cloud endpoint flows (fake runtime, DynamoDB Local)', { skip }, () => 
     assert.match(ep?.error ?? '', /^Endpoint runtime did not answer/);
   });
 
-  test('a connector change reloads the instance before the health check; a provider change that breaks it ends failed', async () => {
+  test('a connector change is checked on freshly read settings; a provider change that breaks it ends failed', async () => {
     const who = owner('reconf');
     const id = await create(who);
     await provision(who, id, FAST);
@@ -180,7 +180,8 @@ describe('cloud endpoint flows (fake runtime, DynamoDB Local)', { skip }, () => 
     assert.equal((await getEndpoint(who, id))?.status, 'updating');
     const before = runtime.calls(id).length;
     await reconfigure(who, id, FAST);
-    assert.deepEqual(runtime.calls(id).slice(before), [`POST /ep/${id}/v0/reload`, `GET /ep/${id}/healthz`]);
+    // One call: a separate reload could reach another instance than the check.
+    assert.deepEqual(runtime.calls(id).slice(before), [`GET /ep/${id}/healthz?fresh=1`]);
     assert.equal((await getEndpoint(who, id))?.status, 'ready');
 
     runtime.healthz.set(id, [{ status: 503, body: '{"error":{"code":"NOT_READY","message":"GROQ_API_KEY is not set"}}' }]);
@@ -203,7 +204,7 @@ describe('cloud endpoint flows (fake runtime, DynamoDB Local)', { skip }, () => 
     await setStatus(who, id, 'updating');
     const before = runtime.calls(id).length;
     await check(who, id, FAST);
-    assert.deepEqual(runtime.calls(id).slice(before), [`POST /ep/${id}/v0/reload`, `GET /ep/${id}/healthz`]);
+    assert.deepEqual(runtime.calls(id).slice(before), [`GET /ep/${id}/healthz?fresh=1`]);
     assert.equal((await getEndpoint(who, id))?.status, 'ready');
 
     await assert.rejects(check(who, id, FAST), (err) => hasCode(err, 'NOT_UPDATABLE'));
@@ -242,29 +243,36 @@ describe('cloud endpoint flows (fake runtime, DynamoDB Local)', { skip }, () => 
     await assert.rejects(remove(who, id, { s3 }), (err) => hasCode(err, 'DELETE_FAILED'));
     const failed = await getEndpoint(who, id);
     assert.deepEqual([failed?.status, failed?.error], ['failed', 'Delete failed: AccessDenied']);
-    assert.ok(await secretStore().get(id, 'SLIME_API_KEY'), 'secrets stay until the teardown finishes');
+    // The keys were revoked first; the item stays so Delete can finish the rest.
+    assert.equal(await secretStore().get(id, 'SLIME_API_KEY'), undefined);
 
     s3.failDeletes = false;
     await remove(who, id, { s3 });
     assert.equal(await getEndpoint(who, id), undefined);
   });
 
-  test('an endpoint already deleting cannot be deleted again', async () => {
+  test('a delete in progress is refused; one an admin timeout cut off resumes and finishes', async () => {
     const who = owner('twice');
     const id = await create(who);
-    await setStatus(who, id, 'deleting');
+    await setStatus(who, id, 'deleting', new Date().toISOString());
     await assert.rejects(remove(who, id, { s3: new FakeS3() }), (err) => hasCode(err, 'NOT_DELETABLE'));
     assert.equal((await getEndpoint(who, id))?.status, 'deleting');
+
+    // Older than the admin Lambda's timeout plus margin: the teardown that set it is gone.
+    await setStatus(who, id, 'deleting', new Date(Date.now() - STALE_DELETE_MS - 1_000).toISOString());
+    await remove(who, id, { s3: new FakeS3() });
+    assert.equal(await getEndpoint(who, id), undefined);
+    assert.equal(await secretStore().get(id, 'SLIME_API_KEY'), undefined);
   });
 
-  async function setStatus(who: string, id: string, status: Status) {
+  async function setStatus(who: string, id: string, status: Status, updatedAt?: string) {
     await ddb().send(
       new UpdateCommand({
         TableName: tables.control,
         Key: endpointKey(who, id),
-        UpdateExpression: 'SET #s = :s',
+        UpdateExpression: updatedAt ? 'SET #s = :s, updatedAt = :u' : 'SET #s = :s',
         ExpressionAttributeNames: { '#s': 'status' },
-        ExpressionAttributeValues: { ':s': status },
+        ExpressionAttributeValues: { ':s': status, ...(updatedAt ? { ':u': updatedAt } : {}) },
       }),
     );
   }

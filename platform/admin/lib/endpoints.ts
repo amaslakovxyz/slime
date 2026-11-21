@@ -176,24 +176,36 @@ export async function requireEndpoint(owner: string, endpointId: string): Promis
 const notUpdatable = (message: string) => new CodedError('NOT_UPDATABLE', message);
 
 /**
+ * The admin Lambda times out at 60 s; a cloud delete still `deleting` after this was cut
+ * off mid-teardown, and Delete may start it again (the teardown is idempotent).
+ */
+export const STALE_DELETE_MS = 90_000;
+
+/** Cloud only: a `deleting` endpoint whose teardown was interrupted, so Delete is offered again. */
+export const isStaleDelete = (ep: Pick<Endpoint, 'status' | 'updatedAt'>, now = Date.now()): boolean =>
+  ep.status === 'deleting' && now - Date.parse(ep.updatedAt) > STALE_DELETE_MS;
+
+/**
  * Moves the item to `deleting`. Locally only from ready|failed (the runner owns the
- * other states). In the cloud from any state but deleting: an admin Lambda that timed
- * out mid-action can leave `provisioning` or `updating` behind, and Delete is the way out.
+ * other states). In the cloud from any state: an admin Lambda that timed out mid-action
+ * can leave `provisioning`, `updating` or a half-done `deleting` behind, and Delete is the
+ * way out. A `deleting` that is still fresh belongs to a delete in progress and is refused.
  */
 export async function requestDelete(owner: string, endpointId: string): Promise<void> {
   const cloud = isCloud();
+  const now = Date.now();
   try {
     await ddb().send(
       new UpdateCommand({
         TableName: env().controlTable,
         Key: endpointKey(owner, endpointId),
         UpdateExpression: 'SET #s = :deleting, updatedAt = :now',
-        ConditionExpression: cloud ? 'attribute_exists(pk) AND #s <> :deleting' : '#s IN (:ready, :failed)',
+        ConditionExpression: cloud ? 'attribute_exists(pk) AND (#s <> :deleting OR updatedAt < :stale)' : '#s IN (:ready, :failed)',
         ExpressionAttributeNames: { '#s': 'status' },
         ExpressionAttributeValues: {
           ':deleting': 'deleting',
-          ':now': new Date().toISOString(),
-          ...(cloud ? {} : { ':ready': 'ready', ':failed': 'failed' }),
+          ':now': new Date(now).toISOString(),
+          ...(cloud ? { ':stale': new Date(now - STALE_DELETE_MS).toISOString() } : { ':ready': 'ready', ':failed': 'failed' }),
         },
       }),
     );

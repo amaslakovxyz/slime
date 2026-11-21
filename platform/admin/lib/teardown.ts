@@ -1,13 +1,13 @@
 // Removes an endpoint, in both modes: the local runner calls it for a `deleting`
-// item, the cloud delete action calls it in the request. Order matters:
-//   1. its Liquid handlers (slime-handlers, one partition per endpoint);
-//   2. its Crystal storage (the folder locally, every object version under the
-//      S3 prefix in the cloud: the bucket is versioned);
-//   3. the control item;
-//   4. the secrets (file or SSM).
-// Secrets go last so a failed step can be retried: the runner treats an endpoint
-// whose secrets it holds as its own, and the runtime keeps serving an id whose SSM
-// path still exists. Usage items (USAGE#<id>) stay as billing history.
+// item, the cloud delete action calls it in the request. Order matters, and differs:
+//   local (Crystal folder): handlers, folder, control item, secrets. Secrets go last:
+//     the runner treats an endpoint whose secrets it holds as its own, so a failed
+//     step leaves it something to retry.
+//   cloud (S3): secrets, handlers, every Crystal object version, control item. Secrets
+//     go first: the shared runtime serves an id exactly as long as its SSM path exists,
+//     so this revokes the keys and the customer's DATABASE_URL on every instance within
+//     one TTL even if a later step fails; the item, still there, lets Delete run again.
+// Every step is idempotent. Usage items (USAGE#<id>) stay as billing history.
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
@@ -49,11 +49,12 @@ export interface Teardown {
 
 export async function removeEndpoint({ endpointId, owner, handlersTable, crystals, secrets }: Teardown): Promise<void> {
   if (!ENDPOINT_ID.test(endpointId)) throw new Error(`Not an endpoint id: ${JSON.stringify(endpointId)}`);
+  if (crystals.kind === 's3') await secrets.removeAll(endpointId);
   await removeHandlers(endpointId, handlersTable);
   if (crystals.kind === 'dir') await rm(join(crystals.dataDir, endpointId), { recursive: true, force: true });
   else await removeCrystalObjects(crystals.client, crystals.bucket, `endpoints/${endpointId}/`);
   await ddb().send(new DeleteCommand({ TableName: env().controlTable, Key: endpointKey(owner, endpointId) }));
-  await secrets.removeAll(endpointId);
+  if (crystals.kind === 'dir') await secrets.removeAll(endpointId);
 }
 
 async function removeHandlers(endpointId: string, handlersTable: string): Promise<void> {

@@ -14,7 +14,6 @@ import { ddb } from './ddb';
 import { endpointKey, requestDelete, requireEndpoint, type Endpoint, type Status } from './endpoints';
 import { env } from './env';
 import { CodedError } from './errors';
-import { reloadOn } from './lifecycle';
 import { secretStore } from './secrets';
 import { removeEndpoint, type CrystalObjects } from './teardown';
 
@@ -52,7 +51,7 @@ function reasonFrom(status: number, body: string): string {
  * retried every `retryMs` until `windowMs` passes (a cold start, SSM not visible yet); any
  * other status is final.
  */
-async function healthz(ep: Endpoint, timing: CheckTiming): Promise<Outcome> {
+async function healthz(ep: Endpoint, timing: CheckTiming, { fresh = false } = {}): Promise<Outcome> {
   const token = await secretStore().get(ep.endpointId, 'SLIME_API_KEY');
   if (!ep.url || !token) return { ok: false, error: 'Endpoint URL or key is missing' };
   const deadline = Date.now() + timing.windowMs;
@@ -62,7 +61,8 @@ async function healthz(ep: Endpoint, timing: CheckTiming): Promise<Outcome> {
   for (;;) {
     let error: string;
     try {
-      const res = await fetch(new URL('healthz', ep.url), {
+      // fresh: the runtime re-reads the settings in this same call, so another warm instance's cache cannot answer.
+      const res = await fetch(new URL(fresh ? 'healthz?fresh=1' : 'healthz', ep.url), {
         headers: { 'x-api-key': token },
         cache: 'no-store',
         signal: AbortSignal.timeout(Math.max(deadline - Date.now(), timing.retryMs)),
@@ -112,17 +112,14 @@ export async function provision(owner: string, endpointId: string, timing = DEFA
 }
 
 /**
- * After a connector or provider change wrote `updating`: the instance that answers drops its
- * cached settings, then healthz proves the new ones work. Other warm instances re-read SSM
- * within their TTL (30 s).
+ * After a connector or provider change wrote `updating`: healthz with `fresh=1` makes the
+ * instance that answers re-read the settings before it checks them. Other warm instances
+ * re-read SSM within their TTL (30 s).
  */
 export async function reconfigure(owner: string, endpointId: string, timing = DEFAULT_TIMING): Promise<void> {
   const ep = await requireEndpoint(owner, endpointId);
   if (ep.status !== 'updating') return;
-  // A reload that fails (the new settings cannot start the engine) is not the outcome:
-  // healthz right after reports the cause.
-  await reloadOn(ep).catch(() => {});
-  await settle(owner, endpointId, 'updating', await healthz(ep, timing));
+  await settle(owner, endpointId, 'updating', await healthz(ep, timing, { fresh: true }));
 }
 
 /** Retry check: finishes what an interrupted create or reconfigure left in `provisioning`/`updating`. */

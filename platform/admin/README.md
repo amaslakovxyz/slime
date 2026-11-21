@@ -16,19 +16,21 @@ Design: [2026-11-21-cloud-mvp-design.md](../../docs/architecture/2026-11-21-clou
 | Endpoint | one `platform/runtime/src/local.ts` process per endpoint on `localhost:87xx` | the path `<runtime URL>ep/<id>/` on the one `slime-runtime` Lambda |
 | Who moves the status | the local runner ([scripts/local-runner.ts](scripts/local-runner.ts)) | the admin's server action, in the request ([lib/cloud-endpoints.ts](lib/cloud-endpoints.ts)) |
 | Create | `pending` → runner starts it → `ready` / `failed` | `provisioning` + URL → `GET healthz` (retried 1 s, up to 20 s) → `ready` / `failed` + reason |
-| Connector or provider change | `updating` → runner restarts it | `updating` → `POST v0/reload` → `GET healthz` → `ready` / `failed` |
+| Connector or provider change | `updating` → runner restarts it | `updating` → `GET healthz?fresh=1` (re-reads the settings in that call) → `ready` / `failed` |
 | After Crystallize | `updating` → runner restarts it with the new tokens | `POST v0/reload`; other instances catch up within 30 s |
-| Delete | `deleting` → runner stops it, then the teardown | the teardown, in the request; any status but `deleting`; a failure leaves `failed` (deletable again) |
+| Delete | `deleting` → runner stops it, then the teardown | the teardown, in the request; any status, and a `deleting` the admin timeout cut off (older than 90 s) resumes; a failure leaves `failed` (deletable again) |
 | Secrets | `.data/secrets.json` (`SLIME_SECRETS=file`) | SSM `/slime/endpoints/<id>/` (`SLIME_SECRETS=ssm`) |
 | Crystal storage | `.data/endpoints/<id>/crystal/` | S3 `endpoints/<id>/crystal/` in `SLIME_CRYSTAL_BUCKET` |
 
 Both modes write `DATABASE_URL`, `SLIME_API_KEY`, `SLIME_PROVIDER` and (after
 Crystallize) `CRYSTAL_TOKENS` to the endpoint's secrets. One teardown
-([lib/teardown.ts](lib/teardown.ts)) removes, in order: the Liquid handlers,
-the Crystal storage (every S3 object version in the cloud), the control item,
-then the secrets. Usage items (`USAGE#<id>`) stay as billing history. In the
-cloud, Settings offers **Retry check** for an endpoint an interrupted action left
-`provisioning` or `updating`.
+([lib/teardown.ts](lib/teardown.ts)) removes locally, in order: the Liquid
+handlers, the Crystal folder, the control item, then the secrets. In the cloud the
+SSM secrets go first, which stops the shared runtime serving the endpoint within
+30 s even if a later step fails; then the handlers, every S3 object version, the
+item. Usage items (`USAGE#<id>`) stay as billing history. In the cloud, Settings
+offers **Retry check** for an endpoint an interrupted action left `provisioning`
+or `updating`.
 
 **Invite-only.** When `ADMIN_ALLOWED_EMAILS` is set (comma-separated,
 case-insensitive), sign-up accepts only those emails and shows "This email is

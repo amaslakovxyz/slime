@@ -1,5 +1,6 @@
-// The shared endpoint teardown (local runner and cloud delete): handlers, Crystal
-// storage (folder or every S3 version), control item, secrets, in that order.
+// The shared endpoint teardown. Locally: handlers, Crystal folder, control item, secrets.
+// In the cloud: secrets first (revoking the endpoint on the shared runtime), then handlers,
+// every S3 version, control item.
 // Runs against DynamoDB Local; skipped when it is not reachable, unless REQUIRE_DYNAMO=1.
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
@@ -97,7 +98,7 @@ describe('shared endpoint teardown (DynamoDB Local)', { skip }, () => {
     assert.equal(await secretStore().get(kept, 'SLIME_API_KEY'), `slm_${kept}`);
   });
 
-  test('in the cloud: deletes every version and delete marker under the prefix, after the handlers and before the item and secrets', async () => {
+  test('in the cloud: removes the secrets first, then the handlers, every version and delete marker under the prefix, then the item', async () => {
     const [gone, kept] = ['ep-1a1b2c3d4e', 'ep-1f8e7d6c5b'];
     await seed(gone);
     await seed(kept);
@@ -109,7 +110,7 @@ describe('shared endpoint teardown (DynamoDB Local)', { skip }, () => {
 
     const seen: string[] = [];
     s3.onCall = async (name) => {
-      if (name === 'ListObjectVersions' && seen.length === 0) {
+      if (name === 'ListObjectVersions' && !seen.some((line) => line.startsWith('s3 starts'))) {
         seen.push(`s3 starts: handlers=${await handlerCount(gone)} item=${Boolean(await controlItem(gone))}`);
       }
     };
@@ -118,21 +119,21 @@ describe('shared endpoint teardown (DynamoDB Local)', { skip }, () => {
       put: files.put.bind(files),
       get: files.get.bind(files),
       removeAll: async (id) => {
-        seen.push(`secrets: item=${Boolean(await controlItem(id))} objects=${s3.keys(`endpoints/${id}/`).length}`);
+        seen.push(`secrets: handlers=${await handlerCount(id)} item=${Boolean(await controlItem(id))} objects=${s3.keys(`endpoints/${id}/`).length}`);
         await files.removeAll(id);
       },
     };
 
     await removeEndpoint({ endpointId: gone, owner: OWNER, handlersTable: tables.handlers, crystals: { kind: 's3', bucket: 'b', client: s3 }, secrets });
 
-    assert.deepEqual(seen, ['s3 starts: handlers=0 item=true', 'secrets: item=false objects=0']);
+    assert.deepEqual(seen, ['secrets: handlers=30 item=true objects=5', 's3 starts: handlers=0 item=true']);
     assert.deepEqual(s3.keys(`endpoints/${gone}/`), []);
     assert.deepEqual(s3.keys(), [`endpoints/${kept}/crystal/manifest.json@v6`, 'artifacts/admin.zip@v7']);
     assert.equal(await secretStore().get(gone, 'DATABASE_URL'), undefined);
     assert.equal(await handlerCount(kept), 30);
   });
 
-  test('a failed Crystal delete keeps the item and secrets, so the teardown can run again', async () => {
+  test('a failed Crystal delete has already revoked the secrets and keeps the item, so the teardown can run again', async () => {
     const id = 'ep-2a1b2c3d4e';
     await seed(id);
     const s3 = new FakeS3();
@@ -143,7 +144,8 @@ describe('shared endpoint teardown (DynamoDB Local)', { skip }, () => {
 
     await assert.rejects(run(), /AccessDenied/);
     assert.ok(await controlItem(id));
-    assert.equal(await secretStore().get(id, 'SLIME_API_KEY'), `slm_${id}`);
+    // The shared runtime stops serving the endpoint once its SSM path is gone.
+    assert.equal(await secretStore().get(id, 'SLIME_API_KEY'), undefined);
 
     s3.failDeletes = false;
     await run();
