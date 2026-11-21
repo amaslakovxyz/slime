@@ -250,7 +250,9 @@ SQL."*
   * The benchmark as the acceptance test, run locally and against AWS.
 * **Out-of-Scope Non-Goals:**
   * Writes and tenancy.
-  * Connectors other than Postgres.
+  * Write connectors, and non-HTTP sources (CSV, Excel, DuckDB). Read-only API
+    sources beside Postgres are planned: see core/docs/multi-source.md
+    (MS1 in core/PLAN.md).
   * The standalone `@slime/server`.
   * Redis.
   * Embeddings or "semantic" matching.

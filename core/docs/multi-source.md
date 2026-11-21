@@ -814,24 +814,24 @@ uses only Postgres (Q10).
 
 ## 11. Open questions
 
-Every question carries a recommendation; P0 marks each Decided or Open.
+Every question carries a recommendation. P0 recorded each one as a decision in [core/PLAN.md §3.1](../PLAN.md) (status Proposed there); Q13 stays open until P5.
 
 | # | Question | Recommendation | Status |
 |---|---|---|---|
-| Q1 | Uniform `steps` for every handler, or keep top-level `sql` and add `calls`? | `steps` for v2 only; v1 artifacts stay as they are when no API source is configured (§3.3). | Recommended |
-| Q2 | How many SQL sources? | Exactly one in v1: one dialect in prompts and lint, and `config.connector` stays required. | Decided after the plan review |
-| Q3 | Constants in API arguments? | Yes, typed and checked against `values`. Otherwise intents like "open negative feedback" need extra inputs. | Recommended |
-| Q4 | List-valued columns (multi_select, relation)? | No list columns in v1: multi_select is a joined string, relation is excluded. | Decided in this revision |
-| Q5 | Notion filters: generated equality and range params, or a model-written filter language? | Generated params in v1. Small, typed, lintable. Anything finer is done in `shape` over at most `rowCap` rows; more data fails the run (§3.5). | Recommended |
-| Q6 | A source is down at startup? | Fail fast in explore and locked mode, matching today's behaviour when the database is unreachable. | Recommended |
-| Q7 | Crystal for handlers with API steps? | Not in v1 (S3, and equivalence on live data is not deterministic). | Recommended |
-| Q8 | Can a `defineApiSource` operation use raw `fetch`? | No. Only the constrained client, which takes headers, method and body options. | Recommended |
-| Q9 | Naming and folders: "source" vs "connector"; `connectors/` vs `sources/`? | "Source" is the umbrella term, and the Postgres connector is a SQL source. New code goes in `core/src/sources/`. | Recommended |
-| Q10 | Merge before or after the demo? | Phase by phase as each is ready: the compatibility rule and the P1–P3 config guard keep a Postgres-only demo unchanged. | Recommended |
-| Q11 | Expose Notion `people` properties? | Excluded by default; opt in per property later. | Recommended |
-| Q12 | The exact JSON schema of the v2 artifact and of `meta.steps`? | Write it in P0 as an addition to `core/docs/request-format.md`. | Open |
+| Q1 | Uniform `steps` for every handler, or keep top-level `sql` and add `calls`? | `steps` for v2 only; v1 artifacts stay as they are when no API source is configured (§3.3). | Recorded: MS3 in core/PLAN.md |
+| Q2 | How many SQL sources? | Exactly one in v1: one dialect in prompts and lint, and `config.connector` stays required. | Recorded: MS1 |
+| Q3 | Constants in API arguments? | Yes, typed and checked against `values`. Otherwise intents like "open negative feedback" need extra inputs. | Recorded: MS4 |
+| Q4 | List-valued columns (multi_select, relation)? | No list columns in v1: multi_select is a joined string, relation is excluded. | Recorded: MS2 |
+| Q5 | Notion filters: generated equality and range params, or a model-written filter language? | Generated params in v1. Small, typed, lintable. Anything finer is done in `shape` over at most `rowCap` rows; more data fails the run (§3.5). | Recorded: MS12 |
+| Q6 | A source is down at startup? | Fail fast in explore and locked mode, matching today's behaviour when the database is unreachable. | Recorded: MS8 |
+| Q7 | Crystal for handlers with API steps? | Not in v1 (S3, and equivalence on live data is not deterministic). | Recorded: MS9 |
+| Q8 | Can a `defineApiSource` operation use raw `fetch`? | No. Only the constrained client, which takes headers, method and body options. | Recorded: MS10 |
+| Q9 | Naming and folders: "source" vs "connector"; `connectors/` vs `sources/`? | "Source" is the umbrella term, and the Postgres connector is a SQL source. New code goes in `core/src/sources/`. | Recorded: MS11 |
+| Q10 | Merge before or after the demo? | Phase by phase as each is ready: the compatibility rule and the P1–P3 config guard keep a Postgres-only demo unchanged. | Recorded: Plan §0 |
+| Q11 | Expose Notion `people` properties? | Excluded by default; opt in per property later. | Recorded: MS12 |
+| Q12 | The exact JSON schema of the v2 artifact and of `meta.steps`? | Write it in P0 as an addition to `core/docs/request-format.md`. | Recorded: Answered in core/docs/request-format.md (P0.2) |
 | Q13 | Does Notion's data source endpoint return property descriptions? | Check in P5. Descriptions are opt-in (`useNotionDescriptions`); join hints come from `comments` either way. | Open |
-| Q14 | API timeout? | A new limit `apiTimeoutMs`, default 10 s, for API steps and for source `describe` and `safetyCheck`. | Decided after the plan review |
+| Q14 | API timeout? | A new limit `apiTimeoutMs`, default 10 s, for API steps and for source `describe` and `safetyCheck`. | Recorded: MS5 |
 
 ## 12. Glossary
 
