@@ -7,15 +7,16 @@ const t = { liquidRuns: 3, crystalRuns: 10 };
 const h = (over: Partial<RuntimeHandler>): RuntimeHandler => ({ key: 'abcdef123456', intent: 'accounts per plan', tier: 'gas', runs: 1, ...over });
 
 describe('toRow', () => {
-  test('Gas counts towards Liquid and shows review once it is due', () => {
+  test('Gas counts towards Liquid; its review label is the engine status, not a guess from runs', () => {
     const fresh = toRow(h({ runs: 1 }), t);
     assert.equal(fresh.progressLabel, '1/3 to Liquid');
     assert.equal(fresh.review.label, '—');
     assert.equal(fresh.shortKey, 'abcdef');
     const due = toRow(h({ runs: 3 }), t);
     assert.equal(due.progressPct, 100);
-    assert.equal(due.review.label, 'reviewing…');
+    assert.equal(due.review.label, '—');
     assert.equal(due.canCrystallize, false);
+    assert.equal(toRow(h({ runs: 3, review: 'pending' }), t).review.label, 'reviewing…');
   });
 
   test('Liquid counts towards Crystal and becomes pickable at the threshold', () => {
@@ -26,6 +27,13 @@ describe('toRow', () => {
     assert.equal(proven.progressLabel, 'ready to crystallize');
     assert.equal(proven.canCrystallize, true);
     assert.equal(proven.review.label, 'no reviewer');
+  });
+
+  test('a stale saved Liquid handler is never pickable and says it regenerates', () => {
+    const row = toRow(h({ tier: 'liquid', runs: 12, review: 'approved', stale: true }), t);
+    assert.equal(row.canCrystallize, false);
+    assert.equal(row.progressLabel, 'stale · regenerates on next request');
+    assert.equal(row.progressPct, 0);
   });
 
   test('a Crystal is its own endpoint and is never picked again', () => {

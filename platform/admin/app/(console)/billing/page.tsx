@@ -4,9 +4,9 @@ import { listWithStats, summarize } from '@/lib/endpoints';
 import { allGasBill, generationCost, PRICE_PER_GENERATION_USD, TIER_PRICE_PER_1K_USD, tierCost, TIERS } from '@/lib/pricing';
 
 const TIER_ROWS = {
-  gas: { label: 'Gas', note: 'Synthesis with the LLM in the loop, 150-400 ms' },
-  liquid: { label: 'Liquid', note: 'Stored handlers, 2-8 ms' },
-  crystal: { label: 'Crystal', note: 'Compiled hot paths, under 2 ms' },
+  gas: { label: 'Gas', note: 'Generated on demand, unreviewed, in memory for 1 h' },
+  liquid: { label: 'Liquid', note: 'Reviewed and saved, 2-8 ms' },
+  crystal: { label: 'Crystal', note: 'Frozen code with its own endpoint, under 2 ms' },
 } as const;
 
 export default async function BillingPage() {

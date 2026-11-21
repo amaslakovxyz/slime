@@ -30,6 +30,13 @@ export default async function LifecyclePage({ params }: { params: Promise<{ id: 
         ))}
       </ol>
 
+      {data.ok &&
+        data.warnings.map((w, i) => (
+          <div key={i} className="note" role="status">
+            <strong>Warning</strong> <span className="muted small">{w}</span>
+          </div>
+        ))}
+
       {!data.ok && (
         <div className="note" role="status">
           <div>
