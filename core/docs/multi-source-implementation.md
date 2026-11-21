@@ -630,6 +630,22 @@ multi-source". If P0 changes one, update the steps that cite it.
   `fakeApiSource` shaped like Notion `feedback`. Ask demo intent 1 and print
   the handler and result.
 - **Done when:** one valid two-step run, pasted into the P3 pull request.
+- **Result (2026-11-21): passed after two fixes.**
+  - **Run 1 failed.** The model took the whole database heading, including
+    Postgres' long version string (`db: postgresql 16.15 (Debian …)`), as the
+    source name. The repair message then hid the bad name behind `<value>`, so
+    the repair failed too.
+  - **Fixes.** Headings now quote the source name (`Database source "db": …`).
+    Core's own lint messages reach the model verbatim; only database and
+    sandbox errors are scrubbed of values (MS15).
+  - **Runs 2 and 3** hit Groq's rate limit, then its 25 s generation budget;
+    the script now allows 90 s.
+  - **Run 4: correct.** A two-step handler: SQL with the plan filter and paid
+    revenue, plus `feedback.query` with constants `negative` and `Open`. It
+    joins on the `matches` hint and sorts by open items. 48 rows, with counts
+    matching the canned data (7 open negative items, top two with 2 each).
+  - The reviewer rejected it. Its notes weren't printed then; the script now
+    prints them, so the next run will show why.
 
 ## 6. Phase P4: generic API source (3 d)
 

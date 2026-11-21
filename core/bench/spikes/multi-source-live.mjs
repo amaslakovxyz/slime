@@ -72,6 +72,7 @@ try {
   console.log('=== meta.steps\n' + JSON.stringify(meta.steps?.map(({ name, source, rows, operation, args }) => ({ name, source, rows, operation, args })), null, 2));
   console.log(`=== first rows (${data.length} total)\n` + JSON.stringify(data.slice(0, 5), null, 2));
   console.log('=== events: ' + events.map((event) => (event.type === 'reviewed' ? `reviewed(${event.verdict})` : event.type)).join(', '));
+  for (const event of events) if (event.type === 'reviewed' && event.notes) console.log(`=== reviewer notes (${event.verdict})\n${event.notes}`);
   console.log('=== stats: ' + JSON.stringify(slime.stats()));
 } finally {
   await slime.close();
