@@ -16,6 +16,8 @@ export interface RuntimeHandler {
   review?: string;
   fixtures?: number;
   createdAt?: string;
+  /** Crystal only: input names (and types when known) its own route takes. */
+  inputs?: Record<string, string | null>;
 }
 
 export interface RuntimeEvent {
@@ -44,6 +46,8 @@ export interface HandlerRow {
   progressLabel: string;
   review: { label: string; tone: 'ok' | 'run' | 'none' };
   canCrystallize: boolean;
+  /** Crystal only: an example body for its own route. */
+  exampleBody?: string;
 }
 
 export type StageState = 'done' | 'now' | 'todo';
@@ -81,7 +85,16 @@ export function toRow(h: RuntimeHandler, t: Thresholds = DEFAULT_THRESHOLDS): Ha
     progressLabel,
     review: reviewOf(h, t),
     canCrystallize,
+    ...(h.tier === 'crystal' ? { exampleBody: exampleBody(h.inputs ?? {}) } : {}),
   };
+}
+
+const EXAMPLE_VALUES: Record<string, unknown> = { number: 5, string: 'text', boolean: true, list: [] };
+
+/** `{"input":{"limit":5}}` for a Crystal whose route takes `limit` (number). */
+export function exampleBody(inputs: Record<string, string | null>): string {
+  const input = Object.fromEntries(Object.entries(inputs).map(([name, type]) => [name, type ? EXAMPLE_VALUES[type] ?? null : null]));
+  return JSON.stringify({ input });
 }
 
 /** Saved records carry the review; live Gas summaries do not, so it is inferred from runs. */

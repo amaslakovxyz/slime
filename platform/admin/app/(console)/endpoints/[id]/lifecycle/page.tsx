@@ -49,7 +49,13 @@ export default async function LifecyclePage({ params }: { params: Promise<{ id: 
         )}
         <div className={`lc-wait ${total > 0 ? 'ok' : ''}`}>
           <i aria-hidden="true" />
-          <span>{total > 0 ? `Agent connected · ${total} requests${firstAt ? ` since ${new Date(firstAt).toLocaleTimeString('en-GB')}` : ''}` : 'Waiting for the first request from your agent…'}</span>
+          <span>
+            {total > 0
+              ? `Agent connected · ${total} requests${firstAt ? ` since ${new Date(firstAt).toLocaleTimeString('en-GB')}` : ''}`
+              : handlers.length > 0
+                ? 'Endpoint restarted · same URL, counters start over'
+                : 'Waiting for the first request from your agent…'}
+          </span>
         </div>
       </section>
 

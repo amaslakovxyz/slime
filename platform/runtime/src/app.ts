@@ -15,6 +15,8 @@ export interface LifecycleHandler {
   review?: string;
   fixtures?: number;
   createdAt?: string;
+  /** Crystal only: the input names (and types, when known) its own route takes. */
+  inputs?: Record<string, string | null>;
 }
 
 /** A saved handler record, reduced to what the Lifecycle tab needs. */
@@ -109,8 +111,15 @@ export function createApp({ slime, connector, crystal, onQuery, events, savedHan
   app.post('/v0/e/:key', async (c) => {
     const handler = (crystal || {})[c.req.param('key')];
     if (!handler) throw new SlimeError('HANDLER_NOT_FOUND', 'No Crystal with this key on this endpoint.');
-    const body = (await c.req.json().catch(() => ({}))) as { input?: unknown };
-    const { data, meta } = await slime.query({ intent: handler.intent, input: body.input ?? {}, output: handler.output } as never);
+    const body = (await c.req.json().catch(() => ({}))) as { input?: Record<string, unknown> };
+    const input = body.input && typeof body.input === 'object' ? body.input : {};
+    // The handler key includes the input names, so every one must be sent (null means "not given").
+    const missing = Object.keys(handler.paramTypes).filter((name) => !(name in input));
+    if (missing.length) {
+      const wanted = Object.entries(handler.paramTypes).map(([name, type]) => `${name}${type ? ` (${type})` : ''}`);
+      throw new SlimeError('INVALID_REQUEST', `This endpoint takes input: ${wanted.join(', ')}. Missing: ${missing.join(', ')}.`);
+    }
+    const { data, meta } = await slime.query({ intent: handler.intent, input, output: handler.output } as never);
     onQuery?.(meta);
     events?.record(meta, 'crystal');
     return c.json({ data, meta });
@@ -127,6 +136,7 @@ export function createApp({ slime, connector, crystal, onQuery, events, savedHan
         tier: 'crystal',
         runs: 0,
         review: h.review,
+        inputs: { ...h.paramTypes },
       }));
       return c.json({ handlers: mergeHandlers([await savedHandlers(), live, crystals]), stats: slime.stats(), thresholds });
     });

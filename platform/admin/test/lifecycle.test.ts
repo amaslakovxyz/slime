@@ -29,7 +29,8 @@ describe('toRow', () => {
   });
 
   test('a Crystal is its own endpoint and is never picked again', () => {
-    const row = toRow(h({ tier: 'crystal', runs: 12 }), t);
+    const row = toRow(h({ tier: 'crystal', runs: 12, inputs: { limit: 'number', country: null } }), t);
+    assert.equal(row.exampleBody, '{"input":{"limit":5,"country":null}}');
     assert.equal(row.progressLabel, 'own endpoint');
     assert.equal(row.canCrystallize, false);
   });

@@ -133,14 +133,16 @@ export function LifecycleBoard({
           <div className="lc-routes">
             {crystals.map((c) => {
               const route = `${url}v0/e/${c.key}`;
+              const curl = `curl -X POST ${route} \\\n  -H "x-api-key: $SLIME_TOKEN" -H 'content-type: application/json' \\\n  -d '${c.exampleBody ?? '{"input":{}}'}'`;
               return (
                 <div key={c.key} className="lc-route">
                   <span className="tier-pill tier-pill-crystal">crystal</span>
                   <div>
                     <div>{c.intent}</div>
-                    <code className="mono small">POST {url}v0/e/{c.shortKey}… {'{ "input": { … } }'}</code>
+                    <code className="mono small">POST {url}v0/e/{c.shortKey}…  body {c.exampleBody}</code>
                   </div>
                   <CopyButton value={route} label="Copy URL" />
+                  <CopyButton value={curl} label="Copy curl" />
                 </div>
               );
             })}

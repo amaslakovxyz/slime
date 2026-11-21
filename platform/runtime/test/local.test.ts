@@ -52,7 +52,7 @@ describe('mergeHandlers', () => {
 });
 
 describe('local routes', () => {
-  const crystal = { k1: { intent: 'accounts per plan', output: [{ plan: 'string' }], review: 'none' } } as unknown as CrystalRegistry;
+  const crystal = { k1: { intent: 'accounts per plan', output: [{ plan: 'string' }], review: 'none', paramTypes: { limit: 'number' } } } as unknown as CrystalRegistry;
 
   test('a Crystal answers on its own route with its fixed intent and output', async () => {
     const queries: unknown[] = [];
@@ -62,6 +62,14 @@ describe('local routes', () => {
     assert.equal(res.status, 200);
     assert.deepEqual(queries[0], { intent: 'accounts per plan', input: { limit: 5 }, output: [{ plan: 'string' }] });
     assert.equal(events.list().events[0]?.route, 'crystal');
+  });
+
+  test('a Crystal call without one of its inputs is a 400 that names them', async () => {
+    const app = createApp({ slime: fakeSlime(), connector, crystal });
+    const res = await app.request('/v0/e/k1', { method: 'POST', body: JSON.stringify({ input: {} }) });
+    assert.equal(res.status, 400);
+    const { error } = (await res.json()) as { error: { message: string } };
+    assert.match(error.message, /takes input: limit \(number\)\. Missing: limit\./);
   });
 
   test('an unknown Crystal key is 404', async () => {
