@@ -9,6 +9,9 @@ const ERRORS: Record<string, string> = {
   email: 'Enter a valid email address',
 };
 
+// One form, two submit buttons: Enter logs in, "Create account" posts the same
+// fields to signup. Kept as an explicit choice instead of auto-creating an
+// account on unknown email, so a typo in the email cannot open a new account.
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   if (await currentUser()) redirect('/');
   const { error } = await searchParams;
@@ -18,41 +21,31 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       <header className="header">
         <span className="wordmark">slime cloud</span>
       </header>
-      {message && (
-        <div className="alert" role="alert" style={{ maxWidth: 760, margin: '0 auto' }}>
-          {message}
-        </div>
-      )}
-      <div className="login-grid">
-        <form action={login} className="card stack">
-          <h2>Log in</h2>
-          <label>
-            Email
-            <input name="email" type="email" autoComplete="email" required />
-          </label>
-          <label>
-            Password
-            <input name="password" type="password" autoComplete="current-password" required />
-          </label>
+      <form action={login} className="card stack login-card">
+        <h2>Sign in</h2>
+        {message && (
+          <div className="alert" role="alert">
+            {message}
+          </div>
+        )}
+        <label>
+          Email
+          <input name="email" type="email" autoComplete="email" required />
+        </label>
+        <label>
+          Password
+          <input name="password" type="password" autoComplete="current-password" required />
+        </label>
+        <div className="login-actions">
           <button className="btn" type="submit">
             Log in
           </button>
-        </form>
-        <form action={signup} className="card stack">
-          <h2>Create account</h2>
-          <label>
-            Email
-            <input name="email" type="email" autoComplete="email" required />
-          </label>
-          <label>
-            Password
-            <input name="password" type="password" autoComplete="new-password" minLength={8} required />
-          </label>
-          <button className="btn" type="submit">
+          <button className="btn-ghost" type="submit" formAction={signup}>
             Create account
           </button>
-        </form>
-      </div>
+        </div>
+        <p className="muted">New here? Enter an email and a password of 8+ characters, then Create account.</p>
+      </form>
     </main>
   );
 }
