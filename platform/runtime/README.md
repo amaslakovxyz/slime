@@ -57,9 +57,10 @@ are the sandbox runtime's, so existing parameters keep working:
 | `MAX_GENERATIONS_PER_HOUR`, `ROW_CAP`, `STATEMENT_TIMEOUT_MS`, ... | limits and tiers (`src/config.ts` lists them) |
 | `SLIME_FLUSH_LIMIT_MS` | how long a response waits for background work (default 5000) |
 | `SLIME_HANDLERS_TABLE`, `SLIME_TENANT_ID` | set by Terraform |
+| `CRYSTAL_TOKENS` | JSON `{ "<crystal key>": "slc_…" }`: each Crystal's own token for `POST /v0/e/<key>` |
+| `PORT`, `CRYSTAL_MIN_RUNS` | local entry only (set by the admin's runner): listen port; runs a Liquid handler needs before Crystallize (default 10). With `SLIME_CRYSTAL_DIR` set, the local entry also mounts `POST /v0/crystallize` and writes Crystal modules there |
 
-No longer read: `META_DATABASE_URL`, `SLIME_META_TABLE`, `SLIME_THINKING`,
-`CRYSTAL_MIN_RUNS` (now `crystallize()`'s `minRuns`), `PORT`.
+No longer read: `META_DATABASE_URL`, `SLIME_META_TABLE`, `SLIME_THINKING`.
 
 ## Switching a deployed runtime to the core (M7)
 
