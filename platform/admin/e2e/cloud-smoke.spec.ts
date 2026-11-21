@@ -70,6 +70,7 @@ test.describe('cloud smoke (Goal 10)', () => {
     // Twelve queries, a Crystallize and a settings TTL for the new Crystal token.
     test.setTimeout(240_000);
     await signIn(page, EMAIL!, SMOKE_PASSWORD!);
-    await lifecycleJourney(page, request, { name: `smoke-db-${randomBytes(3).toString('hex')}`, databaseUrl: SMOKE_DB_URL! });
+    await lifecycleJourney(page, request, { name: `smoke-db-${randomBytes(3).toString('hex')}`, databaseUrl: SMOKE_DB_URL!, onCreated: (id) => (leftover = id) });
+    leftover = undefined;
   });
 });

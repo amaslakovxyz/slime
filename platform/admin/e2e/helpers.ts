@@ -81,9 +81,14 @@ export const OFFLINE_QUERY = {
  * create -> ready, Gas -> Liquid through the dispatch endpoint, Crystallize, the Crystal
  * route with its own token, delete. Locally and in the cloud alike.
  */
-export async function lifecycleJourney(page: Page, request: APIRequestContext, { name, databaseUrl }: { name: string; databaseUrl: string }): Promise<void> {
+export async function lifecycleJourney(
+  page: Page,
+  request: APIRequestContext,
+  { name, databaseUrl, onCreated }: { name: string; databaseUrl: string; /** So a failed run can still delete what it made. */ onCreated?: (endpointId: string) => void },
+): Promise<void> {
   const id = await test.step('CUJ 2: create on the demo database -> ready', async () => {
     const endpointId = await createEndpoint(page, { name, provider: 'offline', databaseUrl });
+    onCreated?.(endpointId);
     await expectStatus(page, 'ready');
     return endpointId;
   });
