@@ -29,6 +29,7 @@ test('the public entry exports createSlime, the config, the stores and errors, a
     'SlimeConfig',
     'SlimeConfigError',
     'SlimeError',
+    'SourceError',
     'createSlime',
     'fileStore',
     'handlerKeyFor',
