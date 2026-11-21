@@ -57,8 +57,9 @@ function rank(handler: LifecycleHandler): number {
 }
 
 /**
- * One row per handler key; the most mature tier wins. Runs never go backwards
- * between rows of equal staleness; a live row that replaces a stale one keeps its own runs.
+ * One row per handler key; the most mature tier wins and runs never go backwards,
+ * except that a live Gas or Liquid row replacing a stale one keeps its own runs:
+ * it is regenerated code. A Crystal is never regenerated, so it keeps the history.
  */
 export function mergeHandlers(lists: LifecycleHandler[][]): LifecycleHandler[] {
   const byKey = new Map<string, LifecycleHandler>();
@@ -72,7 +73,8 @@ export function mergeHandlers(lists: LifecycleHandler[][]): LifecycleHandler[] {
     const [winner, loser] = isNewer ? [handler, seen] : [seen, handler];
     const merged: LifecycleHandler = { ...loser, ...winner };
     if (!winner.stale) delete merged.stale;
-    if (Boolean(seen.stale) === Boolean(handler.stale)) merged.runs = Math.max(seen.runs, handler.runs);
+    const isRegenerated = Boolean(loser.stale) && !winner.stale && winner.tier !== 'crystal';
+    if (!isRegenerated) merged.runs = Math.max(seen.runs, handler.runs);
     byKey.set(handler.key, merged);
   }
   return [...byKey.values()].sort((a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? ''));

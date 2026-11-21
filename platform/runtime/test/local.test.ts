@@ -50,13 +50,18 @@ describe('mergeHandlers', () => {
     assert.equal(merged[0]?.createdAt, '1');
   });
 
-  test('a stale saved row loses to the live Gas row with the same key, runs included', () => {
+  test('a stale saved row loses to a live row: regenerated Gas keeps its own runs, a Crystal keeps the history', () => {
     const merged = mergeHandlers([
       [{ key: 'x', intent: 'i', tier: 'liquid', runs: 9, review: 'approved', stale: true, createdAt: '1' }],
       [{ key: 'x', intent: 'i', tier: 'gas', runs: 1, review: 'none', createdAt: '2' }],
     ]);
     assert.equal(merged.length, 1);
     assert.deepEqual([merged[0]?.tier, merged[0]?.runs, merged[0]?.review, 'stale' in merged[0]!], ['gas', 1, 'none', false]);
+    const crystal = mergeHandlers([
+      [{ key: 'x', intent: 'i', tier: 'liquid', runs: 13, stale: true }],
+      [{ key: 'x', intent: 'i', tier: 'crystal', runs: 0 }],
+    ]);
+    assert.deepEqual([crystal[0]?.tier, crystal[0]?.runs, 'stale' in crystal[0]!], ['crystal', 13, false]);
   });
 });
 
