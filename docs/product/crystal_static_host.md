@@ -37,11 +37,15 @@ x-api-key: slc_…
 { "input": {...} }
 ```
 
+In Slime Cloud every Endpoint lives under `https://<runtime host>/ep/<id>/`,
+so the Crystal endpoint path there is `/ep/<id>/v0/e/<crystal key>`.
+
 * Known key, exact input names → the frozen handler runs: deterministic code,
   zero model tokens.
 * Unknown Crystal key or wrong token → 401 `UNAUTHORIZED` (the token is
-  checked first); a token whose Crystal is not loaded yet (before the
-  endpoint restarts) → `HANDLER_NOT_FOUND`.
+  checked first); a token whose Crystal is not loaded yet (locally before the
+  endpoint restarts; in Slime Cloud on an instance that has not re-read the
+  endpoint within its 30 s settings TTL) → `HANDLER_NOT_FOUND`.
 * Missing or unknown input names → `INVALID_REQUEST`.
 * Never a generation.
 
@@ -53,8 +57,14 @@ Crystallize (admin today; `slime crystallize "<intent>"` later):
    provenance (no generation step).
 2. **Review:** review status `approved`, or `none` when review is off.
 3. **Freeze:** an equivalence test on recorded inputs, then the code is
-   frozen; the Crystal endpoint goes live after the endpoint restarts, and an
-   `slc_` token is issued.
+   frozen; the Crystal endpoint goes live after the endpoint restarts
+   (locally) or reloads (Slime Cloud, every instance within about 30 s), and
+   an `slc_` token is issued.
+
+Crystallize runs locally and in the cloud (S3) as of the cloud MVP
+([2026-11-21-cloud-mvp-design.md](../architecture/2026-11-21-cloud-mvp-design.md)).
+In Slime Cloud the Crystal's code runs in the QuickJS sandbox; in self-hosted
+apps it runs without it.
 
 Re-crystallizing in place is not built (core answers `already` for a key in the
 manifest); after a migration the Crystal must be removed first. Today that means
@@ -123,7 +133,7 @@ User flow — **two steps**:
 <script>
   // The ONLY thing in public static hosting. NOT a source token.
   const SLIME = {
-    endpoint: "https://<endpoint URL>/v0/e/<crystal key>",
+    endpoint: "https://<endpoint URL>/v0/e/<crystal key>", // Slime Cloud: https://<runtime host>/ep/<id>/v0/e/<crystal key>
     key:      "slc_…",                  // scoped to this one Crystal
   };
 

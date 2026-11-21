@@ -551,7 +551,7 @@ Not covered by automation: the shared-Lambda Gas → Liquid → Crystal path on 
 
 - [2026-11-21-cloud-mvp-brief.md](2026-11-21-cloud-mvp-brief.md): brainstorm brief with the 14 Goldfish objections and their resolutions.
 - `docs/product/product_frame_v0_2.md`: product vocabulary (Gas, Liquid, Crystal, Crystallize).
-- `docs/architecture/2026-11-21-endpoint-lifecycle-tab-design.md`: Lifecycle tab and local runner (decisions L1–L16).
+- `docs/architecture/2026-11-21-endpoint-lifecycle-tab-design.md`: Lifecycle tab and local runner (decisions L1–L23; L20–L23 come from this design).
 - `docs/architecture/slime-cloud.html`: current admin + provisioner architecture (superseded by this design).
 - `platform/infra/README.md`, `platform/infra/FINOPS.md`: stack rules, CI apply guard, budgets.
 
@@ -1035,13 +1035,13 @@ Work happens in `.worktrees/cloud-mvp` on branch `feat/cloud-mvp`. Commits follo
 ##### 60. `docs/architecture/2026-11-21-endpoint-lifecycle-tab-design.md` (Modify)
 
 *   **Type / Scope**: Design doc.
-*   **Proposed Changes**: New decisions L17–L20:
-    - L17: Crystallize also runs in the shared Lambda, writing to S3;
-    - L18: cloud Crystals run as data in QuickJS;
-    - L19: in the cloud, `/v0/reload` replaces the restart;
-    - L20: the feed is per instance in the cloud.
+*   **Proposed Changes**: New decisions L20–L23 (L17–L19 already existed):
+    - L20: Crystallize also runs in the shared Lambda, writing to S3;
+    - L21: cloud Crystals run as data in QuickJS;
+    - L22: in the cloud, `/v0/reload` replaces the restart;
+    - L23: the feed is per instance in the cloud.
 
-    Amend L3 and L4 with "local entry; cloud: see L17/L19".
+    Amend L3 and L4 with "local entry; cloud: see L20/L22".
 
 ##### 61. `docs/product/product_frame_v0_2.md`, `docs/product/crystal_static_host.md` (Modify)
 
