@@ -1,0 +1,379 @@
+openapi: 3.1.0
+info:
+  title: Slime Agent API
+  version: 1.0.0-draft
+  description: >
+    Minimal headless surface for autonomous coding agents. One `slm_` token
+    carries the whole lifecycle: query, observe, crystallize. Approvals are
+    delegated to the agent by default (`policy.crystallize: auto`); the gate
+    is mechanical (run count + replay check), not human judgment.
+    Companion design note: docs/product/agent_api_v1.md.
+
+servers:
+  - url: http://localhost:3100
+    description: control plane (admin app)
+  - url: http://localhost:{port}
+    description: data plane (one per endpoint)
+    variables:
+      port:
+        default: "8704"
+
+components:
+  securitySchemes:
+    accountKey:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: sla_ account key (control plane)
+    endpointToken:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: slm_ endpoint token (data plane, full lifecycle)
+    crystalToken:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: slc_ crystal token (exactly one /v0/e/{handlerKey} route)
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, retryable]
+          properties:
+            code:
+              type: string
+              enum: [UNAUTHORIZED, WRITE_REFUSED, INVALID_INPUT,
+                     INTENT_UNSATISFIABLE, NOT_READY, REVIEW_REQUIRED,
+                     ACCOUNT_EXISTS, PROVIDER_ERROR, INTERNAL]
+            message: { type: string }
+            retryable: { type: boolean }
+            expected:
+              type: object
+              additionalProperties: { type: string }
+              description: input name -> type, on INVALID_INPUT
+            missing:
+              type: array
+              items: { type: string }
+              description: missing input names, on INVALID_INPUT
+            nearest:
+              type: array
+              items: { type: string }
+              description: closest existing intents, on INTENT_UNSATISFIABLE
+
+    Policy:
+      type: object
+      properties:
+        crystallize:
+          type: string
+          enum: [auto, manual]
+          default: auto
+          description: >
+            auto — the agent may call the crystallize route itself;
+            manual — only a human in the UI may. The mechanical criteria
+            (liquid tier, runs >= crystal threshold, replay check) apply
+            in both modes.
+
+    Meta:
+      type: object
+      required: [handlerKey, tier, cache, runs, thresholds, readyToCrystallize]
+      properties:
+        handlerKey: { type: string }
+        tier: { type: string, enum: [gas, liquid, crystal] }
+        cache: { type: string, enum: [miss, hit] }
+        runs: { type: integer }
+        thresholds:
+          type: object
+          properties:
+            liquid: { type: integer, default: 3 }
+            crystal: { type: integer, default: 10 }
+        readyToCrystallize: { type: boolean }
+
+    Handler:
+      type: object
+      required: [handlerKey, intent, tier, runs, readyToCrystallize]
+      properties:
+        handlerKey: { type: string }
+        intent: { type: string }
+        tier: { type: string, enum: [gas, liquid, crystal] }
+        runs: { type: integer }
+        readyToCrystallize: { type: boolean }
+        route:
+          type: string
+          description: own route, present once tier is crystal
+
+paths:
+  /v1/accounts:
+    servers:
+      - url: http://localhost:3100
+        description: control plane
+    post:
+      operationId: createAccount
+      summary: Bootstrap an account (local/dev deployments only)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+      responses:
+        "201":
+          description: account created; key is shown exactly once
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accountId, key]
+                properties:
+                  accountId: { type: string }
+                  key: { type: string, description: "sla_… (shown once)" }
+        "409":
+          description: ACCOUNT_EXISTS
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /v1/endpoints:
+    servers:
+      - url: http://localhost:3100
+        description: control plane
+    post:
+      operationId: createEndpoint
+      summary: Create an endpoint; the slm_ token is returned exactly once
+      security: [{ accountKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, provider, databaseUrl]
+              properties:
+                name: { type: string }
+                provider: { type: string, enum: [offline, model] }
+                databaseUrl: { type: string }
+                policy: { $ref: "#/components/schemas/Policy" }
+      responses:
+        "201":
+          description: >
+            endpoint created, provisioning async (status pending -> ready;
+            poll GET /v0/lifecycle on the returned url's host)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [endpointId, url, token, status, policy]
+                properties:
+                  endpointId: { type: string }
+                  url: { type: string, description: "dispatch URL, POST …/v0/query" }
+                  token: { type: string, description: "slm_… (shown once)" }
+                  status: { type: string, enum: [pending, ready, error] }
+                  policy: { $ref: "#/components/schemas/Policy" }
+        "401":
+          description: UNAUTHORIZED
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /v0/query:
+    servers:
+      - url: http://localhost:{port}
+        description: data plane
+        variables:
+          port:
+            default: "8704"
+    post:
+      operationId: query
+      summary: Dispatch — ask for data in words (unchanged shape, enriched meta)
+      security: [{ endpointToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [intent, input, output]
+              properties:
+                intent: { type: string, description: values never go here }
+                input: { type: object, description: all values go here }
+                output: { description: JSON shape wanted back }
+      responses:
+        "200":
+          description: data + lifecycle position
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data: {}
+                  meta: { $ref: "#/components/schemas/Meta" }
+        "400":
+          description: >
+            INVALID_INPUT — known handler called without a required input
+            value; carries expected + missing. (Replaces today's 500
+            INVALID_HANDLER for this client mistake.)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401":
+          description: UNAUTHORIZED
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "403":
+          description: WRITE_REFUSED — the intent asks to modify data
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: >
+            INTENT_UNSATISFIABLE — carries nearest existing intents so the
+            agent reuses a handler instead of minting a gas duplicate
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /v0/lifecycle:
+    servers:
+      - url: http://localhost:{port}
+        description: data plane
+        variables:
+          port:
+            default: "8704"
+    get:
+      operationId: getLifecycle
+      summary: Machine-readable endpoint + handler state (the agent's dashboard)
+      security: [{ endpointToken: [] }]
+      responses:
+        "200":
+          description: current state; updating is observable during a restart
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [endpointId, status, policy, handlers]
+                properties:
+                  endpointId: { type: string }
+                  status: { type: string, enum: [pending, ready, updating, error] }
+                  policy: { $ref: "#/components/schemas/Policy" }
+                  handlers:
+                    type: array
+                    items: { $ref: "#/components/schemas/Handler" }
+        "401":
+          description: UNAUTHORIZED (slc_ tokens are rejected here)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /v0/handlers/{handlerKey}/crystallize:
+    servers:
+      - url: http://localhost:{port}
+        description: data plane
+        variables:
+          port:
+            default: "8704"
+    post:
+      operationId: crystallize
+      summary: Promote a proven handler to its own endpoint (delegated approval)
+      description: >
+        Same code path as the UI button. Hard criteria enforced regardless of
+        policy: tier liquid, runs >= crystal threshold, replay check passes.
+        policy.crystallize only decides who may trigger it. Endpoint restarts
+        on the same port/URL; observe updating -> ready via /v0/lifecycle.
+      security: [{ endpointToken: [] }]
+      parameters:
+        - name: handlerKey
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "201":
+          description: crystallized; slc_ token shown exactly once
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [handlerKey, route, token, exampleBody]
+                properties:
+                  handlerKey: { type: string }
+                  route: { type: string }
+                  token: { type: string, description: "slc_… (shown once)" }
+                  exampleBody: { type: object }
+        "200":
+          description: already crystal (idempotent repeat; no token in body)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [handlerKey, route]
+                properties:
+                  handlerKey: { type: string }
+                  route: { type: string }
+        "409":
+          description: NOT_READY (carries runs/required) or REVIEW_REQUIRED
+            (policy is manual)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401":
+          description: UNAUTHORIZED
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /v0/e/{handlerKey}:
+    servers:
+      - url: http://localhost:{port}
+        description: data plane
+        variables:
+          port:
+            default: "8704"
+    post:
+      operationId: callCrystal
+      summary: Crystal route — the proven request as its own endpoint (unchanged)
+      security: [{ crystalToken: [] }, { endpointToken: [] }]
+      parameters:
+        - name: handlerKey
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [input]
+              properties:
+                input: { type: object }
+      responses:
+        "200":
+          description: data + meta (tier crystal)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data: {}
+                  meta: { $ref: "#/components/schemas/Meta" }
+        "400":
+          description: INVALID_INPUT with expected + missing (shipped behavior)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401":
+          description: UNAUTHORIZED — slc_ opens only its own route
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
