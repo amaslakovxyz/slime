@@ -4,112 +4,62 @@
 
 The sources of `@slime-cloud/core`, compiled into `dist/` by
 `tsconfig.build.json`. `createSlime()` (`create-slime.ts`) builds a Slime
-instance from a `SlimeConfig`; the engine and its parts are in the
-subfolders.
+instance from a `SlimeConfig`.
 
-The files directly in this folder hold the package's public surface:
-- the contracts (Ports) that apps implement;
-- `SlimeConfig`, which an app builds and passes to Slime;
-- the errors a caller sees;
-- the single public entry, `index.ts`.
+The folders say what the system is made of:
 
-The subfolders hold the engine and its building blocks.
+| Kind | Folder | What it is |
+|---|---|---|
+| **Port** | [connectors/](./connectors/README.md) | Where data comes from. `types.ts` + `postgres/`. |
+| **Port** | [models/](./models/README.md) | Generator, Reviewer, Optimizer. `types.ts`, `ModelClient` + `claude/`, `groq/`, `offline/`. |
+| **Port** | [stores/](./stores/README.md) | Slime's own key-value state. `types.ts` + file and memory stores. |
+| **Port** | [sandbox/](./sandbox/README.md) | Where generated shaping code runs. `types.ts` + `quickjs/`. |
+| Engine | [engine/](./engine/README.md) | The Slime instance: handler cache, generation, review, promotion; `crystal/` serves Crystal handlers, `checks/` guards generated SQL. |
+| Engine | [request/](./request/README.md) | Parsing `{ intent, input?, output }`, the output notation, parameter types, cache keys. |
+| Engine | [dictionary/](./dictionary/README.md) | The dictionary text and hashes shown to models. |
+| Setup | [config/](./config/README.md) | `SlimeConfig` (`slime-config.ts`), its option types, defaults and validation. |
+| Shared | `shared/` | `errors.ts` (`SlimeError`, codes), `guards.ts`, `hash.ts` (`sha256`, `canonicalJSON`). |
+| Tooling | [crystallize/](./crystallize/README.md) | The crystallize job and `slime-crystal check`. |
+| Tooling | `testing/` | Contract suites for every port, and test doubles. |
+
+Every port folder has the same shape: `types.ts` holds the contract, each
+implementation has its own folder or file beside it, and `testing/` has a
+contract suite that every implementation, built in or custom, must pass.
 
 ## Interface
 
-**Public entry: `index.ts`.** Everything an app may import is re-exported
-here. Deep imports are not part of the API (`package.json` `exports` only has
-`.`). A test pins the value exports.
+**Package entries** (`package.json` `exports`); deep imports are not part of
+the API:
 
-- **Values:** `createSlime`, `SlimeConfig`, `DEFAULT_TIERS`,
-  `DEFAULT_LIMITS`, `SlimeError`, `SlimeConfigError`, `fileStore`,
-  `memoryStore` and `DEFAULT_STORE_DIR`.
-- **Types:**
-  - from `config.ts`: `SlimeOptions`, `SlimeOptionOverrides`, `TierOptions`,
-    `LimitOptions`, `SlimeMode`, `CrystalRegistry`, `SlimeEvent` and its five
-    event interfaces;
-  - `ErrorCode`, `SlimeErrorOptions` and `SlimeErrorBody`;
-  - every interface in `ports.ts`;
-  - `SlimeRequest`, `InputScalar`, `InputValue` and `InputValues`
-    (`request/parse.ts`), `ParamType` (`request/params.ts`), `Shape` and
-    `ObjectShape` (`request/shape.ts`);
-  - `SlimeStore` and `StoreEntry` (`store/types.ts`);
-  - the instance API from `engine/types.ts`: `Slime`, `QueryResult`,
-    `QueryMeta`, `QueryTimings`, `HandlerRecord`, `HandlerSummary`,
-    `SlimeStats`, `Tier`, `StoredTier`, `ReviewStatus`, `CacheOutcome`;
-  - `HandlerProvenance` and `ParamTypes`.
+| Subpath | Source |
+|---|---|
+| `.` | `index.ts`: `createSlime`, `SlimeConfig`, `DEFAULT_TIERS`, `DEFAULT_LIMITS`, `SlimeError`, `SlimeConfigError`, `fileStore`, `memoryStore`, `DEFAULT_STORE_DIR`, `handlerKeyFor`, and every port type. |
+| `./postgres` | `connectors/postgres/index.ts` |
+| `./models` | `models/index.ts`: `modelRoles`, `parseJsonReply`, `ModelClient` types |
+| `./claude`, `./groq`, `./offline` | `models/<name>/index.ts` |
+| `./crystallize` | `crystallize/index.ts` (and the `slime-crystal` bin) |
+| `./testing` | `testing/index.ts`: `describeStoreContract`, `describeConnectorContract`, `describeModelClientContract`, fakes |
+| `./shape-worker` | `sandbox/quickjs/shape-worker.ts`, for bundlers that copy the worker |
+
+`test/package.test.ts` pins every entry's value exports.
 
 **`create-slime.ts`**: `createSlime(config)`. Startup order: the
 connector's safety check (an unsafe user throws `SlimeConfigError`),
 `store.init()`, `describe()` and the dictionary. In locked mode it emits one
 `warning` event when saved handlers were made against another schema.
 
-**`config.ts`**: the `SlimeConfig` class. Its option types, defaults and
-validation live in [config/](./config/README.md); `config.ts` re-exports
-them.
+**`shared/errors.ts`**
 
-**`guards.ts`**: `isPlainObject` and `isNonEmptyString`, shared by
-`config/` and `request/`.
-
-**`errors.ts`**
-
-- `ErrorCode`: 14 codes, from `INVALID_REQUEST` to `EXECUTION_TIMEOUT`.
-- `ErrorCode` is derived from the `STATUS_BY_CODE` map, so a code can't
-  exist without a status.
-- `SlimeError(code, message, { retryable = false, details }?)`:
-  - `status` comes from `STATUS_BY_CODE`;
-  - `toJSON()` returns a `SlimeErrorBody`: `{ ...details, code, message, retryable }`.
+- `ErrorCode`: 14 codes, from `INVALID_REQUEST` to `EXECUTION_TIMEOUT`,
+  derived from the `STATUS_BY_CODE` map, so a code can't exist without a status.
+- `SlimeError(code, message, { retryable = false, details }?)`; `toJSON()`
+  returns `{ ...details, code, message, retryable }`.
 - `SlimeConfigError(problems)`: `problems: readonly string[]`.
-
-**`ports.ts`** (types only)
-
-| Port | Methods |
-|---|---|
-| `Connector` | `name`, `describe()`, `check(sql, params, limits)`, `run(sql, params, limits)`, `safetyCheck()`, `close()` |
-| `Generator` | `model`, `promptHash`, `generate(request, options: ModelCallOptions)` |
-| `Reviewer` | `model`, `review(request, options: ModelCallOptions)` |
-| `Optimizer` | `model`, `optimize(request, options: ModelCallOptions)` (M5; sees only code) |
-| `SandboxRunner` | `run(job: ShapeJob, limits)`, `close()` |
-
-Supporting types: `SchemaInfo`, `TableInfo`, `ColumnInfo` (with
-`values?: string[]` for enum-like columns), `ForeignKey`, `RunResult`,
-`SafetyReport`, `Artifact`, `GenerationRequest`, `GenerationResult`,
-`ReviewRequest`, `ReviewResult` (both results extend `ModelUsage`),
-`ParamTypesForModel`, `ModelCallOptions`, `SandboxLimits`, `ShapeJob`,
-`QueryPlan` (`check` returns it; the engine compares `cost` with
-`limits.maxQueryCost` itself) and `QueryLimits` (`{ timeoutMs, rowCap }`,
-passed with each `check` and `run`). `SandboxRunner` is a type only: in v1 core
-always uses its own QuickJS runner.
-
-**Subfolders** (internal: only the types listed above are re-exported):
-
-- [config/](./config/README.md): `SlimeConfig`'s option types, defaults and
-  validation.
-- [engine/](./engine/README.md): the Slime instance behind `createSlime()`.
-- [shaping/](./shaping/README.md): the QuickJS shaping sandbox.
-- [dictionary/](./dictionary/README.md): the dictionary text and hashes.
-- [offline/](./offline/README.md): the offline generator (its own subpath).
-- [postgres/](./postgres/README.md): the Postgres connector (its own
-  subpath; needs `pg`).
-- [models/](./models/README.md): prompts and reply schemas shared by the
-  model adapters.
-- [claude/](./claude/README.md): Claude generator, reviewer and optimizer
-  (its own subpath; needs `@anthropic-ai/sdk`).
-- [groq/](./groq/README.md): Groq generator, reviewer and optimizer (its own
-  subpath).
-- [crystal/](./crystal/README.md): Crystal handler types and serving them.
-- [crystallize/](./crystallize/README.md): the crystallize job and
-  `slime-crystal check` (its own subpath).
-- [request/](./request/README.md): parsing of `{ intent, input?, output }`,
-  the output notation, per-handler parameter types, and the cache keys
-  (`requestKey`) and handler provenance (`changedProvenance`).
-- [checks/](./checks/README.md): static SQL checks on generated code
-  (`assertReadOnlySql`, `lintArtifact`).
-- [store/](./store/README.md): the key-value `SlimeStore` Port. It holds no
-  implementation yet.
 
 ## Invariants
 
+- **The main entry never loads a driver or model SDK** (C7). Adapters are
+  reached only through their own subpaths.
 - **Config rules** (validation, defaults, immutability, `with()`) are listed
   in [config/README.md](./config/README.md).
 - **HTTP status is fixed per code.** `SlimeError.status` always comes from
@@ -121,10 +71,11 @@ always uses its own QuickJS runner.
 - No file reads `process.env` or `.env`, and no module keeps mutable state:
   every cache, pool and counter belongs to one Slime instance.
 - `createSlime()` calls the connector and the store. A query runs SQL through
-  the connector and shaping code in worker threads (`shaping/`).
+  the connector and shaping code in worker threads (`sandbox/quickjs/`).
 - `DEFAULT_TIERS` and `DEFAULT_LIMITS` are frozen constants created at load
   time.
 
 ## Verification
 
-- Run: `npm test -w @slime-cloud/core` (from the repository root)
+- Run: `npm test -w @slime-cloud/core` (from the repository root). Tests
+  mirror this folder under `test/`.

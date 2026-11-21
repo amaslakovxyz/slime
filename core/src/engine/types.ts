@@ -1,6 +1,6 @@
 // The Slime instance API (PLAN.md §5).
 import type { SlimeMode } from '../config/options.js';
-import type { Artifact } from '../ports.js';
+import type { Artifact } from '../models/types.js';
 import type { HandlerProvenance } from '../request/key.js';
 import type { InputValues, SlimeRequest } from '../request/parse.js';
 import type { ParamTypes } from '../request/params.js';

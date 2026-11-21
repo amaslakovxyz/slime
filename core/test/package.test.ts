@@ -37,18 +37,32 @@ test('the public entry exports createSlime, the config, the stores and errors, a
 });
 
 test('adapters have their own subpaths, so the main entry never loads them (C7)', async () => {
-  assert.deepEqual(pkg.exports['./offline'], { types: './dist/offline/index.d.ts', default: './dist/offline/index.js' });
-  assert.deepEqual(pkg.exports['./postgres'], { types: './dist/postgres/index.d.ts', default: './dist/postgres/index.js' });
-  assert.deepEqual(Object.keys(await import('../src/offline/index.js')), ['offlineGenerator']);
-  assert.deepEqual(Object.keys(await import('../src/postgres/index.js')), ['postgresConnector']);
+  assert.deepEqual(pkg.exports['./offline'], { types: './dist/models/offline/index.d.ts', default: './dist/models/offline/index.js' });
+  assert.deepEqual(pkg.exports['./postgres'], { types: './dist/connectors/postgres/index.d.ts', default: './dist/connectors/postgres/index.js' });
+  assert.deepEqual(Object.keys(await import('../src/models/offline/index.js')), ['offlineGenerator']);
+  assert.deepEqual(Object.keys(await import('../src/connectors/postgres/index.js')), ['postgresConnector']);
   for (const provider of ['claude', 'groq'] as const) {
-    assert.deepEqual(pkg.exports[`./${provider}`], { types: `./dist/${provider}/index.d.ts`, default: `./dist/${provider}/index.js` });
+    assert.deepEqual(pkg.exports[`./${provider}`], { types: `./dist/models/${provider}/index.d.ts`, default: `./dist/models/${provider}/index.js` });
   }
-  assert.deepEqual(Object.keys(await import('../src/claude/index.js')).sort(), ['claude', 'claudeGenerator', 'claudeOptimizer', 'claudeReviewer']);
-  assert.deepEqual(Object.keys(await import('../src/groq/index.js')).sort(), ['groq', 'groqGenerator', 'groqOptimizer', 'groqReviewer']);
+  assert.deepEqual(Object.keys(await import('../src/models/claude/index.js')).sort(), ['claude', 'claudeGenerator', 'claudeOptimizer', 'claudeReviewer']);
+  assert.deepEqual(Object.keys(await import('../src/models/groq/index.js')).sort(), ['groq', 'groqGenerator', 'groqOptimizer', 'groqReviewer']);
+  assert.deepEqual(pkg.exports['./models'], { types: './dist/models/index.d.ts', default: './dist/models/index.js' });
+  assert.deepEqual(Object.keys(await import('../src/models/index.js')).sort(), ['modelRoles', 'parseJsonReply']);
   assert.deepEqual(pkg.exports['./crystallize'], { types: './dist/crystallize/index.d.ts', default: './dist/crystallize/index.js' });
   assert.deepEqual(pkg.exports['./testing'], { types: './dist/testing/index.d.ts', default: './dist/testing/index.js' });
-  assert.deepEqual(Object.keys(await import('../src/testing/index.js')), ['describeStoreContract']);
+  assert.deepEqual(Object.keys(await import('../src/testing/index.js')).sort(), [
+    'artifact',
+    'describeConnectorContract',
+    'describeModelClientContract',
+    'describeStoreContract',
+    'fakeConnector',
+    'fakeGenerator',
+    'fakeReviewer',
+    'stubGenerator',
+    'stubReviewer',
+  ]);
+  // Bundlers copy the shaping worker by this name; it is never imported, only loaded as a worker.
+  assert.equal(pkg.exports['./shape-worker'], './dist/sandbox/quickjs/shape-worker.js');
 });
 
 test('database drivers and model SDKs are optional peer dependencies (C7)', () => {

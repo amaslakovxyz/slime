@@ -1,7 +1,7 @@
 // The SlimeStore contract (C13). Every store, built in or custom, must pass it.
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import type { SlimeStore } from '../store/types.js';
+import type { SlimeStore } from '../stores/types.js';
 
 export type StoreFactory = () => SlimeStore | Promise<SlimeStore>;
 

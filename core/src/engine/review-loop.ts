@@ -1,5 +1,5 @@
 import type { SlimeEvent } from '../config/options.js';
-import type { ModelUsage, Reviewer, ReviewRequest } from '../ports.js';
+import type { ModelUsage, ReviewRequest, Reviewer } from '../models/types.js';
 import { generatedEvent } from './events.js';
 import { forModel, generateHandler, type GenerationDeps } from './generate.js';
 import type { GenerationLimits } from './generation-limits.js';

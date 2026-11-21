@@ -1,5 +1,5 @@
 // The `output` notation (§4.2; the rules are in request/README.md).
-import { SlimeError } from '../errors.js';
+import { SlimeError } from '../shared/errors.js';
 
 export type Shape = string | readonly Shape[] | ObjectShape;
 

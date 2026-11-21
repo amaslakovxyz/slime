@@ -104,7 +104,7 @@ key, so Slime generates again, and the old handler stays until it expires
 A structured protocol (`from`, `where` with operators, `groupBy`, paths) was
 designed and dropped on 2026-11-20. It turned the request into a query
 language to learn. In the 35 cases analysed in
-[docs/protocol-cases.md](docs/protocol-cases.md), 5 needed new operators and
+[bench/protocol-cases.md](bench/protocol-cases.md), 5 needed new operators and
 grouping was the weak spot, while the ambiguous cases (#18, #19, #23) were
 about what a term means, which structure doesn't fix. The protocol is in this
 file's git history, and the cases stay as benchmark material.
@@ -240,7 +240,7 @@ A shared store for several instances is a custom store: one table keyed by
 
 #### Contract test
 
-One contract test (`test/store-contract.ts`) runs against every store, the
+One contract test (`src/testing/store-contract.ts`) runs against every store, the
 built-in ones and any custom store.
 
 ## 5. Draft public API
@@ -318,7 +318,7 @@ type SlimeEvent =
   | { type: 'error'; code: string; message: string };
 ```
 
-Contracts (Ports) that core exports, as defined in `src/ports.ts`:
+Contracts (Ports) that core exports, each in its port folder's `types.ts` (§6):
 
 * `Connector`: `name`, `describe`, `check`, `run`, `safetyCheck`, `close`.
   `describe` returns the allowed values of enum-like columns (D1). `check` and
@@ -335,38 +335,38 @@ Contracts (Ports) that core exports, as defined in `src/ports.ts`:
 Also exported: `SlimeError`, `SlimeConfigError`, the error codes,
 `DEFAULT_TIERS` and `DEFAULT_LIMITS`.
 
-## 6. Package layout (target)
+## 6. Package layout
+
+Every pluggable part is a port folder: `types.ts` holds the contract, each
+implementation has its own folder beneath it, and `testing/` has its contract
+suite. Restructured on 2026-11-21; [src/README.md](src/README.md) is the map.
 
 ```
 core/
 ├── package.json          # @slime-cloud/core, "exports" per subpath, peerDeps optional
 ├── tsconfig.json         # typecheck only (noEmit)
 ├── tsconfig.build.json   # build → dist/, declarations on
+├── bench/                # run.mjs + cases.mjs (npm run bench), protocol-cases.md
 ├── scripts/
-│   └── check-pack.mjs    # what npm pack would ship
-├── docs/                 # protocol-cases.md
+│   └── check-pack.mjs    # what npm pack would ship (derived from exports and bin)
+├── docs/                 # request-format.md
 ├── src/
 │   ├── index.ts          # createSlime, SlimeConfig, errors, file and memory stores, types
 │   ├── create-slime.ts   # startup: safety check, store init, dictionary
-│   ├── config.ts         # SlimeConfig class; config/ holds options, defaults, validation
-│   ├── errors.ts         # SlimeError, SlimeConfigError, error codes
-│   ├── guards.ts         # shared type guards
-│   ├── ports.ts          # Connector, Generator, Reviewer, SlimeStore, SandboxRunner
+│   ├── shared/           # errors.ts, guards.ts, hash.ts
+│   ├── config/           # slime-config.ts (the SlimeConfig class), options, defaults, validation
+│   ├── connectors/       # PORT: types.ts; postgres/ → @slime-cloud/core/postgres
+│   ├── models/           # PORT: types.ts, model-client.ts, roles.ts, prompts, schemas
+│   │                     #   → @slime-cloud/core/models; claude/, groq/, offline/ each a subpath
+│   ├── stores/           # PORT: types.ts, file-store.ts, memory-store.ts
+│   ├── sandbox/          # PORT: types.ts; quickjs/ (runner and worker → @slime-cloud/core/shape-worker)
+│   ├── engine/           # Slime instance, handler cache, generation, review loop, promotion;
+│   │                     #   crystal/ (serving Crystal handlers), checks/ (SQL guard, limit check)
 │   ├── request/          # parse.ts, shape.ts, params.ts, key.ts (§4)
-│   ├── checks/           # sql.ts: SQL guard and lint; limit.ts: limit check (R6)
-│   ├── store/            # types.ts, file-store.ts, memory-store.ts
-│   ├── engine/           # Slime instance, handler cache, generation, coalescing, rate limits;
-│   │                     #   review loop and promotion arrive in M4
 │   ├── dictionary/       # dictionary rendered from metadata, glossary and rules (§4.4)
-│   ├── shaping/          # QuickJS runner and its worker (shape-worker.ts, compiled by tsc),
-│   │                     #   one pool per Slime instance, closed by close()
-│   ├── offline/          # generator for tests → @slime-cloud/core/offline
-│   ├── crystal/          # (M5+) Crystal registry types; serving crystal handlers
-│   ├── postgres/         # (M3+) connector → @slime-cloud/core/postgres
-│   ├── claude/           # (M4+) generator + reviewer → @slime-cloud/core/claude
-│   ├── groq/             # (M4+) generator + reviewer → @slime-cloud/core/groq
-│   └── crystallize/      # (M5+) job, allowlist, check → @slime-cloud/core/crystallize (+ bin)
-└── test/                 # node:test, one file per area; store-contract.ts runs against every store
+│   ├── crystallize/      # job, allowlist, check → @slime-cloud/core/crystallize (+ bin)
+│   └── testing/          # contract suites and fakes → @slime-cloud/core/testing
+└── test/                 # node:test, mirrors src/; support/ holds the database helpers
 ```
 
 Dependencies:
@@ -384,6 +384,9 @@ on `quickjs-emscripten` (and `zod` from M4).
 
 ## 7. Milestones
 
+The per-milestone file lists record what was built at the time; files moved
+in the 2026-11-21 restructure, and §6 has the current layout.
+
 Each milestone ends with green tests and a commit. Where a sandbox test file
 is named, its cases are copied and adapted; matching the sandbox is not a
 goal. Before a milestone starts, its row gets the files it creates or changes
@@ -396,7 +399,7 @@ goal. Before a milestone starts, its row gets the files it creates or changes
 | M1 | **Request, contracts and pure parts.** Request parsing, intent normalization and the request key (§4); output notation with `date`/`datetime`; Ports and `SlimeError`; SQL guard and lint; `SlimeConfig` with defaults, validation and `glossary`. | `request`, `shape`, `params`, `key`, `sql`, `config` and `package` tests pass. | done |
 | M2 | **Engine, Gas path.** `createSlime` and the instance API (`query`, `flush`, `close`, `evict`, `handlers`, `stats`; `onEvent` with `generated`, `warning` and `error`), the `memory` and `file` stores and the shared store contract test, offline generator, the shaping sandbox with the QuickJS worker, coalescing, rate limits, locked mode, typed and nullable parameters (R4, R5), the limit check (R6), the R7 warning. Engine rules below. | The M2 tests below pass with no database; no core test is skipped because a database is missing; no `config` singleton anywhere. | done |
 | M3 | **Postgres connector.** Connector with the startup safety check and enum values from the catalog, which the M2 dictionary renders (§4.4). CI gets a Postgres service using `sandbox/db/init.sql` (roles and seed data). | `postgres.test.ts` cases pass against Postgres in CI (database tests require `REQUIRE_DB=1` in CI rather than skipping); the file and memory stores pass the shared contract test; changing `rules` changes the dictionary and regenerates handlers in explore mode. | done |
-| M4 | **Models and Liquid.** Claude and Groq generators and reviewers with prompts updated for §4 (nullable parameters, the dictionary); the review loop; promotion to Liquid (rule below); `reviewed` and `promoted` events. | Review and promotion tests pass; one live run against Groq or Claude (`npm run live`). | built; live run pending |
+| M4 | **Models and Liquid.** Claude and Groq generators and reviewers with prompts updated for §4 (nullable parameters, the dictionary); the review loop; promotion to Liquid (rule below); `reviewed` and `promoted` events. | Review and promotion tests pass; one live run against Groq or Claude (`npm run bench` with `GROQ_API_KEY` or `ANTHROPIC_API_KEY`). | built; live run pending |
 | M5 | **Crystal.** Serving from an imported registry; the crystallize job writing `.mjs` modules with a generated index; the `check` command. | `crystal*.test.ts` ported; a hand-edited Crystal file fails `check`; the output passes the equivalence test. | done |
 | M6 | **Use it as a package, and retire `sandbox/`.** An example app that installs the packed tarball and calls `slime.query()` from an endpoint; docs for the request format; the bench ported to run on core. The example takes over what `sandbox/` still provides: the demo server, the demo database (`db/init.sql` and its Docker Compose file, used by core's tests and CI) and the offline handlers. Then `sandbox/` is deleted, with its CI job. Publishing to npm is not part of v1. | The example (`examples/express`, its own lockfile, run in CI from the packed tarball) answers a query. The bench, ported to `core/bench/`, gets the 5 cases recorded as correct in `docs/product/concepts_brief.md` right, and refuses the 2 unsafe ones. Core's tests and CI use the moved demo database. `sandbox/` and its CI job are gone. | built; bench with a model pending |
 | M7 | **Switch `platform/runtime` to the package** (with its owner). Drop the path mapping to `sandbox/src`; build the engine with `createSlime(new SlimeConfig(…))`; replace `DynamoHandlerStore` with a `SlimeStore` over the existing table that serves the items already there; keep `slime.flush()` before each response (C15). After the switch nothing compiles `sandbox/src`, so M6 can delete `sandbox/`. | The runtime's tests pass on the package; a deployed function answers from handlers stored by the new store. Handlers saved before the switch are still served. The previous deploy can be restored. | built; handler copy and deploy pending (runtime owner) |

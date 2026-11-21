@@ -1,7 +1,7 @@
 import type { SlimeEvent } from '../config/options.js';
-import { canonicalJSON } from '../request/key.js';
+import { canonicalJSON } from '../shared/hash.js';
 import type { InputValues } from '../request/parse.js';
-import type { SlimeStore } from '../store/types.js';
+import type { SlimeStore } from '../stores/types.js';
 import type { BackgroundTasks } from './background.js';
 import { HANDLERS_NS, type HandlerCache } from './handler-cache.js';
 import type { ReviewOutcome } from './review-loop.js';

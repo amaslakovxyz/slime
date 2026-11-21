@@ -2,6 +2,7 @@
 // entry and its types must be there, and sources, tests and configs must not.
 // Run after `npm run build` (CI does), or rely on `prepack`.
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const pkgDir = fileURLToPath(new URL('..', import.meta.url));
@@ -10,20 +11,13 @@ const [report] = JSON.parse(
 );
 const files = report.files.map((f) => f.path).sort();
 
-const required = [
-  'package.json',
-  'README.md',
-  'dist/index.js',
-  'dist/index.d.ts',
-  'dist/offline/index.js',
-  'dist/postgres/index.js',
-  'dist/claude/index.js',
-  'dist/groq/index.js',
-  'dist/crystallize/index.js',
-  'dist/crystallize/bin.js',
-  'dist/testing/index.js',
-  'dist/shaping/shape-worker.js',
-];
+// Every file package.json points at (exports and bin) must ship, so a new
+// subpath can't be forgotten here.
+const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+const exportTargets = Object.values(pkg.exports).flatMap((target) => (typeof target === 'string' ? [target] : Object.values(target)));
+const required = [...new Set([...exportTargets, ...Object.values(pkg.bin ?? {}), 'README.md'])]
+  .map((path) => path.replace(/^\.\//, ''))
+  .sort();
 const forbidden = [/^src\//, /^test\//, /^scripts\//, /^tsconfig/, /^PLAN\.md$/, /^docs\//];
 
 const problems = [

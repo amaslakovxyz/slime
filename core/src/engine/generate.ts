@@ -1,7 +1,9 @@
-import { lintArtifact } from '../checks/sql.js';
+import { lintArtifact } from './checks/sql.js';
 import type { LimitOptions } from '../config/options.js';
-import { SlimeError } from '../errors.js';
-import type { Artifact, Connector, Generator, ModelUsage, ParamTypesForModel, SandboxRunner } from '../ports.js';
+import { SlimeError } from '../shared/errors.js';
+import type { Connector } from '../connectors/types.js';
+import type { Artifact, Generator, ModelUsage, ParamTypesForModel } from '../models/types.js';
+import type { SandboxRunner } from '../sandbox/types.js';
 import type { HandlerProvenance } from '../request/key.js';
 import type { ParsedRequest } from '../request/parse.js';
 import { checkParamTypes, type ParamTypes } from '../request/params.js';
@@ -72,7 +74,7 @@ export async function generateHandler(deps: GenerationDeps, { key, request, prev
 async function tryArtifact(deps: GenerationDeps, artifact: Artifact, request: ParsedRequest): Promise<Execution> {
   lintArtifact(artifact, request.input);
   const plan = await deps.connector.check(artifact.sql, bindParams(artifact.params, request.input), queryLimits(deps.limits));
-  if (plan.cost > deps.limits.maxQueryCost) {
+  if (plan.cost !== null && plan.cost > deps.limits.maxQueryCost) {
     throw new SlimeError('QUERY_TOO_EXPENSIVE', `Query cost ${plan.cost} is above the limit of ${deps.limits.maxQueryCost}.`);
   }
   return executeArtifact(deps, { artifact, output: request.output, input: request.input });

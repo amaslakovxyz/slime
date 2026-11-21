@@ -30,4 +30,4 @@ not stored (D3): `createSlime()` builds it at every start.
 
 ## Verification
 
-- `test/dictionary.test.ts`.
+- `test/dictionary/dictionary.test.ts`.
