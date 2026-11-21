@@ -56,6 +56,7 @@ endpoint (`/mcp`), multi-user concurrency, persistence of the feed.
 | L11 | Each Crystal gets its own token (`slc_…`), issued on Crystallize (or with *Issue token* for older Crystals). It opens only `POST /v0/e/<its key>`: not `/v0/query`, not another Crystal, not the admin views. Stored as one secret `CRYSTAL_TOKENS` `{key: token}`; the runner passes it as env, in AWS it arrives through the endpoint's SSM prefix like `SLIME_API_KEY`. | A Crystal can be handed to a frontend or partner without the endpoint key, which can generate new handlers. |
 | L12 | The runtime copies live Liquid run counts to the store: before Crystallize (local) and at most once a minute per instance on flush (Lambda, `SLIME_RUNS_SYNC_MS`). | The core saves a handler only when it turns Liquid; Crystallize reads runs from the store. Chosen over a core change for now. |
 | L13 | Each endpoint keeps its port across restarts (runner restart included). | Two simultaneous restarts used to swap ports, so an agent's URL pointed at another endpoint. |
+| L14 | A busy own port fails the endpoint with a reason instead of moving it; the runner kills its runtimes on exit or crash; one endpoint's error never stops the runner; the file secret store writes atomically and queues changes. | Five parallel deletes raced on the secrets file, crashed the runner, left orphan runtimes on their ports, and the next runner silently moved two endpoints to new URLs. |
 
 ## 4. Components
 

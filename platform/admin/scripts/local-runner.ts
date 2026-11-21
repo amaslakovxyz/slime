@@ -30,6 +30,8 @@ interface Item {
   provider: string;
   status: string;
   url?: string;
+  /** Set when this runner has started the endpoint: it stays ours even after its secrets are gone. */
+  localRunner?: boolean;
 }
 
 interface Running {
@@ -56,7 +58,11 @@ const portFromUrl = (url: string | undefined): number | undefined => {
   return Number.isInteger(port) && port > 0 ? port : undefined;
 };
 
-/** The endpoint's own port when it has one (waiting briefly for the old process to release it); else a port no other endpoint holds. */
+/**
+ * The endpoint's own port when it has one (waiting briefly for the old process to release it);
+ * else a port no other endpoint holds. A busy own port is an error, never a silent move: the
+ * agent holds the URL, and a new port would quietly break it.
+ */
 async function portFor(endpointId: string, previous: number | undefined): Promise<number> {
   const own = ports.get(endpointId) ?? previous;
   if (own !== undefined) {
@@ -64,6 +70,7 @@ async function portFor(endpointId: string, previous: number | undefined): Promis
       if (await isFree(own)) return own;
       await new Promise((r) => setTimeout(r, 250));
     }
+    throw new Error(`Port ${own} is busy (another process holds it); free it so the endpoint keeps its URL`);
   }
   const held = new Set([...ports.entries()].filter(([id]) => id !== endpointId).map(([, port]) => port));
   for (let port = FIRST_PORT; port < FIRST_PORT + 200; port++) {
@@ -146,7 +153,8 @@ function stop(endpointId: string): Promise<void> {
 async function setStatus(item: Item, status: 'ready' | 'failed', extra: { url?: string; error?: string }): Promise<void> {
   const names: Record<string, string> = { '#s': 'status' };
   const values: Record<string, unknown> = { ':s': status, ':now': new Date().toISOString(), ':from': item.status };
-  let set = 'SET #s = :s, updatedAt = :now';
+  let set = 'SET #s = :s, updatedAt = :now, localRunner = :lr';
+  values[':lr'] = true;
   if (extra.url) {
     set += ', #u = :u';
     names['#u'] = 'url';
@@ -185,7 +193,7 @@ async function isOurs(endpointId: string): Promise<boolean> {
 
 async function handle(item: Item): Promise<void> {
   const id = item.endpointId;
-  if (!running.has(id) && !(await isOurs(id))) return;
+  if (!running.has(id) && !item.localRunner && !(await isOurs(id))) return;
   if (item.status === 'pending' || item.status === 'updating' || (item.status === 'ready' && !running.has(id))) {
     await stop(id);
     try {
@@ -199,8 +207,10 @@ async function handle(item: Item): Promise<void> {
   } else if (item.status === 'deleting') {
     await stop(id);
     ports.delete(id);
-    await secretStore().removeAll(id);
+    // Item first, secrets last: if removing secrets fails, the item is already gone, so the
+    // next tick does not treat a half-deleted endpoint as "not ours" and leave it stuck.
     await ddb().send(new DeleteCommand({ TableName: env().controlTable, Key: { pk: item.pk, sk: item.sk } }));
+    await secretStore().removeAll(id);
     log('deleted', { endpointId: id });
   }
 }
@@ -224,7 +234,10 @@ async function tick(): Promise<void> {
       if (known !== undefined && item.status !== 'deleting' && !ports.has(item.endpointId)) ports.set(item.endpointId, known);
       if (busy.has(item.endpointId)) continue;
       busy.add(item.endpointId);
-      void handle(item).finally(() => busy.delete(item.endpointId));
+      // One endpoint's failure must never stop the runner (it supervises the others).
+      void handle(item)
+        .catch((err) => log('handle failed', { endpointId: item.endpointId, error: (err as Error).message }))
+        .finally(() => busy.delete(item.endpointId));
     }
     ExclusiveStartKey = page.LastEvaluatedKey;
   } while (ExclusiveStartKey);
@@ -234,6 +247,19 @@ async function main(): Promise<void> {
   if (existsSync('.env.local')) process.loadEnvFile('.env.local');
   if (!process.env.AWS_ENDPOINT_URL_DYNAMODB) throw new Error('Refusing to run without AWS_ENDPOINT_URL_DYNAMODB (DynamoDB Local only).');
   log('started', { runtime: RUNTIME_DIR, poll: POLL_MS });
+  // Children must never outlive the runner: an orphan keeps its port and the next runner
+  // could not give the endpoint its URL back. 'exit' handlers run synchronously, so SIGKILL.
+  process.on('exit', () => {
+    for (const { child } of running.values()) child.kill('SIGKILL');
+  });
+  process.on('uncaughtException', (err) => {
+    log('crashed', { error: err.message });
+    process.exit(1);
+  });
+  process.on('unhandledRejection', (err) => {
+    log('crashed', { error: (err as Error)?.message ?? String(err) });
+    process.exit(1);
+  });
   const shutdown = async () => {
     await Promise.all([...running.keys()].map(stop));
     process.exit(0);
