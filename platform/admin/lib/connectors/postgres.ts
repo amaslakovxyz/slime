@@ -9,7 +9,7 @@ export interface ConnectionTest {
   user: string | null;
   database: string | null;
   serverVersion: string | null;
-  /** Tables (incl. partitioned) outside the system schemas. */
+  /** Tables (incl. partitioned) outside the system schemas that the role can read. */
   tables: number | null;
   problems: string[];
   error?: string;
@@ -56,9 +56,11 @@ export async function testConnection(databaseUrl: string): Promise<ConnectionTes
         AND (has_table_privilege(c.oid, 'INSERT') OR has_table_privilege(c.oid, 'UPDATE')
           OR has_table_privilege(c.oid, 'DELETE') OR has_table_privilege(c.oid, 'TRUNCATE'))
       LIMIT 5`);
+    // Only what the role can read (column grants count): Slime can't query the rest, so counting it misleads (E2E-16).
     const tables = await client.query<{ count: string }>(`
       SELECT count(*) AS count FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-      WHERE c.relkind IN ('r', 'p') AND ${USER_SCHEMAS}`);
+      WHERE c.relkind IN ('r', 'p') AND ${USER_SCHEMAS}
+        AND has_schema_privilege(n.oid, 'USAGE') AND has_any_column_privilege(c.oid, 'SELECT')`);
 
     const r = role.rows[0];
     const problems: string[] = [];
