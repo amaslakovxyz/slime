@@ -22,7 +22,7 @@ on:
   pull_request:
     paths:
       - infra/aws/**
-      - sandbox/**
+      - oss/packages/core/**
       - slime-cloud/**
       - landing/**
       - .github/workflows/terraform.yml
@@ -30,7 +30,7 @@ on:
     branches: [main]
     paths:
       - infra/aws/**
-      - sandbox/**
+      - oss/packages/core/**
       - slime-cloud/**
       - landing/**
       - .github/workflows/terraform.yml

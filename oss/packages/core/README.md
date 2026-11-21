@@ -66,8 +66,8 @@ input values. Handlers move up through three tiers:
 
 * [concepts_brief.md](../../../concepts_brief.md): the v0 concept and the
   benchmark results.
-* [sandbox/](../../../sandbox/README.md): the first prototype. It is frozen
-  and not used any more; core may copy code and tests from it.
+* `sandbox/`: the first prototype, which core was rebuilt from. It was
+  deleted in M6 and stays in git history.
 * PR #7, `docs/oss-saas-split-design.md`: the layers (core → server →
   platform) and the `@slime-cloud` name.
 

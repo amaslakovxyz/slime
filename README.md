@@ -3,9 +3,11 @@
 ## System Overview
 
 Slime (runtime and CLI `slime`) is a hackathon project in its design phase.
-The only code is a prototype in [sandbox/](./sandbox/README.md). It has one
-data endpoint and uses Claude to generate read-only SQL against a demo Postgres.
-Its benchmark measures generation speed and correctness. The specs in `docs/`
+The engine is [`@slime-cloud/core`](./oss/packages/core/README.md): it answers
+`{ intent, input, output }` requests with model-generated, cached, read-only
+SQL against Postgres. [oss/examples/express](./oss/examples/express/README.md)
+shows it behind an app's endpoints, and
+[slime-cloud/runtime](./slime-cloud/runtime/README.md) runs it on AWS Lambda. The specs in `docs/`
 describe intent, not implemented behaviour.
 
 ### Developer notes (original)
@@ -20,11 +22,9 @@ Backend -- Slime runtime:
 
 - [landing/](./landing/README.md) - Static marketing page (one `index.html`,
   no build step). Preview with `just landing`.
-- [sandbox/](./sandbox/README.md) - Slime v0 prototype (Node 22, TypeScript,
-  Hono, Postgres, Claude, QuickJS) and its speed/correctness benchmark.
-  Frozen: new engine work goes into `oss/packages/core/`.
 - [oss/packages/core/](./oss/packages/core/README.md) - `@slime-cloud/core`,
-  the engine rebuilt from `sandbox/` as an installable library.
+  the engine as an installable library. It replaced the `sandbox/` prototype,
+  which was deleted in M6 (it is in git history).
   [PLAN.md](./oss/packages/core/PLAN.md) holds the decisions and milestones:
   M0–M3 and M5 done, M4 and M6 built (runs against a real model pending).
   The only npm workspace so far.
@@ -46,7 +46,8 @@ Backend -- Slime runtime:
     - [slime_master_brand_book_design_system.html](./docs/brand/slime_master_brand_book_design_system.html) - Interactive brand book and component kit.
     - [slime_marketing_positioning_tone_of_voice_use_cases.md](./docs/brand/slime_marketing_positioning_tone_of_voice_use_cases.md) - Positioning, tone of voice, use cases, and messaging.
 - `.github/workflows/` (no contract file) - [ci.yml](./.github/workflows/ci.yml)
-  runs pre-commit, sandbox tests and the Lambda bundle build on every push and
+  runs pre-commit, the core, example and runtime tests, and the Lambda bundle
+  build on every push and
   pull request; [terraform.yml](./.github/workflows/terraform.yml) plans every
   `infra/aws/` stack on pull requests and applies them on `main` (the landing
   page included); [terraform-quality.yml](./.github/workflows/terraform-quality.yml)
@@ -56,14 +57,13 @@ Backend -- Slime runtime:
   runtime on Lambda + DynamoDB).
 - [slime-cloud/runtime/](./slime-cloud/runtime/README.md) - `@slime-cloud/runtime`:
   the Lambda entry and DynamoDB handler store around the core. Imports
-  `sandbox/` (the future open-source `@slime-cloud/core`); `sandbox/` never
-  imports it.
+  `@slime-cloud/core` (`oss/packages/core`); the core never imports it.
 
 Root files: [AGENTS.md](./AGENTS.md) (repository contract for agents),
 [justfile](./justfile) (task runner),
 [.pre-commit-config.yaml](./.pre-commit-config.yaml) (hooks), and
 [package.json](./package.json) (npm workspaces for `oss/packages/*` only;
-`sandbox/` and `slime-cloud/runtime` keep their own lockfiles).
+`oss/examples/express` and `slime-cloud/runtime` keep their own lockfiles).
 
 ## Global Invariants
 
@@ -82,7 +82,7 @@ Root files: [AGENTS.md](./AGENTS.md) (repository contract for agents),
   `pre-commit/action@v3.0.1` on `push` and `pull_request`.
 - Deploy: [terraform.yml](./.github/workflows/terraform.yml) applies every
   `infra/aws/` stack except `bootstrap/` on each push to `main` that touches
-  `infra/aws/`, `sandbox/`, `slime-cloud/` or `landing/` (AWS account `025772230981`,
+  `infra/aws/`, `oss/packages/core/`, `slime-cloud/` or `landing/` (AWS account `025772230981`,
   `eu-central-1`); `landing/` is served by CloudFront + Lambda.
 
 ## System Verification

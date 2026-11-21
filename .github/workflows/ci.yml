@@ -23,41 +23,6 @@ jobs:
           python-version: "3.12"
       - uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
 
-  sandbox:
-    name: Sandbox tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: sandbox
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: slime_admin
-          POSTGRES_PASSWORD: slime_admin
-          POSTGRES_DB: slime
-        ports:
-          - 54329:5432
-        options: >-
-          --health-cmd "pg_isready -U slime_admin -d slime"
-          --health-interval 2s --health-timeout 3s --health-retries 30
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: sandbox/package-lock.json
-      # Same schema, seed data and database users as `npm run db:up` locally.
-      - run: psql "postgres://slime_admin:slime_admin@localhost:54329/slime" -v ON_ERROR_STOP=1 -f db/init.sql
-      - run: npm ci
-      - run: npm run typecheck
-      # REQUIRE_DB makes database tests fail instead of skipping if Postgres is missing.
-      - run: npm test
-        env:
-          REQUIRE_DB: "1"
-
   core:
     name: Core tests
     runs-on: ubuntu-latest
@@ -82,9 +47,9 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: package-lock.json
-      # Boundary: the open-source core never imports Slime Cloud packages.
-      - name: Core does not import Slime Cloud
-        run: "! grep -rnE \"@slime-cloud/(runtime|server|control-plane)|slime-cloud/runtime\" oss/packages/core/src"
+      # Boundary: the open-source core never imports Slime Cloud packages or AWS.
+      - name: Core does not import Slime Cloud or AWS
+        run: "! grep -rnE \"@slime-cloud/(runtime|server|control-plane)|slime-cloud/runtime|@aws-sdk/\" oss/packages/core/src"
       - run: npm ci
       - run: psql "postgres://slime_admin:slime_admin@localhost:54329/slime" -v ON_ERROR_STOP=1 -f oss/examples/express/db/init.sql
       - run: npm run typecheck -w @slime-cloud/core
@@ -150,16 +115,14 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: |
-            sandbox/package-lock.json
+            package-lock.json
             slime-cloud/runtime/package-lock.json
-      # Boundary: the open-source core never depends on Slime Cloud or AWS.
-      - name: Core does not import the platform
-        working-directory: .
-        run: "! grep -rnE \"slime-cloud|@aws-sdk/\" sandbox/src"
-      # The runtime compiles @slime-cloud/core from sandbox/src, whose imports
-      # resolve against sandbox/node_modules.
+      # The runtime links @slime-cloud/core (oss/packages/core) and bundles its
+      # built dist/; the core's own dependencies come from the root workspace.
       - run: npm ci
-        working-directory: sandbox
+        working-directory: .
+      - run: npm run build -w @slime-cloud/core
+        working-directory: .
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
