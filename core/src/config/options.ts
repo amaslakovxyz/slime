@@ -1,5 +1,6 @@
 import type { CrystalRegistry } from '../engine/crystal/types.js';
 import type { Connector } from '../connectors/types.js';
+import type { Source } from '../sources/types.js';
 import type { Generator, Reviewer } from '../models/types.js';
 import type { SlimeStore } from '../stores/types.js';
 
@@ -29,6 +30,10 @@ export interface LimitOptions {
   maxQueryCost: number;
   shapeTimeoutMs: number;
   shapeMemoryBytes: number;
+  /** Steps in one multi-source handler (MS5). */
+  maxSteps: number;
+  /** One API step, and an API source's describe() and safetyCheck() (MS5). */
+  apiTimeoutMs: number;
 }
 
 export type { CrystalRegistry };
@@ -73,7 +78,10 @@ export interface ErrorEvent {
 export type SlimeEvent = GeneratedEvent | ReviewedEvent | PromotedEvent | WarningEvent | ErrorEvent;
 
 export interface SlimeOptions {
-  connector: Connector;
+  /** Shorthand for sources: { db: connector } (MS1). */
+  connector?: Connector;
+  /** Exactly one SQL source (a Connector) and any number of API sources (MS1). */
+  sources?: Record<string, Source>;
   /** Omit for locked mode: only saved handlers are served (C6). */
   generator?: Generator;
   /** Omit to skip reviews. */

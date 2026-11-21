@@ -26,6 +26,8 @@ const LIMIT_MINIMUMS: Record<keyof LimitOptions, number> = {
   maxQueryCost: 1,
   shapeTimeoutMs: 1,
   shapeMemoryBytes: MEBIBYTE,
+  maxSteps: 1,
+  apiTimeoutMs: 100,
 };
 
 const RULES_BY_SECTION = {

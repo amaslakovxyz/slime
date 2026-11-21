@@ -1,11 +1,13 @@
 // The app passes everything core needs; core never reads process.env or .env (C4).
 import { DEFAULT_LIMITS, DEFAULT_TIERS } from './defaults.js';
 import type { CrystalRegistry, LimitOptions, SlimeEvent, SlimeMode, SlimeOptions, TierOptions } from './options.js';
+import { ALLOW_API_SOURCES, SQL_SOURCE_DEFAULT_NAME } from './source-rules.js';
 import { configProblems } from './validate.js';
 import { SlimeConfigError } from '../shared/errors.js';
 import type { Connector } from '../connectors/types.js';
 import type { Generator, Reviewer } from '../models/types.js';
 import type { SlimeStore } from '../stores/types.js';
+import { isApiSource, type Source } from '../sources/types.js';
 
 export { DEFAULT_LIMITS, DEFAULT_TIERS } from './defaults.js';
 export type {
@@ -28,7 +30,12 @@ export type SlimeOptionOverrides = { [Key in keyof SlimeOptions]?: SlimeOptions[
 const ignoreEvent = (): void => {};
 
 export class SlimeConfig {
+  /** The SQL source; always present (MS1). */
   readonly connector: Connector;
+  readonly sources: Readonly<Record<string, Source>>;
+  readonly sqlSourceName: string;
+  readonly apiSourceNames: readonly string[];
+  readonly hasApiSources: boolean;
   readonly generator: Generator | undefined;
   readonly reviewer: Reviewer | undefined;
   /** undefined: createSlime() builds the default file store. */
@@ -47,8 +54,15 @@ export class SlimeConfig {
     const problems = configProblems(options);
     if (problems.length > 0) throw new SlimeConfigError(problems);
 
-    this.#options = { ...options };
-    this.connector = options.connector;
+    const sources = sourcesOf(options);
+    // Kept in sources form, so with({ connector }) replaces the SQL source instead of adding a second one.
+    const { connector: _connector, ...rest } = options;
+    this.#options = { ...rest, sources };
+    this.sources = Object.freeze({ ...sources });
+    this.sqlSourceName = sqlSourceNameOf(sources);
+    this.connector = sources[this.sqlSourceName] as Connector;
+    this.apiSourceNames = Object.freeze(Object.keys(sources).filter((name) => isApiSource(sources[name] as Source)));
+    this.hasApiSources = this.apiSourceNames.length > 0;
     this.generator = options.generator;
     this.reviewer = options.reviewer;
     // Not copied: a store has behavior and state.
@@ -65,14 +79,28 @@ export class SlimeConfig {
 
   /** `tiers` and `limits` are merged key by key; every other option is replaced whole. */
   with(overrides: SlimeOptionOverrides): SlimeConfig {
+    const { connector, ...rest } = overrides;
+    const sources = connector === undefined ? rest.sources : { ...(rest.sources ?? this.sources), [this.sqlSourceName]: connector };
     const merged: Record<string, unknown> = {
       ...this.#options,
-      ...overrides,
+      ...rest,
+      ...(sources === undefined ? {} : { sources }),
       tiers: { ...this.#options.tiers, ...overrides.tiers },
       limits: { ...this.#options.limits, ...overrides.limits },
     };
-    return new SlimeConfig(withoutUndefined(merged) as unknown as SlimeOptions);
+    const options = withoutUndefined(merged) as unknown as SlimeOptions & { [ALLOW_API_SOURCES]?: boolean };
+    const isApiAllowed = (this.#options as { [ALLOW_API_SOURCES]?: boolean })[ALLOW_API_SOURCES];
+    if (isApiAllowed) options[ALLOW_API_SOURCES] = true;
+    return new SlimeConfig(options);
   }
+}
+
+function sourcesOf(options: SlimeOptions): Record<string, Source> {
+  return options.sources ?? { [SQL_SOURCE_DEFAULT_NAME]: options.connector as Connector };
+}
+
+function sqlSourceNameOf(sources: Record<string, Source>): string {
+  return Object.keys(sources).find((name) => !isApiSource(sources[name] as Source)) as string;
 }
 
 function withoutUndefined(record: Record<string, unknown>): Record<string, unknown> {

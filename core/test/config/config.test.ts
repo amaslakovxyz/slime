@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { DEFAULT_LIMITS, DEFAULT_TIERS, SlimeConfig, type SlimeOptions } from '../../src/config/slime-config.js';
+import { ALLOW_API_SOURCES } from '../../src/config/source-rules.js';
 import { SlimeConfigError } from '../../src/shared/errors.js';
+import type { Source } from '../../src/sources/types.js';
 import type { SlimeStore } from '../../src/stores/types.js';
 import { fakeConnector, fakeGenerator, fakeReviewer } from '../../src/testing/fakes.js';
 
@@ -124,5 +126,74 @@ describe('store option (C14, §4.7)', () => {
 
   test('a { type } option is not a store: stores are passed as objects', () => {
     assert.deepEqual(problems({ connector, store: { type: 'file', dir: '.slime' } }), ['store is missing methods get, put, list, delete']);
+  });
+});
+
+describe('sources (MS1)', () => {
+  const apiSource = (overrides: Record<string, unknown> = {}): Source =>
+    ({
+      kind: 'api',
+      name: 'fake-api',
+      secrets: [],
+      describe: async () => ({ service: 'fake', operations: [] }),
+      call: async () => ({ rows: [], truncated: false, ms: 0 }),
+      safetyCheck: async () => ({ ok: true, user: 'bot', problems: [] }),
+      close: async () => {},
+      ...overrides,
+    }) as Source;
+  const withApiAllowed = (options: Record<string, unknown>): SlimeOptions => ({ ...options, [ALLOW_API_SOURCES]: true }) as unknown as SlimeOptions;
+
+  test('connector is shorthand for sources: { db: connector }', () => {
+    const connector = fakeConnector();
+    const config = new SlimeConfig({ connector });
+    assert.equal(config.connector, connector);
+    assert.deepEqual(Object.keys(config.sources), ['db']);
+    assert.equal(config.sqlSourceName, 'db');
+    assert.equal(config.hasApiSources, false);
+  });
+
+  test('sources may name the SQL source anything', () => {
+    const connector = fakeConnector();
+    const config = new SlimeConfig({ sources: { warehouse: connector } });
+    assert.equal(config.connector, connector);
+    assert.equal(config.sqlSourceName, 'warehouse');
+  });
+
+  test('API sources are refused until P3.3 removes the guard', () => {
+    assert.throws(() => new SlimeConfig({ sources: { db: fakeConnector(), notion: apiSource() } }), /API sources are not yet supported/);
+  });
+
+  test('with the guard bypassed, API sources are listed beside the SQL source', () => {
+    const config = new SlimeConfig(withApiAllowed({ sources: { db: fakeConnector(), notion: apiSource(), films: apiSource() } }));
+    assert.deepEqual(config.apiSourceNames, ['notion', 'films']);
+    assert.equal(config.hasApiSources, true);
+    assert.equal(config.with({ rules: ['x'] }).hasApiSources, true, 'with() keeps the bypass');
+  });
+
+  test('each source problem is reported', () => {
+    const found = problems({ connector: fakeConnector(), sources: { db: fakeConnector() } });
+    assert.deepEqual(found, ['connector and sources are both set: pass the database connector as one of sources, or use connector alone']);
+    const many = problems(withApiAllowed({ sources: { Bad: fakeConnector(), other: fakeConnector(), notion: apiSource({ call: undefined, secrets: 'x' }) } }));
+    assert.ok(many.some((p) => /sources\.Bad: a source name starts with a lowercase letter/.test(p)), many.join('\n'));
+    assert.ok(many.some((p) => /sources\.notion is missing method call/.test(p)), many.join('\n'));
+    assert.ok(many.some((p) => /sources\.notion\.secrets must be a list of strings/.test(p)), many.join('\n'));
+    assert.ok(many.some((p) => /exactly one SQL source/.test(p)), many.join('\n'));
+    assert.ok(problems(withApiAllowed({ sources: { notion: apiSource() } })).some((p) => /exactly one SQL source/.test(p)));
+  });
+
+  test('with({ connector }) replaces the SQL source', () => {
+    const replacement = fakeConnector();
+    const config = new SlimeConfig({ sources: { warehouse: fakeConnector() } }).with({ connector: replacement });
+    assert.equal(config.connector, replacement);
+    assert.deepEqual(Object.keys(config.sources), ['warehouse']);
+  });
+
+  test('maxSteps and apiTimeoutMs have defaults and minimums', () => {
+    const config = new SlimeConfig({ connector: fakeConnector() });
+    assert.equal(config.limits.maxSteps, 4);
+    assert.equal(config.limits.apiTimeoutMs, 10_000);
+    const found = problems({ connector: fakeConnector(), limits: { maxSteps: 0, apiTimeoutMs: 10 } });
+    assert.ok(found.some((p) => /limits\.maxSteps must be an integer of at least 1/.test(p)), found.join('\n'));
+    assert.ok(found.some((p) => /limits\.apiTimeoutMs must be an integer of at least 100/.test(p)), found.join('\n'));
   });
 });
