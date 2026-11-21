@@ -21,7 +21,7 @@ Slime doesn't ship a fixed API. It grows one. Every request moves through three 
 | :---: | :---: | :--- | :--- |
 | **GAS** <br> *(Tier 0)* | **Born** | A request nobody has asked before. An agent writes the handler on the spot—a read-only query plus the exact JSON shape asked for—runs it safely, and checks the result. It lives on probation; if nobody asks again, it evaporates. | An answer in about a second, for a question no one prepared for. |
 | **LIQUID** <br> *(Tier 1)* | **Learned** | Requests that keep succeeding are reviewed by a second model for *meaning*, not just shape (wrong grouping, inverted rankings). Approved handlers are kept, saved, and survive restarts. Rejected ones are rewritten with the reviewer's notes. | The same answer from memory in milliseconds—no AI in the loop. |
-| **CRYSTAL** <br> *(Tier 2, next)* | **Matured** | The most-used paths are rewritten by an optimizing agent, proven against real recorded results, and committed to your repo as ordinary code—revertible, reviewable, yours. | An API you never wrote, now living in your codebase. |
+| **CRYSTAL** <br> *(Tier 2)* | **Matured** | The most-used paths are rewritten by an optimizing agent, proven against real recorded results, and committed to your repo as ordinary code—revertible, reviewable, yours. | An API you never wrote, now living in your codebase. |
 
 **The point:** Gas → Liquid → Crystal is not a cache. It is a backend developing itself—from synthesis, to learning, to maturity—shaped entirely by real usage.
 
@@ -167,7 +167,7 @@ Reads come first because the database can guarantee them. Writes and multi-step 
 ---
 
 ### Proof Points (use these, not adjectives)
-* **First-try correct:** all 8 prototype benchmark cases passed across three full runs; generated handlers matched hand-written reference queries on the first try, including nested output shapes. The one query whose meaning was disputed (churn risk) was held back by the review instead of being trusted—the intended safe outcome.
+* **First-try correct:** all 8 benchmark cases passed across three full runs of the prototype engine; generated handlers matched hand-written reference queries on the first try, including nested output shapes. The one query whose meaning was disputed (churn risk) was held back by the review instead of being trusted—the intended safe outcome. *(Measured on the prototype. The same benchmark now lives in `core/bench/`; re-run it with a model on the current engine before quoting new numbers.)*
 * **About a second, then milliseconds:** new requests take about 1 s; repeats take a few milliseconds and reuse the handler even when input values change.
 * **The review catches real bugs:** it caught grouping by name instead of id, and a churn ranking that pointed the wrong way.
 * **The database says no:** a request for password hashes and a request to delete data were both refused; Postgres itself rejects direct writes and hidden-column reads.
@@ -215,7 +215,7 @@ Reads come first because the database can guarantee them. Writes and multi-step 
 
 ### Claims We Don't Make
 * No latency promises below what we measure ("sub-millisecond", "<1 ms", "150 ms Gas").
-* No "native binaries", "AOT compilation", or "formal verification"—Crystal is code in your repo, and it's next on the roadmap.
+* No "native binaries", "AOT compilation", or "formal verification"—Crystal is ordinary code in your repo.
 * No "multi-tenant" or "row-level security" until tenancy ships; no "safe writes" until writes ship.
 * No absolutes: not "any intent", "always correct", or "prompt-injection proof".
 * Demo what's built: today's connector is Postgres. Legacy APIs and files plug into the same connector contract, so pitch them as part of the story but demo on a database.
