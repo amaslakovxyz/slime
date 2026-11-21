@@ -17,7 +17,7 @@ export type {
   Tier,
 } from './engine/types.js';
 export type { CrystalHandler, ShapeFunction } from './crystal/types.js';
-export type { HandlerProvenance } from './request/key.js';
+export { handlerKeyFor, type HandlerProvenance } from './request/key.js';
 export type { ParamTypes } from './request/params.js';
 
 export {

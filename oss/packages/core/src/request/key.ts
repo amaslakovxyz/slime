@@ -2,7 +2,7 @@
 // Provenance is stored inside the handler, not hashed into the key, so locked
 // mode, which has no generator, finds what explore mode saved (§4.7).
 import { createHash } from 'node:crypto';
-import type { ParsedRequest } from './parse.js';
+import { parseRequest, type ParsedRequest, type SlimeRequest } from './parse.js';
 
 // Bumping it invalidates every saved handler.
 const KEY_VERSION = 1;
@@ -54,4 +54,9 @@ export function requestKey(request: ParsedRequest): string {
 /** Explore mode regenerates on any change; locked mode serves the handler and warns on schemaHash (§4.7). */
 export function changedProvenance(saved: HandlerProvenance, current: HandlerProvenance): (keyof HandlerProvenance)[] {
   return PROVENANCE_FIELDS.filter((field) => saved[field] !== current[field]);
+}
+
+/** The key a request's handler is stored, served and evicted under; throws INVALID_REQUEST like query(). */
+export function handlerKeyFor(request: SlimeRequest): string {
+  return requestKey(parseRequest(request));
 }

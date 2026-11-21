@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { canonicalJSON, changedProvenance, normalizeIntent, requestKey } from '../src/request/key.js';
+import { canonicalJSON, changedProvenance, handlerKeyFor, normalizeIntent, requestKey } from '../src/request/key.js';
 import { parseRequest } from '../src/request/parse.js';
 
 const output = [{ name: 'string', totalPaid: 'integer' }];
@@ -56,5 +56,11 @@ describe('handler provenance (§4.7)', () => {
     for (const field of ['schemaHash', 'dictionaryHash', 'promptHash', 'model'] as const) {
       assert.deepEqual(changedProvenance(saved, { ...saved, [field]: 'x' }), [field]);
     }
+  });
+});
+
+describe('handlerKeyFor', () => {
+  test('is the key query() stores the handler under', () => {
+    assert.equal(handlerKeyFor({ intent: 'Top accounts.', input: { limit: 5 }, output }), key('top accounts', { limit: 50 }));
   });
 });

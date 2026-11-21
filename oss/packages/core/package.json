@@ -34,6 +34,10 @@
       "types": "./dist/crystallize/index.d.ts",
       "default": "./dist/crystallize/index.js"
     },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "default": "./dist/testing/index.js"
+    },
     "./package.json": "./package.json"
   },
   "bin": {

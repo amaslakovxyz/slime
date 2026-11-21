@@ -21,6 +21,7 @@ const required = [
   'dist/groq/index.js',
   'dist/crystallize/index.js',
   'dist/crystallize/bin.js',
+  'dist/testing/index.js',
   'dist/shaping/shape-worker.js',
 ];
 const forbidden = [/^src\//, /^test\//, /^scripts\//, /^tsconfig/, /^PLAN\.md$/, /^docs\//];

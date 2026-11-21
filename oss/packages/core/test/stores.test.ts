@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { after, describe, test } from 'node:test';
 import { fileStore } from '../src/store/file-store.js';
 import { memoryStore } from '../src/store/memory-store.js';
-import { describeStoreContract } from './store-contract.js';
+import { describeStoreContract } from '../src/testing/index.js';
 
 const temporaryDirs: string[] = [];
 after(() => Promise.all(temporaryDirs.map((dir) => rm(dir, { recursive: true, force: true }))));

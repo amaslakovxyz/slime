@@ -31,6 +31,7 @@ test('the public entry exports createSlime, the config, the stores and errors, a
     'SlimeError',
     'createSlime',
     'fileStore',
+    'handlerKeyFor',
     'memoryStore',
   ]);
 });
@@ -46,6 +47,8 @@ test('adapters have their own subpaths, so the main entry never loads them (C7)'
   assert.deepEqual(Object.keys(await import('../src/claude/index.js')).sort(), ['claude', 'claudeGenerator', 'claudeOptimizer', 'claudeReviewer']);
   assert.deepEqual(Object.keys(await import('../src/groq/index.js')).sort(), ['groq', 'groqGenerator', 'groqOptimizer', 'groqReviewer']);
   assert.deepEqual(pkg.exports['./crystallize'], { types: './dist/crystallize/index.d.ts', default: './dist/crystallize/index.js' });
+  assert.deepEqual(pkg.exports['./testing'], { types: './dist/testing/index.d.ts', default: './dist/testing/index.js' });
+  assert.deepEqual(Object.keys(await import('../src/testing/index.js')), ['describeStoreContract']);
 });
 
 test('database drivers and model SDKs are optional peer dependencies (C7)', () => {
