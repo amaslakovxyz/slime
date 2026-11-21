@@ -47,6 +47,11 @@ export default async function EndpointOverviewPage({ params }: { params: Promise
           <div className="stat-value">{formatCount(stats.requests)}</div>
           <div className="stat-note">{formatCount(stats.generations)} generations</div>
         </div>
+        <div className="card stat">
+          <div className="stat-label">LLM tokens</div>
+          <div className="stat-value">{formatCount(stats.tokens)}</div>
+          <div className="stat-note">input + output</div>
+        </div>
         <div className="card stat stat-bill">
           <div className="stat-label">Estimated bill</div>
           <div className="stat-value">

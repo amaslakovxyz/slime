@@ -36,7 +36,6 @@ process.env.SESSION_SECRET ??= 'test-secret-that-is-at-least-32-characters';
 const suffix = randomBytes(4).toString('hex');
 const tables = { control: `test-control-${suffix}`, handlers: `test-handlers-${suffix}` };
 process.env.SLIME_CONTROL_TABLE = tables.control;
-process.env.SLIME_HANDLERS_TABLE = tables.handlers;
 process.env.SLIME_SECRETS = 'file';
 
 const endpointUrl = new URL(process.env.AWS_ENDPOINT_URL_DYNAMODB);
@@ -136,23 +135,19 @@ describe('users and endpoints (DynamoDB Local)', { skip }, () => {
       requests: 1950, generations: 5,
       gasRequests: 50, liquidRequests: 500, crystalRequests: 1400,
       gasMs: 10000, liquidMs: 2250, crystalMs: 700,
-      inputTokens: 10000, outputTokens: 2500, gasHandlers: 3, crystalHandlers: 4,
+      tokens: 12500, gasHandlers: 3, liquidHandlers: 7, crystalHandlers: 4,
     });
     await day('2025-03-01', {
       requests: 1000, generations: 10,
       gasRequests: 100, liquidRequests: 300, crystalRequests: 600,
       gasMs: 25000, liquidMs: 1200, crystalMs: 300,
-      inputTokens: 20000, outputTokens: 5000, gasHandlers: 5, crystalHandlers: 2,
+      tokens: 25000, gasHandlers: 5, liquidHandlers: 9, crystalHandlers: 2,
     });
     // A later day without snapshots must not erase the last reported ones.
     await day('2025-03-03', { updatedAt: '2025-03-03T10:00:00Z' });
     // Other months, and a v1 monthly item, are not part of March.
     await day('2025-04-01', { requests: 99999, gasRequests: 99999, generations: 999 });
     await day('2025-03', { requests: 2000, generations: 10 });
-    for (let i = 0; i < 3; i++) {
-      await ddb().send(new PutCommand({ TableName: tables.handlers, Item: { tenantId: id, artifactKey: `k${i}` } }));
-    }
-    await ddb().send(new PutCommand({ TableName: tables.handlers, Item: { tenantId: 'ep-someoneelse', artifactKey: 'k' } }));
 
     const s = await endpointStats(id, '2025-03');
     assert.equal(s.requests, 2950);
@@ -164,8 +159,9 @@ describe('users and endpoints (DynamoDB Local)', { skip }, () => {
     assert.equal(s.tiers.gas.avgMs?.toFixed(2), '233.33');
     assert.equal(s.tiers.liquid.avgMs, 4.3125);
     assert.equal(s.tiers.crystal.avgMs, 0.5);
-    assert.deepEqual([s.inputTokens, s.outputTokens], [30000, 7500]);
-    assert.deepEqual([s.gasHandlers, s.crystalHandlers, s.liquidHandlers], [3, 4, 3]);
+    assert.equal(s.tokens, 37500);
+    // Snapshots come from the latest day that reported them, not the last item read.
+    assert.deepEqual([s.gasHandlers, s.liquidHandlers, s.crystalHandlers], [3, 7, 4]);
     assert.equal(s.daily.length, 31);
     assert.deepEqual(s.daily[0], { day: '2025-03-01', gas: 100, liquid: 300, crystal: 600 });
     assert.deepEqual(s.daily[2], { day: '2025-03-03', gas: 0, liquid: 0, crystal: 0 });
@@ -178,7 +174,7 @@ describe('users and endpoints (DynamoDB Local)', { skip }, () => {
     const empty = await endpointStats(id, '2025-05');
     assert.equal(empty.requests, 0);
     assert.equal(empty.tiers.gas.avgMs, null);
-    assert.equal(empty.gasHandlers, null);
+    assert.deepEqual([empty.gasHandlers, empty.liquidHandlers, empty.crystalHandlers], [null, null, null]);
     assert.equal(empty.estimatedUsd, 0);
   });
 
@@ -188,11 +184,13 @@ describe('users and endpoints (DynamoDB Local)', { skip }, () => {
     const a = await createEndpoint(owner, { name: 'a', provider: 'offline', databaseUrl: DB_URL });
     const b = await createEndpoint(owner, { name: 'b', provider: 'offline', databaseUrl: DB_URL });
     await setStatus(owner, b, 'updating');
-    const usage = { requests: 1000, generations: 2, gasRequests: 100, liquidRequests: 400, crystalRequests: 500, gasMs: 20000 };
-    for (const id of [a, b]) {
-      await ddb().send(new PutCommand({ TableName: tables.control, Item: { pk: `USAGE#${id}`, sk: today, ...usage } }));
+    const usage = { requests: 1000, generations: 2, gasRequests: 100, liquidRequests: 400, crystalRequests: 500, gasMs: 20000, tokens: 600 };
+    // Only a reports a Liquid snapshot; b's missing one adds nothing.
+    for (const [id, snapshot] of [[a, { liquidHandlers: 4 }], [b, {}]] as const) {
+      await ddb().send(
+        new PutCommand({ TableName: tables.control, Item: { pk: `USAGE#${id}`, sk: today, ...usage, ...snapshot } }),
+      );
     }
-    await ddb().send(new PutCommand({ TableName: tables.handlers, Item: { tenantId: a, artifactKey: 'k' } }));
 
     const o = await overview(owner);
     assert.equal(o.total, 2);
@@ -200,7 +198,9 @@ describe('users and endpoints (DynamoDB Local)', { skip }, () => {
     assert.equal(o.byStatus.updating, 1);
     assert.equal(o.requests, 2000);
     assert.equal(o.tiers.gas.avgMs, 200);
-    assert.equal(o.liquidHandlers, 1);
+    assert.equal(o.tokens, 1200);
+    assert.equal(o.liquidHandlers, 4);
+    assert.equal(o.gasHandlers, null);
     assert.deepEqual(o.daily.at(-1), { day: today, gas: 200, liquid: 800, crystal: 1000 });
     // 200 Gas ($0.40) + 800 Liquid ($0.40) + 1000 Crystal ($0.10) + 4 generations ($0.08).
     assert.equal(o.estimatedUsd, 0.98);

@@ -1,6 +1,6 @@
 // Seeds demo usage into DynamoDB Local so the charts have something to show:
-// one usage item per UTC day of the current month up to today, plus a few
-// handler items for the Liquid count. Refuses to run without
+// one usage item per UTC day of the current month up to today (whole-item
+// PUTs, so re-seeding overwrites older shapes). Refuses to run without
 // AWS_ENDPOINT_URL_DYNAMODB so it can never write into real AWS.
 //
 //   npm run seed -- ep-3a7770c7f6 [ep-...]
@@ -11,7 +11,7 @@
 // Crystal (<2 ms) take over and generations and LLM tokens dry up.
 import { existsSync } from 'node:fs';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { BatchWriteCommand, DynamoDBDocumentClient, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 
 // Deterministic per endpoint, so re-seeding draws the same month.
 function rng(seed: string) {
@@ -55,30 +55,15 @@ function demoDays(endpointId: string, now = new Date()) {
       gasMs: Math.round(gasRequests * gasAvg),
       liquidMs: Math.round(liquidRequests * between(2, 8)),
       crystalMs: Math.round(crystalRequests * between(0.3, 1.6)),
-      inputTokens: generations * Math.round(between(1800, 2600)),
-      outputTokens: generations * Math.round(between(320, 720)),
+      tokens: generations * Math.round(between(2100, 3300)),
       gasHandlers: Math.max(1, Math.round(9 - 7 * progress + between(-1, 1))),
+      liquidHandlers: Math.round(2 + 10 * progress),
       crystalHandlers: Math.round(14 * progress + between(0, 1)),
       updatedAt: d === now.getUTCDate() ? now.toISOString() : new Date(Date.UTC(year, month, d, 23, 59)).toISOString(),
     });
   }
   return items;
 }
-
-const HANDLER_INTENTS = [
-  'number of accounts on each plan',
-  'list products',
-  'monthly revenue by plan',
-  'top customers by order value',
-  'orders in the last 7 days',
-  'average order value per country',
-  'products low on stock',
-  'signups per week',
-  'churned accounts this quarter',
-  'refunds by reason',
-  'active users per plan',
-  'inventory value by warehouse',
-];
 
 async function endpointsOf(doc: DynamoDBDocumentClient, table: string, owner: string): Promise<string[]> {
   const out = await doc.send(
@@ -98,7 +83,6 @@ async function main() {
     process.exit(1);
   }
   const controlTable = process.env.SLIME_CONTROL_TABLE || 'slime-control';
-  const handlersTable = process.env.SLIME_HANDLERS_TABLE || 'slime-handlers';
   const doc = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
   const args = process.argv.slice(2);
@@ -114,25 +98,8 @@ async function main() {
     for (const day of days) {
       await doc.send(new PutCommand({ TableName: controlTable, Item: { pk: `USAGE#${id}`, ...day } }));
     }
-    const handlers = HANDLER_INTENTS.map((intent, i) => ({
-      PutRequest: {
-        Item: {
-          tenantId: id,
-          artifactKey: `seed-${String(i).padStart(2, '0')}`,
-          schemaHash: 'seed',
-          promptHash: 'seed',
-          model: 'seed',
-          intent,
-          runs: 20 + i * 37,
-          lastUsedAt: new Date().toISOString(),
-        },
-      },
-    }));
-    for (let i = 0; i < handlers.length; i += 25) {
-      await doc.send(new BatchWriteCommand({ RequestItems: { [handlersTable]: handlers.slice(i, i + 25) } }));
-    }
     const requests = days.reduce((sum, d) => sum + Number(d.requests), 0);
-    console.log(`${id}: ${days.length} days, ${requests} requests, ${handlers.length} Liquid handlers`);
+    console.log(`${id}: ${days.length} days, ${requests} requests, ${days.at(-1)?.liquidHandlers ?? 0} Liquid handlers`);
   }
 }
 

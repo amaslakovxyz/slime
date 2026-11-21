@@ -54,16 +54,15 @@ export interface Usage {
   month: string;
   requests: number;
   generations: number;
-  inputTokens: number;
-  outputTokens: number;
+  /** LLM tokens (input + output; the core reports one total). */
+  tokens: number;
   tiers: Record<Tier, TierUsage>;
   /** Every day of the month up to today, zero-filled. */
   daily: DayUsage[];
-  /** Warm handler snapshots from the instance that flushed last; null when never reported. */
+  /** Handler snapshots from the instance that flushed last; null when never reported. */
   gasHandlers: number | null;
+  liquidHandlers: number | null;
   crystalHandlers: number | null;
-  /** Stored handlers in slime-handlers. */
-  liquidHandlers: number;
   estimatedUsd: number;
   savingsUsd: number;
 }
@@ -330,24 +329,26 @@ const emptyTiers = (): Record<Tier, TierUsage> => ({
   crystal: { requests: 0, ms: 0, avgMs: null },
 });
 
+/** Per-tier handler counts the runtime reports as a snapshot (not a counter). */
+const SNAPSHOTS = ['gasHandlers', 'liquidHandlers', 'crystalHandlers'] as const;
+type Snapshots = Record<(typeof SNAPSHOTS)[number], number | null>;
+const emptySnapshots = (): Snapshots => ({ gasHandlers: null, liquidHandlers: null, crystalHandlers: null });
+
 /** Sums a month's day items (any order) into Usage. */
-export function usageFromItems(month: string, items: Record<string, unknown>[], liquidHandlers: number): Usage {
+export function usageFromItems(month: string, items: Record<string, unknown>[]): Usage {
   const tiers = emptyTiers();
   const byDay = new Map<string, DayUsage>();
   let requests = 0;
   let generations = 0;
-  let inputTokens = 0;
-  let outputTokens = 0;
-  let gasHandlers: number | null = null;
-  let crystalHandlers: number | null = null;
-  let gasSeen = '';
-  let crystalSeen = '';
+  let tokens = 0;
+  // Latest reported value per snapshot attribute; a day without one keeps the earlier value.
+  const snapshots = emptySnapshots();
+  const seen = { gasHandlers: '', liquidHandlers: '', crystalHandlers: '' };
   for (const item of items) {
     const day = String(item.sk);
     requests += num(item.requests);
     generations += num(item.generations);
-    inputTokens += num(item.inputTokens);
-    outputTokens += num(item.outputTokens);
+    tokens += num(item.tokens);
     for (const tier of TIERS) {
       tiers[tier].requests += num(item[`${tier}Requests`]);
       tiers[tier].ms += num(item[`${tier}Ms`]);
@@ -358,24 +359,12 @@ export function usageFromItems(month: string, items: Record<string, unknown>[], 
       liquid: num(item.liquidRequests),
       crystal: num(item.crystalRequests),
     });
-    if (item.gasHandlers !== undefined && day > gasSeen) [gasHandlers, gasSeen] = [num(item.gasHandlers), day];
-    if (item.crystalHandlers !== undefined && day > crystalSeen) {
-      [crystalHandlers, crystalSeen] = [num(item.crystalHandlers), day];
+    for (const key of SNAPSHOTS) {
+      if (item[key] !== undefined && day > seen[key]) [snapshots[key], seen[key]] = [num(item[key]), day];
     }
   }
   const daily = monthDays(month).map((day) => byDay.get(day) ?? { day, gas: 0, liquid: 0, crystal: 0 });
-  return finish({
-    month,
-    requests,
-    generations,
-    inputTokens,
-    outputTokens,
-    tiers,
-    daily,
-    gasHandlers,
-    crystalHandlers,
-    liquidHandlers,
-  });
+  return finish({ month, requests, generations, tokens, tiers, daily, ...snapshots });
 }
 
 async function usageItems(endpointId: string, month: string): Promise<Record<string, unknown>[]> {
@@ -397,37 +386,16 @@ async function usageItems(endpointId: string, month: string): Promise<Record<str
   return items;
 }
 
-async function countHandlers(endpointId: string): Promise<number> {
-  let count = 0;
-  let ExclusiveStartKey: Record<string, any> | undefined;
-  do {
-    const page = await ddb().send(
-      new QueryCommand({
-        TableName: env().handlersTable,
-        KeyConditionExpression: 'tenantId = :id',
-        ExpressionAttributeValues: { ':id': endpointId },
-        Select: 'COUNT',
-        ExclusiveStartKey,
-      }),
-    );
-    count += page.Count ?? 0;
-    ExclusiveStartKey = page.LastEvaluatedKey;
-  } while (ExclusiveStartKey);
-  return count;
-}
-
 export async function endpointStats(endpointId: string, month = currentMonth()): Promise<Usage> {
-  const [items, liquidHandlers] = await Promise.all([usageItems(endpointId, month), countHandlers(endpointId)]);
-  return usageFromItems(month, items, liquidHandlers);
+  return usageFromItems(month, await usageItems(endpointId, month));
 }
 
 /** Sums several endpoints' Usage for the same month. */
 export function combineUsage(month: string, list: Usage[]): Usage {
   const tiers = emptyTiers();
   const daily = monthDays(month).map((day) => ({ day, gas: 0, liquid: 0, crystal: 0 }));
-  const sum = { requests: 0, generations: 0, inputTokens: 0, outputTokens: 0, liquidHandlers: 0 };
-  let gasHandlers: number | null = null;
-  let crystalHandlers: number | null = null;
+  const sum = { requests: 0, generations: 0, tokens: 0 };
+  const snapshots = emptySnapshots();
   for (const u of list) {
     for (const key of Object.keys(sum) as (keyof typeof sum)[]) sum[key] += u[key];
     for (const tier of TIERS) {
@@ -440,10 +408,12 @@ export function combineUsage(month: string, list: Usage[]): Usage {
       daily[i].liquid += d.liquid;
       daily[i].crystal += d.crystal;
     });
-    if (u.gasHandlers !== null) gasHandlers = (gasHandlers ?? 0) + u.gasHandlers;
-    if (u.crystalHandlers !== null) crystalHandlers = (crystalHandlers ?? 0) + u.crystalHandlers;
+    for (const key of SNAPSHOTS) {
+      const value = u[key];
+      if (value !== null) snapshots[key] = (snapshots[key] ?? 0) + value;
+    }
   }
-  return finish({ month, ...sum, tiers, daily, gasHandlers, crystalHandlers });
+  return finish({ month, ...sum, tiers, daily, ...snapshots });
 }
 
 export type EndpointWithStats = Endpoint & { stats: Usage };

@@ -81,15 +81,19 @@ export default async function UsagePage({ params }: { params: Promise<{ id: stri
 
       <section className="section stats">
         <div className="card stat">
-          <div className="stat-label">LLM input tokens</div>
-          <div className="stat-value">{formatCount(u.inputTokens)}</div>
-          <div className="stat-note">prompt tokens across {formatCount(u.generations)} generations</div>
+          <div className="stat-label">LLM tokens</div>
+          <div className="stat-value">{formatCount(u.tokens)}</div>
+          <div className="stat-note">
+            {u.generations > 0
+              ? `input + output, ${formatCount(Math.round(u.tokens / u.generations))} per generation`
+              : 'no generations yet'}
+          </div>
         </div>
         <div className="card stat">
-          <div className="stat-label">LLM output tokens</div>
-          <div className="stat-value">{formatCount(u.outputTokens)}</div>
+          <div className="stat-label">Liquid handlers</div>
+          <div className="stat-value">{u.liquidHandlers === null ? '—' : formatCount(u.liquidHandlers)}</div>
           <div className="stat-note">
-            {u.generations > 0 ? `${formatCount(Math.round(u.outputTokens / u.generations))} per generation` : 'no generations yet'}
+            {u.liquidHandlers === null ? 'not reported yet' : 'stored, as loaded by the last seen instance'}
           </div>
         </div>
         <div className="card stat stat-savings">

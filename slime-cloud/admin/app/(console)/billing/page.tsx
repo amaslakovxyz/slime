@@ -107,14 +107,9 @@ export default async function BillingPage() {
 
       <section className="section stats">
         <div className="card stat">
-          <div className="stat-label">LLM input tokens</div>
-          <div className="stat-value">{formatCount(o.inputTokens)}</div>
-          <div className="stat-note">Included in the generation price</div>
-        </div>
-        <div className="card stat">
-          <div className="stat-label">LLM output tokens</div>
-          <div className="stat-value">{formatCount(o.outputTokens)}</div>
-          <div className="stat-note">Included in the generation price</div>
+          <div className="stat-label">LLM tokens</div>
+          <div className="stat-value">{formatCount(o.tokens)}</div>
+          <div className="stat-note">Input + output; included in the generation price</div>
         </div>
       </section>
     </>

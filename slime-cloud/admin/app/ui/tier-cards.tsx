@@ -17,7 +17,7 @@ const TIER_COPY: Record<Tier, { tag: string; name: string; desc: string; handler
     name: 'Liquid',
     desc: 'Stored plasma handlers, no generation',
     handlersLabel: 'stored handlers',
-    handlersTitle: 'Handlers persisted in slime-handlers',
+    handlersTitle: WARM,
   },
   crystal: {
     tag: 'TIER 2 · CRYSTAL',

@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react';
 import { revealTokenAction } from '@/app/actions';
 import { CopyButton } from '@/app/ui/copy-button';
 
-// An intent the offline handler set answers (sandbox/offline/handlers.json).
+// An intent the offline handler set answers (slime-cloud/runtime/offline/handlers.json).
 const QUERY_BODY = '{"intent":"number of accounts on each plan","input":{},"output":[{"plan":"string","accounts":"integer"}]}';
 
 export function TokenReveal({ endpointId, url, tokenHint }: { endpointId: string; url?: string; tokenHint: string }) {

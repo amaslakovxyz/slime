@@ -1,6 +1,6 @@
 // Connection test for a customer Postgres URL, run from the admin's network.
-// The role checks mirror the runtime's safetyCheck (sandbox/src/connectors/
-// postgres.ts), which gates `ready`, so a URL that passes here should pass there.
+// The role checks mirror the runtime's safetyCheck (oss/packages/core/src/
+// postgres/safety.ts), which gates `ready`, so a URL that passes here should pass there.
 import pg from 'pg';
 import { validateConnectionUrl } from '../connectors';
 

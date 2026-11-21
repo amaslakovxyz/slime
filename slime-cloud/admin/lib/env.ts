@@ -3,7 +3,6 @@
 export interface Env {
   sessionSecret: string;
   controlTable: string;
-  handlersTable: string;
   secrets: string;
   secretsFile: string;
 }
@@ -14,7 +13,6 @@ export function env(): Env {
   return {
     sessionSecret,
     controlTable: process.env.SLIME_CONTROL_TABLE || 'slime-control',
-    handlersTable: process.env.SLIME_HANDLERS_TABLE || 'slime-handlers',
     secrets: process.env.SLIME_SECRETS || 'file',
     secretsFile: process.env.SLIME_SECRETS_FILE || '.data/secrets.json',
   };

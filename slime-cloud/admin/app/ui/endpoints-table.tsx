@@ -66,7 +66,13 @@ export function EndpointsTable({ rows, compact = false }: { rows: EndpointWithSt
                 {compact ? (
                   <td className="num">{formatUsd(ep.stats.estimatedUsd)}</td>
                 ) : (
-                  <td className="num">{formatCount(ep.stats.liquidHandlers)}</td>
+                  <td className="num">
+                    {ep.stats.liquidHandlers === null ? (
+                      <span className="muted">—</span>
+                    ) : (
+                      formatCount(ep.stats.liquidHandlers)
+                    )}
+                  </td>
                 )}
                 <td className="muted">{ep.createdAt.slice(0, 10)}</td>
               </tr>

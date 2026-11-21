@@ -50,10 +50,8 @@ export default async function OverviewPage() {
         </div>
         <div className="card stat">
           <div className="stat-label">LLM tokens</div>
-          <div className="stat-value">{formatCompact(o.inputTokens + o.outputTokens)}</div>
-          <div className="stat-note">
-            {formatCompact(o.inputTokens)} in · {formatCompact(o.outputTokens)} out
-          </div>
+          <div className="stat-value">{formatCompact(o.tokens)}</div>
+          <div className="stat-note">input + output</div>
         </div>
         <div className="card stat stat-bill">
           <div className="stat-label">Estimated bill</div>

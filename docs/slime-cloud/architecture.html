@@ -250,7 +250,8 @@ footer { text-align: center; font: 400 12px/1.5 var(--font-mono); color: var(--w
       <path class="e-req" d="M590,440 V480 H370 V518" marker-end="url(#a-req)"/>
       <text class="lbl lbl-req" x="470" y="472" text-anchor="middle">SQL (read-only)</text>
       <path class="e-req" d="M675,440 V518" marker-end="url(#a-req)"/>
-      <text class="lbl lbl-req" x="684" y="490">Query · Put</text>
+      <text class="lbl lbl-req" x="684" y="484">Query · Get</text>
+      <text class="lbl lbl-req" x="684" y="500">Put · Delete</text>
       <path class="e-req" d="M850,440 V480 H1035 V518" marker-end="url(#a-req)"/>
       <text class="lbl lbl-req" x="955" y="472" text-anchor="middle">UpdateItem ADD</text>
 
@@ -306,11 +307,11 @@ footer { text-align: center; font: 400 12px/1.5 var(--font-mono); color: var(--w
       <text class="s" x="588" y="414">index.mjs</text>
       <rect class="n-gas" x="716" y="372" width="148" height="56" rx="9"/>
       <text class="t" x="728" y="396" style="font-size:13px;fill:#38F8B8">Gas layer</text>
-      <text class="s-gas" x="728" y="414">/opt/slime/</text>
+      <text class="s-gas" x="728" y="414">/opt/slime/index.js</text>
 
       <rect class="n-gas" x="960" y="346" width="210" height="74" rx="12"/>
       <text class="t" x="974" y="372">Layer slime-gas</text>
-      <text class="s-gas" x="974" y="391">Slime engine bundle</text>
+      <text class="s-gas" x="974" y="391">@slime-cloud/core bundle</text>
       <text class="s-gas" x="974" y="408">nodejs22.x · arm64</text>
 
       <!-- row D -->
@@ -332,7 +333,7 @@ footer { text-align: center; font: 400 12px/1.5 var(--font-mono); color: var(--w
   </div>
   <p class="scroll-hint">← scroll the diagram sideways →</p>
   <div class="legend">
-    <span><i class="sw sw-gas"></i>Gas · engine layer (mint, dashed)</span>
+    <span><i class="sw sw-gas"></i>Gas · runtime layer on @slime-cloud/core (mint, dashed)</span>
     <span><i class="sw sw-liq"></i>Liquid · handler store (plasma, solid)</span>
     <span><i class="sw sw-ctl"></i>Control plane (membrane)</span>
     <span><i class="sw sw-ext"></i>External / local</span>
@@ -398,7 +399,7 @@ footer { text-align: center; font: 400 12px/1.5 var(--font-mono); color: var(--w
 <!-- 3. Request path -->
 <section id="request">
   <h2><span class="num">03</span>Request path</h2>
-  <p class="lede">Each endpoint runs the unchanged runtime from the Gas layer; only its environment differs.</p>
+  <p class="lede">Each endpoint runs the unchanged <code>slime-cloud/runtime</code> (built on <code>@slime-cloud/core</code>, <code>oss/packages/core</code>) from the Gas layer; only its environment differs.</p>
   <div class="flow">
     <div class="chip"><b>Function URL</b><span><code>POST /v0/query</code> from the client app</span></div>
     <div class="arrow" aria-hidden="true">→</div>
@@ -406,18 +407,18 @@ footer { text-align: center; font: 400 12px/1.5 var(--font-mono); color: var(--w
     <div class="arrow" aria-hidden="true">→</div>
     <div class="chip"><b>x-api-key</b><span>must equal <code>SLIME_API_KEY</code>, else 403</span></div>
     <div class="arrow" aria-hidden="true">→</div>
-    <div class="chip"><b>engine.query</b><span>Crystal, Liquid or Gas (below)</span></div>
+    <div class="chip"><b>slime.query</b><span>the <code>createSlime</code> instance answers from Crystal, Liquid or Gas (below)</span></div>
     <div class="arrow" aria-hidden="true">→</div>
-    <div class="chip"><b>Usage meter</b><span>per query: <code>&lt;tier&gt;Requests += 1</code> and <code>&lt;tier&gt;Ms += timingsMs.total</code> by <code>meta.tier</code>; <code>generations += 1</code> on cache <code>miss</code>; <code>inputTokens</code> / <code>outputTokens</code> from <code>meta.generation</code></span></div>
+    <div class="chip"><b>Usage meter</b><span>per query: <code>&lt;tier&gt;Requests += 1</code> and <code>&lt;tier&gt;Ms += timingsMs.total</code> by <code>meta.tier</code>; <code>generations += 1</code> on cache <code>miss</code>; <code>tokens +=</code> the core's <code>generated</code> event <code>tokens</code> (input + output total)</span></div>
     <div class="arrow" aria-hidden="true">→</div>
-    <div class="chip"><b>Flush, respond</b><span>engine flush + one <code>UpdateItem</code> on <code>USAGE#&lt;id&gt;</code> / UTC day: <code>ADD</code> counters, <code>SET updatedAt</code> and the handler snapshot; a failed flush is logged, never fails the request</span></div>
+    <div class="chip"><b>Flush, respond</b><span><code>slime.flush()</code> + one <code>UpdateItem</code> on <code>USAGE#&lt;id&gt;</code> / UTC day: <code>ADD</code> counters, <code>SET updatedAt</code> and the handler snapshot; a failed flush is logged, never fails the request</span></div>
   </div>
   <div class="tiers">
     <div class="flow"><div class="chip cry"><b style="color:var(--crystal-accent)">Crystal</b><span>compiled handlers shipped in <code>/opt/slime/crystal</code> · counts <code>crystalRequests</code>, <code>crystalMs</code></span></div></div>
     <div class="flow"><div class="chip liq"><b style="color:var(--plasma-highlight)">Liquid</b><span>cached handler from <code>slime-handlers</code>, partition <code>tenantId = &lt;id&gt;</code> (cache <code>hit</code>) · counts <code>liquidRequests</code>, <code>liquidMs</code></span></div></div>
-    <div class="flow"><div class="chip gas"><b style="color:var(--gas-accent)">Gas</b><span>generation via <code>SLIME_PROVIDER</code> (cache <code>miss</code>), result stored back into Liquid · counts <code>gasRequests</code>, <code>gasMs</code>, <code>generations</code>, <code>inputTokens</code>, <code>outputTokens</code></span></div></div>
+    <div class="flow"><div class="chip gas"><b style="color:var(--gas-accent)">Gas</b><span>generation via <code>SLIME_PROVIDER</code> (cache <code>miss</code>), result stored back into Liquid · counts <code>gasRequests</code>, <code>gasMs</code>, <code>generations</code>, <code>tokens</code></span></div></div>
   </div>
-  <p class="note">Snapshot, not a sum: each flush also <code>SET</code>s <code>gasHandlers = engine.stats().handlers.gas</code> and <code>crystalHandlers = engine.stats().crystal.loaded</code> from the instance that flushed last; the admin labels them "warm, last seen instance". The <span style="color:var(--plasma-highlight)">Liquid</span> handler count is not a usage attribute: it is a <code>Select COUNT</code> query on <code>slime-handlers</code>, <code>tenantId = &lt;id&gt;</code>. Average latency per tier = <code>&lt;tier&gt;Ms / &lt;tier&gt;Requests</code>.</p>
+  <p class="note">Snapshot, not a sum: each flush also <code>SET</code>s <code>gasHandlers</code> and <code>liquidHandlers</code> from <code>slime.stats().handlers</code> (the core loads every stored handler at start, so this is representative) and <code>crystalHandlers</code> = the number of entries in the Crystal registry, from the instance that flushed last; the admin labels the Gas and Crystal counts "warm, last seen instance". The <span style="color:var(--plasma-highlight)">Liquid</span> count comes from <code>liquidHandlers</code>, never from counting <code>slime-handlers</code>: that table now holds the core's generic namespaced store (<code>artifactKey = &lt;ns&gt;#&lt;key&gt;</code>). Average latency per tier = <code>&lt;tier&gt;Ms / &lt;tier&gt;Requests</code>.</p>
 </section>
 
 <!-- 4. State machine -->
@@ -493,7 +494,7 @@ footer { text-align: center; font: 400 12px/1.5 var(--font-mono); color: var(--w
       <tbody>
         <tr><td>User</td><td><code>USER#&lt;email lowercased&gt;</code></td><td><code>PROFILE</code></td><td><code>type="user"</code>, <code>email</code>, <code>passwordHash</code> (<code>scrypt$salt$hash</code>), <code>createdAt</code> (ISO)</td><td>admin (signup)</td></tr>
         <tr><td>Endpoint</td><td><code>USER#&lt;email&gt;</code></td><td><code>ENDPOINT#&lt;endpointId&gt;</code></td><td><code>type="endpoint"</code>, <code>endpointId</code>, <code>owner</code>, <code>name</code>, <code>provider</code> (<code>claude|groq|offline</code>), <code>connectorType</code> (<code>postgres</code>; missing = <code>postgres</code>), <code>status</code> (<code>pending|provisioning|ready|failed|updating|deleting</code>), <code>tokenHint</code> (last 4), <code>url?</code>, <code>layerArn?</code>, <code>error?</code>, <code>createdAt</code>, <code>updatedAt</code></td><td>admin (create, connector/settings change, delete) · provisioner (status, url)</td></tr>
-        <tr><td>Usage (daily)</td><td><code>USAGE#&lt;endpointId&gt;</code></td><td><code>YYYY-MM-DD</code> (UTC day)</td><td><code>ADD</code>: <code>requests</code>, <code>generations</code>, <code>gasRequests</code>, <code>liquidRequests</code>, <code>crystalRequests</code>, <code>gasMs</code>, <code>liquidMs</code>, <code>crystalMs</code>, <code>inputTokens</code>, <code>outputTokens</code> (N) · <code>SET</code>: <code>updatedAt</code>, <code>gasHandlers</code>, <code>crystalHandlers</code> (snapshot of the last flushing instance). Month totals = <code>Query pk = USAGE#&lt;id&gt; AND begins_with(sk, 'YYYY-MM')</code>, summed.</td><td>endpoint Lambda (one <code>UpdateItem</code> per flush)</td></tr>
+        <tr><td>Usage (daily)</td><td><code>USAGE#&lt;endpointId&gt;</code></td><td><code>YYYY-MM-DD</code> (UTC day)</td><td><code>ADD</code>: <code>requests</code>, <code>generations</code>, <code>gasRequests</code>, <code>liquidRequests</code>, <code>crystalRequests</code>, <code>gasMs</code>, <code>liquidMs</code>, <code>crystalMs</code>, <code>tokens</code> (N) · <code>SET</code>: <code>updatedAt</code>, <code>gasHandlers</code>, <code>liquidHandlers</code>, <code>crystalHandlers</code> (snapshot of the last flushing instance). Month totals = <code>Query pk = USAGE#&lt;id&gt; AND begins_with(sk, 'YYYY-MM-')</code>, summed.</td><td>endpoint Lambda (one <code>UpdateItem</code> per flush)</td></tr>
       </tbody>
     </table>
   </div>
@@ -527,12 +528,12 @@ footer { text-align: center; font: 400 12px/1.5 var(--font-mono); color: var(--w
         </tr>
         <tr>
           <td>Permissions boundary<br><code>slime-endpoint-boundary</code></td>
-          <td>maximum for any endpoint: logs on <code>/aws/lambda/slime-ep-*</code>; <code>Query/PutItem/UpdateItem</code> on handlers; <code>UpdateItem</code> on control; <code>GetParametersByPath</code> on <code>/slime/shared</code> and <code>/slime/endpoints/*</code>; X-Ray</td>
-          <td>no IAM, Lambda, delete or scan actions, so a compromised worker cannot mint a stronger role</td>
+          <td>maximum for any endpoint: logs on <code>/aws/lambda/slime-ep-*</code>; <code>Query/GetItem/PutItem/DeleteItem</code> on handlers (the core store); <code>UpdateItem</code> on control; <code>GetParametersByPath</code> on <code>/slime/shared</code> and <code>/slime/endpoints/*</code>; X-Ray</td>
+          <td>no IAM, Lambda or scan actions and no control-table deletes, so a compromised worker cannot mint a stronger role</td>
         </tr>
         <tr>
           <td>Per-endpoint role<br><code>slime-ep-&lt;hex&gt;</code></td>
-          <td>inline policy <code>endpoint</code>: handlers with <code>ForAllValues:StringEquals dynamodb:LeadingKeys = [&lt;id&gt;]</code>; control <code>UpdateItem</code> with <code>LeadingKeys = ["USAGE#&lt;id&gt;"]</code> and <code>dynamodb:Attributes</code> = <code>pk</code>, <code>sk</code>, <code>requests</code>, <code>generations</code>, <code>gasRequests</code>, <code>liquidRequests</code>, <code>crystalRequests</code>, <code>gasMs</code>, <code>liquidMs</code>, <code>crystalMs</code>, <code>inputTokens</code>, <code>outputTokens</code>, <code>gasHandlers</code>, <code>crystalHandlers</code>, <code>updatedAt</code>; SSM <code>/slime/shared</code> and <code>/slime/endpoints/&lt;id&gt;</code> only; its own log group</td>
+          <td>inline policy <code>endpoint</code>: handlers <code>Query/GetItem/PutItem/DeleteItem</code> with <code>ForAllValues:StringEquals dynamodb:LeadingKeys = [&lt;id&gt;]</code>; control <code>UpdateItem</code> with <code>LeadingKeys = ["USAGE#&lt;id&gt;"]</code> and <code>dynamodb:Attributes</code> = <code>pk</code>, <code>sk</code>, <code>requests</code>, <code>generations</code>, <code>gasRequests</code>, <code>liquidRequests</code>, <code>crystalRequests</code>, <code>gasMs</code>, <code>liquidMs</code>, <code>crystalMs</code>, <code>tokens</code>, <code>gasHandlers</code>, <code>liquidHandlers</code>, <code>crystalHandlers</code>, <code>updatedAt</code>; SSM <code>/slime/shared</code> and <code>/slime/endpoints/&lt;id&gt;</code> only; its own log group</td>
           <td>one endpoint cannot read another's Liquid partition, secrets or usage; boundary still applies</td>
         </tr>
         <tr>
@@ -570,8 +571,8 @@ footer { text-align: center; font: 400 12px/1.5 var(--font-mono); color: var(--w
     <table>
       <thead><tr><th>Area</th><th>Files</th><th>What changes</th></tr></thead>
       <tbody>
-        <tr><td><code>slime-cloud/runtime</code></td><td><code>src/lambda.ts</code>, <code>src/app.ts</code>, <code>src/usage.ts</code>, <code>scripts/build.mjs</code>, <code>test/</code></td><td>comma-separated <code>SLIME_SSM_PREFIX</code>; <code>UsageMeter</code> fed by an <code>onQuery</code> hook (tier, latency, tokens) and flushed before each response into the daily usage item; build also emits <code>dist/layer/slime/</code> for the <span style="color:var(--gas-accent)">Gas</span> layer</td></tr>
-        <tr><td><code>slime-cloud/provisioner</code> (new)</td><td><code>src/config.ts</code>, <code>src/handler.ts</code>, <code>src/provision.ts</code>, <code>shim/index.mjs</code>, <code>scripts/build.mjs</code>, <code>test/provision.test.ts</code></td><td>stream handler dispatching <code>pending → provision</code>, <code>updating → reconfigure</code>, <code>deleting → teardown</code>; fake-client tests for order, retries, failure, reconfigure and teardown paging</td></tr>
+        <tr><td><code>slime-cloud/runtime</code></td><td><code>src/lambda.ts</code>, <code>src/app.ts</code>, <code>src/usage.ts</code>, <code>scripts/build.mjs</code>, <code>test/</code></td><td>built on <code>@slime-cloud/core</code> (<code>oss/packages/core</code>, <code>createSlime</code>); comma-separated <code>SLIME_SSM_PREFIX</code>; <code>UsageMeter</code> fed by the <code>onQuery</code> hook (tier, latency), the core's <code>generated</code> event (tokens) and <code>slime.stats()</code> (handler snapshot), flushed before each response into the daily usage item; build emits <code>index.js</code> + <code>package.json {"type":"module"}</code> and copies it to <code>dist/layer/slime/</code> for the <span style="color:var(--gas-accent)">Gas</span> layer</td></tr>
+        <tr><td><code>slime-cloud/provisioner</code> (new)</td><td><code>src/config.ts</code>, <code>src/handler.ts</code>, <code>src/provision.ts</code>, <code>shim/index.mjs</code> (re-exports <code>/opt/slime/index.js</code>), <code>scripts/build.mjs</code>, <code>test/provision.test.ts</code></td><td>stream handler dispatching <code>pending → provision</code>, <code>updating → reconfigure</code>, <code>deleting → teardown</code>; fake-client tests for order, retries, failure, reconfigure and teardown paging</td></tr>
         <tr><td><code>slime-cloud/admin</code> (new)</td><td><code>app/</code> (login, dashboard, endpoint tabs, actions), <code>lib/</code> (env, ddb, secrets, auth, users, endpoints, connectors, pricing, telemetry), <code>instrumentation.ts</code>, <code>docker-compose.yml</code>, <code>scripts/dev-tables.ts</code>, <code>test/</code></td><td>Next.js App Router, email/password auth, sidebar layout, tier metrics and savings, connector settings with a connection test, reconfigure through <code>updating</code>, OpenTelemetry spans to Jaeger</td></tr>
         <tr><td><code>infra/aws/platform</code></td><td><code>control.tf</code>, <code>gas-layer.tf</code>, <code>provisioner.tf</code>, <code>outputs.tf</code>, <code>build.sh</code></td><td>control table with stream; <code>slime-gas</code> layer + endpoint shim zip; boundary policy, provisioner role/log group/function and filtered event source mapping</td></tr>
         <tr><td>CI</td><td><code>.github/workflows/ci.yml</code></td><td>jobs <em>Slime Cloud admin</em> (with a DynamoDB Local service) and <em>Slime Cloud provisioner</em>: <code>npm ci</code>, typecheck, test, build on Node 22</td></tr>
@@ -589,7 +590,7 @@ footer { text-align: center; font: 400 12px/1.5 var(--font-mono); color: var(--w
         <tr><td>Dashboard</td><td>boards for endpoint counts by status, this month's requests, generations, tokens, <span style="color:var(--plasma-highlight)">Liquid</span> handlers, estimated bill and crystallization savings; daily requests by tier chart; endpoints table</td></tr>
         <tr><td>Endpoint · Overview</td><td>status, URL, token reveal + copy, <code>curl</code> example (intent <code>number of accounts on each plan</code>), polling via <code>router.refresh()</code> every 5 s while <code>pending|provisioning|updating|deleting</code></td></tr>
         <tr><td>Endpoint · Connector</td><td>connector registry; edit the Connection URL; "Test connection" runs from the admin's network (stated in the UI) and reports user, database, server version, table count and <code>safetyCheck</code> problems (superuser/<code>rds_superuser</code>, <code>createrole</code>/<code>createdb</code>, writable tables); saving on <code>ready|failed</code> starts <code>updating</code></td></tr>
-        <tr><td>Endpoint · Usage</td><td>daily requests by tier chart, average latency per tier (<code>&lt;tier&gt;Ms / &lt;tier&gt;Requests</code>), input/output tokens, generations, warm Gas/Crystal handlers ("warm, last seen instance"), estimate and savings</td></tr>
+        <tr><td>Endpoint · Usage</td><td>daily requests by tier chart, average latency per tier (<code>&lt;tier&gt;Ms / &lt;tier&gt;Requests</code>), LLM tokens, generations, handler snapshot per tier (Gas/Crystal "warm, last seen instance", <span style="color:var(--plasma-highlight)">Liquid</span> from <code>liquidHandlers</code>), estimate and savings</td></tr>
         <tr><td>Endpoint · Settings</td><td>rename (plain update), provider change (from <code>ready|failed</code> → <code>updating</code>), delete (from <code>ready|failed</code> → <code>deleting</code>)</td></tr>
       </tbody>
     </table>
@@ -619,7 +620,7 @@ footer { text-align: center; font: 400 12px/1.5 var(--font-mono); color: var(--w
 
   <h3>How to verify</h3>
   <ul class="plain">
-    <li><strong>Runtime:</strong> typecheck, tests (meter: one daily <code>UpdateItem</code> per flush with tier counters, latency, tokens and the handler snapshot; failing client never rejects), build produces <code>dist/layer/slime/index.mjs</code>, worker, wasm and offline handlers.</li>
+    <li><strong>Runtime:</strong> typecheck, tests (meter: one daily <code>UpdateItem</code> per flush with tier counters, latency, <code>tokens</code> and the <code>gas/liquid/crystalHandlers</code> snapshot; failing client never rejects), build produces <code>dist/layer/slime/index.js</code>, <code>package.json</code>, worker, wasm and offline handlers.</li>
     <li><strong>Provisioner:</strong> fake-client scenarios — happy path to <code>ready</code>, IAM propagation retry, healthz 503 → <code>failed</code>, lost claim issues nothing, teardown of 30 handlers in 25 + 5, pre-existing role/function tolerated, reconfigure merging the environment and retrying an in-progress update.</li>
     <li><strong>Admin, locally:</strong> <code>npm run infra:up &amp;&amp; npm run tables &amp;&amp; REQUIRE_DYNAMO=1 npm test</code>, then sign up, create an endpoint (stays <code>pending</code> without AWS), reveal the token, change the connector, seed daily usage and see tiers, bill and savings, check <code>endpoint.create</code> / <code>dashboard.load</code> spans in Jaeger.</li>
     <li><strong>Infra:</strong> <code>terraform fmt</code>/<code>validate</code>, tflint, trivy; the PR plan shows only additions plus a possible <code>slime-runtime</code> code hash change.</li>
