@@ -1,13 +1,13 @@
-# Slime Cloud control plane: users, endpoints, usage (platform/admin).
+# Slime Cloud control plane: users, endpoints, usage.
 #
 #   USER#<email>   PROFILE              user (scrypt password hash)
 #   USER#<email>   ENDPOINT#<id>        endpoint: name, provider, connectorType, status, url, ...
 #   USAGE#<id>     <YYYY-MM-DD>         daily counters: requests/latency per tier, generations, tokens
 #
-# The stream feeds slime-provisioner (provisioner.tf), which creates,
-# reconfigures or deletes the endpoint's Lambda when an endpoint item turns
-# `pending`, `updating` or `deleting`.
-# Item shapes: docs/architecture/slime-cloud.html.
+# Two writers only: the admin (admin.tf) owns users and endpoint items and moves
+# endpoint status itself; the runtime (runtime.tf) may only update USAGE#<id>
+# items. No stream: nothing reacts to item changes.
+# Item shapes: docs/architecture/2026-11-21-cloud-mvp-design.md.
 
 resource "aws_dynamodb_table" "control" {
   name         = "${var.project}-control"
@@ -25,8 +25,7 @@ resource "aws_dynamodb_table" "control" {
     type = "S"
   }
 
-  stream_enabled   = true
-  stream_view_type = "NEW_IMAGE"
+  stream_enabled = false
 
   # Accounts, endpoint records and billing history.
   deletion_protection_enabled = true

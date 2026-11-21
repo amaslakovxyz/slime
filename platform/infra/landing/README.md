@@ -36,7 +36,7 @@ node --test platform/infra/landing/function/index.test.mjs
 
 [`domain.tf`](domain.tf) serves `https://amaslakov.com` and `www.` through
 CloudFront (Function URLs do not accept custom domains). CloudFront caching
-also shields the function: the account Lambda concurrency limit is 10.
+also shields the function: the account Lambda concurrency limit (1000) is shared by every function.
 
 | Resource | Notes |
 |---|---|

@@ -1,8 +1,8 @@
 # Custom domain: <domain> and www.<domain> -> CloudFront -> Function URL.
 #
 # Function URLs cannot take a custom domain, so CloudFront fronts the URL.
-# Its cache also shields the function: the account Lambda concurrency limit is
-# 10 and shared by every function.
+# Its cache also shields the function from traffic spikes: the account Lambda
+# concurrency limit (1000) is shared by every function.
 #
 # The hosted zone is owned outside Terraform (created by the Route 53
 # registrar) and also carries iCloud mail records (MX, SPF/TXT, DKIM, DMARC);
