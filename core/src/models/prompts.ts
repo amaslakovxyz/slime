@@ -23,6 +23,7 @@ SQL rules:
 - Do filtering, joins, aggregation, sorting and limits in SQL. ORDER BY whenever the order matters.
 - Use only tables and columns in the dictionary. Follow the dictionary's rules: they win over your own judgment.
 - Return numbers as numbers: cast counts with ::int, money and averages with ::float8 or ROUND(x::numeric, 2)::float8.
+- Keep values in the unit the column stores (amount_cents stays in cents) unless the intent or an output key names another unit. When an output key does not name its unit, or you convert one, say which unit in assumptions.
 - Alias columns with the exact output key names when shapeJs is null. Postgres lowercases unquoted names, so double-quote aliases with capitals: AS "totalPaid".
 
 Output shape notation:
