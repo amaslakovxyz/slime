@@ -1,5 +1,6 @@
 import type { SlimeMode } from '../config/options.js';
 import { changedProvenance, type HandlerProvenance } from '../request/key.js';
+import { SlimeError } from '../shared/errors.js';
 import type { SlimeStore } from '../stores/types.js';
 import type { HandlerRecord, HandlerSummary, StoredTier } from './types.js';
 
@@ -10,6 +11,8 @@ export interface HandlerCacheSettings {
   mode: SlimeMode;
   provenance: HandlerProvenance;
   gasWindowMs: number;
+  /** Why a saved handler can't be served with today's sources (MS14); undefined when it can. */
+  savedHandlerProblem?: (record: HandlerRecord) => string | undefined;
 }
 
 interface CachedHandler {
@@ -32,7 +35,7 @@ export class HandlerCache {
     this.#handlers.delete(key);
 
     const saved = (await this.#settings.store.get(HANDLERS_NS, key)) as HandlerRecord | undefined;
-    if (!saved || !this.#isUsable(saved)) return undefined;
+    if (!saved || !this.#isUsable(saved) || !this.#fitsSources(saved)) return undefined;
     this.#handlers.set(key, { record: saved, expiresAt: Number.POSITIVE_INFINITY });
     return saved;
   }
@@ -67,6 +70,14 @@ export class HandlerCache {
   #liveRecords(): HandlerRecord[] {
     const now = Date.now();
     return [...this.#handlers.values()].filter(({ expiresAt }) => expiresAt > now).map(({ record }) => record);
+  }
+
+  // Explore mode regenerates an unfit handler; locked mode can't, so it says why instead of serving it (MS14).
+  #fitsSources(saved: HandlerRecord): boolean {
+    const problem = this.#settings.savedHandlerProblem?.(saved);
+    if (problem === undefined) return true;
+    if (this.#settings.mode === 'explore') return false;
+    throw new SlimeError('HANDLER_NOT_FOUND', `The saved handler no longer fits the configured sources: ${problem}`);
   }
 
   // Locked mode can't regenerate, so it serves what it has (§4.7).

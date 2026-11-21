@@ -19,6 +19,7 @@ import { executeArtifact, type Execution } from './execute.js';
 import { generateHandler, type GenerationDeps, type GenerationOutcome } from './generate.js';
 import { GenerationLimits } from './generation-limits.js';
 import { HandlerCache } from './handler-cache.js';
+import { savedHandlerProblem } from './saved-handler-check.js';
 import { HandlerLifecycle } from './lifecycle.js';
 import { queryMeta } from './meta.js';
 import { reviewUntilSettled, type ReviewOutcome } from './review-loop.js';
@@ -62,7 +63,8 @@ export class SlimeEngine implements Slime {
   constructor(parts: EngineParts) {
     const { config, store, provenance } = parts;
     this.#parts = parts;
-    this.#cache = new HandlerCache({ store, mode: config.mode, provenance, gasWindowMs: config.tiers.gasWindowMs });
+    const savedContext = { sqlSourceName: config.sqlSourceName, apiSchemas: parts.apiSchemas, maxSteps: config.limits.maxSteps };
+    this.#cache = new HandlerCache({ store, mode: config.mode, provenance, gasWindowMs: config.tiers.gasWindowMs, savedHandlerProblem: (record) => savedHandlerProblem(record, savedContext) });
     this.#limits = new GenerationLimits({ maxPerHour: config.limits.maxGenerationsPerHour, maxConcurrent: config.limits.maxConcurrentGenerations });
     this.#background = new BackgroundTasks((error) => this.#emit(errorEvent(error)));
     this.#lifecycle = new HandlerLifecycle({
