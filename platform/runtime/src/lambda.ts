@@ -1,119 +1,132 @@
-// Lambda entry for the Slime runtime (Function URL; see platform/infra/platform/runtime.tf).
+// Lambda entry: one function serves every endpoint, under /ep/<id>/ on its
+// Function URL (platform/infra/platform/runtime.tf).
 //
-// Cold start:
-//   1. Every SSM parameter under each path in SLIME_SSM_PREFIX (comma-separated)
-//      becomes an env var named after its last path segment
-//      (/slime/runtime/DATABASE_URL -> DATABASE_URL). Paths load in order, so a
-//      later one overrides an earlier one: provisioned endpoints use
-//      "/slime/shared/,/slime/endpoints/<id>/" (shared model keys, then their own).
-//      Secrets therefore never pass through Terraform state or the function config.
-//   2. The Slime instance is built from those env vars (config.ts) on the first
-//      request, and rebuilt on the next one if that fails (e.g. DATABASE_URL not
-//      set yet), so a broken DB is a 503, not a crash loop.
-// Every route needs the `x-api-key` header to equal SLIME_API_KEY; with no key
-// configured the runtime refuses everything. A Crystal's own token (CRYSTAL_TOKENS,
-// a JSON map from SSM) opens only that Crystal's route, POST /v0/e/<key>.
-import { isAuthorized, keyMatches, parseCrystalTokens } from './auth.js';
-import { GetParametersByPathCommand, SSMClient } from '@aws-sdk/client-ssm';
-import { Hono } from 'hono';
-import { handle } from 'hono/aws-lambda';
+//   /ep/<id>/<route>  id must match ENDPOINT_ID, else 404 before any AWS call;
+//                     no settings under /slime/endpoints/<id>/  -> 404 ENDPOINT_NOT_FOUND
+//                     wrong or missing x-api-key               -> 401 UNAUTHORIZED
+//                     POST /v0/reload                          -> 204, this instance forgets
+//                                                                 the endpoint (tenants.ts)
+//                     engine cannot start                      -> 503 NOT_READY with the cause
+//                     otherwise the endpoint's own app (app.ts) answers <route>
+//   anything else     401, including /healthz: there is no key to check it against
+//
+// Auth is the local entry's (auth.ts) on the path with /ep/<id> removed: the
+// endpoint key opens every route, a Crystal's own token only POST /v0/e/<its key>.
+// Lambda freezes the process after the response, so store writes, reviews and
+// usage are flushed first, for at most SLIME_FLUSH_LIMIT_MS.
+import { setTimeout as sleep } from 'node:timers/promises';
+import { S3Client } from '@aws-sdk/client-s3';
+import { SSMClient } from '@aws-sdk/client-ssm';
+import { QuickJSRunner } from '@slime-cloud/core';
+import { Hono, type Context } from 'hono';
+import { handle, type LambdaContext } from 'hono/aws-lambda';
+import { isAuthorized } from './auth.js';
+import { S3CrystalStore } from './crystal-store.js';
+import { startupErrorMessage, type LogLine } from './endpoint-runtime.js';
+import { ENDPOINT_ID, TenantCache, type Tenant } from './tenants.js';
 
-export { keyMatches };
-
-/** Parameter path -> env var name: the last path segment. */
-export function envNameFor(path: string): string {
-  return path.slice(path.lastIndexOf('/') + 1);
+export interface RouterOptions {
+  /** How long a response waits for background work; an unfinished review continues when the instance next wakes. */
+  flushLimitMs: number;
+  log?: (line: LogLine) => void;
 }
 
-async function loadParameters(prefix: string): Promise<void> {
-  const ssm = new SSMClient({});
-  let NextToken: string | undefined;
-  do {
-    const res = await ssm.send(new GetParametersByPathCommand({ Path: prefix, WithDecryption: true, NextToken }));
-    for (const p of res.Parameters ?? []) {
-      if (p.Name && p.Value !== undefined) process.env[envNameFor(p.Name)] = p.Value;
-    }
-    NextToken = res.NextToken;
-  } while (NextToken);
-}
+const EP_PATH = /^\/ep\/([^/]+)(\/.*)?$/;
+const DEFAULT_FLUSH_LIMIT_MS = 5_000;
+const DEFAULT_TENANT_CACHE_MAX = 8;
+const DEFAULT_TENANT_TTL_MS = 30_000;
+const DEFAULT_SHARED_SSM_PREFIX = '/slime/shared/';
 
-for (const prefix of (process.env.SLIME_SSM_PREFIX ?? '').split(',')) {
-  if (prefix.trim()) await loadParameters(prefix.trim());
-}
+type Bindings = { lambdaContext?: LambdaContext };
 
-type Runtime = { app: Hono; flush: () => Promise<void> };
+export function createRouter(tenants: Pick<TenantCache, 'get' | 'reload'>, { flushLimitMs, log = (line) => console.log(JSON.stringify(line)) }: RouterOptions): Hono<{ Bindings: Bindings }> {
+  const app = new Hono<{ Bindings: Bindings }>();
 
-// flush() also waits for background reviews, which can outlast the 30 s function
-// timeout. Past this cap the response goes out; an unfinished review continues
-// when the instance is next woken, or is retried after a later run.
-const FLUSH_LIMIT_MS = Number(process.env.SLIME_FLUSH_LIMIT_MS || 5_000);
-let booting: Promise<Runtime> | null = null;
-
-function boot(): Promise<Runtime> {
-  booting ??= (async () => {
-    const { createSlime } = await import('@slime-cloud/core');
-    const { slimeConfigFromEnv } = await import('./config.js');
-    const { createApp } = await import('./app.js');
-    const { UsageMeter } = await import('./usage.js');
-    const { LiveRunsSync, DEFAULT_RUNS_SYNC_MS } = await import('./live-runs.js');
-    // Only provisioned endpoints meter usage (slime-runtime has no usage table).
-    // The meter needs slime for its snapshot, so it is assigned after
-    // createSlime; startup events emitted before that are not generations.
-    let meter: InstanceType<typeof UsageMeter> | undefined;
-    const config = await slimeConfigFromEnv(process.env, {
-      onEvent: (event) => {
-        if (event.type === 'generated') meter?.recordTokens(event.tokens);
-        if (event.type === 'warning') console.warn(JSON.stringify({ warning: event.message }));
-      },
-    });
-    const slime = await createSlime(config);
-    const crystals = Object.keys(config.crystal || {}).length;
-    if (process.env.SLIME_USAGE_TABLE) {
-      meter = new UsageMeter(process.env.SLIME_USAGE_TABLE, process.env.SLIME_TENANT_ID ?? '', () => ({
-        ...slime.stats().handlers,
-        crystal: crystals,
-      }));
-    }
-    // Keeps Liquid run counts in the store current, so Crystallize can see them (see live-runs.ts).
-    const runs = config.store
-      ? new LiveRunsSync(config.store, () => slime.handlers(), Number(process.env.SLIME_RUNS_SYNC_MS || DEFAULT_RUNS_SYNC_MS))
-      : undefined;
-    return {
-      app: createApp({ slime, connector: config.connector, crystal: config.crystal, onQuery: (meta) => meter?.record(meta) }),
-      flush: () =>
-        Promise.all([slime.flush(), meter?.flush()])
-          .then(() => runs?.maybeSync())
-          .then(() => {}),
-    };
-  })().catch((err) => {
-    booting = null;
-    throw err;
+  // An AWS call that failed (SSM, S3): logged with its cause, answered without it.
+  app.onError((err, c) => {
+    log({ error: startupErrorMessage(err) });
+    return c.json({ error: { code: 'INTERNAL', message: 'Unexpected server error.', retryable: true } }, 500);
   });
-  return booting;
+
+  app.all('*', async (c) => {
+    const startedAt = performance.now();
+    const url = new URL(c.req.url);
+    const match = EP_PATH.exec(url.pathname);
+    const id = match?.[1] ?? '';
+    const route = match ? (match[2] ?? '/') : url.pathname;
+    const isEndpoint = ENDPOINT_ID.test(id);
+    let status = 500;
+    try {
+      const response = match ? await serveEndpoint(c, tenants, id, route, url, flushLimitMs, log) : refuse(c, 401, 'UNAUTHORIZED', 'Missing or wrong x-api-key.');
+      status = response.status;
+      return response;
+    } finally {
+      log({
+        ...(isEndpoint ? { endpointId: id } : {}),
+        requestId: c.env?.lambdaContext?.awsRequestId,
+        route,
+        status,
+        ms: Math.round(performance.now() - startedAt),
+      });
+    }
+  });
+
+  return app;
 }
 
-export const app = new Hono();
-
-app.use('*', async (c, next) => {
-  const path = new URL(c.req.url).pathname;
-  if (!isAuthorized(c.req.method, path, c.req.header('x-api-key'), process.env.SLIME_API_KEY, parseCrystalTokens(process.env.CRYSTAL_TOKENS))) {
-    return c.json({ error: { code: 'UNAUTHORIZED', message: 'Missing or wrong x-api-key.', retryable: false } }, 401);
+async function serveEndpoint(
+  c: Context<{ Bindings: Bindings }>,
+  tenants: Pick<TenantCache, 'get' | 'reload'>,
+  id: string,
+  route: string,
+  url: URL,
+  flushLimitMs: number,
+  log: (line: LogLine) => void,
+): Promise<Response> {
+  const tenant: Tenant | undefined = ENDPOINT_ID.test(id) ? await tenants.get(id) : undefined;
+  if (!tenant) return refuse(c, 404, 'ENDPOINT_NOT_FOUND', 'No endpoint with this id.');
+  const method = c.req.method;
+  if (!isAuthorized(method, route, c.req.header('x-api-key'), tenant.apiKey, tenant.crystalTokens)) {
+    return refuse(c, 401, 'UNAUTHORIZED', 'Missing or wrong x-api-key.');
   }
-  await next();
-});
-
-app.all('*', async (c) => {
-  let runtime: Runtime;
+  if (method === 'POST' && route === '/v0/reload') {
+    await tenants.reload(id);
+    return c.body(null, 204);
+  }
+  let runtime;
   try {
-    runtime = await boot();
+    runtime = await tenant.runtime();
   } catch (err) {
-    console.error(err);
-    return c.json({ error: { code: 'NOT_READY', message: `Runtime is not ready: ${(err as Error).message}`, retryable: true } }, 503);
+    return refuse(c, 503, 'NOT_READY', `Endpoint is not ready: ${startupErrorMessage(err)}`, true);
   }
-  const res = await runtime.app.fetch(c.req.raw);
-  // Lambda freezes the process after the response; finish store writes and reviews first (C15).
-  await Promise.race([runtime.flush(), new Promise((resolve) => setTimeout(resolve, FLUSH_LIMIT_MS).unref())]);
-  return res;
-});
+  const hasBody = method !== 'GET' && method !== 'HEAD';
+  const forwarded = new Request(new URL(`${route}${url.search}`, url.origin), {
+    method,
+    headers: c.req.raw.headers,
+    ...(hasBody ? { body: await c.req.raw.arrayBuffer() } : {}),
+  });
+  const response = await runtime.app.fetch(forwarded);
+  const flushing = runtime.flush().catch((err: unknown) => log({ endpointId: id, warning: `Flush failed: ${startupErrorMessage(err)}` }));
+  await Promise.race([flushing, sleep(flushLimitMs, undefined, { ref: false })]);
+  return response;
+}
 
+function refuse(c: Context, status: 401 | 404 | 503, code: string, message: string, retryable = false): Response {
+  return c.json({ error: { code, message, retryable } }, status);
+}
+
+/** The deployed router: settings from SSM, Crystals from S3, one QuickJS pool for every endpoint. */
+function tenantsFromEnv(env: NodeJS.ProcessEnv): TenantCache {
+  return new TenantCache({
+    ssm: new SSMClient({}),
+    crystals: new S3CrystalStore({ bucket: env.SLIME_CRYSTAL_BUCKET ?? '', client: new S3Client({}) }),
+    baseEnv: { ...env },
+    sharedPrefix: env.SLIME_SHARED_SSM_PREFIX || DEFAULT_SHARED_SSM_PREFIX,
+    maxEntries: Number(env.SLIME_TENANT_CACHE_MAX || DEFAULT_TENANT_CACHE_MAX),
+    ttlMs: Number(env.SLIME_TENANT_TTL_MS || DEFAULT_TENANT_TTL_MS),
+    runner: new QuickJSRunner(),
+  });
+}
+
+export const app = createRouter(tenantsFromEnv(process.env), { flushLimitMs: Number(process.env.SLIME_FLUSH_LIMIT_MS || DEFAULT_FLUSH_LIMIT_MS) });
 export const handler = handle(app);

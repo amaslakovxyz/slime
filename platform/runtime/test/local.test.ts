@@ -1,4 +1,4 @@
-// Local runtime additions: live feed, Lifecycle merge, Crystal's own route,
+// The endpoint's routes and parts: live feed, Lifecycle merge, Crystal's own route,
 // and the store helpers Crystallize relies on.
 import './setup.js';
 import assert from 'node:assert/strict';
@@ -6,7 +6,8 @@ import { describe, test } from 'node:test';
 import { memoryStore, type CrystalRegistry, type QueryMeta, type Slime } from '@slime-cloud/core';
 import { createApp, mergeHandlers } from '../src/app.js';
 import { RecentRequests } from '../src/events.js';
-import { storeLimitedTo, syncLiveRuns, toSavedHandler } from '../src/local.js';
+import { storeLimitedTo, toSavedHandler } from '../src/endpoint-runtime.js';
+import { syncLiveRuns } from '../src/live-runs.js';
 
 const meta = (handlerKey: string, tier: QueryMeta['tier']): QueryMeta =>
   ({ handlerKey, tier, cache: 'hit', timingsMs: { total: 3, run: 2, shape: 0 } }) as unknown as QueryMeta;
@@ -66,7 +67,7 @@ describe('mergeHandlers', () => {
   });
 });
 
-describe('local routes', () => {
+describe('endpoint routes', () => {
   const crystal = { k1: { intent: 'accounts per plan', output: [{ plan: 'string' }], review: 'none', paramTypes: { limit: 'number' } } } as unknown as CrystalRegistry;
 
   test('a Crystal answers on its own route with its fixed intent and output', async () => {
@@ -117,7 +118,7 @@ describe('local routes', () => {
     assert.deepEqual(queries, []);
   });
 
-  test('local-only routes do not exist unless their parts are given', async () => {
+  test('optional routes do not exist unless their parts are given', async () => {
     const app = createApp({ slime: fakeSlime(), connector, crystal: false });
     assert.equal((await app.request('/v0/events')).status, 404);
     assert.equal((await app.request('/v0/lifecycle')).status, 404);
@@ -140,8 +141,15 @@ describe('local routes', () => {
     const body = (await (await app.request('/v0/lifecycle')).json()) as { handlers: { key: string; tier: string; runs: number }[]; warnings: string[] };
     assert.deepEqual(body.handlers.map((h) => [h.key, h.tier, h.runs]), [['k1', 'crystal', 12], ['k2', 'gas', 2]]);
     assert.deepEqual(body.warnings, ['w1']);
+    assert.equal('instance' in body, false, 'one process serves the whole endpoint');
     await app.request('/v0/crystallize', { method: 'POST', body: JSON.stringify({ keys: ['k1', 7] }) });
     assert.deepEqual(gotKeys, ['k1']);
+  });
+
+  test('lifecycle says instance: true when the feed and Gas rows are one instance of several', async () => {
+    const app = createApp({ slime: fakeSlime(), connector, crystal: false, savedHandlers: async () => [], isPerInstance: true });
+    const body = (await (await app.request('/v0/lifecycle')).json()) as { instance?: boolean };
+    assert.equal(body.instance, true);
   });
 });
 

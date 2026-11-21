@@ -1,14 +1,22 @@
-// SlimeConfig from the runtime's environment (SSM parameters become env vars at
-// cold start, see lambda.ts). The core reads no env; this file is the mapping.
+// SlimeConfig from one endpoint's environment: the process env locally, or the
+// env object the Lambda builds per tenant (tenants.ts). The core reads no env;
+// this file is the mapping, and it reads only the env it is given.
 // Variable names are the sandbox's, so existing SSM parameters keep working.
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { SlimeConfig, type CrystalRegistry, type Generator, type LimitOptions, type Reviewer, type SlimeEvent, type TierOptions } from '@slime-cloud/core';
+import { readFileSync } from 'node:fs';
+import {
+  SlimeConfig,
+  SlimeConfigError,
+  type CrystalRegistry,
+  type Generator,
+  type LimitOptions,
+  type Reviewer,
+  type SlimeEvent,
+  type TierOptions,
+} from '@slime-cloud/core';
 import { postgresConnector } from '@slime-cloud/core/postgres';
-import { DynamoSlimeStore } from './store-dynamodb.js';
+import { DynamoSlimeStore, type DocClient } from './store-dynamodb.js';
 
-type Env = Readonly<Record<string, string | undefined>>;
+export type Env = Readonly<Record<string, string | undefined>>;
 type Effort = 'low' | 'medium' | 'high';
 
 interface Models {
@@ -16,9 +24,7 @@ interface Models {
   reviewer?: Reviewer;
 }
 
-const DEMO_DATABASE_URL = 'postgres://slime_reader:slime_reader@localhost:54329/slime';
 const DEFAULT_OFFLINE_FILE = 'offline/handlers.json';
-const CRYSTAL_INDEX = 'index.mjs';
 const MEBIBYTE = 1024 * 1024;
 const DEFAULT_MODELS = {
   claude: { generator: 'claude-haiku-5-5', reviewer: 'claude-opus-5-5' },
@@ -45,22 +51,41 @@ const TIER_VARIABLES: Readonly<Partial<Record<keyof TierOptions, string>>> = {
   fixturesPerHandler: 'FIXTURES_PER_HANDLER',
 };
 
-/** Runtime hooks that are not env settings (the Lambda entry counts generation tokens). */
-export interface RuntimeHooks {
+/** What an endpoint's config needs besides env settings. */
+export interface ConfigInputs {
+  /** Sees engine events (usage counts generation tokens; warnings reach the log and the Lifecycle tab). */
   onEvent?: (event: SlimeEvent) => void;
+  /** The endpoint's Crystals, loaded by its Crystal store (crystal-store.ts). SLIME_CRYSTAL=off ignores them. */
+  crystal?: CrystalRegistry;
+  /** Tests pass a fake DynamoDB for the handler store. */
+  storeClient?: DocClient;
 }
 
-export async function slimeConfigFromEnv(env: Env = process.env, hooks: RuntimeHooks = {}): Promise<SlimeConfig> {
+/**
+ * Throws SlimeConfigError when DATABASE_URL is missing: an endpoint never falls back to
+ * another database, so a tenant whose settings are incomplete fails closed.
+ */
+export async function slimeConfigFromEnv(env: Env, inputs: ConfigInputs = {}): Promise<SlimeConfig> {
+  if (!env.DATABASE_URL) throw new SlimeConfigError(['DATABASE_URL is not set']);
   const isLocked = env.SLIME_MODE === 'locked';
   const shapeMemoryMb = numberFrom(env.SHAPE_MEMORY_MB);
+  const maxConnections = numberFrom(env.SLIME_MAX_DB_CONNECTIONS);
+  // The store first: its constructor can throw, and a connector built before it would leak its pool.
+  const store = new DynamoSlimeStore({
+    table: env.SLIME_HANDLERS_TABLE ?? '',
+    tenantId: env.SLIME_TENANT_ID ?? '',
+    ...(inputs.storeClient ? { client: inputs.storeClient } : {}),
+  });
+  const models = isLocked ? {} : await modelsFrom(env);
+  const hasCrystals = inputs.crystal && env.SLIME_CRYSTAL !== 'off';
   return new SlimeConfig({
-    connector: postgresConnector({ url: env.DATABASE_URL || DEMO_DATABASE_URL }),
-    store: new DynamoSlimeStore({ table: env.SLIME_HANDLERS_TABLE ?? '', tenantId: env.SLIME_TENANT_ID ?? '' }),
-    ...(isLocked ? {} : await modelsFrom(env)),
-    ...(await crystalsFrom(env)),
+    connector: postgresConnector({ url: env.DATABASE_URL, ...(maxConnections ? { maxConnections } : {}) }),
+    store,
+    ...models,
+    ...(hasCrystals ? { crystal: inputs.crystal } : {}),
     tiers: numbersFrom(env, TIER_VARIABLES),
     limits: { ...numbersFrom(env, LIMIT_VARIABLES), ...(shapeMemoryMb ? { shapeMemoryBytes: shapeMemoryMb * MEBIBYTE } : {}) },
-    ...(hooks.onEvent ? { onEvent: hooks.onEvent } : {}),
+    ...(inputs.onEvent ? { onEvent: inputs.onEvent } : {}),
   });
 }
 
@@ -103,15 +128,6 @@ export function missingProviderKey(env: Env): string | undefined {
   const name = PROVIDER_KEYS[env.SLIME_PROVIDER === 'groq' ? 'groq' : 'claude'];
   if (env[name]?.trim()) return undefined;
   return `${name} is not set: saved handlers still answer, new requests cannot be generated. Set it for the runtime (locally: export it before npm run local), or switch the endpoint to Offline.`;
-}
-
-/** Crystal ships in the bundle (SLIME_CRYSTAL_DIR); SLIME_CRYSTAL=off is the kill switch. */
-async function crystalsFrom(env: Env): Promise<{ crystal?: CrystalRegistry }> {
-  if (env.SLIME_CRYSTAL === 'off' || !env.SLIME_CRYSTAL_DIR) return {};
-  const index = resolve(env.SLIME_CRYSTAL_DIR, CRYSTAL_INDEX);
-  if (!existsSync(index)) return {};
-  const { crystals } = (await import(pathToFileURL(index).href)) as { crystals: CrystalRegistry };
-  return { crystal: crystals };
 }
 
 function numbersFrom<K extends string>(env: Env, variables: Readonly<Partial<Record<K, string>>>): Partial<Record<K, number>> {

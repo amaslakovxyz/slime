@@ -1,7 +1,8 @@
 // The core saves a handler once, when it turns Liquid; later runs only count in
 // memory, while crystallize() reads runs from the store. These helpers copy the
-// live counts into the store, never lowering a saved count. Used by the local
-// entry before Crystallize and, throttled, by the Lambda entry on flush.
+// live counts into the store, never lowering a saved count. Used before every
+// Crystallize, throttled on each flush, and when an endpoint's engine closes:
+// on shutdown locally, and on eviction or replacement in the Lambda tenant cache.
 import type { SlimeStore } from '@slime-cloud/core';
 
 const HANDLERS_NS = 'handlers';

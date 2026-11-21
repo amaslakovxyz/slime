@@ -26,7 +26,9 @@ export function parseCrystalTokens(raw: string | undefined): Record<string, stri
 /**
  * The endpoint key opens every route. A Crystal's own token opens only that
  * Crystal's route (POST /v0/e/<its key>): not /v0/query, not another Crystal,
- * not the admin views.
+ * not the admin views. `path` is the endpoint's own path: the Lambda router
+ * removes `/ep/<id>` before calling this, so a token is never checked against
+ * another endpoint's prefix.
  */
 export function isAuthorized(
   method: string,

@@ -1,9 +1,11 @@
 # @slime-cloud/runtime
 
-Slime Cloud's hosted runtime: `@slime-cloud/core` running on AWS Lambda, with
-reviewed Liquid handlers in DynamoDB. Deployed by
-[`platform/infra/platform`](../infra/README.md#platform-slime-runtime) as the
-`slime-runtime` function.
+Slime Cloud's hosted runtime: `@slime-cloud/core` on AWS Lambda. One function,
+`slime-runtime`, serves every endpoint under `/ep/<endpoint id>/` on its
+Function URL, with Liquid handlers in DynamoDB and Crystals in S3. Deployed by
+[`platform/infra/platform`](../infra/README.md#platform-slime-runtime). The
+same endpoint composition runs locally, one process per endpoint, started by
+the admin's local runner.
 
 **Boundary:** this package imports the core; the core never imports this
 package or anything AWS-specific (CI checks `core/src`).
@@ -17,50 +19,94 @@ replace the `file:` path with a version; nothing else changes.
 
 | File | Role |
 |---|---|
-| [src/lambda.ts](src/lambda.ts) | Lambda entry: SSM settings at cold start (comma-separated `SLIME_SSM_PREFIX` paths, later overrides earlier), `x-api-key` auth, lazy `createSlime()` (503 `NOT_READY` and retry), a capped `flush()` (store, reviews, usage) before each response |
-| [src/config.ts](src/config.ts) | `SlimeConfig` from env, with the same variable names the sandbox runtime read |
-| [src/app.ts](src/app.ts) | HTTP routes on the core's `Slime` API (`/v0/query`, `/healthz`, `/v0/handlers`, a Crystal's own route `/v0/e/<key>`; local-only `/v0/events`, `/v0/lifecycle`, `/v0/crystallize` when their parts are given); the Crystal route refuses missing and unknown input names |
-| [src/local.ts](src/local.ts) | Local entry: the same runtime as a Node HTTP server on `PORT`, started by the admin's local runner; flushes before each response, crystallizes into `SLIME_CRYSTAL_DIR`; marks stale saved handlers; collects `warning` events for `/v0/lifecycle` (and warns when the provider's key is missing); saves live run counts before exiting on SIGTERM; prints `{"fatal": …}` as its last stderr line when it cannot start |
-| [src/events.ts](src/events.ts) | The last 50 answered requests (handler, tier, cache, ms), memory only |
+| [src/lambda.ts](src/lambda.ts) | Lambda entry: the router. `/ep/<id>/…` with `id` matching `^ep-[0-9a-f]{10}$` (else 404 before any AWS call) → tenant cache → `isAuthorized` on the path with `/ep/<id>` removed → `POST /v0/reload` itself, everything else to the endpoint's app; a capped `flush()` before each response; one JSON log line per request (`endpointId`, `requestId`, `route`, `status`, `ms`). Any other path is 401 |
+| [src/tenants.ts](src/tenants.ts) | `TenantCache`: endpoint settings from SSM (`/slime/endpoints/<id>/` over `SLIME_SHARED_SSM_PREFIX` over the Lambda env, plus `SLIME_TENANT_ID`), re-read at most once per `SLIME_TENANT_TTL_MS`; unknown ids cached as missing for the TTL; one engine build per endpoint at a time; at most `SLIME_TENANT_CACHE_MAX` engines, least recently used evicted. A change of `SLIME_API_KEY` or `CRYSTAL_TOKENS` is swapped in place; any other change (or a new Crystal manifest ETag) rebuilds the engine. Never writes `process.env` |
+| [src/endpoint-runtime.ts](src/endpoint-runtime.ts) | `endpointRuntime(env, deps)`: one endpoint's config, engine (on the shared QuickJS runner when given), usage meter, live feed, warnings, saved-handler view (stale ones marked), thresholds and Crystallize, wired into the app. `close()` flushes, saves live run counts, then closes the engine. Reads only the env it is given |
+| [src/crystal-store.ts](src/crystal-store.ts) | `CrystalStore`. `S3CrystalStore`: loads `manifest.json` and each module, drops one whose SHA-256 differs from the manifest or that fails core's `parseModule`, and serves the rest with their shape as source text (run in QuickJS, never imported); publishes new modules, then the manifest with `If-Match` (or `If-None-Match: *`), a 412 being `CrystallizeConflictError`; removes every object version under `endpoints/<id>/`. `DirCrystalStore`: the local Crystal folder, imported as before |
+| [src/config.ts](src/config.ts) | `SlimeConfig` from one endpoint's env, with the same variable names the sandbox runtime read; no `DATABASE_URL` is a `SlimeConfigError`, never a fallback database |
+| [src/app.ts](src/app.ts) | One endpoint's HTTP routes on the core's `Slime` API (table below); the Crystal route refuses missing and unknown input names |
+| [src/local.ts](src/local.ts) | Local entry: one endpoint as a Node HTTP server on `PORT`; same auth; `POST /v0/reload` is a 204 no-op (the runner restarts the process); flushes before each non-GET response; saves live run counts on SIGTERM; prints `{"fatal": …}` as its last stderr line when it cannot start |
+| [src/events.ts](src/events.ts) | The last 50 answered requests (handler, tier, cache, ms), memory only, per process |
 | [src/auth.ts](src/auth.ts) | `keyMatches` and `isAuthorized`, shared by both entries: the endpoint key opens every route; a Crystal's own token (`CRYSTAL_TOKENS`, JSON `{key: token}`) opens only `POST /v0/e/<its key>` |
-| [src/live-runs.ts](src/live-runs.ts) | Copies live Liquid run counts to the store (the core saves a handler only when it turns Liquid): before Crystallize and on shutdown locally, at most every `SLIME_RUNS_SYNC_MS` (default 60 s) on Lambda flush |
-| [src/store-dynamodb.ts](src/store-dynamodb.ts) | The core's `SlimeStore` Port on the existing table; one partition per tenant |
-| [src/usage.ts](src/usage.ts) | Daily usage counters (`USAGE#<tenant>` / `YYYY-MM-DD` in `SLIME_USAGE_TABLE`): requests and latency per tier, generations, LLM tokens, handler snapshot per tier. Set only on provisioned endpoints |
+| [src/live-runs.ts](src/live-runs.ts) | Copies live Liquid run counts to the store (the core saves a handler only when it turns Liquid): before Crystallize, when an engine closes (shutdown, eviction, replacement), and at most every `SLIME_RUNS_SYNC_MS` (default 60 s) on flush |
+| [src/store-dynamodb.ts](src/store-dynamodb.ts) | The core's `SlimeStore` Port on the existing table; one partition per endpoint |
+| [src/usage.ts](src/usage.ts) | Daily usage counters (`USAGE#<endpoint>` / `YYYY-MM-DD` in `SLIME_USAGE_TABLE`): requests and latency per tier, generations, LLM tokens, handler snapshot per tier. `USAGE_ATTRIBUTES` lists every attribute written; the runtime role's IAM condition (`platform/infra/platform/runtime.tf`) mirrors it |
 | [src/legacy-handlers.ts](src/legacy-handlers.ts), [src/migrate-cli.ts](src/migrate-cli.ts) | One-off copy of the sandbox runtime's handlers into the core's format |
-| [scripts/build.mjs](scripts/build.mjs) | Deterministic bundle into `dist/lambda/` (same source, same zip hash), copied to `dist/layer/slime/` for the Gas layer |
+| [scripts/build.mjs](scripts/build.mjs) | Deterministic bundle into `dist/lambda/` (same source, same zip hash), handler `index.handler` |
 | `offline/handlers.json` | Canned handlers for `SLIME_PROVIDER=offline` |
+
+## Routes
+
+Paths are the endpoint's own; the Lambda serves them under `/ep/<id>/`.
+
+| Route | Key | Answers |
+|---|---|---|
+| `POST /v0/query` | endpoint `slm_` | Gas, Liquid or Crystal answer |
+| `POST /v0/e/<crystal key>` | that Crystal's `slc_` token, or `slm_` | the Crystal's answer; body `{"input": {…}}` with exactly its input names |
+| `GET /healthz` | `slm_` | `{ok, database, …stats}`; 503 when the database safety check fails |
+| `GET /v0/handlers`, `DELETE /v0/handlers/<key>` | `slm_` | live handlers and Crystals; evict one |
+| `GET /v0/lifecycle` | `slm_` | saved, live and Crystal rows, thresholds, warnings; `instance: true` on Lambda, where Gas and the feed are this instance's only |
+| `GET /v0/events` | `slm_` | the recent requests feed (per process) |
+| `POST /v0/crystallize` `{keys}` | `slm_` | crystallize reports; on Lambda the Crystals go to S3 and this instance swaps its engine at once, other instances within the TTL |
+| `POST /v0/reload` | `slm_` | 204; on Lambda this instance forgets the endpoint's settings and engine, locally a no-op |
+
+Router answers on Lambda: 404 `ENDPOINT_NOT_FOUND` (malformed id, or no
+parameters under its SSM path), 401 `UNAUTHORIZED` (wrong or missing key, or
+any path outside `/ep/<id>/`, root `/healthz` included), 503 `NOT_READY` (the
+endpoint's engine cannot start, for example an unreachable database or no
+`DATABASE_URL`; the message names the cause).
 
 ## Commands
 
 ```sh
 (cd ../.. && npm ci && npm run build -w @slime-cloud/core) && npm ci
 npm run typecheck
-npm test              # no AWS, no database
-npm run build         # dist/lambda/ and dist/layer/, zipped by Terraform
+npm test              # no AWS; the tenant and Crystallize tests use the demo Postgres
+npm run build         # dist/lambda/, zipped by Terraform
 ```
+
+The demo Postgres is `examples/express`'s (`cd examples/express && npm run db:up`,
+`postgres://slime_reader:slime_reader@localhost:54329/slime`, or `DATABASE_URL`).
+Tests that need it are skipped when it is down, unless `REQUIRE_DB=1` (CI).
 
 ## Settings
 
-SSM parameters under `/slime/runtime/` become env vars at cold start
-([infra README](../infra/README.md#platform-slime-runtime)). The names
-are the sandbox runtime's, so existing parameters keep working:
+**Lambda env** (set by Terraform):
 
 | Variable | Meaning |
 |---|---|
-| `DATABASE_URL` | the read-only database user |
+| `SLIME_HANDLERS_TABLE` | Liquid handlers, one partition per endpoint |
+| `SLIME_USAGE_TABLE` | usage counters (the control table) |
+| `SLIME_CRYSTAL_BUCKET` | Crystal modules: `endpoints/<id>/crystal/manifest.json` and `<crystal key>.mjs` |
+| `SLIME_SHARED_SSM_PREFIX` | shared settings for every endpoint, for example model keys (`/slime/shared/`) |
+| `SLIME_TENANT_CACHE_MAX`, `SLIME_TENANT_TTL_MS` | engines cached per instance (8); how often settings are re-read (30000 ms) |
+| `SLIME_MAX_DB_CONNECTIONS` | Postgres pool size per endpoint (2) |
+| `SLIME_FLUSH_LIMIT_MS` | how long a response waits for background work (default 5000) |
+
+**Per endpoint**, SSM SecureStrings under `/slime/endpoints/<id>/` (written by
+the admin), or the local process env (set by the admin's runner):
+
+| Variable | Meaning |
+|---|---|
+| `DATABASE_URL` | the read-only database user; required |
+| `SLIME_API_KEY` | the endpoint key (`slm_…`) |
+| `CRYSTAL_TOKENS` | JSON `{ "<crystal key>": "slc_…" }`: each Crystal's own token for `POST /v0/e/<key>` |
 | `SLIME_PROVIDER` | `claude` (default), `groq` or `offline` |
-| `ANTHROPIC_API_KEY` / `GROQ_API_KEY` | the provider's key |
+| `ANTHROPIC_API_KEY` / `GROQ_API_KEY` | the provider's key (shared prefix on Lambda) |
 | `SLIME_MODE` | `locked`: no generation, saved and Crystal handlers only |
 | `SLIME_MODEL`, `SLIME_EFFORT` | generator model and effort |
 | `SLIME_REVIEW`, `SLIME_REVIEW_MODEL`, `SLIME_REVIEW_EFFORT` | `off` skips reviews; reviewer model and effort |
-| `SLIME_CRYSTAL_DIR`, `SLIME_CRYSTAL` | Crystal folder in the bundle (`index.mjs`); `off` turns it off |
+| `SLIME_CRYSTAL` | `off` serves no Crystals (kill switch) |
 | `MAX_GENERATIONS_PER_HOUR`, `ROW_CAP`, `STATEMENT_TIMEOUT_MS`, ... | limits and tiers (`src/config.ts` lists them) |
-| `SLIME_FLUSH_LIMIT_MS` | how long a response waits for background work (default 5000) |
-| `SLIME_HANDLERS_TABLE`, `SLIME_TENANT_ID` | set by Terraform |
-| `CRYSTAL_TOKENS` | JSON `{ "<crystal key>": "slc_…" }`: each Crystal's own token for `POST /v0/e/<key>` |
-| `PORT`, `CRYSTAL_MIN_RUNS` | local entry only (set by the admin's runner): listen port; runs a Liquid handler needs before Crystallize (default 10). With `SLIME_CRYSTAL_DIR` set, the local entry also mounts `POST /v0/crystallize` and writes Crystal modules there |
+| `CRYSTAL_MIN_RUNS` | runs a Liquid handler needs before Crystallize (default 10) |
 
-No longer read: `META_DATABASE_URL`, `SLIME_META_TABLE`, `SLIME_THINKING`.
+`SLIME_TENANT_ID` is the endpoint id: the router sets it on Lambda, the runner
+locally. Local entry only: `PORT` (listen port) and `SLIME_CRYSTAL_DIR` (the
+endpoint's Crystal folder; with it set, Crystallize writes there and the
+runner's restart loads it).
+
+No longer read: `META_DATABASE_URL`, `SLIME_META_TABLE`, `SLIME_THINKING`,
+`SLIME_SSM_PREFIX`.
 
 ## Switching a deployed runtime to the core (M7)
 
@@ -89,10 +135,19 @@ request.
 
 ## Behavior
 
-* Every route needs `x-api-key: $SLIME_API_KEY`; with no key configured, every
-  request gets 401.
-* Lambda freezes the process after each response, so the entry awaits
-  `slime.flush()` (store writes and background reviews) for up to
+* Every endpoint route needs `x-api-key`: the endpoint key, or a Crystal's own
+  token on that Crystal's route. An endpoint with no key configured refuses
+  everything.
+* Endpoints share one Lambda process: its memory (1024 MB), its QuickJS pool,
+  and the per-instance state (Gas handlers, the live feed, the hourly
+  generation cap). Each endpoint keeps its own Postgres pool of at most
+  `SLIME_MAX_DB_CONNECTIONS`. Builds and evictions log `rss`.
+* Lambda freezes the process after each response, so the router awaits the
+  endpoint's `flush()` (store writes, background reviews, usage) for up to
   `SLIME_FLUSH_LIMIT_MS`. A review still running then continues on that
   instance's next invocation; if the instance is retired, it is retried after a
   later run.
+* Crystal modules from S3 are data: checked against the manifest's SHA-256,
+  parsed and allowlisted by core, and their shape runs in QuickJS with Liquid's
+  limits. A Crystal that fails a check is dropped and shown as a Lifecycle
+  warning.
