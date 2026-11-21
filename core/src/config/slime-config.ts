@@ -1,7 +1,7 @@
 // The app passes everything core needs; core never reads process.env or .env (C4).
 import { DEFAULT_LIMITS, DEFAULT_TIERS } from './defaults.js';
 import type { CrystalRegistry, LimitOptions, SlimeEvent, SlimeMode, SlimeOptions, TierOptions } from './options.js';
-import { ALLOW_API_SOURCES, SQL_SOURCE_DEFAULT_NAME } from './source-rules.js';
+import { SQL_SOURCE_DEFAULT_NAME } from './source-rules.js';
 import { configProblems } from './validate.js';
 import { SlimeConfigError } from '../shared/errors.js';
 import type { Connector } from '../connectors/types.js';
@@ -88,10 +88,7 @@ export class SlimeConfig {
       tiers: { ...this.#options.tiers, ...overrides.tiers },
       limits: { ...this.#options.limits, ...overrides.limits },
     };
-    const options = withoutUndefined(merged) as unknown as SlimeOptions & { [ALLOW_API_SOURCES]?: boolean };
-    const isApiAllowed = (this.#options as { [ALLOW_API_SOURCES]?: boolean })[ALLOW_API_SOURCES];
-    if (isApiAllowed) options[ALLOW_API_SOURCES] = true;
-    return new SlimeConfig(options);
+    return new SlimeConfig(withoutUndefined(merged) as unknown as SlimeOptions);
   }
 }
 

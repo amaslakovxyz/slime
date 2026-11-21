@@ -2,7 +2,6 @@
 import assert from 'node:assert/strict';
 import { after, describe, test } from 'node:test';
 import { SlimeConfig, type SlimeOptions } from '../../src/config/slime-config.js';
-import { ALLOW_API_SOURCES } from '../../src/config/source-rules.js';
 import { createSlime } from '../../src/create-slime.js';
 import type { Slime } from '../../src/engine/types.js';
 import { SlimeConfigError } from '../../src/shared/errors.js';
@@ -16,7 +15,7 @@ const instances: Slime[] = [];
 after(() => Promise.all(instances.map((slime) => slime.close())));
 
 function multiSourceConfig(sources: Record<string, Source>): SlimeConfig {
-  return new SlimeConfig({ sources, store: memoryStore(), [ALLOW_API_SOURCES]: true } as unknown as SlimeOptions);
+  return new SlimeConfig({ sources, store: memoryStore() } as unknown as SlimeOptions);
 }
 
 async function startupProblems(config: SlimeConfig): Promise<readonly string[]> {

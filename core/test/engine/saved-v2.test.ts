@@ -2,7 +2,6 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import { SlimeConfig, type SlimeOptions } from '../../src/config/slime-config.js';
-import { ALLOW_API_SOURCES } from '../../src/config/source-rules.js';
 import type { SlimeEvent } from '../../src/config/options.js';
 import { createSlime } from '../../src/create-slime.js';
 import type { Slime } from '../../src/engine/types.js';
@@ -32,7 +31,7 @@ const instances: Slime[] = [];
 after(() => Promise.all(instances.map((slime) => slime.close())));
 
 async function start(sources: Record<string, Source>, store: SlimeStore, options: Record<string, unknown> = {}): Promise<Slime> {
-  const config = new SlimeConfig({ sources, store, tiers: { gasToLiquidRuns: 1 }, ...options, [ALLOW_API_SOURCES]: true } as unknown as SlimeOptions);
+  const config = new SlimeConfig({ sources, store, tiers: { gasToLiquidRuns: 1 }, ...options } as unknown as SlimeOptions);
   const slime = await createSlime(config);
   instances.push(slime);
   return slime;

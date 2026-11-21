@@ -2,7 +2,6 @@
 import assert from 'node:assert/strict';
 import { after, describe, test } from 'node:test';
 import { SlimeConfig, type SlimeOptions } from '../../src/config/slime-config.js';
-import { ALLOW_API_SOURCES } from '../../src/config/source-rules.js';
 import type { SlimeEvent } from '../../src/config/options.js';
 import { createSlime } from '../../src/create-slime.js';
 import type { Slime } from '../../src/engine/types.js';
@@ -39,7 +38,7 @@ const instances: Slime[] = [];
 after(() => Promise.all(instances.map((slime) => slime.close())));
 
 async function start(options: Record<string, unknown>, store: SlimeStore): Promise<Slime> {
-  const config = new SlimeConfig({ sources: { db: fakeConnector({ rows: [{ name: 'Acme' }, { name: 'Globex' }] }), notion: notion() }, store, tiers: { gasToLiquidRuns: 1 }, ...options, [ALLOW_API_SOURCES]: true } as unknown as SlimeOptions);
+  const config = new SlimeConfig({ sources: { db: fakeConnector({ rows: [{ name: 'Acme' }, { name: 'Globex' }] }), notion: notion() }, store, tiers: { gasToLiquidRuns: 1 }, ...options } as unknown as SlimeOptions);
   const slime = await createSlime(config);
   instances.push(slime);
   return slime;
@@ -62,6 +61,16 @@ describe('multi-source generation and meta', () => {
     assert.equal(meta.sql, 'SELECT name FROM accounts');
     const generated = events.find((event) => event.type === 'generated');
     assert.deepEqual(generated?.type === 'generated' ? generated.steps : undefined, ARTIFACT.steps);
+  });
+
+  test('a saved v2 handler records the multi-source prompt hash and per-source hashes (MS3, MS17)', async () => {
+    const store = memoryStore();
+    const slime = await start({ generator: stubGenerator(() => ARTIFACT) }, store);
+    const { meta } = await slime.query(REQUEST);
+    await slime.flush();
+    const saved = (await store.get('handlers', meta.handlerKey)) as { provenance: { promptHash: string; sourceHashes?: Record<string, string> } };
+    assert.equal(saved.provenance.promptHash, 'stub-multi-source-prompt');
+    assert.deepEqual(Object.keys(saved.provenance.sourceHashes ?? {}), ['db', 'notion']);
   });
 
   test('locked mode serves the saved v2 handler without step details in meta', async () => {

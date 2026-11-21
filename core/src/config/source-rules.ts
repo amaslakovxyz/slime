@@ -9,20 +9,12 @@ const API_SOURCE_METHODS = ['describe', 'call', 'safetyCheck', 'close'];
 const CONNECTOR_REQUIRED = 'connector is required: it tells Slime where the data comes from (or pass sources)';
 const BOTH_GIVEN = 'connector and sources are both set: pass the database connector as one of sources, or use connector alone';
 const SOURCES_NOT_OBJECT = 'sources must be an object of { name: source }, for example { db: postgresConnector(...) }';
+const GENERATOR_NOT_MULTI_SOURCE = 'generator has no multiSourcePromptHash, so it cannot write handlers for API sources; use a built-in generator or add it';
 const ONE_SQL_SOURCE = 'sources must contain exactly one SQL source (a connector); API sources go beside it';
-// MS1: removed in P3.3, once the engine and prompts can use API sources.
-const API_SOURCES_NOT_YET = 'API sources are not yet supported by this version of Slime';
-
-/**
- * Lets core's own tests configure API sources before P3.3 removes the guard.
- * A symbol key: invisible to unknown-option checks, and not exported from the package.
- */
-export const ALLOW_API_SOURCES = Symbol('allowApiSources');
-
 export interface SourceOptions {
   connector?: unknown;
   sources?: unknown;
-  [ALLOW_API_SOURCES]?: boolean;
+  generator?: unknown;
 }
 
 export function sourceProblems(options: SourceOptions): string[] {
@@ -31,7 +23,7 @@ export function sourceProblems(options: SourceOptions): string[] {
   if (connector !== undefined && sources !== undefined) return [BOTH_GIVEN];
   if (connector !== undefined) return missingMethods('connector', connector, CONNECTOR_METHODS);
   if (!isPlainObject(sources) || Object.keys(sources).length === 0) return [SOURCES_NOT_OBJECT];
-  return [...namedSourceProblems(sources), ...sourceCountProblems(sources, options[ALLOW_API_SOURCES] === true)];
+  return [...namedSourceProblems(sources), ...sourceCountProblems(sources), ...generatorProblems(sources, options.generator)];
 }
 
 export function isApiSourceShape(source: unknown): boolean {
@@ -49,11 +41,16 @@ function namedSourceProblems(sources: Record<string, unknown>): string[] {
   });
 }
 
-function sourceCountProblems(sources: Record<string, unknown>, isApiAllowed: boolean): string[] {
-  const values = Object.values(sources);
-  const sqlCount = values.filter((source) => !isApiSourceShape(source)).length;
-  const hasApi = values.some(isApiSourceShape);
-  return [...(sqlCount === 1 ? [] : [ONE_SQL_SOURCE]), ...(hasApi && !isApiAllowed ? [API_SOURCES_NOT_YET] : [])];
+function sourceCountProblems(sources: Record<string, unknown>): string[] {
+  const sqlCount = Object.values(sources).filter((source) => !isApiSourceShape(source)).length;
+  return sqlCount === 1 ? [] : [ONE_SQL_SOURCE];
+}
+
+// The generator's multi-source prompt hash is what v2 handlers record (MS3).
+function generatorProblems(sources: Record<string, unknown>, generator: unknown): string[] {
+  if (!generator || typeof generator !== 'object' || !Object.values(sources).some(isApiSourceShape)) return [];
+  const hash = (generator as { multiSourcePromptHash?: unknown }).multiSourcePromptHash;
+  return typeof hash === 'string' && hash.length > 0 ? [] : [GENERATOR_NOT_MULTI_SOURCE];
 }
 
 export function missingMethods(optionName: string, value: unknown, methods: readonly string[]): string[] {

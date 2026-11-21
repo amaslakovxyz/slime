@@ -6,7 +6,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, describe, test } from 'node:test';
 import { SlimeConfig, type SlimeOptions } from '../../src/config/slime-config.js';
-import { ALLOW_API_SOURCES } from '../../src/config/source-rules.js';
 import { postgresConnector } from '../../src/connectors/postgres/index.js';
 import { createSlime } from '../../src/create-slime.js';
 import { crystallize } from '../../src/crystallize/index.js';
@@ -44,7 +43,7 @@ after(() => Promise.all(instances.map((slime) => slime.close())));
 
 async function start(options: Record<string, unknown> & { sources?: Record<string, Source>; store?: SlimeStore }): Promise<Slime> {
   const sources = options.sources ?? { db: fakeConnector({ rows: ROWS }), notion: fakeApiSource({ operations: { 'feedback.query': feedback() } }) };
-  const config = new SlimeConfig({ store: memoryStore(), ...options, sources, [ALLOW_API_SOURCES]: true } as unknown as SlimeOptions);
+  const config = new SlimeConfig({ store: memoryStore(), ...options, sources } as unknown as SlimeOptions);
   const slime = await createSlime(config);
   instances.push(slime);
   return slime;

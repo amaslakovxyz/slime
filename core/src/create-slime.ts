@@ -42,11 +42,12 @@ async function assertSafeCredentials(connector: Connector): Promise<void> {
   throw new SlimeConfigError(report.problems.length > 0 ? report.problems : [UNSAFE_CREDENTIALS]);
 }
 
-function currentProvenance({ generator }: SlimeConfig, dictionary: Dictionary): HandlerProvenance {
+function currentProvenance(config: SlimeConfig, dictionary: Dictionary): HandlerProvenance {
+  const { generator } = config;
   return {
     schemaHash: dictionary.schemaHash,
     dictionaryHash: dictionary.hash,
-    promptHash: generator?.promptHash ?? LOCKED_MARKER,
+    promptHash: (config.hasApiSources ? generator?.multiSourcePromptHash : generator?.promptHash) ?? LOCKED_MARKER,
     model: generator?.model ?? LOCKED_MARKER,
     ...(dictionary.sourceHashes ? { sourceHashes: dictionary.sourceHashes } : {}),
   };

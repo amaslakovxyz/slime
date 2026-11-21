@@ -24,6 +24,7 @@ export function offlineGenerator(handlers: OfflineHandlers): Generator {
     model: OFFLINE_MODEL,
     // The handlers play the role of the prompt: editing them regenerates handlers in explore mode.
     promptHash: sha256(canonicalJSON([...byIntent])),
+    multiSourcePromptHash: sha256(canonicalJSON([...byIntent])),
     async generate(request): Promise<GenerationResult> {
       const artifact = byIntent.get(normalizeIntent(request.intent)) ?? MISSING_HANDLER;
       return { artifact, ...NO_USAGE };

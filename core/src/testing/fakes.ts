@@ -47,6 +47,7 @@ export function stubGenerator(artifactFor: (request: GenerationRequest) => AnyAr
   return {
     model: 'stub-model',
     promptHash: 'stub-prompt',
+    multiSourcePromptHash: 'stub-multi-source-prompt',
     get calls() {
       return calls;
     },

@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { DEFAULT_LIMITS, DEFAULT_TIERS, SlimeConfig, type SlimeOptions } from '../../src/config/slime-config.js';
-import { ALLOW_API_SOURCES } from '../../src/config/source-rules.js';
 import { SlimeConfigError } from '../../src/shared/errors.js';
 import type { Source } from '../../src/sources/types.js';
 import type { SlimeStore } from '../../src/stores/types.js';
@@ -141,7 +140,6 @@ describe('sources (MS1)', () => {
       close: async () => {},
       ...overrides,
     }) as Source;
-  const withApiAllowed = (options: Record<string, unknown>): SlimeOptions => ({ ...options, [ALLOW_API_SOURCES]: true }) as unknown as SlimeOptions;
 
   test('connector is shorthand for sources: { db: connector }', () => {
     const connector = fakeConnector();
@@ -159,26 +157,29 @@ describe('sources (MS1)', () => {
     assert.equal(config.sqlSourceName, 'warehouse');
   });
 
-  test('API sources are refused until P3.3 removes the guard', () => {
-    assert.throws(() => new SlimeConfig({ sources: { db: fakeConnector(), notion: apiSource() } }), /API sources are not yet supported/);
-  });
-
-  test('with the guard bypassed, API sources are listed beside the SQL source', () => {
-    const config = new SlimeConfig(withApiAllowed({ sources: { db: fakeConnector(), notion: apiSource(), films: apiSource() } }));
+  test('API sources are listed beside the SQL source', () => {
+    const config = new SlimeConfig({ sources: { db: fakeConnector(), notion: apiSource(), films: apiSource() } });
     assert.deepEqual(config.apiSourceNames, ['notion', 'films']);
     assert.equal(config.hasApiSources, true);
-    assert.equal(config.with({ rules: ['x'] }).hasApiSources, true, 'with() keeps the bypass');
+    assert.equal(config.with({ rules: ['x'] }).hasApiSources, true);
+  });
+
+  test('a generator without a multi-source prompt hash is refused beside API sources', () => {
+    const { multiSourcePromptHash: _hash, ...v1Only } = fakeGenerator();
+    const found = problems({ sources: { db: fakeConnector(), notion: apiSource() }, generator: v1Only });
+    assert.deepEqual(found, ['generator has no multiSourcePromptHash, so it cannot write handlers for API sources; use a built-in generator or add it']);
+    assert.doesNotThrow(() => new SlimeConfig({ connector: fakeConnector(), generator: v1Only }));
   });
 
   test('each source problem is reported', () => {
     const found = problems({ connector: fakeConnector(), sources: { db: fakeConnector() } });
     assert.deepEqual(found, ['connector and sources are both set: pass the database connector as one of sources, or use connector alone']);
-    const many = problems(withApiAllowed({ sources: { Bad: fakeConnector(), other: fakeConnector(), notion: apiSource({ call: undefined, secrets: 'x' }) } }));
+    const many = problems({ sources: { Bad: fakeConnector(), other: fakeConnector(), notion: apiSource({ call: undefined, secrets: 'x' }) } });
     assert.ok(many.some((p) => /sources\.Bad: a source name starts with a lowercase letter/.test(p)), many.join('\n'));
     assert.ok(many.some((p) => /sources\.notion is missing method call/.test(p)), many.join('\n'));
     assert.ok(many.some((p) => /sources\.notion\.secrets must be a list of strings/.test(p)), many.join('\n'));
     assert.ok(many.some((p) => /exactly one SQL source/.test(p)), many.join('\n'));
-    assert.ok(problems(withApiAllowed({ sources: { notion: apiSource() } })).some((p) => /exactly one SQL source/.test(p)));
+    assert.ok(problems({ sources: { notion: apiSource() } }).some((p) => /exactly one SQL source/.test(p)));
   });
 
   test('with({ connector }) replaces the SQL source', () => {
