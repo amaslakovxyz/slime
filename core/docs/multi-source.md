@@ -55,8 +55,9 @@ The first build targets three sources:
   It shows that a second, very different API fits the same interface with
   about 30 lines of app code.
 
-Estimated effort: **9.5–13.5 person-days** for one developer, phases P0–P6
-(§10).
+Estimated effort: **about 20 person-days (18–22)** for one developer, phases
+P0–P6 (§10), after the architect and staff-engineer reviews of the
+implementation plan.
 
 ## 1. Problem and goal
 
@@ -77,8 +78,10 @@ other.
 
 ### 1.2 Goals
 
-- G1. One Slime instance, several named sources: at most one SQL source and any
-  number of API sources.
+- G1. One Slime instance, several named sources: exactly one SQL source and any
+  number of API sources. (A setup with no SQL source would make
+  `config.connector` optional and ripple through the engine and
+  `platform/runtime`; none of the use cases needs it.)
 - G2. One handler can read from several sources and combine the results.
 - G3. API sources are described to the model in the same dictionary format as
   database tables, rendered by Slime from metadata, not written by a model
@@ -212,13 +215,14 @@ interface ApiSource {
   readonly kind: 'api';
   readonly name: string;                       // adapter name, e.g. "notion"
   readonly secrets: readonly string[];         // values core redacts from every message and event (S2)
-  describe(): Promise<ApiSchema>;              // metadata only, never rows (D1)
+  describe(options: SourceCallOptions): Promise<ApiSchema>;   // metadata only, never rows (D1)
   call(operation: string, args: Readonly<Record<string, unknown>>, options: CallOptions): Promise<RunResult>;
-  safetyCheck(): Promise<SafetyReport>;        // the token works and every listed data set is readable
+  safetyCheck(options: SourceCallOptions): Promise<SafetyReport>;  // the token works
   close(): Promise<void>;
 }
 
-interface CallOptions { timeoutMs: number; rowCap: number; signal: AbortSignal }
+interface SourceCallOptions { timeoutMs: number; signal: AbortSignal }
+interface CallOptions extends SourceCallOptions { rowCap: number }
 
 interface ApiSchema {
   service: string;                             // shown to the model like `dialect`, e.g. "Notion API 2025-09-03"
@@ -262,13 +266,15 @@ source is configured.
 
 ```jsonc
 {
+  "version": 2,
   "unsatisfiable": null,
   "steps": [
     { "name": "accounts", "source": "db",
       "sql": "SELECT a.name, sum(i.amount_cents)::int AS \"paidCents\" FROM accounts a JOIN plans p ON p.id = a.plan_id JOIN invoices i ON i.account_id = a.id AND i.status = 'paid' WHERE p.name = $1::text GROUP BY a.name",
       "params": ["plan"] },
     { "name": "feedback", "source": "notion", "operation": "feedback.query",
-      "args": { "sentiment": { "value": "negative" }, "status": { "value": "Open" } } }
+      "args": [ { "param": "sentiment", "input": null, "value": "negative" },
+                { "param": "status", "input": null, "value": "Open" } ] }
   ],
   "shapeJs": "function shape(data, input) { const open = new Map(); for (const f of data.feedback) open.set(f.account, (open.get(f.account) ?? 0) + 1); return data.accounts.map(a => ({ name: a.name, paidCents: a.paidCents, openNegative: open.get(a.name) ?? 0 })); }",
   "assumptions": ["Feedback is matched to accounts by exact account name."]
@@ -278,19 +284,34 @@ source is configured.
 - **Step kinds:**
   - A SQL step: `{ name, source, sql, params }`, exactly today's `sql` and `params`.
   - An API step: `{ name, source, operation, args }`.
-- **API step arguments.** Each argument is bound in one of two ways:
-  - `{ "input": "<input name>" }`: the value comes from the request.
-  - `{ "value": <constant> }`: a constant from the intent, for example
-    "negative". A constant must match the parameter's type and its `values`
-    list when there is one.
+- **API step arguments.** `args` is a list, one entry per bound parameter:
+  `{ "param", "input", "value" }` with exactly one of `input` and `value` set.
+  - `input`: the value comes from the request input of that name.
+  - `value`: a constant from the intent, for example "negative". A constant
+    must match the parameter's type and its `values` list when there is one.
+  - A list, not a map keyed by parameter name, because model structured output
+    (Claude) accepts only closed JSON objects.
   - The model never builds URLs, paths, headers or query strings.
-- **`shape` calling convention.** An artifact with a `steps` field is v2 and
-  gets `shape(data, input)`, where `data` is `{ [stepName]: rows[] }`. An
-  artifact without one is v1 and keeps `shape(rows, input)`.
+- **Format marker.** `"version": 2` identifies a v2 artifact. A stored artifact
+  without it is v1 and keeps `shape(rows, input)`; v2 gets
+  `shape(data, input)`, where `data` is `{ [stepName]: rows[] }`.
 - **When `shapeJs` may be null.** It is required when there is more than one
   step. With one step it may be null, as today.
-- **Crystal.** A v2 artifact whose only step is SQL is crystallized like a v1
-  artifact. Artifacts with an API step are skipped in v1 (§3.6).
+- **Single-SQL-step artifacts become v1 before they run.** When the model
+  returns a v2 artifact whose only step is SQL, the engine converts it to v1
+  before the first run, so the stored code is the code that ran. The model's
+  function is nested, not renamed:
+  `function shape(rows, input) { <model's function shape(data, input) …> return shape({ <step>: rows }, input); }`.
+  The inner declaration shadows the outer one, which the Crystal allowlist
+  accepts. Everything after that (execution, meta, review, Crystal) sees a v1
+  handler. Every stored v2 artifact therefore has at least one API step, and
+  those are skipped by Crystal in v1 (§3.6).
+- **Saved handlers are checked against today's sources.** Each time a v2
+  handler is loaded, and once at startup in locked mode, the step lint (§3.5)
+  runs against the current sources and schemas. A handler that fails it (a
+  removed source, a renamed Notion property or option) is not served: explore
+  mode regenerates it, locked mode answers `HANDLER_NOT_FOUND` with the reason,
+  and startup lists such handlers in one warning.
 - **Storage.** Handlers stay in the same store, keyed by the same request key.
   A stored v2 handler holds names, SQL text, argument bindings and code. It
   never holds credentials or row data, so `.slime/` stays safe to commit.
@@ -352,52 +373,76 @@ Rules: ...
   output. A schema change in any source changes it, so explore mode
   regenerates handlers and locked mode warns (§2). The source's data never
   enters the hash or the request key, so a new Notion row regenerates nothing.
+  Provenance also records one hash per source (`sourceHashes`, an additive
+  field). Crystal's schema warning compares only the SQL source's hash, so
+  adding an API source or editing a Notion option doesn't flag every Crystal
+  handler.
 
 ### 3.5 Generation, lint and execution
 
 **Generation.** The flow does not change: generate, lint, check, run, repair.
 - The generation prompt learns about steps, operations and `shape(data, input)`.
 - The model sees the dictionary, the intent, input names and types, and the
-  output shape. Rows are never put in the prompt. A failed attempt's error text
-  goes back to the model for repair and can contain values from rows or input,
-  as it does today (`generate.ts`, `quickjs-runner.ts`). Source errors are
-  redacted (S2) and final, so they never reach the repair prompt.
+  output shape. Rows are never put in the prompt.
+- Repair errors differ by format. For v1 (no API source configured) a failed
+  attempt's error text goes back to the model as it does today, and can
+  contain values (`request/shape.ts`, `quickjs-runner.ts`, `generate.ts`). For
+  v2, the repair message carries only the error code, the failing paths and the
+  expected and actual types, never values. Text written in Notion by outside
+  customers therefore cannot reach the model through repair. Source errors are
+  redacted (S2) and final, so they never reach the repair prompt either.
 
 **Lint.** Model-free and deterministic. It adds these checks to today's SQL lint:
 - Step names are unique identifiers.
 - Each step's source exists and is of the right kind.
 - The operation exists, and its arguments name declared parameters.
-- Every `input` binding names an input key, and the input's type matches the
-  parameter's type (the existing parameter type checks); a mismatch is
-  `INVALID_REQUEST`.
+- Every `input` binding names an input key.
+- Each `args` entry sets exactly one of `input` and `value`.
 - Constants match the parameter's type and `values`.
 - No input value appears hard-coded in a constant. Today's hard-coded-value
   rule covers constants too.
 - `shapeJs` is present when there is more than one step.
-- There are at most `maxSteps` steps (the only new limit, default 4).
+- There are at most `maxSteps` steps (new limit, default 4).
 - SQL steps also go through today's SQL lint.
 
+The same lint runs when a saved v2 handler is loaded (§3.3).
+
 **Check.** SQL steps go through `connector.check` (cost), as today. API steps
-have no cost estimate. Each step is bounded by existing limits: `rowCap` rows
-and `statementTimeoutMs` time (API calls use it as their timeout). The combined
-data is bounded by `shapeMemoryBytes` in the sandbox.
+have no cost estimate. Each SQL step is bounded by `rowCap` and
+`statementTimeoutMs`, as today. Each API step is bounded by `rowCap` and a new
+`apiTimeoutMs` (default 10 s); 2 s would not fit Notion pagination and one
+`Retry-After` wait. The combined data is bounded by `shapeMemoryBytes` in the
+sandbox.
 
 **Execution.**
-1. All steps run in parallel under one deadline. If an API step fails, the
-   other API steps get an aborted `AbortSignal`. A running SQL step is not
-   cancelled (`Connector.run` takes no signal); its result is discarded.
-2. Rows must be plain JSON to cross into the sandbox, as today. Adapter
-   correctness is covered by the contract suite (T2), not a runtime check.
-3. Timeouts, 429s after retry, and 5xx become `SOURCE_ERROR`: HTTP 502,
-   `retryable: true` (a hint to the caller of the HTTP endpoint), and final
-   during generation (added to `FINAL_CODES`), because the model can't fix an
-   outage. There is no partial data.
-4. If any step is truncated and the handler has more than one step, the run
-   fails with `QUERY_TOO_LARGE` (HTTP 422, not retryable, final). `rowCap` is
-   therefore the largest data set one step may read in v1. A single-step
-   handler keeps today's behaviour: rows are cut and `meta.truncated` is true.
-5. `shape` runs, then today's output validation and the R6 limit check.
-6. In explore mode, `meta.steps` lists each step's source, row count and time.
+1. Every run checks each input value bound to an API parameter against the
+   parameter's type, not only the first run; a mismatch, or a list bound to a
+   scalar, is `INVALID_REQUEST`.
+2. All steps start in parallel under one deadline (the larger of the two
+   timeouts). Any failing step aborts the API steps through a shared
+   `AbortSignal`; a running SQL step is not cancelled (`Connector.run` takes no
+   signal) and its result is discarded. When several steps fail, the first
+   failure that is not an abort is reported.
+3. API rows must be plain JSON; a bigint, function, symbol or undefined is a
+   source contract failure. SQL rows keep today's handling (`Date` objects from
+   pg become ISO strings in `JSON.stringify`).
+4. Errors are classified once, at the source boundary:
+   - a SQL failure stays `QUERY_ERROR`, repairable, as today;
+   - an API 429, 5xx or timeout becomes `SOURCE_ERROR` (502, `retryable: true`);
+   - any other API 4xx becomes `SOURCE_ERROR` with `retryable: false`;
+   - `SOURCE_ERROR` is final during generation (added to `FINAL_CODES`),
+     because the model can't fix an outage; its details carry the source, the
+     operation, the HTTP status and the attempt count, never secrets.
+   There is no partial data.
+5. If any step is truncated and the handler has more than one step, the run
+   fails with `QUERY_TOO_LARGE` (HTTP 422, not retryable). During generation
+   it is repairable: the model can add a filter. `rowCap` is therefore the
+   largest data set one step may read in v1. A single-step handler keeps
+   today's behaviour: rows are cut and `meta.truncated` is true.
+6. `shape` runs, then today's output validation and the R6 limit check.
+7. `timingsMs.run` is the wall time of all steps. In explore mode, `meta.steps`
+   lists each step's name, source, operation and arguments (API steps), SQL
+   (SQL steps), row count and time.
 
 **Rules the design keeps.**
 - No model-chosen URLs, hosts, paths or headers: only declared operations with
@@ -413,8 +458,8 @@ data is bounded by `shapeMemoryBytes` in the sandbox.
 | Gas | Unchanged: cached in memory after its first successful run. |
 | Review | Unchanged loop. The review prompt shows the steps. |
 | Liquid | Unchanged rule (`lifecycle.ts`): enough successful runs, plus approval when a reviewer is set. |
-| Locked | Serves saved v2 handlers like any other. Adapters still run, so sources must be reachable. |
-| Crystal | v1: handlers with an API step are skipped and reported; a single-SQL-step v2 handler is crystallized as today. P7 adds a module format for API steps with record-and-replay equivalence. |
+| Locked | Serves saved v2 handlers that pass the step lint against today's sources (§3.3). Adapters still run, so sources must be reachable. |
+| Crystal | v1: handlers with an API step are skipped and reported. Single-SQL-step handlers were stored as v1 (§3.3) and crystallize as today. P7 adds a module format for API steps with record-and-replay equivalence. |
 
 ### 3.7 Alternatives considered
 
@@ -461,18 +506,24 @@ export const ghibliFilms = defineApiSource({
 
 `run` gets a constrained `http` client, not global `fetch`. The client is
 where §5's transport rules are enforced once, for every adapter:
-- It only reaches `baseUrl`.
-- It encodes query values, and validates path segments against a pattern.
-- It refuses redirects to other origins.
-- It applies the step timeout and `signal`, a response-size cap and JSON parsing.
-- It retries a 429 after `Retry-After` while the timeout allows.
-- It turns failures into redacted `SourceError`s.
+- It only reaches `baseUrl`. A path must start with one `/`, must not contain
+  `//` or `..`, and is appended to `baseUrl` (keeping any path prefix); after
+  building the URL the client checks that its origin equals `baseUrl`'s.
+- It encodes query values.
+- It follows at most 3 same-origin redirects and refuses any redirect to
+  another origin.
+- It applies one deadline (`apiTimeoutMs`) and the `signal` to all attempts,
+  caps the response at 10 MB while reading the stream, and parses JSON.
+- It retries a 429 after `Retry-After` while the deadline allows.
+- It turns failures into `SourceError`s whose messages are redacted. Every
+  header value it sends is added to the source's secrets automatically.
 
-The timeout, abort and `Retry-After` handling already exist inline in
-`core/src/models/groq/groq-client.ts`; P4 extracts them into a shared helper
-that both use, instead of writing them again. An adapter that needs more
-(custom auth, a POST body) gets options on the client: headers, method and
-body. There is no raw `fetch` (Q8).
+The retry helper is new and small (`core/src/sources/api/retry.ts`), with one
+deadline for all attempts. The Groq client keeps its own retry logic: it
+reports provider wait time and classifies retries from the response body,
+which a shared helper would change. An adapter that needs more (custom auth, a
+POST body) gets options on the client: headers, method and body. There is no
+raw `fetch` (Q8).
 
 The Ghibli API was chosen because:
 - it needs no key;
@@ -504,6 +555,7 @@ notionSource({
   dataSources: { feedback: '<data_source_id>', movieNights: '<data_source_id>' },
   exclude: { feedback: ['Internal notes'] }, // optional: properties never exposed
   comments: { feedback: { account: 'matches db.accounts.name' } }, // optional join hints
+  useNotionDescriptions: false,             // optional: property descriptions as comments
 })
 ```
 The `dataSources` map is the allowlist and plays the role of a GRANT.
@@ -514,10 +566,15 @@ The `dataSources` map is the allowlist and plays the role of a GRANT.
 **`describe()`: the dictionary builds itself.** At startup it calls
 `GET /v1/data_sources/{id}` for each listed data source and maps properties to
 columns, the way the Postgres connector reads the catalog. Nothing is written
-by hand except the optional `exclude` and `comments`. If Notion returns a
-property description, it becomes the column comment; a `comments` entry
-overrides it. (Whether the data source endpoint returns property descriptions
-is to be confirmed in P5.)
+by hand except the optional `exclude` and `comments`. With
+`useNotionDescriptions: true`, a property description becomes the column
+comment; a `comments` entry overrides it. (Whether the data source endpoint
+returns property descriptions is to be confirmed in P5.)
+
+Everything taken from Notion's metadata (property names, option labels,
+descriptions, the data source title) is written by Notion users, so before it
+enters the dictionary it is made single-line, stripped of control characters
+and cut at 200 characters.
 
 | Notion property | Column type | Notes |
 |---|---|---|
@@ -535,8 +592,10 @@ Every Notion column is nullable, because any cell can be empty. Every row also
 gets `id` (the page id), not null, as its primary key.
 
 **Column names.** The property name converted to camelCase ASCII
-(`Created date` → `createdDate`). If two properties map to the same name, the
-later one in Notion's property order gets a numeric suffix (`createdDate2`), so
+(`Created date` → `createdDate`). A name with no ASCII letters becomes
+`property<N>`, a name starting with a digit gets a `p` prefix, and `id` is
+reserved for the page id. If two properties map to the same name, the later
+one in Notion's property order gets a numeric suffix (`createdDate2`), so
 startup never needs a person.
 
 **Operations.** One per data source: `<alias>.query`. Parameters are generated
@@ -550,15 +609,18 @@ language is the alternative (Q5).
 
 **`call()`.** It sends `POST /v1/data_sources/{id}/query` and handles
 Notion's limits:
-- **Pagination:** follows `start_cursor` until the end or `rowCap`.
-- **Rate limit:** a 429 is retried after `Retry-After` while the step timeout
-  allows.
+- **Pagination:** `page_size` 100, follows `next_cursor` until the end or
+  `rowCap`; `truncated` is set when `rowCap` rows were read and `has_more` is
+  still true.
+- **Rate limit:** at most 2 requests in flight per Notion source; a 429 is
+  retried after `Retry-After` while `apiTimeoutMs` allows.
 - **Large results:** a page with `request_status` `incomplete` (Notion's
   10,000-result cap) sets `truncated`.
 
 **`safetyCheck()`.**
-- The token is valid.
-- Every listed data source can be retrieved.
+- One call, `GET /v1/users/me`: the token is valid; its bot name becomes
+  `SafetyReport.user`. A data source that can't be read fails `describe()`, so
+  startup makes N+1 calls in total, not 2N+1.
 - The token itself can write if the integration has write capabilities. Slime
   stays read-only because the adapter calls only read endpoints, and the
   integration should have only "Read content". Setting that is a documented
@@ -571,7 +633,8 @@ creates two data sources and prints their ids for `.env`. Slime's own token
 stays read-only.
 - **Customer feedback:** about 40 entries. Fields: Title; Account (rich text,
   real account names from the demo database); Sentiment (select); Status
-  (status); Area (multi-select); Created (date).
+  (status, or select if the API can't create status properties); Area
+  (multi-select); Created (date).
 - **Movie nights:** about 15 entries. Fields: Film (title, matching Ghibli
   film titles); Host (select); Date (date); Rating (number).
 
@@ -616,29 +679,33 @@ around them. That is what the rules below are for.
 
 | # | Threat | Rule | Test |
 |---|---|---|---|
-| S1 | **The model steers a request to another host** (SSRF). If an argument can shape the URL, the adapter sends its `Authorization` header to an attacker's server. | Base URL fixed per source. Arguments only as encoded query or body values; path segments validated against a pattern. Cross-origin redirects refused. No URL, host or path parameters. | Input values with `../`, `?`, `#` and full URLs reach the fixture stub encoded, on the same host. A redirect to another origin fails. |
-| S2 | **Secrets in error text.** HTTP client errors often carry request headers or URLs. Error text reaches the HTTP response (`SlimeError` JSON), `onEvent` logs, and the repair prompt sent to the model provider. | Adapters throw `SourceError(status, safeMessage)` with no headers and no raw body. Core redacts each source's `secrets` from every message and event. | The token never appears in a `QueryResult`, `SlimeError.toJSON()`, an `onEvent` payload, a store file, or a prompt captured by a spy generator. |
+| S1 | **The model steers a request to another host** (SSRF). If an argument can shape the URL, the adapter sends its `Authorization` header to an attacker's server. | Base URL fixed per source. Arguments only as encoded query or body values. Paths start with one `/` and contain no `//` or `..`; the built URL's origin must equal the base URL's. Cross-origin redirects refused. No URL, host or path parameters. | Query values with `../`, `?`, `#` and full URLs are encoded and keep the host. Paths `//evil.example/x` and `/a/../b` are refused. A redirect to another origin fails. |
+| S2 | **Secrets in error text.** HTTP client errors often carry request headers or URLs. Error text reaches the HTTP response (`SlimeError` JSON), startup errors (which `platform/runtime` returns in its 503 body), `onEvent` logs, and the repair prompt sent to the model provider. | Adapters throw `SourceError(status, safeMessage)` with no headers and no raw body. The engine calls every source method (`describe`, `safetyCheck`, `call`, `close`) through one wrapper that redacts the source's `secrets` and wraps the error. The constrained client adds every header value it sends to `secrets`. | The token never appears in a `QueryResult`, `SlimeError.toJSON()`, a startup `SlimeConfigError`, an `onEvent` payload, a store file, or a prompt captured by a spy generator. |
 | S3 | **Crystal runs `shape` in-process.** The allowlist is the only wall between model code and `process.env`. | v1: no Crystal for handlers with API steps. Keep the allowlist tests. | Crystallize skips handlers with API steps and reports them. |
-| S4 | **Non-JSON objects reach the sandbox** (adapter objects, functions, response objects with headers). | `ShapeJob` carries only `JSON.stringify`-able rows. | A row with a function or bigint is rejected before the sandbox. |
+| S4 | **Non-JSON objects reach the sandbox** (adapter objects, functions, response objects with headers). | API rows are checked before they cross: a bigint, function, symbol or undefined is refused. SQL rows keep today's handling. | An API row with a function or bigint is refused; a SQL row with a `Date` still works. |
 | S5 | **Secrets in the environment** widen the damage of any future bug that reads it. On Lambda, `platform/runtime/src/lambda.ts:30-42` (the Lambda wrapper for Slime Cloud) loads every SSM parameter into `process.env`. | Pass each secret straight to its adapter. Separate follow-up in `platform/runtime`, outside this plan: load only what the runtime needs. | Runtime review item. |
 | S6 | **Too much data visible** (a data leak, not a secret leak). | Least privilege per source acts as the GRANT. Postgres: read-only user, as today. Notion: "Read content" only, integration shared only with the listed data sources; Slime exposes only `dataSources` minus `exclude`. `people` properties excluded. | Safety check fails if a listed data source is unreadable. Dictionary snapshot test shows no excluded properties. |
 | S7 | **An open explore endpoint.** `POST /slime` in explore mode lets anyone generate queries over everything all sources can read, and spend Notion quota. | R8: explore only in development; locked in production. R11: identity-bound values come from the server. Document this in the example. | Example README states it. A locked-mode test shows no generation. |
-| S8 | **Prompt injection through data or metadata.** Notion page text, property names and option labels are written by Notion users. | Rows are never put in prompts. Source errors are final and redacted, so they never reach the repair prompt. Property names and option labels do reach the dictionary: only people the integration's pages are shared with can edit them, and every generated handler still passes lint and review. | Spy generator: no seeded row text appears in any prompt. |
-| S9 | **Resource abuse** (quota, memory, time). | `maxSteps`, the existing `rowCap` and `statementTimeoutMs` per step, the QuickJS memory cap. | Cap tests with a fake source. |
+| S8 | **Prompt injection through data or metadata.** Notion page text, property names and option labels are written by Notion users, including outside customers. | Rows are never put in prompts. For v2, repair messages carry codes, paths and types, never values (§3.5). Source errors are final and redacted. Notion metadata is made single-line, stripped of control characters and cut at 200 characters before it enters the dictionary; Notion property descriptions are off by default. Every generated handler still passes lint and review. | A spy generator records every prompt while a first attempt is forced to fail over the Notion fixtures, so the repair path runs; no seeded row text appears in any prompt. |
+| S9 | **Resource abuse** (quota, memory, time). | `maxSteps`, `rowCap` per step, `statementTimeoutMs` for SQL steps, `apiTimeoutMs` for API steps, at most 2 in-flight Notion requests per source, the QuickJS memory cap. | Cap tests with a fake source. |
 | S10 | **Writes.** | API adapters expose only read operations. Notion's adapter calls only `GET` and the query `POST`. | The fixture stub fails the test on any other method or path. |
 
 ## 6. Risks and limits
 
 - Notion allows about 3 query requests per second per integration token, shared
   by every Slime instance using it. With 100-row pages, a 1,000-row step takes
-  about 4 seconds; heavy traffic gets 429s and then `SOURCE_ERROR`.
+  about 4 seconds, inside the 10-second `apiTimeoutMs`; heavy traffic gets 429s
+  and then `SOURCE_ERROR`.
 - `rowCap` bounds every step. A multi-step handler over a larger data set fails
   with `QUERY_TOO_LARGE` instead of answering wrongly.
-- Startup needs every source reachable (Q6). A Notion outage stops the app from
-  starting, including Lambda cold starts.
+- Startup needs every source reachable, in explore and locked mode alike (Q6).
+  A Notion outage stops the app from starting, including Lambda cold starts,
+  where `platform/runtime` retries startup on each request; Notion startup
+  costs N+1 calls (one per data source plus one identity check).
 - The Notion schema is read at every start. An edit in Notion (a new property,
   a renamed option) changes `schemaHash`: explore mode regenerates every
-  handler; locked mode keeps serving and warns.
+  handler; locked mode keeps serving the handlers that still pass the step
+  lint and stops serving the rest (§3.3).
 - Changing the prompts regenerates explore-mode handlers once, which matters
   for a demo prepared in explore mode.
 - People properties are personal data and stay excluded.
@@ -651,11 +718,11 @@ opt-in.
 | Layer | What | Runs in |
 |---|---|---|
 | T1 Unit | v2 handler parsing and lint (every rule in §3.5); dictionary rendering and `schemaHash` for API sources (deterministic, data-independent); with no API source, dictionary text and `schemaHash` byte-identical to today; the `shape(data, input)` convention; **v1 compatibility**: two v1 handlers committed under `core/test/fixtures/v1-handlers/` load and run unchanged; redaction. | CI |
-| T2 Source contract | An `apiSourceContract(source, fixtures)` suite, like `core/src/testing/connector-contract.ts`. Run against `fakeApiSource`, the Notion adapter and the Ghibli adapter over recorded fixtures. Cases: `describe` is valid and stable; rows match declared types; null params add no filter; `rowCap` sets `truncated`; abort and timeout are honoured; 429 is retried within the timeout, then `SOURCE_ERROR`; no secret in any error; unknown operations or params are rejected; only allowed method and path pairs are called. | CI |
-| T3 HTTP fixtures | A fixture stub inside the constrained client replays recorded JSON, so no server process is needed. Fixtures live in `core/test/fixtures/<source>/`. `npm run record:fixtures -- <source>` records one source at a time (Ghibli needs no token; Notion needs `NOTION_TOKEN`), scrubs tokens and ids, and the fixtures are committed. | CI (replay); manual (record) |
-| T4 Engine integration | Postgres demo database (already a CI service) plus `fakeApiSource`, then the Notion and Ghibli fixtures, with the offline generator (a stub generator that returns pre-written handlers) holding v2 handlers. Cases: <br>• the combined query returns the expected output; <br>• repeated runs promote it to liquid, with and without a stub reviewer; <br>• locked mode serves a saved v2 handler; <br>• a Notion schema change changes `schemaHash` (explore regenerates, locked warns); <br>• one source down gives a retryable `SOURCE_ERROR` and no partial data; <br>• a truncated step in a two-step handler fails with `QUERY_TOO_LARGE`; <br>• a single-SQL-step v2 handler is crystallized. | CI |
+| T2 Source contract | A `describeApiSourceContract(options)` suite, like `core/src/testing/connector-contract.ts`. Run against `fakeApiSource`, the Notion adapter and the Ghibli adapter over recorded fixtures. Cases: `describe` is valid and stable; rows match declared types; null params add no filter; `rowCap` sets `truncated`; abort and timeout are honoured; 429 is retried within the timeout, then `SOURCE_ERROR`; no secret in any error; unknown operations or params are rejected; only allowed method and path pairs are called. | CI |
+| T3 HTTP fixtures | A fixture `fetch` passed to the constrained client replays recorded JSON, so no server process is needed. Ghibli fixtures are hand-curated (public data). Notion adapter tests first run on hand-written fixtures; a small Notion recorder then records the demo scenario. It scrubs by allowlist (only the fields the adapter reads are kept) and maps real ids to stable placeholder UUIDs in requests and responses alike, so request keys still match. Fixtures are reviewed in the pull request. | CI (replay); manual (record) |
+| T4 Engine integration | Postgres demo database (already a CI service) plus `fakeApiSource`, then the Notion and Ghibli fixtures, with a stub generator that returns pre-written handlers. Cases: <br>• the combined query returns the expected output; <br>• repeated runs promote it to liquid, with and without a stub reviewer; <br>• locked mode serves a saved v2 handler; <br>• locked mode refuses a saved v2 handler whose source was removed or whose Notion property was renamed, and startup lists it; <br>• a Notion schema change changes `schemaHash` (explore regenerates, locked warns); <br>• one source down gives a retryable `SOURCE_ERROR` and no partial data; <br>• a truncated step in a two-step handler fails with `QUERY_TOO_LARGE`; <br>• a single-SQL-step v2 artifact is stored as v1, gives the same result and crystallizes. | CI |
 | T5 Security | The tests in §5.2's last column, plus the existing sandbox isolation tests. | CI |
-| T6 Live | `LIVE=1` with `NOTION_TOKEN` and `GROQ_API_KEY` (or `ANTHROPIC_API_KEY`). Seed Notion, run the three demo intents (§8) against real Notion, Ghibli and a real model. Check the output shape, non-empty results, and promotion after N runs. Add the intents as bench cases in `core/bench/`. | manual / nightly |
+| T6 Live | A manual script with `NOTION_TOKEN` and `GROQ_API_KEY` (or `ANTHROPIC_API_KEY`), outside the `npm test` glob. Seed Notion, run the three demo intents (§8) against real Notion, Ghibli and a real model. Check the output shape, non-empty results, and promotion after N runs. Results go into the pull request. | manual |
 | T7 Example smoke | `examples/multi-source`: start it, `curl POST /slime` with the demo intents against the fixtures. | CI (new job) |
 
 ## 8. Demo scenario
@@ -683,45 +750,52 @@ known so far.
 
 | Area | Change | Files |
 |---|---|---|
-| Ports | `ApiSource`, `OperationInfo`, `ParamInfo`, `CallOptions`, `SourceError`; optional `kind` on `Connector` | `core/src/sources/types.ts`, `core/src/connectors/types.ts` |
-| Config | `sources`, `maxSteps`; `connector` as shorthand; validation of source names | `core/src/config/*` |
-| Startup | `describe()` and `safetyCheck()` over every source | `core/src/create-slime.ts` |
-| Dictionary | Render API sources; `schemaHash` over every source | `core/src/dictionary/dictionary.ts` |
-| Handler | `Artifact` v2 with steps; v1 read path | `core/src/models/types.ts`, `core/src/engine/types.ts` |
-| Errors | `SOURCE_ERROR`, `QUERY_TOO_LARGE`; `FINAL_CODES` | `core/src/shared/errors.ts`, `core/src/engine/generate.ts` |
+| Ports | `ApiSource`, `OperationInfo`, `ParamInfo`, `SourceCallOptions`, `CallOptions`, `SourceError`; optional `kind` on `Connector` | `core/src/sources/types.ts`, `core/src/connectors/types.ts` |
+| Config | `sources` (exactly one SQL source), `maxSteps`, `apiTimeoutMs`; `connector` as shorthand; validation of source names | `core/src/config/*` |
+| Startup | `describe()` and `safetyCheck()` over every source through the redacting wrapper; locked-mode check of saved v2 handlers | `core/src/create-slime.ts`, `core/src/sources/call-source.ts` |
+| Dictionary | Render API sources; `schemaHash` over every source; per-source hashes in provenance | `core/src/dictionary/dictionary.ts`, `core/src/request/key.ts` |
+| Handler | `Artifact` v2 with steps; single-SQL-step normalization; saved-handler lint on load | `core/src/models/types.ts`, `core/src/engine/types.ts`, `core/src/engine/handler-cache.ts` |
+| Errors | `SOURCE_ERROR`, `QUERY_TOO_LARGE`; `FINAL_CODES`; value-free v2 repair messages | `core/src/shared/errors.ts`, `core/src/engine/generate.ts`, `core/src/request/shape.ts` |
 | Lint | Step rules (§3.5) | `core/src/engine/checks/*` |
-| Execution | Parallel steps, deadline, abort for API steps, truncation rule, redaction, `meta.steps`, `shape(data, input)` | `core/src/engine/execute.ts`, `generate.ts`, `slime-engine.ts`, `meta.ts` |
-| Sandbox | `ShapeJob` carries `rows` (v1) or `data` (v2) | `core/src/sandbox/types.ts`, `core/src/sandbox/quickjs/quickjs-runner.ts` |
-| Models | Generation and review prompts for steps; JSON reply format and schema; offline generator accepts v2 | `core/src/models/prompts.ts`, `roles.ts`, `offline/` |
-| Crystal | Skip handlers with API steps, with an event; crystallize single-SQL-step v2 handlers | `core/src/crystallize/crystallize.ts` |
-| HTTP | Shared timeout, abort and `Retry-After` helper extracted from `groq-client.ts`; constrained client | `core/src/shared/http.ts`, `core/src/models/groq/groq-client.ts`, `core/src/sources/api/*` |
+| Execution | Parallel steps, deadline, abort on any failure, input type check per run, truncation rule, `meta.steps`, `shape(data, input)` | `core/src/engine/execute.ts`, `generate.ts`, `slime-engine.ts` (split), `meta.ts`, `events.ts` |
+| Sandbox | The first `shape` argument may be an object of step rows; API rows checked for plain JSON | `core/src/sandbox/types.ts`, `core/src/sandbox/quickjs/quickjs-runner.ts` |
+| Models | Generation and review prompts for steps (in a new file); JSON reply format and schema; offline generator accepts v2 | `core/src/models/prompts-multi-source.ts`, `roles.ts`, `schemas.ts`, `offline/` |
+| Crystal | Skip handlers with API steps, with a `skipped` outcome | `core/src/crystallize/crystallize.ts` |
+| HTTP | New deadline retry helper; constrained client. `groq-client.ts` is not touched. | `core/src/sources/api/*` |
 | Adapters | `defineApiSource`; `notion/` subpath and its export | `core/src/sources/api/*`, `core/src/sources/notion/*`, `core/package.json` |
 | Testing | `fakeApiSource`, `apiSourceContract`, fixture stub, fixtures | `core/src/testing/*`, `core/test/**`, `core/test/package.test.ts` (new export) |
 | CI | Job for `examples/multi-source` | `.github/workflows/ci.yml` |
 | Example | `examples/multi-source` with the Ghibli source and seed script | new |
 | Docs | This document; `core/PLAN.md` (C12, new decisions); `core/docs/request-format.md` (`meta.steps`, new error codes); `docs/product/concepts_brief.md` (non-goal); READMEs | |
 
-**Public types that change:** `SlimeConfig` options (`sources`, `maxSteps`),
-`Connector.kind` (optional), `ShapeJob`, `QueryMeta.steps`, the error code
-union. Tests that pin today's prompt text or hashes change only for setups with
-an API source, because of the compatibility rule.
+**Public types that change:** `SlimeConfig` options (`sources`, `maxSteps`,
+`apiTimeoutMs`), `Connector.kind` (optional), `ShapeJob`, `QueryMeta.steps`,
+`GeneratedEvent.steps`, `HandlerRecord.artifact`, `ReviewRequest.artifact`
+(custom reviewers that read `.sql` must handle v2), `HandlerProvenance`
+(additive `sourceHashes`), `Generator.multiSourcePromptHash` (optional), the
+error code union. `config.connector` stays a required `Connector`. Tests that
+pin today's prompt text or hashes change only for setups with an API source,
+because of the compatibility rule.
 
 ## 10. High-level plan
 
+The step-by-step version is
+[multi-source-implementation.md](./multi-source-implementation.md).
+
 | Phase | Goal | Exit criteria | Effort |
 |---|---|---|---|
-| **P0** Decide and spike | Review this document; settle §11; amend `core/PLAN.md` C12 and `concepts_brief.md`. Half-day spike: hand-write the dictionary for `db` + one API source and check that the model returns a valid two-step handler for the demo intents. | Each §11 question marked Decided or Open with an owner; a `core/PLAN.md` diff adding decision IDs MS1–MSn (one per decided question and per rule in §3.5 and §3.6); spike result recorded. | 1 d |
-| **P1** Sources and dictionary | `sources` config with `connector` shorthand; optional `kind`; `ApiSource` port; `fakeApiSource` (in-memory, `core/src/testing`); dictionary renders API sources; `schemaHash` over all sources | Dictionary tests updated for API sources; with no API source, dictionary text and `schemaHash` byte-identical to today; all other existing tests pass unchanged | 1–1.5 d |
-| **P2** Handler v2 and execution | Steps, lint, parallel execution, truncation rule, `SOURCE_ERROR`, redaction, `shape(data, input)`, `meta.steps`; v1 compatibility; Crystal skip and single-SQL-step crystallization; v1 handler fixtures | T1 and the `fakeApiSource` subset of T4 pass; v1 handlers still run; S3, S4, S9 tests pass | 2–3 d |
-| **P3** Models | Prompts, reply schemas and the offline generator for v2 | Offline v2 generation works; one live generation of a two-source handler against `db` + `fakeApiSource` | 1–1.5 d |
-| **P4** Generic API source | Shared HTTP helper, constrained client, `defineApiSource`, `apiSourceContract`, fixture stub; the Ghibli source and its fixtures | T2 passes for `fakeApiSource` and Ghibli; S1, S2, S10 tests pass | 1–1.5 d |
-| **P5** Notion | `@slime-cloud/core/notion` and its export: describe mapping, column names, filter compilation, pagination, safety check; seed script; recorded fixtures | T2 passes for Notion; S6, S8 tests pass; recording works against a real workspace | 2–3 d |
-| **P6** Example, tests, docs | `examples/multi-source` and its CI job; T4 with the Notion and Ghibli fixtures, T5, T7 in CI; T6 live run; docs | All CI layers green; the three demo intents answer live and promote to liquid | 1.5–2 d |
-| **Total** | | | **9.5–13.5 person-days, one developer** |
+| **P0** Decide and spike | Settle §11; amend `core/PLAN.md` C12 and `concepts_brief.md`; write the v2 JSON schema; spike the real v2 schema through the real Claude and Groq clients | §11 marked Decided or Open; PLAN.md diff with MS decisions; spike result recorded | 1.5 d |
+| **P1** Sources and dictionary | Compatibility pins first; `sources` config (exactly one SQL source; API sources refused until P3); `ApiSource` port; redacting source wrapper; `fakeApiSource`; dictionary and hashes | With no API source, everything pinned is byte-identical; all existing tests pass | 2.5 d |
+| **P2** Handler v2 and execution | Steps, lint, executor, normalization, saved-handler lint, value-free repair errors, meta, Crystal skip, engine split | T1 and the `fakeApiSource` subset of T4 pass; v1 handlers still run | 5 d |
+| **P3** Models | Multi-source prompts and schema, second prompt hash, API sources accepted in config | Offline v2 generation works; one manual live generation of a two-source handler | 2 d |
+| **P4** Generic API source | Retry helper, constrained client, `defineApiSource`, contract suite, fixture `fetch`; the Ghibli source | Contract passes for the fake and Ghibli; S1, S2, S10 tests pass | 3 d |
+| **P5** Notion | Workspace setup; adapter on hand-written fixtures; seed script; recorder and recorded fixtures | Contract passes for Notion; S6, S8 tests pass | 3.5 d |
+| **P6** Example, tests, docs | `examples/multi-source` and its CI job; engine tests over fixtures; live run; docs | All CI layers green; the three demo intents answer live and promote to liquid | 2.5 d |
+| **Total** | | | **about 20 person-days (18–22), one developer** |
 
 **Order.** P1 → P2 → P3 is the critical path. P4 can start once P1's types
-exist. P5 needs P1, and P4's HTTP client and contract suite. P6 comes last. A
-second developer can run P4 and P5 alongside P2 and P3.
+exist. P5 needs P1 and P4. P6 comes last. A second developer can run P4 and P5
+alongside P2 and P3.
 
 **Separate follow-up, outside this plan:** S5 in `platform/runtime`.
 
@@ -730,11 +804,13 @@ second developer can run P4 and P5 alongside P2 and P3.
 - Crystal for handlers with API steps (module format, record-and-replay equivalence);
 - the OpenAPI importer;
 - a Jira adapter;
-- per-source schema hashes, so one source's change doesn't regenerate every handler.
+- regeneration by per-source hash, so one source's change doesn't regenerate
+  every handler (the hashes are recorded from P1 on).
 
-**Timing against the demo.** Changing the prompts changes `promptHash`, so a
-demo that runs in explore mode would regenerate its prepared handlers. Build on
-a branch and decide the merge date with the demo owner (Q10).
+**Timing against the demo.** With no API source configured nothing changes,
+including `promptHash`, and API sources are refused by config until P3. Each
+phase can therefore merge to `main` on its own without touching a demo that
+uses only Postgres (Q10).
 
 ## 11. Open questions
 
@@ -743,18 +819,19 @@ Every question carries a recommendation; P0 marks each Decided or Open.
 | # | Question | Recommendation | Status |
 |---|---|---|---|
 | Q1 | Uniform `steps` for every handler, or keep top-level `sql` and add `calls`? | `steps` for v2 only; v1 artifacts stay as they are when no API source is configured (§3.3). | Recommended |
-| Q2 | More than one SQL source? | Not in v1. One SQL source keeps one dialect in prompts and lint. | Recommended |
+| Q2 | How many SQL sources? | Exactly one in v1: one dialect in prompts and lint, and `config.connector` stays required. | Decided after the plan review |
 | Q3 | Constants in API arguments? | Yes, typed and checked against `values`. Otherwise intents like "open negative feedback" need extra inputs. | Recommended |
 | Q4 | List-valued columns (multi_select, relation)? | No list columns in v1: multi_select is a joined string, relation is excluded. | Decided in this revision |
 | Q5 | Notion filters: generated equality and range params, or a model-written filter language? | Generated params in v1. Small, typed, lintable. Anything finer is done in `shape` over at most `rowCap` rows; more data fails the run (§3.5). | Recommended |
-| Q6 | A source is down at startup? | Fail fast, matching today's behaviour when the database is unreachable. | Recommended |
+| Q6 | A source is down at startup? | Fail fast in explore and locked mode, matching today's behaviour when the database is unreachable. | Recommended |
 | Q7 | Crystal for handlers with API steps? | Not in v1 (S3, and equivalence on live data is not deterministic). | Recommended |
 | Q8 | Can a `defineApiSource` operation use raw `fetch`? | No. Only the constrained client, which takes headers, method and body options. | Recommended |
 | Q9 | Naming and folders: "source" vs "connector"; `connectors/` vs `sources/`? | "Source" is the umbrella term, and the Postgres connector is a SQL source. New code goes in `core/src/sources/`. | Recommended |
-| Q10 | Merge before or after the demo? | After, unless the demo needs it and runs in locked mode. | Recommended |
+| Q10 | Merge before or after the demo? | Phase by phase as each is ready: the compatibility rule and the P1–P3 config guard keep a Postgres-only demo unchanged. | Recommended |
 | Q11 | Expose Notion `people` properties? | Excluded by default; opt in per property later. | Recommended |
 | Q12 | The exact JSON schema of the v2 artifact and of `meta.steps`? | Write it in P0 as an addition to `core/docs/request-format.md`. | Open |
-| Q13 | Does Notion's data source endpoint return property descriptions? | Check in P5; if not, join hints come only from `comments`. | Open |
+| Q13 | Does Notion's data source endpoint return property descriptions? | Check in P5. Descriptions are opt-in (`useNotionDescriptions`); join hints come from `comments` either way. | Open |
+| Q14 | API timeout? | A new limit `apiTimeoutMs`, default 10 s, for API steps and for source `describe` and `safetyCheck`. | Decided after the plan review |
 
 ## 12. Glossary
 
