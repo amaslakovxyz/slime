@@ -12,18 +12,12 @@
 //      set yet), so a broken DB is a 503, not a crash loop.
 // Every route needs the `x-api-key` header to equal SLIME_API_KEY; with no key
 // configured the runtime refuses everything.
-import { createHash, timingSafeEqual } from 'node:crypto';
+import { keyMatches } from './auth.js';
 import { GetParametersByPathCommand, SSMClient } from '@aws-sdk/client-ssm';
 import { Hono } from 'hono';
 import { handle } from 'hono/aws-lambda';
 
-export function keyMatches(given: string | undefined, expected: string | undefined): boolean {
-  if (!expected || !given) return false;
-  // Hash both sides so timingSafeEqual gets equal lengths.
-  const a = createHash('sha256').update(given).digest();
-  const b = createHash('sha256').update(expected).digest();
-  return timingSafeEqual(a, b);
-}
+export { keyMatches };
 
 /** Parameter path -> env var name: the last path segment. */
 export function envNameFor(path: string): string {
