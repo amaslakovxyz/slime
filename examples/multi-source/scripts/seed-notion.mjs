@@ -3,6 +3,7 @@
 // uses the reader token. Prints the ids to put into .env.
 //
 //   node --env-file=.env scripts/seed-notion.mjs
+import { readFileSync, writeFileSync } from 'node:fs';
 import pg from 'pg';
 
 const NOTION = 'https://api.notion.com';
@@ -21,7 +22,11 @@ const TITLES = ['Exports time out', 'Invoice PDF is blank', 'SSO login loops', '
 // Set once the feedback data source exists: Status is a status property, or a select fallback.
 let statusIsSelect = false;
 const token = required('NOTION_SEED_TOKEN');
-const parentPageId = required('NOTION_PARENT_PAGE_ID');
+const parentPageId = pageId(required('NOTION_PARENT_PAGE_ID'));
+const ENV_FILE = new URL('../.env', import.meta.url);
+if (process.env.NOTION_FEEDBACK_ID && !process.argv.includes('--force')) {
+  throw new Error('NOTION_FEEDBACK_ID is already set: the demo data exists. Run with --force to create another copy.');
+}
 const random = seededRandom(42);
 
 const accounts = await accountNames();
@@ -40,9 +45,24 @@ const nightsId = await createDataSource('Movie nights', {
 });
 for (let index = 0; index < 15; index++) await createPage(nightsId, nightPage(index));
 
-console.log('\nSeeded. Add these to .env:');
-console.log(`NOTION_FEEDBACK_ID=${feedbackId}`);
-console.log(`NOTION_MOVIE_NIGHTS_ID=${nightsId}`);
+writeEnvValues({ NOTION_FEEDBACK_ID: feedbackId, NOTION_MOVIE_NIGHTS_ID: nightsId });
+console.log(`\nSeeded, and wrote to .env:\nNOTION_FEEDBACK_ID=${feedbackId}\nNOTION_MOVIE_NIGHTS_ID=${nightsId}\nNext: npm run notion:record`);
+
+function writeEnvValues(values) {
+  let text = readFileSync(ENV_FILE, 'utf8');
+  for (const [name, value] of Object.entries(values)) {
+    const line = `${name}=${value}`;
+    text = new RegExp(`^${name}=.*$`, 'm').test(text) ? text.replace(new RegExp(`^${name}=.*$`, 'm'), line) : `${text.trimEnd()}\n${line}\n`;
+  }
+  writeFileSync(ENV_FILE, text);
+}
+
+// Accepts a bare id, a dashed id, or a whole page URL.
+function pageId(value) {
+  const hex = value.replace(/-/g, '').match(/[0-9a-f]{32}(?=[^0-9a-f]*$)/i);
+  if (!hex) throw new Error(`NOTION_PARENT_PAGE_ID "${value}" has no 32-character page id`);
+  return hex[0];
+}
 
 function feedbackProperties(useStatus) {
   const statusOptions = { options: STATUSES.filter((name, index, all) => all.indexOf(name) === index).map((name) => ({ name })) };

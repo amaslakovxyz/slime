@@ -10,7 +10,11 @@
   "scripts": {
     "start": "node --env-file-if-exists=.env src/server.mjs",
     "start:fixtures": "FETCH_FIXTURES=1 node src/server.mjs",
-    "test": "node --test 'test/**/*.test.mjs'"
+    "test": "node --test 'test/**/*.test.mjs'",
+    "notion:check": "node --env-file=.env scripts/check-notion.mjs",
+    "notion:seed": "node --env-file=.env scripts/seed-notion.mjs",
+    "notion:record": "node --env-file=.env scripts/record-notion-fixtures.mjs",
+    "live": "node --env-file=.env scripts/live-run.mjs"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.11",

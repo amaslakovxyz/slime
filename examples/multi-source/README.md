@@ -30,24 +30,25 @@ The other two demo intents are in `offline-handlers.json`.
 
 ## Run it against your own Notion
 
-1. In Notion, create a page for the demo data.
-2. At notion.so/my-integrations, create two internal integrations:
-   - **Slime reader** with only the *Read content* capability. Slime uses this
-     one. It is read-only because the adapter calls only read endpoints *and*
-     the integration can't write.
+1. Fill `.env`: copy `.env.example`; the comments at its top walk through
+   creating the page and the two integrations:
+   - **Slime reader** with only *Read content*. Slime uses this one. It is
+     read-only because the adapter calls only read endpoints *and* the
+     integration can't write.
    - **Slime seeder** with *Insert content*, used only to create demo data.
-3. Share the page with both integrations (page menu → Connections).
-4. Copy `.env.example` to `.env` and set `NOTION_TOKEN` (reader),
-   `NOTION_SEED_TOKEN` (seeder) and `NOTION_PARENT_PAGE_ID`.
-5. Seed the data and put the printed ids into `.env`
-   (`NOTION_FEEDBACK_ID`, `NOTION_MOVIE_NIGHTS_ID`). The seed script,
-   `scripts/seed-notion.mjs`, comes with the recorded fixtures (P5.5); until
-   then create the two databases by hand with the properties in
-   `test/fixtures/notion/retrieve-*.json`.
-6. `npm start`. Set `GROQ_API_KEY` or `ANTHROPIC_API_KEY` to let a model write
-   handlers; without one, the offline handlers answer the three demo intents.
-7. `node --env-file=.env scripts/live-run.mjs` runs the three intents against
-   real Notion, the films API and a model until each is promoted (P6.5).
+2. `npm run notion:check` checks both tokens and that both integrations can
+   open the page.
+3. `npm run notion:seed` creates "Customer feedback" and "Movie nights" under
+   the page and writes their ids into `.env`.
+4. `npm run notion:record` records the responses the tests replay into
+   `test/fixtures/notion/` and `core/test/fixtures/notion-recorded/`. It keeps
+   only the fields the adapter reads and replaces real ids with placeholders.
+   Review the diff before committing.
+5. `npm start` serves the app against real Notion. Set `GROQ_API_KEY` or
+   `ANTHROPIC_API_KEY` to let a model write handlers; without one, the offline
+   handlers answer the three demo intents.
+6. `npm run live` runs the three intents against real Notion, the films API
+   and a model until each is promoted (P6.5).
 
 ## Development only
 
