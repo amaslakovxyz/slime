@@ -41,7 +41,7 @@ export interface FakeApiSource extends ApiSource {
 export const FAKE_SECRET = 'fake-secret-token';
 const BAD_REQUEST = 400;
 
-/** Every failure message contains a secret, so redaction tests have something to remove. */
+/** Scripted failures (failWith) carry a secret in their message, so redaction tests have something to remove. */
 export function fakeApiSource({ name = 'fake-api', service = 'Fake API', operations, secrets = [FAKE_SECRET], safetyFailWith, describeFailWith }: FakeApiSourceOptions): FakeApiSource {
   const calls: FakeCall[] = [];
   let isClosed = false;
@@ -65,7 +65,9 @@ export function fakeApiSource({ name = 'fake-api', service = 'Fake API', operati
     call: async (operationName, args, options) => {
       calls.push({ operation: operationName, args });
       const operation = operations[operationName];
-      if (!operation) return fail({ status: BAD_REQUEST, message: `unknown operation ${operationName}` });
+      if (!operation) throw Object.assign(new Error(`unknown operation ${operationName}`), { status: BAD_REQUEST, isRetryable: false });
+      const unknownArgs = Object.keys(args).filter((arg) => !(operation.params ?? []).some((param) => param.name === arg));
+      if (unknownArgs.length > 0) throw Object.assign(new Error(`${operationName} has no param ${unknownArgs.join(', ')}`), { status: BAD_REQUEST, isRetryable: false });
       if (operation.gate) await waitUnlessAborted(operation.gate, options.signal);
       if (options.signal.aborted) throw options.signal.reason;
       if (operation.failWith) fail(operation.failWith);

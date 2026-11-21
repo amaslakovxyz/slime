@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
+import { describeApiSourceContract } from '../../src/testing/api-source-contract.js';
 import { FAKE_SECRET, fakeApiSource } from '../../src/testing/fake-api-source.js';
 
 const COLUMNS = [{ name: 'id', type: 'string', nullable: false }];
@@ -8,9 +9,9 @@ const options = (overrides: Partial<{ rowCap: number; signal: AbortSignal }> = {
 
 describe('fakeApiSource', () => {
   test('describes its operations and returns rows, recording each call', async () => {
-    const source = fakeApiSource({ operations: { 'items.list': { columns: COLUMNS, rows: ROWS } } });
+    const source = fakeApiSource({ operations: { 'items.list': { params: [{ name: 'x', type: 'integer' }], columns: COLUMNS, rows: ROWS } } });
     const schema = await source.describe({ timeoutMs: 1_000, signal: new AbortController().signal });
-    assert.deepEqual(schema, { service: 'Fake API', operations: [{ name: 'items.list', params: [], columns: COLUMNS }] });
+    assert.deepEqual(schema, { service: 'Fake API', operations: [{ name: 'items.list', params: [{ name: 'x', type: 'integer' }], columns: COLUMNS }] });
     assert.deepEqual((await source.call('items.list', { x: 1 }, options())).rows, ROWS);
     assert.deepEqual(source.calls, [{ operation: 'items.list', args: { x: 1 } }]);
   });
@@ -32,4 +33,22 @@ describe('fakeApiSource', () => {
     controller.abort(new Error('sibling failed'));
     await assert.rejects(pending, /sibling failed/);
   });
+});
+
+describeApiSourceContract({
+  name: 'fakeApiSource',
+  makeSource: () =>
+    fakeApiSource({
+      operations: {
+        'items.list': {
+          params: [{ name: 'kind', type: 'string' }],
+          columns: [
+            { name: 'id', type: 'string', nullable: false },
+            { name: 'kind', type: 'string', nullable: true },
+          ],
+          rows: (args) => [{ id: 'a', kind: 'x' }, { id: 'b', kind: null }, { id: 'c', kind: 'y' }].filter((row) => args.kind == null || row.kind === args.kind),
+        },
+      },
+    }),
+  cases: [{ operation: 'items.list', args: { kind: 'x' }, allNullArgs: { kind: null } }],
 });

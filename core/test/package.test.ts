@@ -55,6 +55,7 @@ test('adapters have their own subpaths, so the main entry never loads them (C7)'
   assert.deepEqual(Object.keys(await import('../src/testing/index.js')).sort(), [
     'FAKE_SECRET',
     'artifact',
+    'describeApiSourceContract',
     'describeConnectorContract',
     'describeModelClientContract',
     'describeStoreContract',

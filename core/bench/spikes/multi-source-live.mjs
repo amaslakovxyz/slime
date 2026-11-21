@@ -53,6 +53,8 @@ const config = new SlimeConfig({
   glossary: { revenue: 'sum of paid invoices, in cents' },
   rules: ['Revenue counts only invoices with status paid.'],
   tiers: { gasToLiquidRuns: 1 },
+  // A shared Groq key can be slow under its rate limit; this is a manual check, not a latency test.
+  limits: { generationBudgetMs: 90_000, reviewTimeoutMs: 120_000 },
   onEvent: (event) => events.push(event),
 });
 const slime = await createSlime(config);
