@@ -1,6 +1,6 @@
 // The crystallize job: turns proven Liquid handlers into Crystal modules in the
 // app's own code (C10). The app runs it from its own script with its own config.
-import { asV1 } from '../models/artifact-v2.js';
+import { asV1, isArtifactV2 } from '../models/artifact-v2.js';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { DEFAULT_LIMITS } from '../config/defaults.js';
@@ -34,7 +34,7 @@ export interface CrystallizeOptions {
   isDryRun?: boolean;
 }
 
-export type CrystalOutcome = 'crystallized' | 'already' | 'not-ready' | 'failed';
+export type CrystalOutcome = 'crystallized' | 'already' | 'not-ready' | 'skipped' | 'failed';
 
 export interface CrystalReport {
   key: string;
@@ -60,6 +60,7 @@ interface JobContext {
 export const DEFAULT_MIN_RUNS = 10;
 const DEFAULT_OPTIMIZE_TIMEOUT_MS = 120_000;
 const REVIEWS_ALLOWED = new Set(['approved', 'none']);
+const SKIPPED_API_STEPS = 'has API steps, which Crystal does not support yet';
 
 export async function crystallize(options: CrystallizeOptions): Promise<CrystalReport[]> {
   const runner = new QuickJSRunner();
@@ -84,6 +85,8 @@ export async function crystallize(options: CrystallizeOptions): Promise<CrystalR
 async function crystallizeOne(context: JobContext, record: HandlerRecord): Promise<CrystalReport> {
   const report: CrystalReport = { key: record.key, intent: record.intent, outcome: 'not-ready', reasons: [] };
   if (context.manifest.entries[record.key]) return { ...report, outcome: 'already' };
+  // MS9: every stored v2 handler has an API step (single-SQL ones were stored as v1).
+  if (isArtifactV2(record.artifact)) return { ...report, outcome: 'skipped', reasons: [SKIPPED_API_STEPS] };
   const notReadyReason = readinessProblem(record, context.minRuns);
   if (notReadyReason) return { ...report, reasons: [notReadyReason] };
 
@@ -110,7 +113,7 @@ function readinessProblem({ tier, review, runs, fixtures }: HandlerRecord, minRu
 
 /** The optimized version first, when there is an optimizer; the unchanged Liquid code always. */
 async function candidatesFor({ options }: JobContext, record: HandlerRecord, report: CrystalReport): Promise<Candidate[]> {
-  const { sql, params, shapeJs } = asV1(record.artifact, 'crystallize'); // MS9: P2.10 skips v2 records first
+  const { sql, params, shapeJs } = asV1(record.artifact, 'crystallize'); // v2 records were skipped in crystallizeOne
   const unchanged: Candidate = { code: { sql, params, shape: shapeJs }, isOptimized: false, notes: [] };
   if (!options.optimizer) return [unchanged];
   try {
