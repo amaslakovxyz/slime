@@ -9,6 +9,7 @@ Project-wide docs. Code-local docs live next to their code and are listed at the
 | [product/product_frame_v0_2.md](product/product_frame_v0_2.md) | Design | @Tony | Unified product frame (slime-client / slime-cloud): merged decisions from both 2026-11-21 research tracks, demo vertical, risks. |
 | [product/slime_runtime_master_spec.md](product/slime_runtime_master_spec.md) | Vision | — | Pitch and target architecture (V8/Wasm, Redis, connectors). Conflicts in places with the dev spec. |
 | [architecture/architecture-spec.md](architecture/architecture-spec.md), [architecture/architecture.excalidraw](architecture/architecture.excalidraw) | Design | @Tony | Bun/intents/Gatekeeper dev spec and its diagram. Implemented only on unmerged `feat/shop-bench`, `chore/gas-v0-plan`. The engine on main is `core/`. |
+| [architecture/slime-cloud.html](architecture/slime-cloud.html) | Current | @Tony | Slime Cloud admin + endpoint provisioner: topology, lifecycle (create/reconfigure/delete), data model, IAM, pricing. Open in a browser. |
 | [brand/slime_master_brand_book_agent_design_system.md](brand/slime_master_brand_book_agent_design_system.md) | Current | — | Color tokens, typography, and UI rules for agents generating Slime UI. |
 | [brand/slime_master_brand_book_design_system.html](brand/slime_master_brand_book_design_system.html) | Current | — | Interactive brand book and component kit. |
 | [brand/slime_marketing_positioning_tone_of_voice_use_cases.md](brand/slime_marketing_positioning_tone_of_voice_use_cases.md) | Current | — | Positioning, tone of voice, use cases, and messaging. |
@@ -20,5 +21,6 @@ Project-wide docs. Code-local docs live next to their code and are listed at the
 - [../core/bench/protocol-cases.md](../core/bench/protocol-cases.md) (Design; benchmark material)
 - [../examples/express/README.md](../examples/express/README.md) (Current, example app and demo database)
 - [../platform/runtime/README.md](../platform/runtime/README.md) (Current)
+- [../platform/provisioner/README.md](../platform/provisioner/README.md) (Current)
 - [../platform/infra/README.md](../platform/infra/README.md) and [../platform/infra/FINOPS.md](../platform/infra/FINOPS.md) (Current)
 - [../platform/docs/reviews/2026-11-20-infra-review.md](../platform/docs/reviews/2026-11-20-infra-review.md) (Record)

@@ -17,12 +17,13 @@ replace the `file:` path with a version; nothing else changes.
 
 | File | Role |
 |---|---|
-| [src/lambda.ts](src/lambda.ts) | Lambda entry: SSM settings at cold start, `x-api-key` auth, lazy `createSlime()` (503 `NOT_READY` and retry), a capped `flush()` before each response |
+| [src/lambda.ts](src/lambda.ts) | Lambda entry: SSM settings at cold start (comma-separated `SLIME_SSM_PREFIX` paths, later overrides earlier), `x-api-key` auth, lazy `createSlime()` (503 `NOT_READY` and retry), a capped `flush()` (store, reviews, usage) before each response |
 | [src/config.ts](src/config.ts) | `SlimeConfig` from env, with the same variable names the sandbox runtime read |
 | [src/app.ts](src/app.ts) | HTTP routes on the core's `Slime` API (`/v0/query`, `/healthz`, `/v0/handlers`) |
 | [src/store-dynamodb.ts](src/store-dynamodb.ts) | The core's `SlimeStore` Port on the existing table; one partition per tenant |
+| [src/usage.ts](src/usage.ts) | Daily usage counters (`USAGE#<tenant>` / `YYYY-MM-DD` in `SLIME_USAGE_TABLE`): requests and latency per tier, generations, LLM tokens, handler snapshot per tier. Set only on provisioned endpoints |
 | [src/legacy-handlers.ts](src/legacy-handlers.ts), [src/migrate-cli.ts](src/migrate-cli.ts) | One-off copy of the sandbox runtime's handlers into the core's format |
-| [scripts/build.mjs](scripts/build.mjs) | Deterministic bundle into `dist/lambda/` (same source, same zip hash) |
+| [scripts/build.mjs](scripts/build.mjs) | Deterministic bundle into `dist/lambda/` (same source, same zip hash), copied to `dist/layer/slime/` for the Gas layer |
 | `offline/handlers.json` | Canned handlers for `SLIME_PROVIDER=offline` |
 
 ## Commands
@@ -31,7 +32,7 @@ replace the `file:` path with a version; nothing else changes.
 (cd ../.. && npm ci && npm run build -w @slime-cloud/core) && npm ci
 npm run typecheck
 npm test              # no AWS, no database
-npm run build         # dist/lambda/, zipped by Terraform
+npm run build         # dist/lambda/ and dist/layer/, zipped by Terraform
 ```
 
 ## Settings

@@ -3,17 +3,19 @@
 // exists this file becomes an import of its route factory.
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
-import { SlimeError, type Connector, type CrystalRegistry, type Slime } from '@slime-cloud/core';
+import { SlimeError, type Connector, type CrystalRegistry, type QueryMeta, type Slime } from '@slime-cloud/core';
 
 export interface RuntimeParts {
   slime: Slime;
   connector: Connector;
   crystal: CrystalRegistry | false;
+  /** Sees every answered query (the Lambda entry meters usage with it). */
+  onQuery?: (meta: QueryMeta) => void;
 }
 
 const MAX_BODY_BYTES = 16 * 1024;
 
-export function createApp({ slime, connector, crystal }: RuntimeParts): Hono {
+export function createApp({ slime, connector, crystal, onQuery }: RuntimeParts): Hono {
   const app = new Hono();
 
   app.onError((error, c) => {
@@ -34,6 +36,7 @@ export function createApp({ slime, connector, crystal }: RuntimeParts): Hono {
         throw new SlimeError('INVALID_REQUEST', 'Body must be valid JSON.');
       });
       const { data, meta } = await slime.query(body);
+      onQuery?.(meta);
       c.header('Server-Timing', `total;dur=${meta.timingsMs.total}, generate;dur=${meta.timingsMs.generate ?? 0}`);
       console.log(JSON.stringify({ at: new Date().toISOString(), handler: meta.handlerKey, tier: meta.tier, cache: meta.cache, ms: meta.timingsMs }));
       return c.json({ data, meta });

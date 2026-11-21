@@ -1,8 +1,11 @@
 // Lambda entry for the Slime runtime (Function URL; see platform/infra/platform/runtime.tf).
 //
 // Cold start:
-//   1. Every SSM parameter under SLIME_SSM_PREFIX becomes an env var named after
-//      its last path segment (/slime/runtime/DATABASE_URL -> DATABASE_URL).
+//   1. Every SSM parameter under each path in SLIME_SSM_PREFIX (comma-separated)
+//      becomes an env var named after its last path segment
+//      (/slime/runtime/DATABASE_URL -> DATABASE_URL). Paths load in order, so a
+//      later one overrides an earlier one: provisioned endpoints use
+//      "/slime/shared/,/slime/endpoints/<id>/" (shared model keys, then their own).
 //      Secrets therefore never pass through Terraform state or the function config.
 //   2. The Slime instance is built from those env vars (config.ts) on the first
 //      request, and rebuilt on the next one if that fails (e.g. DATABASE_URL not
@@ -39,7 +42,9 @@ async function loadParameters(prefix: string): Promise<void> {
   } while (NextToken);
 }
 
-if (process.env.SLIME_SSM_PREFIX) await loadParameters(process.env.SLIME_SSM_PREFIX);
+for (const prefix of (process.env.SLIME_SSM_PREFIX ?? '').split(',')) {
+  if (prefix.trim()) await loadParameters(prefix.trim());
+}
 
 type Runtime = { app: Hono; flush: () => Promise<void> };
 
@@ -54,9 +59,28 @@ function boot(): Promise<Runtime> {
     const { createSlime } = await import('@slime-cloud/core');
     const { slimeConfigFromEnv } = await import('./config.js');
     const { createApp } = await import('./app.js');
-    const config = await slimeConfigFromEnv();
+    const { UsageMeter } = await import('./usage.js');
+    // Only provisioned endpoints meter usage (slime-runtime has no usage table).
+    // The meter needs slime for its snapshot, so it is assigned after
+    // createSlime; startup events emitted before that are not generations.
+    let meter: InstanceType<typeof UsageMeter> | undefined;
+    const config = await slimeConfigFromEnv(process.env, {
+      onEvent: (event) => {
+        if (event.type === 'generated') meter?.recordTokens(event.tokens);
+      },
+    });
     const slime = await createSlime(config);
-    return { app: createApp({ slime, connector: config.connector, crystal: config.crystal }), flush: () => slime.flush() };
+    const crystals = Object.keys(config.crystal || {}).length;
+    if (process.env.SLIME_USAGE_TABLE) {
+      meter = new UsageMeter(process.env.SLIME_USAGE_TABLE, process.env.SLIME_TENANT_ID ?? '', () => ({
+        ...slime.stats().handlers,
+        crystal: crystals,
+      }));
+    }
+    return {
+      app: createApp({ slime, connector: config.connector, crystal: config.crystal, onQuery: (meta) => meter?.record(meta) }),
+      flush: () => Promise.all([slime.flush(), meter?.flush()]).then(() => {}),
+    };
   })().catch((err) => {
     booting = null;
     throw err;

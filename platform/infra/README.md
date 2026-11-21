@@ -62,6 +62,32 @@ URL=$(terraform -chdir=platform/infra/platform output -raw runtime_url)
 curl -s "${URL}healthz" -H "x-api-key: $KEY" | jq
 ```
 
+## Platform: Slime Cloud endpoints
+
+Design: [`docs/architecture/slime-cloud.html`](../../docs/architecture/slime-cloud.html).
+
+- [`platform/control.tf`](platform/control.tf): DynamoDB `slime-control`
+  (users, endpoints, usage) with a `NEW_IMAGE` stream, used by
+  [`platform/admin`](../admin).
+- [`platform/gas-layer.tf`](platform/gas-layer.tf): layer `slime-gas`, the
+  runtime bundle under `/opt/slime/` (`platform/runtime/dist/layer`).
+- [`platform/provisioner.tf`](platform/provisioner.tf): Lambda
+  `slime-provisioner` ([`platform/provisioner`](../provisioner/README.md)),
+  triggered by endpoint items that turn `pending`, `updating` or `deleting`. It
+  creates, reconfigures and deletes `slime-ep-<id>` functions, roles (bounded by
+  `slime-endpoint-boundary`), Function URLs and log groups at runtime; those are
+  not in Terraform state.
+
+Model keys for every endpoint are shared SSM parameters, set once by hand:
+
+```sh
+aws ssm put-parameter --name /slime/shared/ANTHROPIC_API_KEY --type SecureString --value '<key>'
+aws ssm put-parameter --name /slime/shared/GROQ_API_KEY --type SecureString --value '<key>'   # if used
+```
+
+Each endpoint's own `DATABASE_URL` and `SLIME_API_KEY` live under
+`/slime/endpoints/<id>/`, written by the admin.
+
 ## Rules for `platform/`
 
 The CI roles deny anything outside these names, so follow them:
