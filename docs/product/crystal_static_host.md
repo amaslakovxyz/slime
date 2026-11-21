@@ -57,8 +57,9 @@ Crystallize (admin today; `slime crystallize "<intent>"` later):
    `slc_` token is issued.
 
 Re-crystallizing in place is not built (core answers `already` for a key in the
-manifest); after a migration the Crystal must be removed first, and the same
-Crystal key comes back. `query` = "ask"
+manifest); after a migration the Crystal must be removed first. Today that means
+deleting the Endpoint, which also changes its URL and every `slc_` token, so the
+page must be updated; the Crystal key itself comes back the same. `query` = "ask"
 (may generate); `crystallize` = "freeze and give me a permanent address".
 
 ## slime CLI / MCP
