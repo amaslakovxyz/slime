@@ -41,10 +41,8 @@ export function CrystalCard({
     });
 
   return (
-    <div className="lc-route" data-testid="crystal-card">
-      <span className="tier-pill tier-pill-crystal">crystal</span>
+    <div className="lc-route" data-testid="crystal-card" data-key={crystal.key}>
       <div className="lc-route-body">
-        <div>{crystal.intent}</div>
         <code className="mono small">
           POST {url}v0/e/{crystal.shortKey}…  {body}
         </code>

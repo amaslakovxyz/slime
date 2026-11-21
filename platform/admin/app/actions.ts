@@ -123,7 +123,7 @@ export async function updateConnectorAction(form: FormData): Promise<void> {
   const owner = await requireUser();
   const endpointId = field(form, 'endpointId');
   const connectorType = field(form, 'connectorType') || 'postgres';
-  const page = `/endpoints/${endpointId}/connector`;
+  const page = `/endpoints/${endpointId}/settings`;
   try {
     await withSpan(
       'endpoint.update_connector',
@@ -169,7 +169,7 @@ export async function deleteEndpointAction(form: FormData): Promise<void> {
     throw err;
   }
   refreshEndpoint();
-  redirect(`/endpoints/${endpointId}`);
+  redirect('/endpoints');
 }
 
 export async function revealTokenAction(endpointId: string): Promise<string | null> {

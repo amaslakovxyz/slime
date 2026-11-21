@@ -57,6 +57,8 @@ endpoint (`/mcp`), multi-user concurrency, persistence of the feed.
 | L12 | The runtime copies live Liquid run counts to the store: before Crystallize (local) and at most once a minute per instance on flush (Lambda, `SLIME_RUNS_SYNC_MS`). | The core saves a handler only when it turns Liquid; Crystallize reads runs from the store. Chosen over a core change for now. |
 | L13 | Each endpoint keeps its port across restarts (runner restart included). | Two simultaneous restarts used to swap ports, so an agent's URL pointed at another endpoint. |
 | L14 | A busy own port fails the endpoint with a reason instead of moving it; the runner kills its runtimes on exit or crash; one endpoint's error never stops the runner; the file secret store writes atomically and queues changes. | Five parallel deletes raced on the secrets file, crashed the runner, left orphan runtimes on their ports, and the next runner silently moved two endpoints to new URLs. |
+| L15 | Endpoint tabs are Lifecycle · Usage · Settings (Overview and Connector redirect: Overview folded into Lifecycle and Usage, the connection moved to Settings). Crystallize is a button in the ready row; a Crystal's URL, token and curl open under its row. The endpoint list shows name, status, URL and requests; the whole row is a link. | Fewer screens repeating the same numbers; the whole flow fits one list. |
+| L16 | The local runtime writes the same usage counters as Lambda (`USAGE#<id>` in the control table, `SLIME_USAGE_TABLE` set by the runner). | Locally, Usage, Billing and the list showed zeros next to a Lifecycle tab full of traffic. |
 
 ## 4. Components
 

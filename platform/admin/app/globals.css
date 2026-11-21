@@ -2010,3 +2010,14 @@ code.inline {
 .lc-route > .lc-route-actions { flex: 0 0 auto; }
 .form-narrow { max-width: 720px; }
 .tier-head .tier-name { margin: 0; }
+.settings-replace { margin-top: 16px; }
+/* Whole table row opens the endpoint: the name link stretches over the row. */
+.row-link { position: relative; }
+.row-link .cell-name a::after { content: ""; position: absolute; inset: 0; }
+.row-link:hover td { background: var(--bg-surface-hover); }
+.lc-action { text-align: right; width: 1%; }
+.lc-restarting { margin-left: auto; font-weight: 400; }
+.lc-sub td { border-top: 0; padding-top: 0; }
+.lc-row-crystal td { border-bottom: 0; }
+.lc-sub .lc-route { margin: 0 0 4px; }
+.lc-stage { padding-top: 30px; }

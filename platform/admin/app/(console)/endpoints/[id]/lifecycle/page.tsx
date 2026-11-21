@@ -26,7 +26,6 @@ export default async function LifecyclePage({ params }: { params: Promise<{ id: 
           <li key={s.id} className={`lc-stage lc-${s.state} lc-s-${s.id}`}>
             <span className="lc-dot">{s.state === 'done' ? '✓' : i + 1}</span>
             <b>{s.label}</b>
-            <small>{s.note}</small>
           </li>
         ))}
       </ol>
@@ -51,7 +50,7 @@ export default async function LifecyclePage({ params }: { params: Promise<{ id: 
           <i aria-hidden="true" />
           <span>
             {total > 0
-              ? `${total} requests${firstAt ? ` since ${new Date(firstAt).toLocaleTimeString('en-GB')}` : ''}`
+              ? `${total} request${total === 1 ? '' : 's'}${firstAt ? ` since ${new Date(firstAt).toLocaleTimeString('en-GB')}` : ''}`
               : handlers.length > 0
                 ? 'Restarted · same URL'
                 : 'Waiting for requests…'}
@@ -65,7 +64,6 @@ export default async function LifecyclePage({ params }: { params: Promise<{ id: 
           url={ep.url}
           rows={rows}
           events={data.events}
-          thresholds={data.thresholds}
           restarting={ep.status === 'updating'}
           tokenHints={tokenHints}
         />
