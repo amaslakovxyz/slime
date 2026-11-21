@@ -9,9 +9,9 @@ check:
 hooks:
     pre-commit install
 
-# Serve the landing page locally at http://localhost:8000.
-landing:
-    python3 -m http.server 8000 --directory platform/landing
+# Serve the landing page locally at http://localhost:8090.
+landing port="8090":
+    python3 -m http.server {{port}} --bind 127.0.0.1 --directory platform/landing
 
 # Type-check, test, build and pack-check @slime-cloud/core, as CI does.
 core:

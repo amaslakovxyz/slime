@@ -73,4 +73,18 @@ describe('Claude adapter', () => {
     assert.match(system[0]?.text ?? '', /Every parameter may be null/);
     assert.deepEqual([system[1]?.text, system[1]?.cache_control], ['Database: postgresql 16', { type: 'ephemeral' }]);
   });
+
+  test('a missing API key fails with a clear error and sends no request (E2E-13)', async () => {
+    let calls = 0;
+    globalThis.fetch = (async () => (calls++, message(ARTIFACT))) as typeof fetch;
+    // JS callers pass process.env.ANTHROPIC_API_KEY as is, so the key may be undefined.
+    for (const apiKey of ['', ' ', undefined as unknown as string]) {
+      await assert.rejects(claude.generator({ ...OPTIONS, apiKey }).generate(REQUEST, { timeoutMs: 5_000 }), {
+        code: 'GENERATION_FAILED',
+        message: 'No Claude API key is set.',
+        retryable: false,
+      });
+    }
+    assert.equal(calls, 0);
+  });
 });

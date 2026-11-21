@@ -1,12 +1,16 @@
 // Connection URL masking and the Postgres connection test. The live test uses
 // the demo database from the repo's docker setup and skips when it is down.
 import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
 import { connect } from 'node:net';
 import { describe, test } from 'node:test';
+import pg from 'pg';
 import { maskConnectionUrl } from '../lib/connectors';
 import { testConnection } from '../lib/connectors/postgres';
 
 const DEMO_URL = 'postgres://slime_reader:slime_reader@127.0.0.1:54329/slime';
+// Owns slime_meta, which slime_reader cannot read (examples/express/db/init.sql).
+const WRITER_URL = 'postgres://slime_writer:slime_writer@127.0.0.1:54329/slime';
 const demoUp = await new Promise<boolean>((resolve) => {
   const socket = connect(54329, '127.0.0.1');
   socket.setTimeout(1000);
@@ -42,6 +46,20 @@ describe('testConnection', () => {
     assert.match(result.serverVersion ?? '', /^\d+/);
     assert.ok((result.tables ?? 0) >= 5, `expected >= 5 tables, got ${result.tables}`);
     assert.deepEqual(result.problems, []);
+  });
+
+  test('counts only the tables the role can read (E2E-16)', { skip: demoUp ? false : 'demo Postgres on 127.0.0.1:54329 is down' }, async () => {
+    const hidden = `slime_meta.hidden_${randomBytes(4).toString('hex')}`;
+    const writer = new pg.Client({ connectionString: WRITER_URL });
+    await writer.connect();
+    try {
+      await writer.query(`CREATE TABLE ${hidden} (id int)`);
+      // accounts, invoices, plans, subscriptions, usage_events
+      assert.equal((await testConnection(DEMO_URL)).tables, 5);
+    } finally {
+      await writer.query(`DROP TABLE IF EXISTS ${hidden}`);
+      await writer.end();
+    }
   });
 
   test('a URL that cannot connect is not ok and says why', async () => {

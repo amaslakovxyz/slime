@@ -94,4 +94,17 @@ describe('Groq adapter (M4)', () => {
     const review = await groq.reviewer(OPTIONS).review({ ...REQUEST, artifact: ARTIFACT }, CALL);
     assert.deepEqual([review.verdict, review.problems], ['reject', ['wrong sort direction']]);
   });
+
+  test('a missing API key fails with a clear error and sends no request (E2E-13)', async () => {
+    const sent = stubFetch([]);
+    // JS callers pass process.env.GROQ_API_KEY as is (examples/hono), so the key may be undefined.
+    for (const apiKey of ['', ' ', undefined as unknown as string]) {
+      await assert.rejects(groq.generator({ ...OPTIONS, apiKey }).generate(REQUEST, CALL), {
+        code: 'GENERATION_FAILED',
+        message: 'No Groq API key is set.',
+        retryable: false,
+      });
+    }
+    assert.equal(sent.length, 0);
+  });
 });

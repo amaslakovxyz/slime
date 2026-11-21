@@ -32,6 +32,9 @@ export function claudeClient({ apiKey, model, effort, maxRetries = DEFAULT_MAX_R
     model,
     outputMode: 'native',
     async call<T>(call: ModelCall<T>): Promise<ModelReply<T>> {
+      // An empty key would come back as a 401, which reads as a wrong key, not a missing one.
+      // JS callers may pass an unset env var, so undefined counts as missing too.
+      if (!apiKey?.trim()) throw new SlimeError('GENERATION_FAILED', 'No Claude API key is set.');
       const startedAt = performance.now();
       let response;
       try {
