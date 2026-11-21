@@ -1,8 +1,9 @@
 # Endpoint provisioner: one Lambda per customer endpoint, created at runtime.
 #
-#   slime-control stream (endpoint item -> pending | deleting)
+#   slime-control stream (endpoint item -> pending | updating | deleting)
 #     -> slime-provisioner   <- slime-cloud/provisioner/dist/lambda (build.sh)
-#          creates/deletes   role slime-ep-<id>, function slime-ep-<id> (shim + Gas
+#          creates, reconfigures (env) and deletes
+#                            role slime-ep-<id>, function slime-ep-<id> (shim + Gas
 #                            layer), its public Function URL and log group
 #
 # Guard rails, because this function creates IAM roles at runtime:
@@ -13,7 +14,7 @@
 # Per-endpoint isolation (dynamodb:LeadingKeys, /slime/endpoints/<id>/) is in the
 # inline policy the provisioner writes (slime-cloud/provisioner/src/provision.ts).
 #
-# The stream filter matches only `pending` and `deleting`; the provisioner's own
+# The stream filter matches only `pending`, `updating` and `deleting`; the provisioner's own
 # writes (provisioning, ready, failed) never re-trigger it.
 
 locals {
@@ -149,9 +150,9 @@ data "aws_iam_policy_document" "provisioner" {
   statement {
     sid = "EndpointFunctions"
     actions = [
-      "lambda:CreateFunction", "lambda:GetFunction", "lambda:GetFunctionConfiguration", "lambda:DeleteFunction",
-      "lambda:TagResource", "lambda:AddPermission", "lambda:CreateFunctionUrlConfig", "lambda:GetFunctionUrlConfig",
-      "lambda:DeleteFunctionUrlConfig",
+      "lambda:CreateFunction", "lambda:GetFunction", "lambda:GetFunctionConfiguration", "lambda:UpdateFunctionConfiguration",
+      "lambda:DeleteFunction", "lambda:TagResource", "lambda:AddPermission", "lambda:CreateFunctionUrlConfig",
+      "lambda:GetFunctionUrlConfig", "lambda:DeleteFunctionUrlConfig",
     ]
     resources = [local.endpoint_functions]
   }
@@ -249,7 +250,7 @@ resource "aws_lambda_event_source_mapping" "provisioner" {
             # USAGE#<id>, so they cannot forge a record that reaches the worker.
             pk     = { S = [{ prefix = "USER#" }] }
             type   = { S = ["endpoint"] }
-            status = { S = ["pending", "deleting"] }
+            status = { S = ["pending", "updating", "deleting"] }
           }
         }
       })

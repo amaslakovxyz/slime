@@ -1,11 +1,12 @@
 # Slime Cloud control plane: users, endpoints, usage (slime-cloud/admin).
 #
 #   USER#<email>   PROFILE              user (scrypt password hash)
-#   USER#<email>   ENDPOINT#<id>        endpoint: name, provider, status, url, ...
-#   USAGE#<id>     <YYYY-MM>            requests / generations counters
+#   USER#<email>   ENDPOINT#<id>        endpoint: name, provider, connectorType, status, url, ...
+#   USAGE#<id>     <YYYY-MM-DD>         daily counters: requests/latency per tier, generations, tokens
 #
-# The stream feeds slime-provisioner (provisioner.tf), which creates or deletes
-# the endpoint's Lambda when an endpoint item turns `pending` or `deleting`.
+# The stream feeds slime-provisioner (provisioner.tf), which creates,
+# reconfigures or deletes the endpoint's Lambda when an endpoint item turns
+# `pending`, `updating` or `deleting`.
 # Item shapes: docs/slime-cloud/architecture.html.
 
 resource "aws_dynamodb_table" "control" {

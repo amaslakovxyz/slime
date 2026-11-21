@@ -1,12 +1,13 @@
-// provision/teardown against fake AWS clients: every client records the command
-// class and input in one shared log, so tests can assert the exact order.
+// provision/reconfigure/teardown against fake AWS clients: every client records
+// the command class and input in one shared log, so tests can assert the exact order.
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { marshall } from '@aws-sdk/util-dynamodb';
 import type { Config } from '../src/config.js';
 import type { Deps, Endpoint } from '../src/deps.js';
 import { dispatch } from '../src/handler.js';
-import { provision } from '../src/provision.js';
+import { provision, USAGE_ATTRIBUTES } from '../src/provision.js';
+import { reconfigure } from '../src/reconfigure.js';
 import { teardown } from '../src/teardown.js';
 
 const config: Config = {
@@ -80,6 +81,9 @@ function fakeDeps(on: Responders = {}, health: (n: number) => Response = () => n
     waitActive: async (FunctionName) => {
       calls.push({ command: 'waitActive', input: { FunctionName } });
     },
+    waitUpdated: async (FunctionName) => {
+      calls.push({ command: 'waitUpdated', input: { FunctionName } });
+    },
   };
   return { deps, calls, sleeps, names: () => calls.map((c) => c.command) };
 }
@@ -122,6 +126,7 @@ describe('provision', () => {
     assert.deepEqual(liquid.Condition['ForAllValues:StringEquals']['dynamodb:LeadingKeys'], ['ep-a1b2c3d4e5']);
     const usage = policy.Statement.find((s: any) => s.Sid === 'Usage');
     assert.deepEqual(usage.Condition['ForAllValues:StringEquals']['dynamodb:LeadingKeys'], ['USAGE#ep-a1b2c3d4e5']);
+    assert.deepEqual(usage.Condition['ForAllValues:StringEquals']['dynamodb:Attributes'], [...USAGE_ATTRIBUTES]);
 
     const fn = calls.find((c) => c.command === 'CreateFunctionCommand')!.input;
     assert.equal(fn.Role, 'arn:aws:iam::123456789012:role/slime-ep-a1b2c3d4e5');
@@ -218,6 +223,134 @@ describe('provision', () => {
     const done = last(calls).input;
     assert.equal(done.ExpressionAttributeValues[':s'], 'ready');
     assert.equal(done.ExpressionAttributeValues[':url'], URL);
+  });
+
+  test('the endpoint role may write exactly the usage attributes the runtime flushes', () => {
+    // Contract: slime-cloud v2 section 1. A missing attribute makes every flush
+    // fail AccessDenied; an extra one widens what the role can shape.
+    assert.deepEqual(
+      [...USAGE_ATTRIBUTES].sort(),
+      [
+        'pk',
+        'sk',
+        'requests',
+        'generations',
+        'gasRequests',
+        'liquidRequests',
+        'crystalRequests',
+        'gasMs',
+        'liquidMs',
+        'crystalMs',
+        'inputTokens',
+        'outputTokens',
+        'gasHandlers',
+        'crystalHandlers',
+        'updatedAt',
+      ].sort(),
+    );
+  });
+});
+
+describe('reconfigure', () => {
+  const existingEnv = {
+    SLIME_SSM_PREFIX: '/slime/shared/,/slime/endpoints/ep-a1b2c3d4e5/',
+    SLIME_TENANT_ID: 'ep-a1b2c3d4e5',
+    SLIME_PROVIDER: 'offline',
+    SLIME_CONFIG_VERSION: '2026-11-19T00:00:00.000Z',
+  };
+  const updating = (): Endpoint => ({ ...endpoint('updating'), provider: 'groq', updatedAt: '2026-11-21T10:00:00.000Z' });
+  const lambdaState: Responders = {
+    GetFunctionConfigurationCommand: () => ({ Environment: { Variables: existingEnv } }),
+    GetFunctionUrlConfigCommand: () => ({ FunctionUrl: URL }),
+  };
+
+  test('an updating stream record merges the env, waits for the update, probes healthz and ends ready', async () => {
+    const { deps, calls, names } = fakeDeps(lambdaState);
+    await dispatch({ Records: [{ eventName: 'MODIFY', dynamodb: { NewImage: marshall({ pk: 'USER#demo@slime.dev', sk: 'ENDPOINT#ep-a1b2c3d4e5', ...updating() }) } }] }, deps);
+
+    assert.deepEqual(names(), [
+      'UpdateCommand',
+      'GetFunctionConfigurationCommand',
+      'UpdateFunctionConfigurationCommand',
+      'waitUpdated',
+      'GetFunctionUrlConfigCommand',
+      'GetParameterCommand',
+      'fetch',
+      'UpdateCommand',
+    ]);
+
+    const claim = calls[0].input;
+    assert.equal(claim.ConditionExpression, '#s = :updating');
+    assert.equal(claim.ExpressionAttributeValues[':provisioning'], 'provisioning');
+
+    const update = calls.find((c) => c.command === 'UpdateFunctionConfigurationCommand')!.input;
+    assert.equal(update.FunctionName, 'slime-ep-a1b2c3d4e5');
+    assert.deepEqual(update.Environment.Variables, {
+      SLIME_SSM_PREFIX: '/slime/shared/,/slime/endpoints/ep-a1b2c3d4e5/',
+      SLIME_TENANT_ID: 'ep-a1b2c3d4e5',
+      SLIME_PROVIDER: 'groq',
+      SLIME_CONFIG_VERSION: '2026-11-21T10:00:00.000Z',
+    });
+    assert.deepEqual(calls.find((c) => c.command === 'waitUpdated')!.input, { FunctionName: 'slime-ep-a1b2c3d4e5' });
+    assert.equal(calls.find((c) => c.command === 'fetch')!.input.url, `${URL}healthz`);
+
+    const done = last(calls).input;
+    assert.deepEqual(done.Key, claim.Key);
+    assert.match(done.UpdateExpression, /REMOVE #err/);
+    assert.equal(done.ExpressionAttributeValues[':s'], 'ready');
+    assert.equal(done.ExpressionAttributeValues[':url'], URL);
+  });
+
+  test('retries UpdateFunctionConfiguration while a previous update is in progress', async () => {
+    const { deps, calls, sleeps } = fakeDeps({
+      ...lambdaState,
+      UpdateFunctionConfigurationCommand: (_input, n) => {
+        if (n <= 2) throw awsError('ResourceConflictException', 'An update is in progress for resource');
+        return {};
+      },
+    });
+    await reconfigure(updating(), deps);
+
+    assert.equal(calls.filter((c) => c.command === 'UpdateFunctionConfigurationCommand').length, 3);
+    assert.deepEqual(sleeps, [3000, 3000]);
+    assert.equal(last(calls).input.ExpressionAttributeValues[':s'], 'ready');
+  });
+
+  test('an endpoint that is no longer updating is left alone', async () => {
+    const { deps, names } = fakeDeps({
+      ...lambdaState,
+      UpdateCommand: () => {
+        throw awsError('ConditionalCheckFailedException');
+      },
+    });
+    await reconfigure(updating(), deps);
+    assert.deepEqual(names(), ['UpdateCommand']);
+  });
+
+  test('a healthz that keeps failing ends failed with the body as the error', async () => {
+    const { deps, calls } = fakeDeps(lambdaState, () => new Response('connection refused', { status: 502 }));
+    await reconfigure(updating(), deps);
+
+    assert.equal(calls.filter((c) => c.command === 'fetch').length, 5);
+    const done = last(calls).input;
+    assert.equal(done.ExpressionAttributeValues[':s'], 'failed');
+    assert.equal(done.ExpressionAttributeValues[':e'], 'connection refused');
+    assert.doesNotMatch(done.UpdateExpression, /REMOVE/);
+  });
+
+  test('a failed update ends failed without probing healthz', async () => {
+    const { deps, calls, names } = fakeDeps({
+      ...lambdaState,
+      UpdateFunctionConfigurationCommand: () => {
+        throw awsError('AccessDeniedException', 'not authorized');
+      },
+    });
+    await reconfigure(updating(), deps);
+
+    assert.ok(!names().includes('fetch'));
+    const done = last(calls).input;
+    assert.equal(done.ExpressionAttributeValues[':s'], 'failed');
+    assert.equal(done.ExpressionAttributeValues[':e'], 'not authorized');
   });
 });
 

@@ -7,7 +7,6 @@
 import { CreateLogGroupCommand, PutRetentionPolicyCommand } from '@aws-sdk/client-cloudwatch-logs';
 import { CreateRoleCommand, PutRolePolicyCommand } from '@aws-sdk/client-iam';
 import { AddPermissionCommand, CreateFunctionCommand, CreateFunctionUrlConfigCommand, GetFunctionUrlConfigCommand } from '@aws-sdk/client-lambda';
-import { GetParameterCommand } from '@aws-sdk/client-ssm';
 import { UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import {
   endpointKey,
@@ -20,6 +19,7 @@ import {
   type Deps,
   type Endpoint,
 } from './deps.js';
+import { checkHealth, recordOutcome, RETRY_DELAY_MS, type Outcome } from './outcome.js';
 
 const LAMBDA_TRUST = JSON.stringify({
   Version: '2012-10-17',
@@ -28,8 +28,29 @@ const LAMBDA_TRUST = JSON.stringify({
 
 /** A new role is not assumable by Lambda for a few seconds (IAM propagation). */
 const CREATE_FUNCTION_ATTEMPTS = 20;
-const HEALTH_ATTEMPTS = 5;
-const RETRY_DELAY_MS = 3000;
+
+/**
+ * Every attribute the runtime's usage flush writes on USAGE#<id> day items
+ * (slime-cloud/runtime/src/usage.ts), plus the key. The endpoint role may
+ * UpdateItem nothing else on the control table.
+ */
+export const USAGE_ATTRIBUTES = [
+  'pk',
+  'sk',
+  'requests',
+  'generations',
+  'gasRequests',
+  'liquidRequests',
+  'crystalRequests',
+  'gasMs',
+  'liquidMs',
+  'crystalMs',
+  'inputTokens',
+  'outputTokens',
+  'gasHandlers',
+  'crystalHandlers',
+  'updatedAt',
+] as const;
 
 export async function provision(ep: Endpoint, deps: Deps): Promise<void> {
   const { ddb, config } = deps;
@@ -51,7 +72,7 @@ export async function provision(ep: Endpoint, deps: Deps): Promise<void> {
   }
 
   let url: string | undefined;
-  let outcome: { ok: true } | { ok: false; error: string };
+  let outcome: Outcome;
   try {
     url = await deploy(ep, deps);
     outcome = await checkHealth(ep, url, deps);
@@ -59,26 +80,7 @@ export async function provision(ep: Endpoint, deps: Deps): Promise<void> {
     outcome = { ok: false, error: errorMessage(err) };
   }
 
-  const now = new Date().toISOString();
-  await ddb.send(
-    outcome.ok
-      ? new UpdateCommand({
-          TableName: config.controlTable,
-          Key: endpointKey(ep),
-          UpdateExpression: 'SET #s = :s, #url = :url, layerArn = :layer, updatedAt = :u REMOVE #err',
-          ExpressionAttributeNames: { '#s': 'status', '#url': 'url', '#err': 'error' },
-          ExpressionAttributeValues: { ':s': 'ready', ':url': url, ':layer': config.gasLayerArn, ':u': now },
-        })
-      : new UpdateCommand({
-          TableName: config.controlTable,
-          Key: endpointKey(ep),
-          UpdateExpression: url
-            ? 'SET #s = :s, #url = :url, #err = :e, updatedAt = :u'
-            : 'SET #s = :s, #err = :e, updatedAt = :u',
-          ExpressionAttributeNames: url ? { '#s': 'status', '#url': 'url', '#err': 'error' } : { '#s': 'status', '#err': 'error' },
-          ExpressionAttributeValues: { ':s': 'failed', ':e': outcome.error, ':u': now, ...(url ? { ':url': url } : {}) },
-        }),
-  );
+  await recordOutcome(ep, deps, outcome, { url, layerArn: config.gasLayerArn });
   console.log(JSON.stringify({ provision: outcome.ok ? 'ready' : 'failed', endpointId: ep.endpointId, ...(outcome.ok ? {} : { error: outcome.error }) }));
 }
 
@@ -134,7 +136,7 @@ async function deploy(ep: Endpoint, deps: Deps): Promise<string> {
         Condition: {
           'ForAllValues:StringEquals': {
             'dynamodb:LeadingKeys': [`USAGE#${id}`],
-            'dynamodb:Attributes': ['pk', 'sk', 'requests', 'generations', 'updatedAt'],
+            'dynamodb:Attributes': [...USAGE_ATTRIBUTES],
           },
         },
       },
@@ -223,24 +225,4 @@ async function deploy(ep: Endpoint, deps: Deps): Promise<string> {
     'ResourceConflictException',
   );
   return url;
-}
-
-/**
- * GET /healthz with the endpoint's key. The runtime's healthz runs the DB
- * safety check, so an unsafe or unreachable customer database ends as failed.
- * 403 and 5xx are retried: the URL permission and a cold start can lag.
- */
-async function checkHealth(ep: Endpoint, url: string, deps: Deps): Promise<{ ok: true } | { ok: false; error: string }> {
-  const res = await deps.ssm.send(new GetParameterCommand({ Name: `${secretsPath(ep.endpointId)}SLIME_API_KEY`, WithDecryption: true }));
-  const token = res.Parameter?.Value;
-  if (!token) throw new Error('SLIME_API_KEY parameter is empty');
-
-  for (let attempt = 1; ; attempt++) {
-    const health = await deps.fetch(`${url}healthz`, { headers: { 'x-api-key': token }, signal: AbortSignal.timeout(25000) });
-    if (health.status === 200) return { ok: true };
-    const body = await health.text();
-    const retryable = health.status === 403 || health.status >= 500;
-    if (!retryable || attempt >= HEALTH_ATTEMPTS) return { ok: false, error: (body || `healthz answered ${health.status}`).slice(0, 300) };
-    await deps.sleep(RETRY_DELAY_MS);
-  }
 }

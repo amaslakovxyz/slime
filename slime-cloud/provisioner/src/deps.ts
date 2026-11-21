@@ -1,18 +1,21 @@
-// What provision/teardown talk to. Each client is the slice of its SDK client
-// that the worker uses, so tests pass fakes with a send() method; fetch, sleep
-// and the function-active waiter are injected for the same reason.
+// What provision/reconfigure/teardown talk to. Each client is the slice of its
+// SDK client that the worker uses, so tests pass fakes with a send() method;
+// fetch, sleep and the function waiters are injected for the same reason.
 import { CloudWatchLogsClient, type CreateLogGroupCommand, type DeleteLogGroupCommand, type PutRetentionPolicyCommand } from '@aws-sdk/client-cloudwatch-logs';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { IAMClient, type CreateRoleCommand, type DeleteRoleCommand, type DeleteRolePolicyCommand, type PutRolePolicyCommand } from '@aws-sdk/client-iam';
 import {
   LambdaClient,
   waitUntilFunctionActiveV2,
+  waitUntilFunctionUpdatedV2,
   type AddPermissionCommand,
   type CreateFunctionCommand,
   type CreateFunctionUrlConfigCommand,
   type DeleteFunctionCommand,
   type DeleteFunctionUrlConfigCommand,
+  type GetFunctionConfigurationCommand,
   type GetFunctionUrlConfigCommand,
+  type UpdateFunctionConfigurationCommand,
 } from '@aws-sdk/client-lambda';
 import { SSMClient, type DeleteParametersCommand, type GetParameterCommand, type GetParametersByPathCommand } from '@aws-sdk/client-ssm';
 import { DynamoDBDocumentClient, type BatchWriteCommand, type DeleteCommand, type QueryCommand, type UpdateCommand } from '@aws-sdk/lib-dynamodb';
@@ -26,7 +29,7 @@ export interface Endpoint {
   owner: string;
   name: string;
   provider: 'claude' | 'groq' | 'offline';
-  status: 'pending' | 'provisioning' | 'ready' | 'failed' | 'deleting';
+  status: 'pending' | 'provisioning' | 'ready' | 'failed' | 'updating' | 'deleting';
   tokenHint?: string;
   url?: string;
   layerArn?: string;
@@ -45,6 +48,8 @@ export interface Deps {
         | CreateFunctionCommand
         | CreateFunctionUrlConfigCommand
         | GetFunctionUrlConfigCommand
+        | GetFunctionConfigurationCommand
+        | UpdateFunctionConfigurationCommand
         | AddPermissionCommand
         | DeleteFunctionUrlConfigCommand
         | DeleteFunctionCommand,
@@ -56,6 +61,8 @@ export interface Deps {
   sleep: (ms: number) => Promise<void>;
   /** Resolves once the function is Active; throws if it never gets there. */
   waitActive: (functionName: string) => Promise<void>;
+  /** Resolves once the last configuration update has finished; throws if it fails or times out. */
+  waitUpdated: (functionName: string) => Promise<void>;
 }
 
 export function defaultDeps(config: Config = loadConfig()): Deps {
@@ -71,6 +78,9 @@ export function defaultDeps(config: Config = loadConfig()): Deps {
     sleep: (ms) => sleep(ms),
     waitActive: async (FunctionName) => {
       await waitUntilFunctionActiveV2({ client: lambda, maxWaitTime: 120 }, { FunctionName });
+    },
+    waitUpdated: async (FunctionName) => {
+      await waitUntilFunctionUpdatedV2({ client: lambda, maxWaitTime: 120 }, { FunctionName });
     },
   };
 }

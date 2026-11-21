@@ -1,11 +1,12 @@
 // Lambda entry for slime-provisioner: the slime-control stream, filtered by the
-// event source mapping to endpoint items in status pending or deleting
+// event source mapping to endpoint items in status pending, updating or deleting
 // (infra/aws/platform/provisioner.tf). The worker's own writes (provisioning,
 // ready, failed) never match that filter, so it cannot trigger itself.
 import type { AttributeValue } from '@aws-sdk/client-dynamodb';
 import { unmarshall } from '@aws-sdk/util-dynamodb';
 import { defaultDeps, type Deps, type Endpoint } from './deps.js';
 import { provision } from './provision.js';
+import { reconfigure } from './reconfigure.js';
 import { teardown } from './teardown.js';
 
 export interface StreamEvent {
@@ -48,6 +49,7 @@ export async function dispatch(event: StreamEvent, deps: Deps): Promise<void> {
     }
     const ep = item as Endpoint;
     if (ep.status === 'pending') await provision(ep, deps);
+    else if (ep.status === 'updating') await reconfigure(ep, deps);
     else if (ep.status === 'deleting') await teardown(ep, deps);
   }
 }

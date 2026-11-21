@@ -71,8 +71,8 @@ Design: [`docs/slime-cloud/architecture.html`](../../docs/slime-cloud/architectu
   runtime bundle under `/opt/slime/` (`slime-cloud/runtime/dist/layer`).
 - [`platform/provisioner.tf`](platform/provisioner.tf): Lambda
   `slime-provisioner` ([`slime-cloud/provisioner`](../../slime-cloud/provisioner)),
-  triggered by endpoint items that turn `pending` or `deleting`. It creates and
-  deletes `slime-ep-<id>` functions, roles (bounded by
+  triggered by endpoint items that turn `pending`, `updating` or `deleting`. It
+  creates, reconfigures and deletes `slime-ep-<id>` functions, roles (bounded by
   `slime-endpoint-boundary`), Function URLs and log groups at runtime; those are
   not in Terraform state.
 
