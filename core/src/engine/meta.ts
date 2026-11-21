@@ -23,6 +23,8 @@ export interface MetaParts {
 }
 
 const MS_PRECISION = 100;
+// Repeated in warnings so a client that only checks warnings still learns the data is incomplete.
+const TRUNCATED_WARNING = 'The result was cut at the row cap, so data is incomplete; narrow the request or page it with limit and offset.';
 
 export function queryMeta({ handlerKey, tier, cache, review, execution, code, mode, intent, totalMs, generateMs }: MetaParts): QueryMeta {
   const timingsMs = {
@@ -32,6 +34,7 @@ export function queryMeta({ handlerKey, tier, cache, review, execution, code, mo
     ...(generateMs === undefined ? {} : { generate: roundMs(generateMs) }),
   };
   const warnings = literalsInIntent(intent).map(literalWarning);
+  if (execution.truncated) warnings.push(TRUNCATED_WARNING);
   return { handlerKey, tier, cache, truncated: execution.truncated, timingsMs, warnings, review, ...generatedCodeFor(mode, code) };
 }
 

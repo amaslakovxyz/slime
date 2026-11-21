@@ -180,6 +180,14 @@ describe('engine: startup, warnings, events and eviction', () => {
     assert.match(meta.warnings[0]!, /a number/);
   });
 
+  test('a result cut at the row cap says so in warnings, not only in truncated', async () => {
+    const slime = await startSlime({ connector: fakeConnector({ rows: ROWS, truncated: true }), generator: stubGenerator(() => artifact('SELECT name FROM accounts')) });
+    const { meta } = await slime.query({ intent: 'all accounts', output: OUTPUT });
+    assert.equal(meta.truncated, true);
+    assert.equal(meta.warnings.length, 1);
+    assert.match(meta.warnings[0]!, /row cap/);
+  });
+
   test('emits generated and error events (C11)', async () => {
     const events: SlimeEvent[] = [];
     const slime = await startSlime({ generator: stubGenerator(() => filteredArtifact), onEvent: (event) => events.push(event) });
