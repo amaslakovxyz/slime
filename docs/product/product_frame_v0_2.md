@@ -200,13 +200,18 @@ A Liquid handler frozen into plain code and hosted by Slime.
   because the engine checks Crystals first.
 * Runtime: one module per key plus `manifest.json` and `index.mjs`, loaded
   at startup. Runs without the QuickJS sandbox: guarded by the code
-  allowlist and the equivalence test only. Crystallize is local-only in v0
-  (`SLIME_LOCAL=1`).
+  allowlist and the equivalence test only. Crystallize is local-only in v0:
+  `POST /v0/crystallize` exists only in the local runtime (when its Crystal
+  folder `SLIME_CRYSTAL_DIR` is set); the Lambda entry has no such route.
 * Schema drift: a Crystal is served as is after a schema change. The runtime
-  logs a startup warning and shows it in the Lifecycle tab; the operator
-  re-crystallizes after a migration (the Crystal key stays the same). A
-  breaking migration gives a database error at call time; a semantic one
-  gives a silently wrong answer — a stated limit.
+  logs a startup warning and shows it in the Lifecycle tab. Re-crystallizing
+  in place is not built: core answers `already` for a key that is in the
+  manifest, and the saved Liquid record behind it keeps its old provenance.
+  Today the fix is to delete the Endpoint, let the handler regenerate and
+  turn Liquid again, then crystallize (same Crystal key); `slime
+  uncrystallize` would make this one step. A breaking migration gives a
+  database error at call time; a semantic one gives a silently wrong answer —
+  a stated limit.
 * Removal: `slime uncrystallize <crystal key>` is planned, not built. Today a
   Crystal is removed only by deleting its Endpoint, and `slc_` tokens cannot
   be revoked one by one.
@@ -326,5 +331,5 @@ latency for federated calls — repeat latency against SaaS sources is bounded
 by the upstream API round-trip (estimated 0.3–2 s, not measured); 3–8 ms
 holds only for the local database path. Honest line: *"Read-only. One
 protocol for your database and your SaaS tools. First call generates; repeat
-calls run reviewed code at zero model tokens; a Crystal endpoint can never
-reach the generator."*
+calls run the same code without generating; once reviewed it is served at
+zero model tokens; a Crystal endpoint can never reach the generator."*
