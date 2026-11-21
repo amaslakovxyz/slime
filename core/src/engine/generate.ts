@@ -1,7 +1,9 @@
 import { lintArtifact } from './checks/sql.js';
 import type { LimitOptions } from '../config/options.js';
 import { SlimeError } from '../shared/errors.js';
-import type { Artifact, Connector, Generator, ModelUsage, ParamTypesForModel, SandboxRunner } from '../ports.js';
+import type { Connector } from '../connectors/types.js';
+import type { Artifact, Generator, ModelUsage, ParamTypesForModel } from '../models/types.js';
+import type { SandboxRunner } from '../sandbox/types.js';
 import type { HandlerProvenance } from '../request/key.js';
 import type { ParsedRequest } from '../request/parse.js';
 import { checkParamTypes, type ParamTypes } from '../request/params.js';

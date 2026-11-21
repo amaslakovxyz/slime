@@ -1,6 +1,6 @@
 import { GENERATION_INSTRUCTIONS, OPTIMIZE_INSTRUCTIONS, REVIEW_INSTRUCTIONS, generationMessage, optimizeMessage, promptHash, reviewMessage } from '../prompts.js';
 import { ArtifactSchema, OptimizedCodeSchema, ReviewVerdictSchema } from '../schemas.js';
-import type { Generator, Optimizer, Reviewer } from '../../ports.js';
+import type { Generator, Optimizer, Reviewer } from '../types.js';
 import { structuredCaller, type ClaudeOptions } from './structured-call.js';
 
 const PROVIDER = 'claude';

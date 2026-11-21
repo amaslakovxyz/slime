@@ -14,7 +14,7 @@ import { checkCrystalFolder, crystallize, type CrystallizeOptions } from '../src
 import { moduleFileFor, renderManifest, readManifest } from '../src/crystallize/manifest.js';
 import { sha256 } from '../src/shared/hash.js';
 import type { HandlerRecord } from '../src/engine/types.js';
-import type { OptimizedCode, Optimizer } from '../src/ports.js';
+import type { OptimizedCode, Optimizer } from '../src/models/types.js';
 import { requestKey } from '../src/request/key.js';
 import { parseRequest } from '../src/request/parse.js';
 import { memoryStore } from '../src/stores/memory-store.js';

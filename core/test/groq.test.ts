@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { afterEach, describe, test } from 'node:test';
 import { SlimeError } from '../src/shared/errors.js';
 import { groq } from '../src/models/groq/index.js';
-import type { GenerationRequest } from '../src/ports.js';
+import type { GenerationRequest } from '../src/models/types.js';
 
 const OPTIONS = { apiKey: 'test-key', model: 'openai/gpt-oss-120b', reasoningEffort: 'low' as const };
 const REQUEST: GenerationRequest = { context: 'Database: postgresql 16', intent: 'all plans', params: {}, output: [{ name: 'string' }] };

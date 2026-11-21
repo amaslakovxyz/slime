@@ -1,5 +1,6 @@
 // Test doubles shared by the unit tests. No database, no model.
-import type { Artifact, Connector, GenerationRequest, Generator, Reviewer } from '../src/ports.js';
+import type { Connector } from '../src/connectors/types.js';
+import type { Artifact, GenerationRequest, Generator, Reviewer } from '../src/models/types.js';
 
 export function artifact(sql: string, params: string[] = [], shapeJs: string | null = null): Artifact {
   return { unsatisfiable: null, sql, params, shapeJs, assumptions: [] };

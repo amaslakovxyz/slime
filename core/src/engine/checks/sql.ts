@@ -1,6 +1,6 @@
 // Defence in depth only: the read-only database user is the real boundary.
 import { SlimeError } from '../../shared/errors.js';
-import type { Artifact } from '../../ports.js';
+import type { Artifact } from '../../models/types.js';
 
 type Inputs = Readonly<Record<string, unknown>>;
 

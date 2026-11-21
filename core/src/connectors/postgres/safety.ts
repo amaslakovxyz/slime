@@ -1,6 +1,6 @@
 // The startup safety check: Slime refuses credentials that could write (R8).
 import type pg from 'pg';
-import type { SafetyReport } from '../../ports.js';
+import type { SafetyReport } from '../types.js';
 
 interface RoleRow {
   user: string;

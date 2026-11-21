@@ -1,5 +1,6 @@
 import type { CrystalRegistry } from '../engine/crystal/types.js';
-import type { Connector, Generator, Reviewer } from '../ports.js';
+import type { Connector } from '../connectors/types.js';
+import type { Generator, Reviewer } from '../models/types.js';
 import type { SlimeStore } from '../stores/types.js';
 
 export interface TierOptions {

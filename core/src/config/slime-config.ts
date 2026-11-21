@@ -3,7 +3,8 @@ import { DEFAULT_LIMITS, DEFAULT_TIERS } from './defaults.js';
 import type { CrystalRegistry, LimitOptions, SlimeEvent, SlimeMode, SlimeOptions, TierOptions } from './options.js';
 import { configProblems } from './validate.js';
 import { SlimeConfigError } from '../shared/errors.js';
-import type { Connector, Generator, Reviewer } from '../ports.js';
+import type { Connector } from '../connectors/types.js';
+import type { Generator, Reviewer } from '../models/types.js';
 import type { SlimeStore } from '../stores/types.js';
 
 export { DEFAULT_LIMITS, DEFAULT_TIERS } from './defaults.js';

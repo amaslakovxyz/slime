@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { buildDictionary } from '../src/dictionary/dictionary.js';
-import type { SchemaInfo } from '../src/ports.js';
+import type { SchemaInfo } from '../src/connectors/types.js';
 
 const schema: SchemaInfo = {
   dialect: 'postgresql 16',

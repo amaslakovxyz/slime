@@ -1,5 +1,5 @@
 import pg from 'pg';
-import type { Connector, QueryLimits, QueryPlan, RunResult, SafetyReport, SchemaInfo } from '../../ports.js';
+import type { Connector, QueryLimits, QueryPlan, RunResult, SafetyReport, SchemaInfo } from '../types.js';
 import { toSlimeError } from './database-errors.js';
 import { describeSchema } from './describe.js';
 import { checkSafety } from './safety.js';

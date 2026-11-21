@@ -1,6 +1,6 @@
 import type { ErrorEvent, GeneratedEvent, SlimeEvent } from '../config/options.js';
 import { SlimeError } from '../shared/errors.js';
-import type { ModelUsage } from '../ports.js';
+import type { ModelUsage } from '../models/types.js';
 import type { HandlerRecord } from './types.js';
 
 const BACKGROUND_FAILED = 'BACKGROUND_FAILED';

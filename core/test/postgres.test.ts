@@ -5,7 +5,7 @@ import { SlimeConfig } from '../src/config/slime-config.js';
 import { createSlime } from '../src/create-slime.js';
 import { SlimeError } from '../src/shared/errors.js';
 import { offlineGenerator } from '../src/models/offline/index.js';
-import type { Connector, QueryLimits } from '../src/ports.js';
+import type { Connector, QueryLimits } from '../src/connectors/types.js';
 import { valuesInCheck } from '../src/connectors/postgres/enum-values.js';
 import { postgresConnector } from '../src/connectors/postgres/index.js';
 import { memoryStore } from '../src/stores/memory-store.js';

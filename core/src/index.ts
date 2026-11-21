@@ -39,10 +39,18 @@ export {
 } from './config/slime-config.js';
 export { SlimeConfigError, SlimeError, type ErrorCode, type SlimeErrorBody, type SlimeErrorOptions } from './shared/errors.js';
 export type {
-  Artifact,
   ColumnInfo,
   Connector,
   ForeignKey,
+  QueryLimits,
+  QueryPlan,
+  RunResult,
+  SafetyReport,
+  SchemaInfo,
+  TableInfo,
+} from './connectors/types.js';
+export type {
+  Artifact,
   GenerationRequest,
   GenerationResult,
   Generator,
@@ -53,19 +61,11 @@ export type {
   OptimizedCode,
   Optimizer,
   ParamTypesForModel,
-  QueryLimits,
-  QueryPlan,
   ReviewRequest,
   ReviewResult,
   Reviewer,
-  RunResult,
-  SafetyReport,
-  SandboxLimits,
-  SandboxRunner,
-  SchemaInfo,
-  ShapeJob,
-  TableInfo,
-} from './ports.js';
+} from './models/types.js';
+export type { SandboxLimits, SandboxRunner, ShapeJob } from './sandbox/types.js';
 export type { InputScalar, InputValue, InputValues, SlimeRequest } from './request/parse.js';
 export type { ParamType } from './request/params.js';
 export type { ObjectShape, Shape } from './request/shape.js';

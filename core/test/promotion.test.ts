@@ -5,7 +5,7 @@ import { SlimeConfig, type SlimeOptions } from '../src/config/slime-config.js';
 import type { SlimeEvent } from '../src/config/options.js';
 import { createSlime } from '../src/create-slime.js';
 import type { HandlerRecord, QueryMeta, Slime } from '../src/engine/types.js';
-import type { GenerationRequest } from '../src/ports.js';
+import type { GenerationRequest } from '../src/models/types.js';
 import type { SlimeStore } from '../src/stores/types.js';
 import { memoryStore } from '../src/stores/memory-store.js';
 import { artifact, fakeConnector, stubGenerator, stubReviewer } from './helpers.js';

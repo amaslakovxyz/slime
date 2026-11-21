@@ -5,7 +5,7 @@ import { HANDLERS_NS } from './engine/handler-cache.js';
 import { SlimeEngine } from './engine/slime-engine.js';
 import type { HandlerRecord, Slime } from './engine/types.js';
 import { SlimeConfigError } from './shared/errors.js';
-import type { Connector } from './ports.js';
+import type { Connector } from './connectors/types.js';
 import type { HandlerProvenance } from './request/key.js';
 import { QuickJSRunner } from './shaping/quickjs-runner.js';
 import { fileStore } from './stores/file-store.js';
