@@ -1,8 +1,11 @@
-// The Groq adapter against a stubbed fetch: request shape, validation, rate-limit waits, errors.
+// The Groq adapter against a stubbed fetch: the shared ModelClient contract, then
+// Groq's request shape and rate-limit waits.
 import assert from 'node:assert/strict';
 import { afterEach, describe, test } from 'node:test';
 import { SlimeError } from '../../src/shared/errors.js';
+import { groqClient } from '../../src/models/groq/groq-client.js';
 import { groq } from '../../src/models/groq/index.js';
+import { describeModelClientContract, type ModelScenario } from '../../src/testing/model-contract.js';
 import type { GenerationRequest } from '../../src/models/types.js';
 
 const OPTIONS = { apiKey: 'test-key', model: 'openai/gpt-oss-120b', reasoningEffort: 'low' as const };
@@ -33,6 +36,34 @@ afterEach(() => {
   globalThis.fetch = realFetch;
 });
 
+// Retries are part of the adapter, so each scenario answers every attempt the same way.
+const FAST_RETRY_AFTER = { 'retry-after': '0.001' };
+
+function responseFor(scenario: ModelScenario): Response {
+  if (scenario.kind === 'reply') return completion(scenario.value);
+  if (scenario.kind === 'rate-limited') return new Response('slow down', { status: 429, headers: FAST_RETRY_AFTER });
+  if (scenario.kind === 'auth-failed') return new Response('unauthorized', { status: 401 });
+  return new Response('upstream failed', { status: 503 });
+}
+
+const KEEP_ALIVE_MS = 1_000;
+
+// A real request's socket keeps the process alive; AbortSignal.timeout's timer does not, so hold one.
+function hangUntilAborted(_url: string, init: RequestInit): Promise<Response> {
+  const keepAlive = setInterval(() => {}, KEEP_ALIVE_MS);
+  return new Promise((_resolve, reject) =>
+    init.signal?.addEventListener('abort', () => {
+      clearInterval(keepAlive);
+      reject(init.signal?.reason);
+    }),
+  );
+}
+
+describeModelClientContract('groq', (scenario) => {
+  globalThis.fetch = (scenario.kind === 'hang' ? hangUntilAborted : async () => responseFor(scenario)) as typeof fetch;
+  return groqClient(OPTIONS);
+});
+
 describe('Groq adapter (M4)', () => {
   test('sends the prompt, dictionary and request in JSON mode and returns the validated artifact', async () => {
     const sent = stubFetch([completion(ARTIFACT)]);
@@ -56,16 +87,6 @@ describe('Groq adapter (M4)', () => {
     stubFetch([new Response('slow down', { status: 429, headers: { 'retry-after': '0.01' } }), completion(ARTIFACT)]);
     const result = await groq.generator(OPTIONS).generate(REQUEST, CALL);
     assert.ok(result.waitMs > 0);
-  });
-
-  test('a reply with wrong fields is a retryable GENERATION_FAILED', async () => {
-    stubFetch([completion({ sql: 'SELECT 1' })]);
-    await assert.rejects(groq.generator(OPTIONS).generate(REQUEST, CALL), (error) => error instanceof SlimeError && error.code === 'GENERATION_FAILED' && error.retryable);
-  });
-
-  test('a rejected API key is a final GENERATION_FAILED', async () => {
-    stubFetch([new Response('unauthorized', { status: 401 })]);
-    await assert.rejects(groq.generator(OPTIONS).generate(REQUEST, CALL), (error) => error instanceof SlimeError && error.code === 'GENERATION_FAILED' && !error.retryable);
   });
 
   test('the reviewer returns a validated verdict', async () => {

@@ -13,3 +13,17 @@ export {
   type StubReviewer,
   type Verdict,
 } from './fakes.js';
+export {
+  describeConnectorContract,
+  type ConnectorContractOptions,
+  type ConnectorContractQueries,
+  type ConnectorFactory,
+  type DescribeExpectation,
+  type ParameterizedQuery,
+} from './connector-contract.js';
+export {
+  describeModelClientContract,
+  type ModelClientFactory,
+  type ModelContractOptions,
+  type ModelScenario,
+} from './model-contract.js';

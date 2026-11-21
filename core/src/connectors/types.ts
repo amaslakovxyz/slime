@@ -36,8 +36,12 @@ export interface QueryLimits {
 }
 
 export interface QueryPlan {
-  /** In database planner units; the engine compares it with limits.maxQueryCost. */
-  cost: number;
+  /**
+   * In the database's own planner units; the engine compares it with
+   * limits.maxQueryCost. null when the database has no cost estimate, which
+   * skips that check.
+   */
+  cost: number | null;
   ms: number;
 }
 

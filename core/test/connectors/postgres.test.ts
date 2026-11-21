@@ -1,4 +1,5 @@
-// The Postgres connector against the demo database, as the read-only slime_reader (M3).
+// The Postgres connector against the demo database, as the read-only slime_reader (M3):
+// the shared Connector contract, then what is specific to Postgres.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import { SlimeConfig } from '../../src/config/slime-config.js';
@@ -10,6 +11,7 @@ import { valuesInCheck } from '../../src/connectors/postgres/enum-values.js';
 import { postgresConnector } from '../../src/connectors/postgres/index.js';
 import { memoryStore } from '../../src/stores/memory-store.js';
 import { READER_URL, WRITER_URL, asWriter, isDatabaseAvailable } from '../support/database.js';
+import { describeConnectorContract } from '../../src/testing/connector-contract.js';
 import { artifact } from '../../src/testing/fakes.js';
 
 const hasDatabase = await isDatabaseAvailable();
@@ -27,6 +29,23 @@ const errorCode = (pending: Promise<unknown>): Promise<string> =>
     (error: unknown) => (error instanceof SlimeError ? error.code : `not a SlimeError: ${String(error)}`),
   );
 
+describeConnectorContract('postgres', {
+  createReader: () => postgresConnector({ url: READER_URL }),
+  createWriter: async () => {
+    await asWriter(WRITER_FIXTURE);
+    return postgresConnector({ url: WRITER_URL });
+  },
+  queries: {
+    parameterized: { sql: 'SELECT name FROM plans WHERE monthly_price_cents >= $1::int ORDER BY name', params: [9900], rows: [{ name: 'Enterprise' }, { name: 'Growth' }] },
+    aggregates: 'SELECT count(*) AS n, sum(amount_cents) AS s FROM invoices',
+    manyRows: 'SELECT g FROM generate_series(1, 20) AS g',
+    write: 'DELETE FROM plans',
+    slow: 'SELECT pg_sleep(5)',
+  },
+  describes: { table: 'accounts', hiddenColumn: 'password_hash' },
+  skip: !hasDatabase,
+});
+
 describe('enum values in CHECK constraints (D1)', () => {
   test('reads the values Postgres stores for status IN (…)', () => {
     assert.deepEqual(valuesInCheck("CHECK ((status = ANY (ARRAY['active'::text, 'past_due'::text])))"), ['active', 'past_due']);
@@ -42,10 +61,6 @@ describe('Postgres connector as slime_reader (M3)', { skip: !hasDatabase }, () =
   });
   after(() => reader.close());
 
-  test('passes the startup safety check', async () => {
-    assert.deepEqual(await reader.safetyCheck(), { ok: true, user: 'slime_reader', problems: [] });
-  });
-
   test('describes only granted columns, with keys, comments and CHECK enum values', async () => {
     const { dialect, tables } = await reader.describe();
     const table = (name: string) => tables.find((candidate) => candidate.name === name);
@@ -59,20 +74,14 @@ describe('Postgres connector as slime_reader (M3)', { skip: !hasDatabase }, () =
     assert.match(table('usage_events')?.comment ?? '', /churn risk/);
   });
 
-  test('runs a parameterized query and returns counts and sums as numbers', async () => {
-    const plans = await reader.run('SELECT name FROM plans WHERE monthly_price_cents >= $1::int ORDER BY name', [9900], LIMITS);
-    assert.deepEqual(plans.rows.map(({ name }) => name), ['Enterprise', 'Growth']);
-    const [totals] = (await reader.run('SELECT count(*) AS n, sum(amount_cents) AS s FROM invoices', [], LIMITS)).rows;
-    assert.deepEqual([typeof totals?.n, typeof totals?.s], ['number', 'number']);
-  });
-
   test('refuses hidden columns and other schemas with ACCESS_DENIED', async () => {
     assert.equal(await errorCode(reader.run('SELECT password_hash FROM accounts', [], LIMITS)), 'ACCESS_DENIED');
     await asWriter(WRITER_FIXTURE);
     assert.equal(await errorCode(reader.run('SELECT * FROM slime_meta.probe', [], LIMITS)), 'ACCESS_DENIED');
   });
 
-  test('turns a second statement into a syntax error, and refuses a write hidden in WITH', async () => {
+  test('reports the reader as slime_reader, turns a second statement into a syntax error, and refuses a write hidden in WITH', async () => {
+    assert.equal((await reader.safetyCheck()).user, 'slime_reader');
     assert.equal(await errorCode(reader.run('SELECT 1; DELETE FROM plans', [], LIMITS)), 'QUERY_ERROR');
     assert.notEqual(await errorCode(reader.run('WITH d AS (DELETE FROM plans RETURNING *) SELECT * FROM d', [], LIMITS)), 'OK');
   });
@@ -84,14 +93,9 @@ describe('Postgres connector as slime_reader (M3)', { skip: !hasDatabase }, () =
     assert.ok(performance.now() - startedAt < 2_500, 'the client-side timeout stopped it');
   });
 
-  test('caps rows at rowCap and says so', async () => {
-    const result = await reader.run('SELECT g FROM generate_series(1, 10) AS g', [], { ...LIMITS, rowCap: 5 });
-    assert.deepEqual([result.rows.length, result.truncated], [5, true]);
-  });
-
   test('check reports the planner cost without running the query', async () => {
     const { cost } = await reader.check('SELECT * FROM invoices', [], LIMITS);
-    assert.ok(cost > 1, `cost ${cost}`);
+    assert.ok(cost !== null && cost > 1, `cost ${cost}`);
   });
 });
 
