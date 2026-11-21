@@ -32,6 +32,7 @@ The proposed product changes three things:
 | D5 | Where does execution run? | **All in slime-cloud** (tokens and execution in our Lambda). | Execution in slime-client (control/data plane split); explore local + pinned in cloud. |
 | D6 | Agent-facing surface | **MCP server + `slime` CLI.** CLI: `login`, `connect`, `pin`. MCP tools: `query`, `catalog`, `pin`. Internally the existing `{intent, input, output}`. | Own protocol + SDK; CLI only. |
 | D7 | How does the agent reuse handlers? | **Catalog first** (§4.1). The agent looks up existing handlers before writing a new intent. | Semantic intent matching (risk of serving a handler with a different meaning); both (largest scope). |
+| D10 | How does the D9 user connect? (revises D6) | **A remote MCP server added by URL is the main path; the `slime` CLI is optional.** The user pastes the Slime URL into their agent, signs in with OAuth, and connects Linear/Notion on a web page. Tools stay `query`, `catalog`, `pin` (D6, D7). | Keep an installed slime-client as the main path (terminal, Node and JSON configs lose much of the D9 audience); two equal paths (double onboarding and tests). |
 | D9 | Who is the user? | **PM, manager or vibecoder: not tech-savvy, needs fast iteration** (§4.7). | Engineer/tech lead; ops analytics across all three sources as the ICP. |
 | D8 | Whose credentials read the sources? | **The developer's personal OAuth**, for explore and pinned endpoints alike (§4.2). | One workspace connection per source (needs a workspace admin); personal for explore + workspace app for pinned (two connections, different data in Gas and Liquid). |
 
@@ -180,9 +181,14 @@ Never stored, not even as a response cache: rows and content.
    not tech-savvy, iterating fast in an AI chat or app builder. This puts
    pressure on earlier decisions:
    * **D6 assumed a developer machine.** A CLI and a locally installed MCP
-     server are friction for this user. A remote MCP server added by URL with
-     OAuth sign-in needs no install (support per client still to verify:
-     Claude, Cursor, ChatGPT, Lovable).
+     server are friction for this user. Resolved by D10: a remote MCP server
+     added by URL with OAuth sign-in. Checked on 2026-11-21 in the official
+     docs: Claude Code (remote HTTP with OAuth,
+     [docs](https://docs.claude.com/en/docs/claude-code/mcp)), Cursor
+     (Streamable HTTP with OAuth, [docs](https://cursor.com/docs/context/mcp))
+     and the Claude apps (custom connectors,
+     [docs](https://modelcontextprotocol.io/docs/develop/connect-remote-servers)).
+     ChatGPT and Lovable are not verified.
    * **Trust (gap 4) gets harder.** The user cannot read a plan or SQL, so
      `assumptions` and provenance must be plain language ("counted issues in
      the *Blocked* state of project *Release 2.1*").
@@ -197,5 +203,6 @@ Never stored, not even as a response cache: rows and content.
 
 ## 5. Next decision
 
-Agent-facing surface for D9: keep slime-client as an installed devtool, or
-lead with a remote MCP server added by URL.
+Semantic layer (gap 3) for the D9 demo: how business terms ("blocked",
+"release", "spec") and the Linear issue ↔ Notion page link get defined
+without asking a non-technical user to write a dictionary.
