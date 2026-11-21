@@ -88,8 +88,12 @@ One Slime instance reads from one SQL source and any number of read-only API
 sources (Notion first), and a handler can combine them. Why, the threat model
 and the alternatives are in [docs/multi-source.md](./docs/multi-source.md); the
 work is in [docs/multi-source-implementation.md](./docs/multi-source-implementation.md).
-None of this is implemented yet. With no API source configured, Slime stays
-byte-identical to today (MS3).
+Implemented in core and merged to `main` (PR #26) as an experimental layer:
+`platform/runtime` and the admin do not configure API sources yet. The
+decisions stay Proposed until they are confirmed against
+[product frame v0.2](../docs/product/product_frame_v0_2.md) (handler shape,
+Crystal for API steps). With no API source configured, Slime stays
+byte-identical to before (MS3).
 
 | # | Decision | Status |
 |---|---|---|
@@ -433,7 +437,7 @@ goal. Before a milestone starts, its row gets the files it creates or changes
 | M5 | **Crystal.** Serving from an imported registry; the crystallize job writing `.mjs` modules with a generated index; the `check` command. | `crystal*.test.ts` ported; a hand-edited Crystal file fails `check`; the output passes the equivalence test. | done |
 | M6 | **Use it as a package, and retire `sandbox/`.** An example app that installs the packed tarball and calls `slime.query()` from an endpoint; docs for the request format; the bench ported to run on core. The example takes over what `sandbox/` still provides: the demo server, the demo database (`db/init.sql` and its Docker Compose file, used by core's tests and CI) and the offline handlers. Then `sandbox/` is deleted, with its CI job. Publishing to npm is not part of v1. | The example (`examples/express`, its own lockfile, run in CI from the packed tarball) answers a query. The bench, ported to `core/bench/`, gets the 5 cases recorded as correct in `docs/product/concepts_brief.md` right, and refuses the 2 unsafe ones. Core's tests and CI use the moved demo database. `sandbox/` and its CI job are gone. | built; bench with a model pending |
 | M7 | **Switch `platform/runtime` to the package** (with its owner). Drop the path mapping to `sandbox/src`; build the engine with `createSlime(new SlimeConfig(…))`; replace `DynamoHandlerStore` with a `SlimeStore` over the existing table that serves the items already there; keep `slime.flush()` before each response (C15). After the switch nothing compiles `sandbox/src`, so M6 can delete `sandbox/`. | The runtime's tests pass on the package; a deployed function answers from handlers stored by the new store. Handlers saved before the switch are still served. The previous deploy can be restored. | built; handler copy and deploy pending (runtime owner) |
-| M8 | **Multi-source handlers** (MS1–MS17, [docs/multi-source.md](docs/multi-source.md)): `sources` config, the `ApiSource` port, v2 step handlers, the step executor, `defineApiSource`, the constrained HTTP client, `@slime-cloud/core/notion`, `examples/multi-source`. | v1 pins unchanged; contract, security (S1–S10) and engine tests pass in CI; the example answers three demo intents on recorded responses; one live run against seeded Notion and a real model. | built; real Notion fixtures and the live run pending (needs a Notion workspace) |
+| M8 | **Multi-source handlers** (MS1–MS17, [docs/multi-source.md](docs/multi-source.md)): `sources` config, the `ApiSource` port, v2 step handlers, the step executor, `defineApiSource`, the constrained HTTP client, `@slime-cloud/core/notion`, `examples/multi-source`. | v1 pins unchanged; contract, security (S1–S10) and engine tests pass in CI; the example answers three demo intents on recorded responses; one live run against seeded Notion and a real model. | built and merged (PR #26, experimental); real Notion fixtures recorded; the live run (P6.5) and runtime wiring pending |
 
 **M2 engine rules.** `createSlime()` awaits `connector.safetyCheck()` (unsafe
 credentials throw `SlimeConfigError`), `store.init()` and the dictionary, in

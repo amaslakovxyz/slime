@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| Status | **Built** on `chore/multi-source-plan` (PR #26): P0–P6 done, except recording real Notion fixtures (P5.5) and the live Notion run (P6.5), which need a Notion workspace |
+| Status | **Built, merged to `main`** (PR #26) as an experimental core layer: P0–P6 done, including real Notion fixtures (P5.5); the live Notion run (P6.5) is pending. `platform/runtime` and the admin don't configure API sources yet. |
 | Owner | Konstantin |
 | Date | 2026-11-21 (revised after the review in PR #26) |
 | Scope | `core/` (`@slime-cloud/core`), one new adapter subpath, one example app |
-| Next step | Settle §11 in P0, then turn §10 into a step-by-step implementation plan |
+| Next step | Confirm handler shape and Crystal for API steps against [product frame v0.2](../../docs/product/product_frame_v0_2.md) (open questions); run P6.5; wire sources into `platform/runtime` |
 
 ## 0. Summary
 
