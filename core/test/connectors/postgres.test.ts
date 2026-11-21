@@ -93,6 +93,12 @@ describe('Postgres connector as slime_reader (M3)', { skip: !hasDatabase }, () =
     assert.ok(performance.now() - startedAt < 2_500, 'the client-side timeout stopped it');
   });
 
+  test('a caller value the SQL cannot cast is INVALID_REQUEST; a bad cast of table data stays QUERY_ERROR', async () => {
+    assert.equal(await errorCode(reader.run('SELECT name FROM accounts LIMIT $1::int', ['many'], LIMITS)), 'INVALID_REQUEST');
+    assert.equal(await errorCode(reader.run('SELECT name FROM accounts WHERE created_at > $1::timestamptz', ['yesterday-ish'], LIMITS)), 'INVALID_REQUEST');
+    assert.equal(await errorCode(reader.run('SELECT name::int FROM accounts', [], LIMITS)), 'QUERY_ERROR');
+  });
+
   test('check reports the planner cost without running the query', async () => {
     const { cost } = await reader.check('SELECT * FROM invoices', [], LIMITS);
     assert.ok(cost !== null && cost > 1, `cost ${cost}`);

@@ -45,6 +45,9 @@ imports this folder.
   - `42501` (insufficient privilege) → `ACCESS_DENIED`;
   - `25006` (write in a read-only transaction) → `WRITE_REFUSED`;
   - timeouts → `EXECUTION_TIMEOUT` (retryable);
+  - class `22` (data exception) quoting a bound input value, such as
+    `invalid input syntax for type integer: "many"` → `INVALID_REQUEST`:
+    the caller's value is wrong, not the SQL;
   - anything else → `QUERY_ERROR` with `details.sqlState`.
 - **The safety check refuses:**
   - superusers (including `rds_superuser`);
