@@ -63,7 +63,10 @@ function boot(): Promise<Runtime> {
     const engine = await Engine.create(connector, { store });
     // Only provisioned endpoints meter usage (slime-runtime has no usage table).
     const meter = process.env.SLIME_USAGE_TABLE
-      ? new UsageMeter(process.env.SLIME_USAGE_TABLE, process.env.SLIME_TENANT_ID ?? '')
+      ? new UsageMeter(process.env.SLIME_USAGE_TABLE, process.env.SLIME_TENANT_ID ?? '', () => {
+          const s = engine.stats();
+          return { gas: s.handlers.gas, crystal: s.crystal.loaded };
+        })
       : undefined;
     return {
       app: createApp(engine, connector, (m) => meter?.record(m)),

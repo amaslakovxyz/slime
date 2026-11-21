@@ -28,7 +28,7 @@ The core's own dependencies resolve from `sandbox/node_modules`, so run
 | [src/lambda.ts](src/lambda.ts) | Lambda entry: SSM settings at cold start (comma-separated `SLIME_SSM_PREFIX` paths, later overrides earlier), `x-api-key` auth, lazy engine boot (503 `NOT_READY` and retry), store and usage flush before each response |
 | [src/app.ts](src/app.ts) | HTTP routes (mirror `sandbox/src/index.ts` until `@slime-cloud/server` exists) |
 | [src/store-dynamodb.ts](src/store-dynamodb.ts) | Core `HandlerStore` port on DynamoDB, one partition per tenant |
-| [src/usage.ts](src/usage.ts) | Usage counters (`USAGE#<tenant>` / month in `SLIME_USAGE_TABLE`), set only on provisioned endpoints |
+| [src/usage.ts](src/usage.ts) | Daily usage counters (`USAGE#<tenant>` / `YYYY-MM-DD` in `SLIME_USAGE_TABLE`): requests and latency per tier, generations, LLM tokens, Gas/Crystal handler snapshot. Set only on provisioned endpoints |
 | [scripts/build.mjs](scripts/build.mjs) | Deterministic bundle into `dist/lambda/` (same source, same zip hash), copied to `dist/layer/slime/` for the Gas layer |
 
 ## Commands
