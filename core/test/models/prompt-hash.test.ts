@@ -9,9 +9,9 @@ import { groq } from '../../src/models/groq/index.js';
 const OPTIONS = { apiKey: 'unused', model: 'any-model' };
 
 test('the Claude generator prompt hash is pinned', () => {
-  assert.equal(claude.generator(OPTIONS).promptHash, '2a84dcc9f858da27');
+  assert.equal(claude.generator(OPTIONS).promptHash, '9651520e2b76a20d');
 });
 
 test('the Groq generator prompt hash is pinned', () => {
-  assert.equal(groq.generator(OPTIONS).promptHash, '73951f5f7a83efd5');
+  assert.equal(groq.generator(OPTIONS).promptHash, '30a50a4b7fce1b5e');
 });
