@@ -31,6 +31,7 @@ The proposed product changes three things:
 | D4 | Operations in v0 | **Read-only.** Matches `core` and the current positioning. | Writes; read + one confirmed write. |
 | D5 | Where does execution run? | **All in slime-cloud** (tokens and execution in our Lambda). | Execution in slime-client (control/data plane split); explore local + pinned in cloud. |
 | D6 | Agent-facing surface | **MCP server + `slime` CLI.** CLI: `login`, `connect`, `pin`. MCP tools: `query`, `catalog`, `pin`. Internally the existing `{intent, input, output}`. | Own protocol + SDK; CLI only. |
+| D7 | How does the agent reuse handlers? | **Catalog first** (§4.1). The agent looks up existing handlers before writing a new intent. | Semantic intent matching (risk of serving a handler with a different meaning); both (largest scope). |
 
 The hybrid maps the existing tiers onto user actions:
 
@@ -124,11 +125,23 @@ Never stored, not even as a response cache: rows and content.
 
 ## 4. Gaps still to design
 
-1. **Handler matching for agents.** The cache key is the normalized intent
-   text. Agents paraphrase constantly, so every paraphrase is a new handler,
-   model call and review, and Liquid rarely forms. Options: a handler
-   **catalog** that slime-client exposes so the agent reuses existing intents,
-   and/or semantic intent matching.
+1. **Handler matching for agents (decided: D7, catalog first).** The cache
+   key is the normalized intent text, and agents paraphrase constantly, so
+   without help every paraphrase is a new handler, model call and review.
+   The design sketch:
+   * **`catalog` MCP tool** returns the tenant's reusable handlers: intent,
+     input names and types, `output`, tier, sources touched, and call cost.
+     It takes optional `source` and `search` (plain substring) filters so the
+     list stays small as it grows.
+   * **Only reviewed handlers are listed** (Liquid and pinned). Gas handlers
+     are not, so an unreviewed guess never spreads.
+   * **The MCP server instructions and the `query` tool description** tell the
+     agent to call `catalog` first and to send a listed intent verbatim, which
+     hits the cache key exactly.
+   * **A `query` miss** answers as Gas and adds `meta.hint: "pin to add to the
+     catalog"`.
+   * **Known limit:** reuse depends on the agent following instructions.
+     Semantic matching stays a later option if the measured hit rate is low.
 2. **Identity and permissions.** Whose token reads Linear: the developer's or a
    workspace's? A pinned production endpoint needs a service identity, scopes
    and token refresh. The rule "never take authorization from `input`"
@@ -152,4 +165,5 @@ Never stored, not even as a response cache: rows and content.
 
 ## 5. Next decision
 
-Handler matching (gap 1): catalog-first, semantic matching, or both.
+Identity (gap 2): whose credentials read Linear and Notion, in explore and
+in a pinned endpoint.
