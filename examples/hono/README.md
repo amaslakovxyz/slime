@@ -3,13 +3,18 @@
 The smallest app around `@slime-cloud/core`: one file, two endpoints.
 
 - `GET /health` returns `slime.stats()`.
-- `GET /plans` asks Slime for the number of accounts on each plan.
+- `POST /slime` takes `{ intent, input, output }` from the frontend and passes
+  it to `slime.query()`.
 
 ```sh
 (cd ../express && npm run db:up)   # the demo database
 npm install
 GROQ_API_KEY=... npm start
-curl localhost:3000/plans
+curl localhost:3000/slime -H 'content-type: application/json' -d '{
+  "intent": "number of accounts on each plan",
+  "input": {},
+  "output": [{ "plan": "string", "accounts": "integer" }]
+}'
 ```
 
 `DATABASE_URL` and `PORT` override the defaults. Generated handlers are saved

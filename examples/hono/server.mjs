@@ -11,7 +11,7 @@ const slime = await createSlime(new SlimeConfig({
 
 const app = new Hono()
   .get('/health', (c) => c.json(slime.stats()))
-  .get('/plans', async (c) => c.json(await slime.query({ intent: 'number of accounts on each plan', input: {}, output: [{ plan: 'string', accounts: 'integer' }] })))
+  .post('/slime', async (c) => c.json(await slime.query(await c.req.json())))
   .onError((error, c) => c.json({ error: error.toJSON?.() ?? { code: 'INTERNAL' } }, error.status ?? 500));
 
 serve({ fetch: app.fetch, port: Number(process.env.PORT ?? 3000) });
