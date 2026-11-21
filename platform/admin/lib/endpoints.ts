@@ -282,6 +282,25 @@ export async function updateSettings(
   }
 }
 
+/** After a Crystallize: the runner restarts the endpoint so it loads the new Crystal modules. */
+export async function requestRestart(owner: string, endpointId: string): Promise<void> {
+  try {
+    await ddb().send(
+      new UpdateCommand({
+        TableName: env().controlTable,
+        Key: endpointKey(owner, endpointId),
+        UpdateExpression: 'SET #s = :updating, updatedAt = :now',
+        ConditionExpression: '#s = :ready',
+        ExpressionAttributeNames: { '#s': 'status' },
+        ExpressionAttributeValues: { ':updating': 'updating', ':ready': 'ready', ':now': new Date().toISOString() },
+      }),
+    );
+  } catch (err) {
+    if (err instanceof ConditionalCheckFailedException) throw notUpdatable('The endpoint is not ready');
+    throw err;
+  }
+}
+
 export async function revealToken(owner: string, endpointId: string): Promise<string | undefined> {
   if (!(await getEndpoint(owner, endpointId))) return undefined;
   return secretStore().get(endpointId, 'SLIME_API_KEY');

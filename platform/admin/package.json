@@ -13,7 +13,9 @@
     "infra:up": "docker compose up -d --wait",
     "infra:down": "docker compose down -v",
     "tables": "node --import tsx scripts/dev-tables.ts",
-    "seed": "node --import tsx scripts/seed-demo.ts"
+    "seed": "node --import tsx scripts/seed-demo.ts",
+    "runner": "node --import tsx scripts/local-runner.ts",
+    "local": "node scripts/local.mjs"
   },
   "engines": {
     "node": ">=22"

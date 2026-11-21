@@ -1956,3 +1956,75 @@ code.inline {
     transition: none !important;
   }
 }
+
+/* ---- Lifecycle tab (lc-*) ---- */
+.lc-rail { display: grid; grid-template-columns: repeat(4, 1fr); list-style: none; padding: 0; margin: 0 0 24px; }
+.lc-stage { position: relative; padding-top: 32px; color: var(--wireframe-grey); }
+.lc-stage::before { content: ""; position: absolute; top: 11px; left: 0; right: 0; height: 2px; background: var(--border-color); }
+.lc-stage:first-child::before { left: 12px; }
+.lc-stage:last-child::before { right: calc(100% - 12px); }
+.lc-stage b { display: block; font-size: 13px; font-weight: 600; }
+.lc-stage small { font-size: 12px; color: var(--wireframe-grey); }
+.lc-dot { position: absolute; top: 0; left: 0; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--border-bright); background: var(--bg-canvas); display: grid; place-items: center; font-size: 11px; z-index: 1; }
+.lc-done { color: var(--text-pure); }
+.lc-done::before { background: linear-gradient(90deg, var(--plasma-primary), var(--plasma-shadow)); }
+.lc-done .lc-dot { border-color: var(--plasma-primary); background: var(--plasma-primary); color: #fff; box-shadow: 0 0 14px var(--glow-primary); }
+.lc-s-linked.lc-done .lc-dot { border-color: var(--gas-accent); background: var(--gas-accent); color: #000; box-shadow: 0 0 14px rgba(56, 248, 184, 0.5); }
+.lc-s-crystal.lc-done .lc-dot { border-color: var(--crystal-glow); background: var(--crystal-accent); color: #000; box-shadow: 0 0 16px rgba(196, 181, 253, 0.7); }
+.lc-now .lc-dot { animation: lc-pulse 1.4s infinite; }
+@keyframes lc-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 20, 118, 0.5); } 50% { box-shadow: 0 0 0 7px rgba(255, 20, 118, 0); } }
+
+.lc-card { margin-bottom: 18px; }
+.lc-h { font-size: 15px; font-weight: 600; margin: 0 0 2px; display: flex; align-items: center; gap: 10px; }
+.lc-num { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--bg-surface-hover); border: 1px solid var(--border-bright); font-size: 11px; color: var(--text-muted); }
+.lc-gas { color: var(--gas-accent); }
+.lc-liquid { color: var(--plasma-highlight); }
+.lc-crystal { color: var(--crystal-glow); }
+
+.lc-seg { display: inline-flex; background: var(--bg-canvas); border: 1px solid var(--border-color); border-radius: 10px; padding: 3px; margin: 6px 0 10px; }
+.lc-seg button { background: none; border: 0; color: var(--text-muted); font: inherit; font-size: 12px; padding: 5px 12px; border-radius: 7px; cursor: pointer; }
+.lc-seg button.on { background: var(--bg-surface-hover); color: var(--text-pure); }
+.lc-copy { display: flex; align-items: flex-start; gap: 10px; background: var(--bg-canvas); border: 1px solid var(--border-color); border-radius: var(--radius-control); padding: 12px 14px; }
+.lc-copy pre { margin: 0; flex: 1; white-space: pre-wrap; word-break: break-all; font-family: var(--font-code); font-size: 12.5px; color: var(--plasma-highlight); }
+.lc-wait { display: flex; align-items: center; gap: 10px; margin-top: 14px; color: var(--text-muted); font-size: 13px; }
+.lc-wait i { width: 8px; height: 8px; border-radius: 50%; background: var(--plasma-primary); animation: lc-pulse 1.4s infinite; }
+.lc-wait.ok { color: var(--gas-accent); }
+.lc-wait.ok i { background: var(--gas-accent); animation: none; }
+
+.lc-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+.lc-table th { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--wireframe-grey); font-weight: 600; text-align: left; padding: 0 10px 10px; }
+.lc-table td { white-space: nowrap; padding: 12px 10px; border-top: 1px solid var(--border-color); vertical-align: middle; }
+.lc-hash { font-size: 12px; color: var(--text-muted); }
+.lc-table td.lc-intent { max-width: 380px; min-width: 220px; white-space: normal; overflow-wrap: anywhere; }
+.lc-prog { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.lc-bar { width: 90px; height: 5px; border-radius: 5px; background: var(--bg-surface-hover); overflow: hidden; }
+.lc-bar i { display: block; height: 100%; border-radius: 5px; transition: width 0.4s; }
+.lc-fill-gas { background: var(--gas-accent); }
+.lc-fill-liquid { background: var(--plasma-primary); }
+.lc-fill-crystal { background: var(--crystal-glow); }
+.lc-review { font-size: 12px; color: var(--text-muted); }
+.lc-review-ok { color: var(--gas-accent); }
+.lc-review-run { color: var(--plasma-highlight); }
+.lc-chk { accent-color: var(--crystal-glow); width: 16px; height: 16px; }
+.lc-empty { color: var(--wireframe-grey); text-align: center; padding: 22px 0 6px; }
+
+.lc-feed { margin-top: 14px; font-family: var(--font-code); font-size: 12px; color: var(--wireframe-grey); }
+.lc-feed div { display: grid; grid-template-columns: 76px 70px 64px 1fr 80px; gap: 8px; padding: 2px 0; }
+.lc-ms { text-align: right; }
+
+.lc-crys { border-color: var(--crystal-border); background: radial-gradient(500px 200px at 100% 0%, rgba(196, 181, 253, 0.1), transparent 70%), var(--bg-surface); }
+.lc-crys-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 6px; }
+.lc-btn-crystal { background: var(--crystal-accent); color: #1a1020; border-color: transparent; box-shadow: 0 0 22px rgba(196, 181, 253, 0.45); }
+.lc-btn-crystal:disabled { opacity: 0.35; box-shadow: none; cursor: not-allowed; }
+.lc-reports { list-style: none; padding: 0; margin: 14px 0 0; font-size: 13px; }
+.lc-reports li { padding: 3px 0; }
+.lc-reports li.ok::before { content: "✓ "; color: var(--gas-accent); }
+.lc-reports li.bad::before { content: "· "; color: var(--plasma-highlight); }
+.lc-routes { margin-top: 16px; display: grid; gap: 8px; }
+.lc-route { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--crystal-border); border-radius: var(--radius-control); background: var(--crystal-bg); }
+.lc-route > div { flex: 1; }
+
+@media (max-width: 720px) {
+  .lc-rail { grid-template-columns: repeat(2, 1fr); row-gap: 16px; }
+  .lc-table th:nth-child(6), .lc-table td:nth-child(6), .lc-table th:nth-child(5), .lc-table td:nth-child(5) { display: none; }
+}

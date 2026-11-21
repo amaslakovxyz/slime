@@ -45,7 +45,7 @@ export function EndpointsTable({ rows, compact = false }: { rows: EndpointWithSt
             {rows.map((ep) => (
               <tr key={ep.endpointId}>
                 <td className="cell-name">
-                  <Link href={`/endpoints/${ep.endpointId}`}>{ep.name}</Link>
+                  <Link href={`/endpoints/${ep.endpointId}/lifecycle`}>{ep.name}</Link>
                   <span className="cell-sub">{ep.endpointId}</span>
                 </td>
                 <td>

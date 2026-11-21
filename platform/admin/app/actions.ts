@@ -12,12 +12,15 @@ import {
   connectionUrl,
   createEndpoint,
   isProvider,
+  getEndpoint,
   requestDelete,
+  requestRestart,
   revealToken,
   updateConnector,
   updateSettings,
 } from '@/lib/endpoints';
 import { CodedError, hasCode } from '@/lib/errors';
+import { crystallizeOn, type CrystallizeReport } from '@/lib/lifecycle';
 import { withSpan } from '@/lib/telemetry';
 import { checkLogin, createUser } from '@/lib/users';
 
@@ -89,7 +92,7 @@ export async function createEndpointAction(_prev: FormState, form: FormData): Pr
     if (userFacing(err)) return { error: (err as Error).message };
     throw err;
   }
-  redirect(`/endpoints/${endpointId}`);
+  redirect(`/endpoints/${endpointId}/lifecycle`);
 }
 
 /** Tests a URL typed into the create form; the URL already travels to the server for create. */
@@ -174,4 +177,25 @@ export async function revealTokenAction(endpointId: string): Promise<string | nu
     revealToken(owner, endpointId),
   );
   return token ?? null;
+}
+
+export type CrystallizeResult = { reports: CrystallizeReport[]; restarting: boolean } | { error: string };
+
+/** Lifecycle tab: crystallize the picked handlers, then restart the endpoint so they serve as Crystal. */
+export async function crystallizeAction(endpointId: string, keys: string[]): Promise<CrystallizeResult> {
+  const email = await requireUser();
+  const ep = await getEndpoint(email, endpointId);
+  if (!ep) return { error: 'Endpoint not found.' };
+  if (keys.length === 0) return { error: 'Pick at least one handler.' };
+  try {
+    const reports = await withSpan('endpoint.crystallize', { 'slime.endpoint.id': endpointId, 'slime.handlers': keys.length }, () =>
+      crystallizeOn(ep, keys),
+    );
+    const restarting = reports.some((r) => r.outcome === 'crystallized');
+    if (restarting) await requestRestart(email, endpointId);
+    refreshEndpoint();
+    return { reports, restarting };
+  } catch (err) {
+    return { error: (err as Error).message };
+  }
 }

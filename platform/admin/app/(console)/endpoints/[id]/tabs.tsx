@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 const TABS = [
+  { slug: '/lifecycle', label: 'Lifecycle' },
   { slug: '', label: 'Overview' },
   { slug: '/connector', label: 'Connector' },
   { slug: '/usage', label: 'Usage' },
