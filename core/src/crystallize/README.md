@@ -71,6 +71,6 @@ folder.
 
 ## Verification
 
-- `test/crystal-allowlist.test.ts`: the allowlist and the module format.
-- `test/crystallize.test.ts`: the job, the optimizer and its fallbacks,
+- `test/crystallize/allowlist.test.ts`: the allowlist and the module format.
+- `test/crystallize/crystallize.test.ts`: the job, the optimizer and its fallbacks,
   `check`, the bin's exit codes, and serving the result.

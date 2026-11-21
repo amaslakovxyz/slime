@@ -1,7 +1,7 @@
 // The dictionary (§4.4, D2): metadata, glossary and rules rendered as text, with
 // no model, so the same inputs always give the same text and hash.
-import type { ColumnInfo, SchemaInfo, TableInfo } from '../ports.js';
-import { canonicalJSON, sha256 } from '../request/key.js';
+import type { ColumnInfo, SchemaInfo, TableInfo } from '../connectors/types.js';
+import { canonicalJSON, sha256 } from '../shared/hash.js';
 
 export interface DictionarySources {
   schema: SchemaInfo;

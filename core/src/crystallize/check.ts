@@ -2,8 +2,9 @@
 // doesn't re-check Crystal at startup (C10).
 import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { assertReadOnlySql } from '../checks/sql.js';
-import { INDEX_FILE, INDEX_TYPES_FILE, MODULE_EXTENSION, readManifest, renderIndex, renderIndexTypes, sha256Hex, type Manifest } from './manifest.js';
+import { assertReadOnlySql } from '../engine/checks/sql.js';
+import { INDEX_FILE, INDEX_TYPES_FILE, MODULE_EXTENSION, readManifest, renderIndex, renderIndexTypes, type Manifest } from './manifest.js';
+import { sha256 } from '../shared/hash.js';
 import { parseModule } from './module-format.js';
 
 const REGENERATE = 'run crystallize again instead of editing it';
@@ -29,7 +30,7 @@ export async function checkCrystalFolder(dir: string): Promise<string[]> {
 async function moduleProblem(dir: string, file: string, pinnedSha256: string): Promise<string | undefined> {
   try {
     const text = await readFile(join(dir, file), 'utf8');
-    if (sha256Hex(text) !== pinnedSha256) return `${file} does not match the hash pinned in manifest.json; ${REGENERATE}`;
+    if (sha256(text) !== pinnedSha256) return `${file} does not match the hash pinned in manifest.json; ${REGENERATE}`;
     // A re-pinned hand edit still has to pass the allowlist and the read-only lint.
     assertReadOnlySql(parseModule(text).sql);
     return undefined;

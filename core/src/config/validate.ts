@@ -1,4 +1,4 @@
-import { isNonEmptyString, isPlainObject } from '../guards.js';
+import { isNonEmptyString, isPlainObject } from '../shared/guards.js';
 import { numberProblems } from './number-rules.js';
 
 const OPTION_KEYS = ['connector', 'generator', 'reviewer', 'store', 'crystal', 'glossary', 'rules', 'tiers', 'limits', 'onEvent'];

@@ -7,11 +7,13 @@ import type { LimitOptions } from '../config/options.js';
 import { HANDLERS_NS } from '../engine/handler-cache.js';
 import { forModel } from '../engine/generate.js';
 import type { HandlerRecord } from '../engine/types.js';
-import type { Connector, Optimizer } from '../ports.js';
-import { QuickJSRunner } from '../shaping/quickjs-runner.js';
-import type { SlimeStore } from '../store/types.js';
+import type { Connector } from '../connectors/types.js';
+import type { Optimizer } from '../models/types.js';
+import { QuickJSRunner } from '../sandbox/quickjs/quickjs-runner.js';
+import type { SlimeStore } from '../stores/types.js';
 import { verifyCandidate, type EquivalenceDeps } from './equivalence.js';
-import { moduleFileFor, readManifest, sha256Hex, writeManifestAndIndex, type Manifest } from './manifest.js';
+import { sha256 } from '../shared/hash.js';
+import { moduleFileFor, readManifest, writeManifestAndIndex, type Manifest } from './manifest.js';
 import type { CrystalCode } from './module-format.js';
 
 export interface CrystallizeOptions {
@@ -127,7 +129,7 @@ async function saveCrystal({ options, manifest }: JobContext, record: HandlerRec
   const { intent, output, paramTypes, provenance, review } = record;
   manifest.entries[record.key] = {
     file,
-    sha256: sha256Hex(text),
+    sha256: sha256(text),
     intent,
     output,
     paramTypes,

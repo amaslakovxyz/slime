@@ -3,7 +3,7 @@
 ## Overview
 
 The parts of `SlimeConfig` (PLAN.md C4): the option types, the defaults and
-the validation. The class itself is in [`../config.ts`](../config.ts), which
+the validation. The class itself is in [`slime-config.ts`](./slime-config.ts), which
 re-exports the types and defaults, so the public entry and tests import from
 there.
 
@@ -83,4 +83,4 @@ there.
 ## Verification
 
 - Run from the repository root: `npm test -w @slime-cloud/core`
-- Tests: `test/config.test.ts`.
+- Tests: `test/config/config.test.ts`.

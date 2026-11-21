@@ -1,6 +1,6 @@
 // Every failure is INVALID_REQUEST with a message the caller can act on (§4.1).
-import { SlimeError } from '../errors.js';
-import { isPlainObject } from '../guards.js';
+import { SlimeError } from '../shared/errors.js';
+import { isPlainObject } from '../shared/guards.js';
 import { assertValidShape, type Shape } from './shape.js';
 
 export type InputScalar = string | number | boolean | null;
