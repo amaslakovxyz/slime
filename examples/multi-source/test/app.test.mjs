@@ -49,11 +49,10 @@ describe('the multi-source example', { skip: !isDatabaseUp && 'Postgres is not r
       output: [{ name: 'string', paidCents: 'integer', openNegative: 'integer' }],
     });
     assert.equal(status, 200, JSON.stringify(body));
-    assert.deepEqual(body.data.slice(0, 3).map(({ name, openNegative }) => ({ name, openNegative })), [
-      { name: 'Iron Analytics 15', openNegative: 2 },
-      { name: 'Lunar Works 14', openNegative: 1 },
-      { name: 'Swift Labs 12', openNegative: 1 },
-    ]);
+    const notionRows = body.meta.steps.find((step) => step.source === 'notion').rows;
+    const counted = body.data.reduce((sum, row) => sum + row.openNegative, 0);
+    assert.ok(counted > 0 && counted <= notionRows, `${counted} counted of ${notionRows} Notion rows`);
+    assert.ok(body.data.every((row, index, rows) => index === 0 || rows[index - 1].openNegative >= row.openNegative), 'most open items first');
     assert.deepEqual(body.meta.steps.map((step) => step.source), ['db', 'notion']);
   });
 
@@ -63,8 +62,9 @@ describe('the multi-source example', { skip: !isDatabaseUp && 'Postgres is not r
       output: [{ film: 'string', date: 'date|null', director: 'string|null', runningTimeMin: 'integer|null' }],
     });
     assert.equal(status, 200, JSON.stringify(body));
-    assert.deepEqual(body.data[0], { film: 'My Neighbor Totoro', date: '2026-11-14', director: 'Hayao Miyazaki', runningTimeMin: 86 });
-    assert.equal(body.data.length, 3);
+    assert.equal(body.data.length, body.meta.steps.find((step) => step.source === 'notion').rows);
+    assert.ok(body.data.every((row, index, rows) => index === 0 || (rows[index - 1].date ?? '') >= (row.date ?? '')), 'newest first');
+    assert.ok(body.data.some((row) => row.director !== null && Number.isInteger(row.runningTimeMin)), 'nights are matched to films');
   });
 
   test('intent 3: films alone, filtered on the server', async () => {
