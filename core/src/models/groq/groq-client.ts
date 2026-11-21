@@ -39,6 +39,8 @@ export function groqClient(options: GroqOptions): ModelClient {
 }
 
 async function callGroqJson<T>(options: GroqOptions, call: ModelCall<T>): Promise<ModelReply<T>> {
+  // An empty key would come back as a 401, which reads as a wrong key, not a missing one.
+  if (!options.apiKey.trim()) throw new SlimeError('GENERATION_FAILED', 'No Groq API key is set.');
   let waitMs = 0;
   let transientRetries = 0;
   for (let rateLimitRetries = 0; ; ) {
