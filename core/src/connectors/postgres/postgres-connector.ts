@@ -55,14 +55,14 @@ class PostgresConnector implements Connector {
 
   async check(sql: string, params: unknown[], limits: QueryLimits): Promise<QueryPlan> {
     const startedAt = performance.now();
-    const result = await this.#readOnly(limits, (client) => client.query<ExplainRow>(timed(`EXPLAIN (FORMAT JSON) ${wrap(sql, limits)}`, params, limits)));
+    const result = await this.#readOnly(limits, params, (client) => client.query<ExplainRow>(timed(`EXPLAIN (FORMAT JSON) ${wrap(sql, limits)}`, params, limits)));
     const cost = result.rows[0]?.['QUERY PLAN'][0]?.Plan['Total Cost'] ?? 0;
     return { cost, ms: performance.now() - startedAt };
   }
 
   async run(sql: string, params: unknown[], limits: QueryLimits): Promise<RunResult> {
     const startedAt = performance.now();
-    const result = await this.#readOnly(limits, (client) => client.query(timed(wrap(sql, limits), params, limits)));
+    const result = await this.#readOnly(limits, params, (client) => client.query(timed(wrap(sql, limits), params, limits)));
     const truncated = result.rows.length > limits.rowCap;
     return { rows: truncated ? result.rows.slice(0, limits.rowCap) : result.rows, truncated, ms: performance.now() - startedAt };
   }
@@ -76,7 +76,7 @@ class PostgresConnector implements Connector {
   }
 
   // Defence in depth: the read-only user is the boundary; this also blocks writes and caps time per query.
-  async #readOnly<T>(limits: QueryLimits, work: (client: pg.PoolClient) => Promise<T>): Promise<T> {
+  async #readOnly<T>(limits: QueryLimits, params: readonly unknown[], work: (client: pg.PoolClient) => Promise<T>): Promise<T> {
     const client = await this.#pool.connect();
     let isBroken = false;
     try {
@@ -84,7 +84,7 @@ class PostgresConnector implements Connector {
       await client.query(`SET LOCAL statement_timeout = ${Math.floor(limits.timeoutMs)}`);
       return await work(client);
     } catch (error) {
-      throw toSlimeError(error, limits.timeoutMs);
+      throw toSlimeError(error, limits.timeoutMs, params);
     } finally {
       isBroken = await rollback(client);
       // A connection whose state can't be trusted is destroyed, not reused.

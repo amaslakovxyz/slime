@@ -32,7 +32,8 @@ contract; each implementation has its own folder and its own package subpath.
    - fetch `rowCap + 1` rows to know whether to set `truncated`;
    - return counts and sums as numbers, not strings;
    - map errors to `ACCESS_DENIED`, `WRITE_REFUSED`, `EXECUTION_TIMEOUT`
-     (retryable) or `QUERY_ERROR`.
+     (retryable), `INVALID_REQUEST` (an input value the SQL can't use) or
+     `QUERY_ERROR`.
 3. Add the driver as an optional peer dependency and a dev dependency, a
    `./<name>` entry in `package.json` `exports`, and the subpath to
    `test/package.test.ts`.
