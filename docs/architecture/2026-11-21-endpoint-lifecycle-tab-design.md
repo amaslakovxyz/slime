@@ -203,7 +203,8 @@ sequenceDiagram
   built: `crystallize()` answers `already` for a key in the manifest, and the
   saved Liquid record behind a Crystal keeps its old provenance (the engine
   serves the key from the Crystal, so it never regenerates). Today: delete the
-  endpoint and let the handler regenerate. The core warning text ("run
+  endpoint and create a new one, which also changes its URL, `slm_` key and
+  every `slc_` token (agents and pages holding them break). The core warning text ("run
   crystallize again") overstates this.
 * Crystal code runs without the QuickJS sandbox (allowlist and equivalence
   test only), and Crystallize is local-only (L3).
