@@ -27,11 +27,12 @@ The proposed product changes three things:
 |---|---|---|---|
 | D1 | When does the agent use Slime? | **Hybrid explore → pin.** The agent explores data (Gas), pins a good request into a hosted endpoint (Liquid), and can export it into its repo as code (Crystal). | Runtime gateway only (competes head-on with MCP servers, Composio); dev-time API builder only (integrations become just more sources). |
 | D2 | How are Linear/Notion queried? | **Live federation.** Every call goes to the source API at request time. | Sync → Postgres (excluded by D3: a replica is stored customer data). |
-| D3 | Customer data retention | **No customer data is stored.** Rows and content live in memory for one request only. | Response caching, replicas. |
+| D3 | Customer data retention | **No customer data is persisted.** Rows and content never reach disk, a shared cache (Redis, DynamoDB) or logs. They live in process memory only, for one request or the D12 cache window. | Persistent response caching, replicas. |
 | D4 | Operations in v0 | **Read-only.** Matches `core` and the current positioning. | Writes; read + one confirmed write. |
 | D5 | Where does execution run? | **All in slime-cloud** (tokens and execution in our Lambda). | Execution in slime-client (control/data plane split); explore local + pinned in cloud. |
 | D6 | Agent-facing surface | **MCP server + `slime` CLI.** CLI: `login`, `connect`, `pin`. MCP tools: `query`, `catalog`, `pin`. Internally the existing `{intent, input, output}`. | Own protocol + SDK; CLI only. |
 | D7 | How does the agent reuse handlers? | **Catalog first** (§4.1). The agent looks up existing handlers before writing a new intent. | Semantic intent matching (risk of serving a handler with a different meaning); both (largest scope). |
+| D12 | How do pinned endpoints survive load? (refines D3) | **A short in-memory response cache plus request coalescing.** Key: handler key + input values + token owner; TTL about 30 s; process RAM only. Concurrent identical calls share one source run. | Strict D3 with per-endpoint rate limits and `Cache-Control` only (no load reduction); accept the risk for the hackathon (demo can fail on a Notion 429). |
 | D11 | Does Slime own business meaning? | **No. Slime is only the liquid backend API.** It turns `{intent, input, output}` into a handler over the connected sources' schemas. Business terms and cross-source links are the agent's job: the agent clarifies with its user and writes a precise intent. Slime returns its reading in `meta.assumptions` (already in `core`). | Inferred meaning + clarifying questions + tenant glossary; a glossary page in Notion; hard-coded demo conventions. |
 | D10 | How does the D9 user connect? (revises D6) | **A remote MCP server added by URL is the main path; the `slime` CLI is optional.** The user pastes the Slime URL into their agent, signs in with OAuth, and connects Linear/Notion on a web page. Tools stay `query`, `catalog`, `pin` (D6, D7). | Keep an installed slime-client as the main path (terminal, Node and JSON configs lose much of the D9 audience); two equal paths (double onboarding and tests). |
 | D9 | Who is the user? | **PM, manager or vibecoder: not tech-savvy, needs fast iteration** (§4.7). | Engineer/tech lead; ops analytics across all three sources as the ICP. |
@@ -108,18 +109,34 @@ and cacheable ([concepts brief](concepts_brief.md)).
    the handler key. A renamed Notion property fails plan validation before any
    call and drops the handler back to Gas.
 
-### 3.5 What "no customer data" means precisely (D3)
+### 3.5 What "no customer data" means precisely (D3, D12)
 
-Stored:
+Persisted:
 
 * handlers (plans and shaping code);
 * source schemas (Notion database and property names are customer metadata);
 * OAuth tokens, encrypted with KMS;
 * logs without payloads.
 
-Never stored, not even as a response cache: rows and content.
+Never persisted: rows and content. The only copy outside a single request is
+the D12 in-memory cache, which expires in about 30 s and dies with the
+process.
 
-### 3.6 Consequences of D5 (all in cloud)
+### 3.6 Load on pinned endpoints (D12)
+
+Without a cache, a dashboard opened by ten people makes ten live runs per
+refresh with the developer's personal token (D8), hitting Notion's ~3 rps
+data source limit and the developer's Linear quota. D12 bounds that:
+
+* identical calls within the TTL cost one source run;
+* concurrent identical calls are coalesced into one run (`core` coalesces
+  generations today; this extends the idea to source runs);
+* `meta` reports `cache: hit` and the age of the answer, so staleness is
+  visible;
+* on Lambda the cache is per instance, so hit rate drops as instances scale
+  out. This is acceptable for v0.
+
+### 3.7 Consequences of D5 (all in cloud)
 
 * The customer database must be reachable from the internet: managed Postgres
   (Neon, Supabase, RDS) with an allowlist of our egress IPs. `localhost`
