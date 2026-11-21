@@ -34,6 +34,10 @@
       "types": "./dist/models/groq/index.d.ts",
       "default": "./dist/models/groq/index.js"
     },
+    "./notion": {
+      "types": "./dist/sources/notion/index.d.ts",
+      "default": "./dist/sources/notion/index.js"
+    },
     "./crystallize": {
       "types": "./dist/crystallize/index.d.ts",
       "default": "./dist/crystallize/index.js"

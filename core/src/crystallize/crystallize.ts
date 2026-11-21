@@ -1,5 +1,6 @@
 // The crystallize job: turns proven Liquid handlers into Crystal modules in the
 // app's own code (C10). The app runs it from its own script with its own config.
+import { asV1, isArtifactV2 } from '../models/artifact-v2.js';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { DEFAULT_LIMITS } from '../config/defaults.js';
@@ -7,6 +8,7 @@ import type { LimitOptions } from '../config/options.js';
 import { HANDLERS_NS } from '../engine/handler-cache.js';
 import { forModel } from '../engine/generate.js';
 import type { HandlerRecord } from '../engine/types.js';
+import { changedProvenance, type HandlerProvenance } from '../request/key.js';
 import type { Connector } from '../connectors/types.js';
 import type { Optimizer } from '../models/types.js';
 import { QuickJSRunner } from '../sandbox/quickjs/quickjs-runner.js';
@@ -27,13 +29,15 @@ export interface CrystallizeOptions {
   optimizer?: Optimizer;
   /** Successful runs a Liquid handler needs before it is crystallized. */
   minRuns?: number;
+  /** Current provenance; a handler made with another one is not ready. */
+  provenance?: HandlerProvenance;
   limits?: Partial<LimitOptions>;
   optimizeTimeoutMs?: number;
   /** Check everything, write nothing. */
   isDryRun?: boolean;
 }
 
-export type CrystalOutcome = 'crystallized' | 'already' | 'not-ready' | 'failed';
+export type CrystalOutcome = 'crystallized' | 'already' | 'not-ready' | 'skipped' | 'failed';
 
 export interface CrystalReport {
   key: string;
@@ -54,11 +58,13 @@ interface JobContext {
   deps: EquivalenceDeps;
   manifest: Manifest;
   minRuns: number;
+  provenance: HandlerProvenance | undefined;
 }
 
 export const DEFAULT_MIN_RUNS = 10;
 const DEFAULT_OPTIMIZE_TIMEOUT_MS = 120_000;
 const REVIEWS_ALLOWED = new Set(['approved', 'none']);
+const SKIPPED_API_STEPS = 'has API steps, which Crystal does not support yet';
 
 export async function crystallize(options: CrystallizeOptions): Promise<CrystalReport[]> {
   const runner = new QuickJSRunner();
@@ -67,6 +73,7 @@ export async function crystallize(options: CrystallizeOptions): Promise<CrystalR
     deps: { connector: options.connector, runner, limits: { ...DEFAULT_LIMITS, ...options.limits } },
     manifest: await readManifest(options.dir),
     minRuns: options.minRuns ?? DEFAULT_MIN_RUNS,
+    provenance: options.provenance,
   };
   try {
     const saved = await options.store.list(HANDLERS_NS);
@@ -83,7 +90,9 @@ export async function crystallize(options: CrystallizeOptions): Promise<CrystalR
 async function crystallizeOne(context: JobContext, record: HandlerRecord): Promise<CrystalReport> {
   const report: CrystalReport = { key: record.key, intent: record.intent, outcome: 'not-ready', reasons: [] };
   if (context.manifest.entries[record.key]) return { ...report, outcome: 'already' };
-  const notReadyReason = readinessProblem(record, context.minRuns);
+  // MS9: every stored v2 handler has an API step (single-SQL ones were stored as v1).
+  if (isArtifactV2(record.artifact)) return { ...report, outcome: 'skipped', reasons: [SKIPPED_API_STEPS] };
+  const notReadyReason = readinessProblem(record, context.minRuns, context.provenance);
   if (notReadyReason) return { ...report, reasons: [notReadyReason] };
 
   report.outcome = 'failed';
@@ -99,8 +108,14 @@ async function crystallizeOne(context: JobContext, record: HandlerRecord): Promi
   return report;
 }
 
-function readinessProblem({ tier, review, runs, fixtures }: HandlerRecord, minRuns: number): string | undefined {
+function readinessProblem(
+  { tier, review, runs, fixtures, provenance: made }: HandlerRecord,
+  minRuns: number,
+  provenance?: HandlerProvenance,
+): string | undefined {
   if (tier !== 'liquid') return `tier is ${tier}`;
+  const changed = provenance ? changedProvenance(made, provenance) : [];
+  if (changed.length) return `made with another ${changed.join(', ')}`;
   if (!REVIEWS_ALLOWED.has(review)) return `review is ${review}`;
   if (runs < minRuns) return `${runs} of ${minRuns} successful runs`;
   if (fixtures.length === 0) return 'no recorded inputs to test against';
@@ -109,7 +124,7 @@ function readinessProblem({ tier, review, runs, fixtures }: HandlerRecord, minRu
 
 /** The optimized version first, when there is an optimizer; the unchanged Liquid code always. */
 async function candidatesFor({ options }: JobContext, record: HandlerRecord, report: CrystalReport): Promise<Candidate[]> {
-  const { sql, params, shapeJs } = record.artifact;
+  const { sql, params, shapeJs } = asV1(record.artifact, 'crystallize'); // v2 records were skipped in crystallizeOne
   const unchanged: Candidate = { code: { sql, params, shape: shapeJs }, isOptimized: false, notes: [] };
   if (!options.optimizer) return [unchanged];
   try {

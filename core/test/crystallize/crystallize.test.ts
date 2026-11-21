@@ -107,6 +107,13 @@ describe('crystallize (M5)', () => {
     assert.equal((await runJob(liquidRecord(), { dir })).report.outcome, 'already');
   });
 
+  test('refuses a handler made with another provenance than the current one', async () => {
+    const made = liquidRecord({ provenance: { schemaHash: 'old', dictionaryHash: 'dictionary', promptHash: 'prompt', model: 'model' } });
+    const { report } = await runJob(made, { provenance: { ...made.provenance, schemaHash: 'new' } });
+    assert.deepEqual([report.outcome, report.reasons], ['not-ready', ['made with another schemaHash']]);
+    assert.equal((await runJob(made, { provenance: { ...made.provenance } })).report.outcome, 'crystallized');
+  });
+
   test('uses an optimized version that gives the same output, and records its notes', async () => {
     const shape = 'function shape(rows) { return rows.map(({ name, cents }) => ({ name, euros: cents / 100 })); }';
     const optimizer = optimizerReturning({ sql: SQL, params: ['country'], shape, notes: ['destructured the row'] });

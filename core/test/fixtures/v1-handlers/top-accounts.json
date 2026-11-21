@@ -1,0 +1,37 @@
+{
+  "key": "d3818420853abd6ebe8ff567d42f9287f4515f7eb1a31173f8f61fdbe86d4541",
+  "intent": "top N accounts by total paid invoice amount in cents, highest first",
+  "output": [
+    {
+      "name": "string",
+      "totalPaidCents": "integer"
+    }
+  ],
+  "artifact": {
+    "unsatisfiable": null,
+    "sql": "SELECT a.name AS \"name\", sum(i.amount_cents)::int AS \"totalPaidCents\" FROM accounts a JOIN invoices i ON i.account_id = a.id AND i.status = 'paid' GROUP BY a.id, a.name ORDER BY 2 DESC LIMIT $1::int",
+    "params": [
+      "limit"
+    ],
+    "shapeJs": null,
+    "assumptions": []
+  },
+  "paramTypes": {
+    "limit": "number"
+  },
+  "provenance": {
+    "schemaHash": "recorded-on-main",
+    "dictionaryHash": "recorded-on-main",
+    "promptHash": "recorded-on-main",
+    "model": "offline"
+  },
+  "tier": "liquid",
+  "review": "approved",
+  "runs": 3,
+  "fixtures": [
+    {
+      "limit": 5
+    }
+  ],
+  "createdAt": "2026-11-21T00:00:00.000Z"
+}

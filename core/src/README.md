@@ -12,6 +12,7 @@ The folders say what the system is made of:
 |---|---|---|
 | **Port** | [connectors/](./connectors/README.md) | Where data comes from. `types.ts` + `postgres/`. |
 | **Port** | [models/](./models/README.md) | Generator, Reviewer, Optimizer. `types.ts`, `ModelClient` + `claude/`, `groq/`, `offline/`. |
+| **Port** | `sources/` | Read-only API sources beside the SQL connector (MS1–MS17). `types.ts` (`ApiSource`) + `call-source.ts` (timeout, redaction), `api/` (`defineApiSource`, the constrained HTTP client) and `notion/`. |
 | **Port** | [stores/](./stores/README.md) | Slime's own key-value state. `types.ts` + file and memory stores. |
 | **Port** | [sandbox/](./sandbox/README.md) | Where generated shaping code runs. `types.ts` + `quickjs/`. |
 | Engine | [engine/](./engine/README.md) | The Slime instance: handler cache, generation, review, promotion; `crystal/` serves Crystal handlers, `checks/` guards generated SQL. |
@@ -33,8 +34,9 @@ the API:
 
 | Subpath | Source |
 |---|---|
-| `.` | `index.ts`: `createSlime`, `SlimeConfig`, `DEFAULT_TIERS`, `DEFAULT_LIMITS`, `SlimeError`, `SlimeConfigError`, `fileStore`, `memoryStore`, `DEFAULT_STORE_DIR`, `handlerKeyFor`, and every port type. |
+| `.` | `index.ts`: `createSlime`, `SlimeConfig`, `DEFAULT_TIERS`, `DEFAULT_LIMITS`, `SlimeError`, `SlimeConfigError`, `fileStore`, `memoryStore`, `DEFAULT_STORE_DIR`, `handlerKeyFor`, `changedProvenance`, and every port type. |
 | `./postgres` | `connectors/postgres/index.ts` |
+| `./notion` | `sources/notion/index.ts` |
 | `./models` | `models/index.ts`: `modelRoles`, `parseJsonReply`, `ModelClient` types |
 | `./claude`, `./groq`, `./offline` | `models/<name>/index.ts` |
 | `./crystallize` | `crystallize/index.ts` (and the `slime-crystal` bin) |

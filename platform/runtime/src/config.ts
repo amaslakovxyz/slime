@@ -4,7 +4,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { SlimeConfig, type CrystalRegistry, type Generator, type LimitOptions, type Reviewer, type TierOptions } from '@slime-cloud/core';
+import { SlimeConfig, type CrystalRegistry, type Generator, type LimitOptions, type Reviewer, type SlimeEvent, type TierOptions } from '@slime-cloud/core';
 import { postgresConnector } from '@slime-cloud/core/postgres';
 import { DynamoSlimeStore } from './store-dynamodb.js';
 
@@ -45,7 +45,12 @@ const TIER_VARIABLES: Readonly<Partial<Record<keyof TierOptions, string>>> = {
   fixturesPerHandler: 'FIXTURES_PER_HANDLER',
 };
 
-export async function slimeConfigFromEnv(env: Env = process.env): Promise<SlimeConfig> {
+/** Runtime hooks that are not env settings (the Lambda entry counts generation tokens). */
+export interface RuntimeHooks {
+  onEvent?: (event: SlimeEvent) => void;
+}
+
+export async function slimeConfigFromEnv(env: Env = process.env, hooks: RuntimeHooks = {}): Promise<SlimeConfig> {
   const isLocked = env.SLIME_MODE === 'locked';
   const shapeMemoryMb = numberFrom(env.SHAPE_MEMORY_MB);
   return new SlimeConfig({
@@ -55,6 +60,7 @@ export async function slimeConfigFromEnv(env: Env = process.env): Promise<SlimeC
     ...(await crystalsFrom(env)),
     tiers: numbersFrom(env, TIER_VARIABLES),
     limits: { ...numbersFrom(env, LIMIT_VARIABLES), ...(shapeMemoryMb ? { shapeMemoryBytes: shapeMemoryMb * MEBIBYTE } : {}) },
+    ...(hooks.onEvent ? { onEvent: hooks.onEvent } : {}),
   });
 }
 
@@ -84,6 +90,19 @@ async function modelsFrom(env: Env): Promise<Models> {
     generator: claude.generator({ apiKey, model: generatorModel, effort: generatorEffort }),
     ...(isReviewing ? { reviewer: claude.reviewer({ apiKey, model: reviewerModel, effort: reviewerEffort }) } : {}),
   };
+}
+
+const PROVIDER_KEYS = { claude: 'ANTHROPIC_API_KEY', groq: 'GROQ_API_KEY' } as const;
+
+/**
+ * A warning when the provider that generates has no key: saved and Crystal handlers still
+ * serve, but every new request would be sent to the provider with an empty key and fail.
+ */
+export function missingProviderKey(env: Env): string | undefined {
+  if (env.SLIME_MODE === 'locked' || env.SLIME_PROVIDER === 'offline') return undefined;
+  const name = PROVIDER_KEYS[env.SLIME_PROVIDER === 'groq' ? 'groq' : 'claude'];
+  if (env[name]?.trim()) return undefined;
+  return `${name} is not set: saved handlers still answer, new requests cannot be generated. Set it for the runtime (locally: export it before npm run local), or switch the endpoint to Offline.`;
 }
 
 /** Crystal ships in the bundle (SLIME_CRYSTAL_DIR); SLIME_CRYSTAL=off is the kill switch. */

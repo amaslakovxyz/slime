@@ -1,0 +1,31 @@
+{
+  "key": "589af6616578ab3b20f08f624306154e7cbedb3d409527fc2d0f4b14edebbb56",
+  "intent": "number of accounts on each plan",
+  "output": [
+    {
+      "plan": "string",
+      "accounts": "integer"
+    }
+  ],
+  "artifact": {
+    "unsatisfiable": null,
+    "sql": "SELECT p.name AS \"plan\", count(a.id)::int AS \"accounts\" FROM plans p JOIN accounts a ON a.plan_id = p.id GROUP BY p.id, p.name",
+    "params": [],
+    "shapeJs": null,
+    "assumptions": []
+  },
+  "paramTypes": {},
+  "provenance": {
+    "schemaHash": "recorded-on-main",
+    "dictionaryHash": "recorded-on-main",
+    "promptHash": "recorded-on-main",
+    "model": "offline"
+  },
+  "tier": "liquid",
+  "review": "approved",
+  "runs": 3,
+  "fixtures": [
+    {}
+  ],
+  "createdAt": "2026-11-21T00:00:00.000Z"
+}

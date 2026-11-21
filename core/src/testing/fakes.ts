@@ -1,5 +1,6 @@
 // Test doubles for apps' and adapters' own tests, and core's: no database, no model.
 import type { Connector } from '../connectors/types.js';
+import type { AnyArtifact } from '../models/artifact-v2.js';
 import type { Artifact, GenerationRequest, Generator, Reviewer } from '../models/types.js';
 
 export function artifact(sql: string, params: string[] = [], shapeJs: string | null = null): Artifact {
@@ -41,11 +42,12 @@ export interface StubGenerator extends Generator {
 }
 
 /** Returns `artifactFor(request)` after `delayMs`, and counts its calls. */
-export function stubGenerator(artifactFor: (request: GenerationRequest) => Artifact, delayMs = 0): StubGenerator {
+export function stubGenerator(artifactFor: (request: GenerationRequest) => AnyArtifact, delayMs = 0): StubGenerator {
   let calls = 0;
   return {
     model: 'stub-model',
     promptHash: 'stub-prompt',
+    multiSourcePromptHash: 'stub-multi-source-prompt',
     get calls() {
       return calls;
     },

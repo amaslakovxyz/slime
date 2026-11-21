@@ -1,0 +1,49 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "https://api.notion.com/v1/data_sources/1a1b1c1d-1e1f-4a2b-8c3d-4e5f60718293"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "object": "data_source",
+      "id": "1a1b1c1d-1e1f-4a2b-8c3d-4e5f60718293",
+      "title": [
+        {
+          "plain_text": "Movie nights"
+        }
+      ],
+      "properties": {
+        "Date": {
+          "name": "Date",
+          "type": "date"
+        },
+        "Host": {
+          "name": "Host",
+          "type": "select",
+          "select": {
+            "options": [
+              {
+                "name": "Anna"
+              },
+              {
+                "name": "Ben"
+              },
+              {
+                "name": "Chen"
+              }
+            ]
+          }
+        },
+        "Rating": {
+          "name": "Rating",
+          "type": "number"
+        },
+        "Film": {
+          "name": "Film",
+          "type": "title"
+        }
+      }
+    }
+  }
+}

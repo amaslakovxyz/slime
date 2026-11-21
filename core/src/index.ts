@@ -17,7 +17,7 @@ export type {
   Tier,
 } from './engine/types.js';
 export type { CrystalHandler, ShapeFunction } from './engine/crystal/types.js';
-export { handlerKeyFor, type HandlerProvenance } from './request/key.js';
+export { changedProvenance, handlerKeyFor, type HandlerProvenance } from './request/key.js';
 export type { ParamTypes } from './request/params.js';
 
 export {
@@ -68,5 +68,10 @@ export type {
 export type { SandboxLimits, SandboxRunner, ShapeJob } from './sandbox/types.js';
 export type { InputScalar, InputValue, InputValues, SlimeRequest } from './request/parse.js';
 export type { ParamType } from './request/params.js';
-export type { ObjectShape, Shape } from './request/shape.js';
+export type { LeafType, ObjectShape, Shape } from './request/shape.js';
+export { SourceError, type SourceErrorOptions } from './sources/source-error.js';
+export { defineApiSource } from './sources/api/define-api-source.js';
+export type { ApiColumnDeclaration, ApiOperationDeclaration, ApiParamDeclaration, ApiRow, ApiRunContext, ApiSourceDeclaration } from './sources/api/declaration.js';
+export type { HttpClient, HttpRequestOptions } from './sources/api/http-client.js';
+export type { ApiSchema, ApiSource, CallOptions, OperationInfo, ParamInfo, Source, SourceCallOptions } from './sources/types.js';
 export type { SlimeStore, StoreEntry } from './stores/types.js';

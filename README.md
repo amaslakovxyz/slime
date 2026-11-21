@@ -35,6 +35,11 @@ Backend -- Slime runtime:
 - [examples/express/](./examples/express/README.md) - an Express app
   whose endpoints are answered by `@slime-cloud/core`; its own lockfile. It
   also holds the demo database (`db/init.sql`) that core's tests and CI use.
+- [examples/hono/](./examples/hono/README.md) - the smallest app around
+  the core: one Hono file with `/health` and `POST /slime`.
+- [examples/multi-source/](./examples/multi-source/README.md) - one instance
+  over Postgres, Notion and a public films API; runs offline on recorded
+  responses, and in CI.
 - **`platform/` — hosted Slime Cloud**
   - [platform/landing/](./platform/landing/README.md) - Static marketing page
     (one `index.html`, no build step). Preview with `just landing`.
@@ -46,7 +51,14 @@ Backend -- Slime runtime:
     the Lambda entry and DynamoDB handler store around the core. Imports
     `@slime-cloud/core` (`core/`); the core never imports it.
   - `platform/docs/` - dated reviews.
-  - `platform/admin/` and `platform/provisioner/` arrive with PR #18.
+  - [platform/provisioner/](./platform/provisioner/README.md) -
+    `slime-provisioner` Lambda: turns `pending` endpoints in `slime-control`
+    into `slime-ep-<id>` functions on the shared Gas layer, reconfigures and
+    deletes them.
+  - [platform/admin/](./platform/admin/README.md) - slime cloud admin (Next.js, runs
+    locally): sign-up, endpoints, connector settings, tier usage and bill
+    estimate, OpenTelemetry. Design:
+    [docs/architecture/slime-cloud.html](./docs/architecture/slime-cloud.html).
 - **`docs/`** - project-wide docs, indexed with statuses in
   [docs/README.md](./docs/README.md): `product/`, `architecture/`, `brand/`.
 - `.github/workflows/` (no contract file) - [ci.yml](./.github/workflows/ci.yml)
@@ -56,6 +68,7 @@ Backend -- Slime runtime:
   `platform/infra/` stack on pull requests and applies them on `main` (the landing
   page included); [terraform-quality.yml](./.github/workflows/terraform-quality.yml)
   runs tflint and trivy.
+
 
 Root files: [AGENTS.md](./AGENTS.md) (repository contract for agents),
 [justfile](./justfile) (task runner),

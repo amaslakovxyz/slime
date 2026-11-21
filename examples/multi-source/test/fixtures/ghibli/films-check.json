@@ -1,0 +1,19 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "https://ghibliapi.vercel.app/films?limit=1"
+  },
+  "response": {
+    "status": 200,
+    "body": [
+      {
+        "id": "2baf70d1-42bb-4437-b551-e5fed5a87abe",
+        "title": "Castle in the Sky",
+        "director": "Hayao Miyazaki",
+        "release_date": "1986",
+        "running_time": "124",
+        "rt_score": "95"
+      }
+    ]
+  }
+}

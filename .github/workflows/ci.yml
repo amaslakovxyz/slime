@@ -101,6 +101,44 @@ jobs:
       - run: npm run check:crystal
         working-directory: examples/express
 
+  example-multi-source:
+    name: Multi-source example
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: slime_admin
+          POSTGRES_PASSWORD: slime_admin
+          POSTGRES_DB: slime
+        ports:
+          - 54329:5432
+        options: >-
+          --health-cmd "pg_isready -U slime_admin -d slime"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            examples/multi-source/package-lock.json
+      - run: psql "postgres://slime_admin:slime_admin@localhost:54329/slime" -v ON_ERROR_STOP=1 -f examples/express/db/init.sql
+      # Runs on the packed tarball, as an app installing the package would; Notion and the films API are replayed from fixtures.
+      - run: npm ci
+      - run: npm pack -w @slime-cloud/core --pack-destination "$RUNNER_TEMP"
+      - run: npm ci
+        working-directory: examples/multi-source
+      - run: npm install --no-save "$RUNNER_TEMP"/slime-cloud-core-*.tgz
+        working-directory: examples/multi-source
+      - run: npm test
+        working-directory: examples/multi-source
+        env:
+          REQUIRE_DB: "1"
+
   runtime:
     name: Slime Cloud runtime
     runs-on: ubuntu-latest
@@ -127,6 +165,60 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       # The Lambda bundle deployed by terraform.yml (platform/infra/platform).
+      - run: npm run build
+
+  provisioner:
+    name: Slime Cloud provisioner
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: platform/provisioner
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: platform/provisioner/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      # Fake AWS clients only; no credentials.
+      - run: npm test
+      # The Lambda bundle deployed by terraform.yml (platform/infra/platform).
+      - run: npm run build
+
+  admin:
+    name: Slime Cloud admin
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: platform/admin
+    services:
+      dynamodb:
+        image: amazon/dynamodb-local:latest
+        ports:
+          - 8000:8000
+    env:
+      AWS_REGION: eu-central-1
+      AWS_ENDPOINT_URL_DYNAMODB: http://localhost:8000
+      AWS_ACCESS_KEY_ID: local
+      AWS_SECRET_ACCESS_KEY: local
+      SESSION_SECRET: ci-only-session-secret-0123456789abcdef
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: platform/admin/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      # REQUIRE_DYNAMO makes the DynamoDB Local tests fail instead of skipping.
+      - run: npm test
+        env:
+          REQUIRE_DYNAMO: "1"
       - run: npm run build
 
   landing:

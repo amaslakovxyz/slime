@@ -1,0 +1,521 @@
+{
+  "request": {
+    "method": "POST",
+    "url": "https://api.notion.com/v1/data_sources/0f0e0d0c-0b0a-4908-8706-050403020100/query",
+    "body": {
+      "page_size": 100,
+      "sorts": [
+        {
+          "timestamp": "created_time",
+          "direction": "descending"
+        }
+      ],
+      "filter": {
+        "and": [
+          {
+            "property": "Status",
+            "status": {
+              "equals": "Open"
+            }
+          },
+          {
+            "property": "Sentiment",
+            "select": {
+              "equals": "negative"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "object": "list",
+      "results": [
+        {
+          "object": "page",
+          "id": "00000000-0000-4000-8000-000000000001",
+          "properties": {
+            "Created": {
+              "type": "date",
+              "date": {
+                "start": "2026-09-03"
+              }
+            },
+            "Account": {
+              "type": "rich_text",
+              "rich_text": [
+                {
+                  "plain_text": "Lunar Works 14"
+                }
+              ]
+            },
+            "Status": {
+              "type": "status",
+              "status": {
+                "name": "Open"
+              }
+            },
+            "Area": {
+              "type": "multi_select",
+              "multi_select": [
+                {
+                  "name": "Security"
+                }
+              ]
+            },
+            "Sentiment": {
+              "type": "select",
+              "select": {
+                "name": "negative"
+              }
+            },
+            "Title": {
+              "type": "title",
+              "title": [
+                {
+                  "plain_text": "Dashboard is slow"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "object": "page",
+          "id": "00000000-0000-4000-8000-000000000002",
+          "properties": {
+            "Created": {
+              "type": "date",
+              "date": {
+                "start": "2026-09-19"
+              }
+            },
+            "Account": {
+              "type": "rich_text",
+              "rich_text": [
+                {
+                  "plain_text": "Swift Labs 12"
+                }
+              ]
+            },
+            "Status": {
+              "type": "status",
+              "status": {
+                "name": "Open"
+              }
+            },
+            "Area": {
+              "type": "multi_select",
+              "multi_select": [
+                {
+                  "name": "Billing"
+                }
+              ]
+            },
+            "Sentiment": {
+              "type": "select",
+              "select": {
+                "name": "negative"
+              }
+            },
+            "Title": {
+              "type": "title",
+              "title": [
+                {
+                  "plain_text": "Invoice PDF is blank"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "object": "page",
+          "id": "00000000-0000-4000-8000-000000000003",
+          "properties": {
+            "Created": {
+              "type": "date",
+              "date": {
+                "start": "2026-09-27"
+              }
+            },
+            "Account": {
+              "type": "rich_text",
+              "rich_text": [
+                {
+                  "plain_text": "Swift Cloud 8"
+                }
+              ]
+            },
+            "Status": {
+              "type": "status",
+              "status": {
+                "name": "Open"
+              }
+            },
+            "Area": {
+              "type": "multi_select",
+              "multi_select": [
+                {
+                  "name": "Export"
+                }
+              ]
+            },
+            "Sentiment": {
+              "type": "select",
+              "select": {
+                "name": "negative"
+              }
+            },
+            "Title": {
+              "type": "title",
+              "title": [
+                {
+                  "plain_text": "Invoice PDF is blank"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "object": "page",
+          "id": "00000000-0000-4000-8000-000000000004",
+          "properties": {
+            "Created": {
+              "type": "date",
+              "date": {
+                "start": "2026-10-13"
+              }
+            },
+            "Account": {
+              "type": "rich_text",
+              "rich_text": [
+                {
+                  "plain_text": "Nova Studio 20"
+                }
+              ]
+            },
+            "Status": {
+              "type": "status",
+              "status": {
+                "name": "Open"
+              }
+            },
+            "Area": {
+              "type": "multi_select",
+              "multi_select": [
+                {
+                  "name": "Export"
+                }
+              ]
+            },
+            "Sentiment": {
+              "type": "select",
+              "select": {
+                "name": "negative"
+              }
+            },
+            "Title": {
+              "type": "title",
+              "title": [
+                {
+                  "plain_text": "SSO login loops"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "object": "page",
+          "id": "00000000-0000-4000-8000-000000000005",
+          "properties": {
+            "Created": {
+              "type": "date",
+              "date": {
+                "start": "2026-10-19"
+              }
+            },
+            "Account": {
+              "type": "rich_text",
+              "rich_text": [
+                {
+                  "plain_text": "Lunar Works 14"
+                }
+              ]
+            },
+            "Status": {
+              "type": "status",
+              "status": {
+                "name": "Open"
+              }
+            },
+            "Area": {
+              "type": "multi_select",
+              "multi_select": [
+                {
+                  "name": "UI"
+                }
+              ]
+            },
+            "Sentiment": {
+              "type": "select",
+              "select": {
+                "name": "negative"
+              }
+            },
+            "Title": {
+              "type": "title",
+              "title": [
+                {
+                  "plain_text": "Search misses results"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "object": "page",
+          "id": "00000000-0000-4000-8000-000000000006",
+          "properties": {
+            "Created": {
+              "type": "date",
+              "date": {
+                "start": "2026-10-21"
+              }
+            },
+            "Account": {
+              "type": "rich_text",
+              "rich_text": [
+                {
+                  "plain_text": "Lunar Logistics 37"
+                }
+              ]
+            },
+            "Status": {
+              "type": "status",
+              "status": {
+                "name": "Open"
+              }
+            },
+            "Area": {
+              "type": "multi_select",
+              "multi_select": [
+                {
+                  "name": "Billing"
+                }
+              ]
+            },
+            "Sentiment": {
+              "type": "select",
+              "select": {
+                "name": "negative"
+              }
+            },
+            "Title": {
+              "type": "title",
+              "title": [
+                {
+                  "plain_text": "Love the new charts"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "object": "page",
+          "id": "00000000-0000-4000-8000-000000000007",
+          "properties": {
+            "Created": {
+              "type": "date",
+              "date": {
+                "start": "2026-10-23"
+              }
+            },
+            "Account": {
+              "type": "rich_text",
+              "rich_text": [
+                {
+                  "plain_text": "Quiet Foods 3"
+                }
+              ]
+            },
+            "Status": {
+              "type": "status",
+              "status": {
+                "name": "Open"
+              }
+            },
+            "Area": {
+              "type": "multi_select",
+              "multi_select": [
+                {
+                  "name": "Performance"
+                }
+              ]
+            },
+            "Sentiment": {
+              "type": "select",
+              "select": {
+                "name": "negative"
+              }
+            },
+            "Title": {
+              "type": "title",
+              "title": [
+                {
+                  "plain_text": "Dashboard is slow"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "object": "page",
+          "id": "00000000-0000-4000-8000-000000000008",
+          "properties": {
+            "Created": {
+              "type": "date",
+              "date": {
+                "start": "2026-10-25"
+              }
+            },
+            "Account": {
+              "type": "rich_text",
+              "rich_text": [
+                {
+                  "plain_text": "Lunar Logistics 37"
+                }
+              ]
+            },
+            "Status": {
+              "type": "status",
+              "status": {
+                "name": "Open"
+              }
+            },
+            "Area": {
+              "type": "multi_select",
+              "multi_select": [
+                {
+                  "name": "Export"
+                }
+              ]
+            },
+            "Sentiment": {
+              "type": "select",
+              "select": {
+                "name": "negative"
+              }
+            },
+            "Title": {
+              "type": "title",
+              "title": [
+                {
+                  "plain_text": "Great onboarding"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "object": "page",
+          "id": "00000000-0000-4000-8000-000000000009",
+          "properties": {
+            "Created": {
+              "type": "date",
+              "date": {
+                "start": "2026-10-31"
+              }
+            },
+            "Account": {
+              "type": "rich_text",
+              "rich_text": [
+                {
+                  "plain_text": "Quiet Foods 3"
+                }
+              ]
+            },
+            "Status": {
+              "type": "status",
+              "status": {
+                "name": "Open"
+              }
+            },
+            "Area": {
+              "type": "multi_select",
+              "multi_select": [
+                {
+                  "name": "Export"
+                }
+              ]
+            },
+            "Sentiment": {
+              "type": "select",
+              "select": {
+                "name": "negative"
+              }
+            },
+            "Title": {
+              "type": "title",
+              "title": [
+                {
+                  "plain_text": "Dashboard is slow"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "object": "page",
+          "id": "00000000-0000-4000-8000-000000000010",
+          "properties": {
+            "Created": {
+              "type": "date",
+              "date": {
+                "start": "2026-11-12"
+              }
+            },
+            "Account": {
+              "type": "rich_text",
+              "rich_text": [
+                {
+                  "plain_text": "Swift Health 36"
+                }
+              ]
+            },
+            "Status": {
+              "type": "status",
+              "status": {
+                "name": "Open"
+              }
+            },
+            "Area": {
+              "type": "multi_select",
+              "multi_select": [
+                {
+                  "name": "UI"
+                }
+              ]
+            },
+            "Sentiment": {
+              "type": "select",
+              "select": {
+                "name": "negative"
+              }
+            },
+            "Title": {
+              "type": "title",
+              "title": [
+                {
+                  "plain_text": "SSO login loops"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "has_more": false,
+      "next_cursor": null
+    }
+  }
+}

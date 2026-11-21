@@ -1,0 +1,27 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "https://ghibliapi.vercel.app/films?director=Isao+Takahata"
+  },
+  "response": {
+    "status": 200,
+    "body": [
+      {
+        "id": "12cfb892-aac0-4c5b-94af-521852e46d6a",
+        "title": "Grave of the Fireflies",
+        "director": "Isao Takahata",
+        "release_date": "1988",
+        "running_time": "89",
+        "rt_score": "97"
+      },
+      {
+        "id": "4e236f34-b981-41c3-8c65-f8c9000b94e7",
+        "title": "Only Yesterday",
+        "director": "Isao Takahata",
+        "release_date": "1991",
+        "running_time": "118",
+        "rt_score": "100"
+      }
+    ]
+  }
+}

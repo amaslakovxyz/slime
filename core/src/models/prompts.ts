@@ -1,5 +1,6 @@
 // The prompts every model adapter shares, so a bench compares models, not prompts.
 // Kept byte-stable: they are the cached prompt prefix, and their hash is each handler's promptHash.
+import { asV1 } from './artifact-v2.js';
 import type { GenerationRequest, OptimizeRequest, ReviewRequest } from './types.js';
 import { sha256 } from '../shared/hash.js';
 
@@ -84,7 +85,8 @@ export function generationMessage({ intent, params, output, previous }: Generati
   return lines.join('\n');
 }
 
-export function reviewMessage({ intent, params, output, artifact }: ReviewRequest): string {
+export function reviewMessage({ intent, params, output, artifact: reviewed }: ReviewRequest): string {
+  const artifact = asV1(reviewed, 'the v1 review message'); // MS3: P3.1 adds the multi-source review message
   const assumptions = artifact.assumptions.length > 0 ? artifact.assumptions.join(' | ') : 'none';
   return [
     `Intent: ${intent}`,

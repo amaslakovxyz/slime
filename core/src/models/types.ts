@@ -2,6 +2,7 @@
 // folders (claude/, groq/, offline/).
 import type { ParamType } from '../request/params.js';
 import type { Shape } from '../request/shape.js';
+import type { AnyArtifact } from './artifact-v2.js';
 
 export interface Artifact {
   /** null, or one sentence on why the schema can't answer the request. */
@@ -15,6 +16,8 @@ export interface Artifact {
   assumptions: string[];
 }
 
+export type ArtifactFormat = 'v1' | 'v2';
+
 /** 'unknown' while only null has been seen. Never values. */
 export type ParamTypesForModel = Record<string, ParamType | 'unknown'>;
 
@@ -25,7 +28,9 @@ export interface GenerationRequest {
   params: ParamTypesForModel;
   output: Shape;
   /** Set when retrying after a failed attempt. */
-  previous?: { artifact: Artifact; error: string };
+  previous?: { artifact: AnyArtifact; error: string };
+  /** 'v2' when the instance has API sources (MS3); missing means 'v1'. */
+  format?: ArtifactFormat;
 }
 
 export interface ModelUsage {
@@ -37,7 +42,7 @@ export interface ModelUsage {
 }
 
 export interface GenerationResult extends ModelUsage {
-  artifact: Artifact;
+  artifact: AnyArtifact;
 }
 
 export interface ModelCallOptions {
@@ -49,6 +54,8 @@ export interface Generator {
   /** `model` and `promptHash` are recorded in each handler's provenance (§4.7). */
   readonly model: string;
   readonly promptHash: string;
+  /** Hash of the multi-source prompts, recorded instead of promptHash when API sources are configured (MS3). Optional so existing custom generators compile. */
+  readonly multiSourcePromptHash?: string;
   generate(request: GenerationRequest, options: ModelCallOptions): Promise<GenerationResult>;
 }
 
@@ -57,7 +64,8 @@ export interface ReviewRequest {
   intent: string;
   params: ParamTypesForModel;
   output: Shape;
-  artifact: Artifact;
+  /** Custom reviewers that read `.sql` must also handle v2 artifacts. */
+  artifact: AnyArtifact;
 }
 
 export interface ReviewResult extends ModelUsage {

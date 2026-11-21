@@ -1,0 +1,12 @@
+{
+  "name": "slime-example-hono",
+  "private": true,
+  "type": "module",
+  "scripts": { "start": "node --env-file-if-exists=.env server.mjs" },
+  "dependencies": {
+    "@hono/node-server": "^2.1.11",
+    "@slime-cloud/core": "file:../../core",
+    "hono": "^4.13.19",
+    "pg": "^8.23.1"
+  }
+}

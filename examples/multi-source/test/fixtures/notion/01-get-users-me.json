@@ -1,0 +1,14 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "https://api.notion.com/v1/users/me"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "object": "user",
+      "type": "bot",
+      "name": "Slime connector"
+    }
+  }
+}

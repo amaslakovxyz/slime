@@ -4,24 +4,27 @@ import type { Artifact } from '../../models/types.js';
 
 type Inputs = Readonly<Record<string, unknown>>;
 
+/** The parts of a handler the SQL lint reads: a v1 artifact, or one SQL step with the handler's shapeJs. */
+export type SqlCode = Pick<Artifact, 'sql' | 'params' | 'shapeJs'>;
+
 const WRITE_SQL =
   /\b(insert|update|delete|merge|drop|alter|create|grant|revoke|truncate|copy|vacuum|set_config|pg_sleep|pg_read_file|lo_import|dblink)\b/i;
 const PLACEHOLDER = /\$(\d+)/g;
 // Two-letter values such as "DE" would match inside keywords like DESC.
-const MIN_HARDCODED_LENGTH = 3;
+export const MIN_HARDCODED_LENGTH = 3;
 
 export function assertReadOnlySql(sql: string): void {
   if (!WRITE_SQL.test(sql)) return;
   throw new SlimeError('WRITE_REFUSED', 'SQL contains a write or a forbidden function; refused.', { details: { enforcedBy: 'lint' } });
 }
 
-export function lintArtifact(artifact: Artifact, input: Inputs): void {
+export function lintArtifact(artifact: SqlCode, input: Inputs): void {
   assertReadOnlySql(artifact.sql);
   assertPlaceholdersMapped(artifact, input);
   assertNoHardcodedInputs(artifact, input);
 }
 
-function assertPlaceholdersMapped({ sql, params }: Artifact, input: Inputs): void {
+function assertPlaceholdersMapped({ sql, params }: SqlCode, input: Inputs): void {
   const usedPlaceholders = placeholderNumbers(sql);
   const highestPlaceholder = Math.max(0, ...usedPlaceholders);
   if (highestPlaceholder > params.length) {
@@ -35,7 +38,7 @@ function assertPlaceholdersMapped({ sql, params }: Artifact, input: Inputs): voi
 }
 
 // The model never sees input values, so a value found in the code was copied from the intent.
-function assertNoHardcodedInputs({ sql, shapeJs }: Artifact, input: Inputs): void {
+function assertNoHardcodedInputs({ sql, shapeJs }: SqlCode, input: Inputs): void {
   for (const [name, value] of Object.entries(input)) {
     if (typeof value !== 'string' || value.length < MIN_HARDCODED_LENGTH) continue;
     if (sql.includes(value) || shapeJs?.includes(value)) {
