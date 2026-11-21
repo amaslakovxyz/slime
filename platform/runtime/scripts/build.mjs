@@ -20,8 +20,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const out = join(root, 'dist/lambda');
 const runtimeRequire = createRequire(join(root, 'package.json'));
 const coreRoot = dirname(runtimeRequire.resolve('@slime-cloud/core/package.json'));
-const worker = join(coreRoot, 'dist/shaping/shape-worker.js');
-if (!existsSync(worker)) throw new Error(`${worker} is missing: build the core first (npm run build -w @slime-cloud/core)`);
+const worker = resolveShapeWorker();
 // QuickJS's wasm resolves from the core's own dependencies.
 const coreRequire = createRequire(join(coreRoot, 'package.json'));
 
@@ -51,3 +50,12 @@ cpSync(join(root, 'offline'), join(out, 'offline'), { recursive: true });
 if (existsSync(join(root, 'crystal'))) cpSync(join(root, 'crystal'), join(out, 'crystal'), { recursive: true });
 
 console.log(`built ${out}`);
+
+// The core exports the worker's path, so its folder layout can change freely.
+function resolveShapeWorker() {
+  try {
+    return runtimeRequire.resolve('@slime-cloud/core/shape-worker');
+  } catch {
+    throw new Error("@slime-cloud/core's shape worker is missing: build the core first (npm run build -w @slime-cloud/core)");
+  }
+}

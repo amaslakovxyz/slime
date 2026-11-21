@@ -15,7 +15,7 @@ const files = report.files.map((f) => f.path).sort();
 // subpath can't be forgotten here.
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 const exportTargets = Object.values(pkg.exports).flatMap((target) => (typeof target === 'string' ? [target] : Object.values(target)));
-const required = [...new Set([...exportTargets, ...Object.values(pkg.bin ?? {}), 'README.md', 'dist/shaping/shape-worker.js'])]
+const required = [...new Set([...exportTargets, ...Object.values(pkg.bin ?? {}), 'README.md'])]
   .map((path) => path.replace(/^\.\//, ''))
   .sort();
 const forbidden = [/^src\//, /^test\//, /^scripts\//, /^tsconfig/, /^PLAN\.md$/, /^docs\//];

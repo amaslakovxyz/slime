@@ -1,7 +1,7 @@
 // Generated shaping code runs in QuickJS (WebAssembly) in a worker thread. It
 // gets rows and input as JSON only: no database, network, files or timers.
-import { SlimeError } from '../shared/errors.js';
-import type { SandboxLimits, SandboxRunner, ShapeJob } from '../sandbox/types.js';
+import { SlimeError } from '../../shared/errors.js';
+import type { SandboxLimits, SandboxRunner, ShapeJob } from '../types.js';
 import { INTERRUPTED_MESSAGE, type ShapeReply } from './messages.js';
 import { ShapeWorker, shapeTimeout } from './shape-worker-client.js';
 

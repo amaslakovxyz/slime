@@ -7,7 +7,7 @@ import type { HandlerRecord, Slime } from './engine/types.js';
 import { SlimeConfigError } from './shared/errors.js';
 import type { Connector } from './connectors/types.js';
 import type { HandlerProvenance } from './request/key.js';
-import { QuickJSRunner } from './shaping/quickjs-runner.js';
+import { QuickJSRunner } from './sandbox/quickjs/quickjs-runner.js';
 import { fileStore } from './stores/file-store.js';
 import type { SlimeStore } from './stores/types.js';
 

@@ -1,5 +1,5 @@
 // The SandboxRunner port: where generated shaping code runs (C3). A type only in v1:
-// core always uses its own QuickJS runner (shaping/, §5).
+// core always uses its own QuickJS runner (quickjs/, §5).
 export interface SandboxLimits {
   timeoutMs: number;
   memoryBytes: number;

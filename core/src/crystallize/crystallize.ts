@@ -9,7 +9,7 @@ import { forModel } from '../engine/generate.js';
 import type { HandlerRecord } from '../engine/types.js';
 import type { Connector } from '../connectors/types.js';
 import type { Optimizer } from '../models/types.js';
-import { QuickJSRunner } from '../shaping/quickjs-runner.js';
+import { QuickJSRunner } from '../sandbox/quickjs/quickjs-runner.js';
 import type { SlimeStore } from '../stores/types.js';
 import { verifyCandidate, type EquivalenceDeps } from './equivalence.js';
 import { sha256 } from '../shared/hash.js';

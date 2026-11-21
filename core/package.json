@@ -38,6 +38,7 @@
       "types": "./dist/testing/index.d.ts",
       "default": "./dist/testing/index.js"
     },
+    "./shape-worker": "./dist/sandbox/quickjs/shape-worker.js",
     "./package.json": "./package.json"
   },
   "bin": {

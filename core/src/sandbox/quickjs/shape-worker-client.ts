@@ -1,5 +1,5 @@
 import { Worker } from 'node:worker_threads';
-import { SlimeError } from '../shared/errors.js';
+import { SlimeError } from '../../shared/errors.js';
 import { READY_MESSAGE, type ShapeReply, type ShapeTask } from './messages.js';
 
 const WORKER_HEAP_MB = 128;
