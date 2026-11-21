@@ -4,6 +4,32 @@
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { SlimeError, type Connector, type CrystalRegistry, type QueryMeta, type Slime } from '@slime-cloud/core';
+import type { RecentRequests } from './events.js';
+
+/** A handler as the admin's Lifecycle tab sees it. */
+export interface LifecycleHandler {
+  key: string;
+  intent: string;
+  tier: 'gas' | 'liquid' | 'crystal';
+  runs: number;
+  review?: string;
+  fixtures?: number;
+  createdAt?: string;
+  /** Crystal only: the input names (and types, when known) its own route takes. */
+  inputs?: Record<string, string | null>;
+  /** Saved with another schema, dictionary, prompt or model: regenerates on next request; cannot be crystallized. */
+  stale?: boolean;
+}
+
+/** A saved handler record, reduced to what the Lifecycle tab needs. */
+export type SavedHandler = Omit<LifecycleHandler, 'tier'> & { tier: 'gas' | 'liquid' };
+
+export interface CrystallizeOutcome {
+  key: string;
+  intent: string;
+  outcome: string;
+  reasons: string[];
+}
 
 export interface RuntimeParts {
   slime: Slime;
@@ -11,12 +37,59 @@ export interface RuntimeParts {
   crystal: CrystalRegistry | false;
   /** Sees every answered query (the Lambda entry meters usage with it). */
   onQuery?: (meta: QueryMeta) => void;
+  /** Local runtime only: the live feed behind `GET /v0/events`. */
+  events?: RecentRequests;
+  /** Local runtime only: saved handlers, so Liquid ones show before their first hit after a restart. */
+  savedHandlers?: () => Promise<SavedHandler[]>;
+  /** Local runtime only: `POST /v0/crystallize`. Absent means the route does not exist. */
+  crystallize?: (keys?: string[]) => Promise<CrystallizeOutcome[]>;
+  /** Runs needed for Gas → Liquid and for Crystal readiness, shown as progress. */
+  thresholds?: { liquidRuns: number; crystalRuns: number };
+  /** Local runtime only: startup and engine warnings, shown in the Lifecycle tab. */
+  warnings?: () => string[];
+}
+
+const TIER_RANK = { gas: 0, liquid: 1, crystal: 2 } as const;
+
+/** A stale saved row ranks below live Gas, so the live row with the same key replaces it. */
+function rank(handler: LifecycleHandler): number {
+  return handler.stale ? -1 : TIER_RANK[handler.tier];
+}
+
+/**
+ * One row per handler key; the most mature tier wins and runs never go backwards,
+ * except that a live Gas or Liquid row replacing a stale one keeps its own runs:
+ * it is regenerated code. A Crystal is never regenerated, so it keeps the history.
+ */
+export function mergeHandlers(lists: LifecycleHandler[][]): LifecycleHandler[] {
+  const byKey = new Map<string, LifecycleHandler>();
+  for (const handler of lists.flat()) {
+    const seen = byKey.get(handler.key);
+    if (!seen) {
+      byKey.set(handler.key, { ...handler });
+      continue;
+    }
+    const isNewer = rank(handler) > rank(seen);
+    const [winner, loser] = isNewer ? [handler, seen] : [seen, handler];
+    // Regenerated code shares nothing with the stale record: not its runs, fixtures or review.
+    const isRegenerated = Boolean(loser.stale) && !winner.stale && winner.tier !== 'crystal';
+    const merged: LifecycleHandler = isRegenerated ? { ...winner } : { ...loser, ...winner };
+    if (!winner.stale) delete merged.stale;
+    if (!isRegenerated) merged.runs = Math.max(seen.runs, handler.runs);
+    byKey.set(handler.key, merged);
+  }
+  return [...byKey.values()].sort((a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? ''));
 }
 
 const MAX_BODY_BYTES = 16 * 1024;
 
-export function createApp({ slime, connector, crystal, onQuery }: RuntimeParts): Hono {
+export function createApp({ slime, connector, crystal, onQuery, events, savedHandlers, crystallize, thresholds, warnings }: RuntimeParts): Hono {
   const app = new Hono();
+
+  const limitBody = bodyLimit({
+    maxSize: MAX_BODY_BYTES,
+    onError: (c) => c.json({ error: { code: 'INVALID_REQUEST', message: 'Body larger than 16 KB.', retryable: false } }, 413),
+  });
 
   app.onError((error, c) => {
     if (error instanceof SlimeError) return c.json({ error: error.toJSON() }, error.status as 400);
@@ -27,16 +100,14 @@ export function createApp({ slime, connector, crystal, onQuery }: RuntimeParts):
   // The one data endpoint. Behind the API key: callers are the tenant's own backend, not browsers.
   app.post(
     '/v0/query',
-    bodyLimit({
-      maxSize: MAX_BODY_BYTES,
-      onError: (c) => c.json({ error: { code: 'INVALID_REQUEST', message: 'Body larger than 16 KB.', retryable: false } }, 413),
-    }),
+    limitBody,
     async (c) => {
       const body = await c.req.json().catch(() => {
         throw new SlimeError('INVALID_REQUEST', 'Body must be valid JSON.');
       });
       const { data, meta } = await slime.query(body);
       onQuery?.(meta);
+      events?.record(meta);
       c.header('Server-Timing', `total;dur=${meta.timingsMs.total}, generate;dur=${meta.timingsMs.generate ?? 0}`);
       console.log(JSON.stringify({ at: new Date().toISOString(), handler: meta.handlerKey, tier: meta.tier, cache: meta.cache, ms: meta.timingsMs }));
       return c.json({ data, meta });
@@ -55,6 +126,63 @@ export function createApp({ slime, connector, crystal, onQuery }: RuntimeParts):
   app.delete('/v0/handlers/:key', async (c) =>
     (await slime.evict(c.req.param('key'))) ? c.json({ evicted: true }) : c.json({ evicted: false }, 404),
   );
+
+  // A Crystal is its own endpoint: intent and output are fixed, the body carries only `input`.
+  // The handler key hashes the input names, so the exact name set is required: a missing or
+  // unknown name is refused, and the call can never miss the Crystal and generate.
+  app.post('/v0/e/:key', limitBody, async (c) => {
+    const key = c.req.param('key');
+    // Own keys only: `constructor` or `__proto__` must not resolve to Object.prototype members.
+    const handler = crystal && Object.hasOwn(crystal, key) ? crystal[key] : undefined;
+    if (!handler) throw new SlimeError('HANDLER_NOT_FOUND', 'No Crystal with this key on this endpoint.');
+    const body = (await c.req.json().catch(() => ({}))) as { input?: Record<string, unknown> };
+    const input = body.input && typeof body.input === 'object' ? body.input : {};
+    const wanted = Object.entries(handler.paramTypes).map(([name, type]) => `${name}${type ? ` (${type})` : ''}`);
+    // null means "not given", but the name must still be sent. Own properties only: an
+    // inherited name such as `toString` would otherwise pass and change the key.
+    const missing = Object.keys(handler.paramTypes).filter((name) => !Object.hasOwn(input, name));
+    if (missing.length) {
+      throw new SlimeError('INVALID_REQUEST', `This endpoint takes input: ${wanted.join(', ')}. Missing: ${missing.join(', ')}.`);
+    }
+    const unknown = Object.keys(input).filter((name) => !Object.hasOwn(handler.paramTypes, name));
+    if (unknown.length) {
+      throw new SlimeError('INVALID_REQUEST', `This endpoint takes input: ${wanted.join(', ')}. Unknown: ${unknown.join(', ')}.`);
+    }
+    const { data, meta } = await slime.query({ intent: handler.intent, input, output: handler.output } as never);
+    onQuery?.(meta);
+    events?.record(meta, 'crystal');
+    return c.json({ data, meta });
+  });
+
+  if (events) app.get('/v0/events', (c) => c.json(events.list()));
+
+  if (savedHandlers) {
+    app.get('/v0/lifecycle', async (c) => {
+      const live: LifecycleHandler[] = slime.handlers().map((h) => ({ ...h }));
+      const crystals: LifecycleHandler[] = Object.entries(crystal || {}).map(([key, h]) => ({
+        key,
+        intent: h.intent,
+        tier: 'crystal',
+        runs: 0,
+        review: h.review,
+        inputs: { ...h.paramTypes },
+      }));
+      return c.json({
+        handlers: mergeHandlers([await savedHandlers(), live, crystals]),
+        stats: slime.stats(),
+        thresholds,
+        warnings: warnings?.() ?? [],
+      });
+    });
+  }
+
+  if (crystallize) {
+    app.post('/v0/crystallize', async (c) => {
+      const body = (await c.req.json().catch(() => ({}))) as { keys?: unknown };
+      const keys = Array.isArray(body.keys) ? body.keys.filter((k): k is string => typeof k === 'string') : undefined;
+      return c.json({ reports: await crystallize(keys) });
+    });
+  }
 
   return app;
 }

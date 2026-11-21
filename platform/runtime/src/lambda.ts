@@ -11,19 +11,14 @@
 //      request, and rebuilt on the next one if that fails (e.g. DATABASE_URL not
 //      set yet), so a broken DB is a 503, not a crash loop.
 // Every route needs the `x-api-key` header to equal SLIME_API_KEY; with no key
-// configured the runtime refuses everything.
-import { createHash, timingSafeEqual } from 'node:crypto';
+// configured the runtime refuses everything. A Crystal's own token (CRYSTAL_TOKENS,
+// a JSON map from SSM) opens only that Crystal's route, POST /v0/e/<key>.
+import { isAuthorized, keyMatches, parseCrystalTokens } from './auth.js';
 import { GetParametersByPathCommand, SSMClient } from '@aws-sdk/client-ssm';
 import { Hono } from 'hono';
 import { handle } from 'hono/aws-lambda';
 
-export function keyMatches(given: string | undefined, expected: string | undefined): boolean {
-  if (!expected || !given) return false;
-  // Hash both sides so timingSafeEqual gets equal lengths.
-  const a = createHash('sha256').update(given).digest();
-  const b = createHash('sha256').update(expected).digest();
-  return timingSafeEqual(a, b);
-}
+export { keyMatches };
 
 /** Parameter path -> env var name: the last path segment. */
 export function envNameFor(path: string): string {
@@ -60,6 +55,7 @@ function boot(): Promise<Runtime> {
     const { slimeConfigFromEnv } = await import('./config.js');
     const { createApp } = await import('./app.js');
     const { UsageMeter } = await import('./usage.js');
+    const { LiveRunsSync, DEFAULT_RUNS_SYNC_MS } = await import('./live-runs.js');
     // Only provisioned endpoints meter usage (slime-runtime has no usage table).
     // The meter needs slime for its snapshot, so it is assigned after
     // createSlime; startup events emitted before that are not generations.
@@ -67,6 +63,7 @@ function boot(): Promise<Runtime> {
     const config = await slimeConfigFromEnv(process.env, {
       onEvent: (event) => {
         if (event.type === 'generated') meter?.recordTokens(event.tokens);
+        if (event.type === 'warning') console.warn(JSON.stringify({ warning: event.message }));
       },
     });
     const slime = await createSlime(config);
@@ -77,9 +74,16 @@ function boot(): Promise<Runtime> {
         crystal: crystals,
       }));
     }
+    // Keeps Liquid run counts in the store current, so Crystallize can see them (see live-runs.ts).
+    const runs = config.store
+      ? new LiveRunsSync(config.store, () => slime.handlers(), Number(process.env.SLIME_RUNS_SYNC_MS || DEFAULT_RUNS_SYNC_MS))
+      : undefined;
     return {
       app: createApp({ slime, connector: config.connector, crystal: config.crystal, onQuery: (meta) => meter?.record(meta) }),
-      flush: () => Promise.all([slime.flush(), meter?.flush()]).then(() => {}),
+      flush: () =>
+        Promise.all([slime.flush(), meter?.flush()])
+          .then(() => runs?.maybeSync())
+          .then(() => {}),
     };
   })().catch((err) => {
     booting = null;
@@ -91,7 +95,8 @@ function boot(): Promise<Runtime> {
 export const app = new Hono();
 
 app.use('*', async (c, next) => {
-  if (!keyMatches(c.req.header('x-api-key'), process.env.SLIME_API_KEY)) {
+  const path = new URL(c.req.url).pathname;
+  if (!isAuthorized(c.req.method, path, c.req.header('x-api-key'), process.env.SLIME_API_KEY, parseCrystalTokens(process.env.CRYSTAL_TOKENS))) {
     return c.json({ error: { code: 'UNAUTHORIZED', message: 'Missing or wrong x-api-key.', retryable: false } }, 401);
   }
   await next();

@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { formatCount, formatUsd } from '@/app/format';
 import { StatusBadge } from '@/app/ui/status-badge';
-import { CONNECTOR_SPECS } from '@/lib/connectors';
 import type { EndpointWithStats } from '@/lib/endpoints';
 
 function TierMix({ row }: { row: EndpointWithStats }) {
@@ -22,7 +21,7 @@ function TierMix({ row }: { row: EndpointWithStats }) {
   );
 }
 
-/** `compact` for the overview; the full variant adds URL, token, connector and handlers. */
+/** `compact` for the dashboard (tier mix, estimate, created); the full list shows name, status, URL and requests. Rows are links. */
 export function EndpointsTable({ rows, compact = false }: { rows: EndpointWithStats[]; compact?: boolean }) {
   return (
     <div className="card table-card">
@@ -32,49 +31,32 @@ export function EndpointsTable({ rows, compact = false }: { rows: EndpointWithSt
             <tr>
               <th>Name</th>
               <th>Status</th>
-              {!compact && <th>Provider</th>}
               {!compact && <th>URL</th>}
-              {!compact && <th>Token</th>}
-              <th>Tier mix</th>
+              {compact && <th>Tier mix</th>}
               <th className="num">Requests</th>
-              {compact ? <th className="num">Estimate</th> : <th className="num">Liquid handlers</th>}
-              <th>Created</th>
+              {compact && <th className="num">Estimate</th>}
+              {compact && <th>Created</th>}
             </tr>
           </thead>
           <tbody>
             {rows.map((ep) => (
-              <tr key={ep.endpointId}>
+              <tr key={ep.endpointId} className="row-link">
                 <td className="cell-name">
-                  <Link href={`/endpoints/${ep.endpointId}`}>{ep.name}</Link>
+                  <Link href={`/endpoints/${ep.endpointId}/lifecycle`}>{ep.name}</Link>
                   <span className="cell-sub">{ep.endpointId}</span>
                 </td>
                 <td>
                   <StatusBadge status={ep.status} />
                 </td>
-                {!compact && (
-                  <td>
-                    {ep.provider}
-                    <span className="cell-sub">{CONNECTOR_SPECS[ep.connectorType].label}</span>
-                  </td>
-                )}
                 {!compact && <td className="mono cell-url">{ep.url ?? <span className="muted">—</span>}</td>}
-                {!compact && <td className="mono">slm_…{ep.tokenHint}</td>}
-                <td>
-                  <TierMix row={ep} />
-                </td>
-                <td className="num">{formatCount(ep.stats.requests)}</td>
-                {compact ? (
-                  <td className="num">{formatUsd(ep.stats.estimatedUsd)}</td>
-                ) : (
-                  <td className="num">
-                    {ep.stats.liquidHandlers === null ? (
-                      <span className="muted">—</span>
-                    ) : (
-                      formatCount(ep.stats.liquidHandlers)
-                    )}
+                {compact && (
+                  <td>
+                    <TierMix row={ep} />
                   </td>
                 )}
-                <td className="muted">{ep.createdAt.slice(0, 10)}</td>
+                <td className="num">{formatCount(ep.stats.requests)}</td>
+                {compact && <td className="num">{formatUsd(ep.stats.estimatedUsd)}</td>}
+                {compact && <td className="muted">{ep.createdAt.slice(0, 10)}</td>}
               </tr>
             ))}
           </tbody>

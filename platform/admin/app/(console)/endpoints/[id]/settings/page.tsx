@@ -1,8 +1,13 @@
-import { deleteEndpointAction, updateSettingsAction } from '@/app/actions';
+import { deleteEndpointAction, updateConnectorAction, updateSettingsAction } from '@/app/actions';
+import { formatDate } from '@/app/format';
 import { PROVIDER_INFO } from '@/app/ui/providers';
-import { PROVIDERS } from '@/lib/endpoints';
+import { TestConnection } from '@/app/ui/test-connection';
+import { CONNECTOR_SPECS, maskConnectionUrl } from '@/lib/connectors';
+import { connectionUrl, PROVIDERS } from '@/lib/endpoints';
 import { loadEndpoint } from '../data';
 
+// Everything about the endpoint that is not its traffic: name and provider, the
+// database connection, identifiers, and deletion.
 export default async function SettingsPage({
   params,
   searchParams,
@@ -12,9 +17,14 @@ export default async function SettingsPage({
 }) {
   const { id } = await params;
   const { error, saved } = await searchParams;
-  const { ep } = await loadEndpoint(id);
+  const { email, ep } = await loadEndpoint(id);
   const settled = ep.status === 'ready' || ep.status === 'failed';
   const renamable = ep.status !== 'deleting';
+  const spec = CONNECTOR_SPECS[ep.connectorType];
+  // Masked on the server: the password never reaches the browser.
+  const stored = await connectionUrl(email, ep.endpointId);
+  const masked = stored ? maskConnectionUrl(stored) : null;
+  const connectionEditable = settled || ep.status === 'pending';
 
   return (
     <>
@@ -25,7 +35,7 @@ export default async function SettingsPage({
       )}
       {saved && (
         <div className="alert alert-ok" role="status">
-          {ep.status === 'updating' ? 'Saved. The endpoint is redeploying with the new provider.' : 'Saved.'}
+          {ep.status === 'updating' ? 'Saved. Restarting…' : 'Saved.'}
         </div>
       )}
 
@@ -36,7 +46,6 @@ export default async function SettingsPage({
           <label className="field">
             <span className="field-label">Name</span>
             <input name="name" maxLength={40} required defaultValue={ep.name} disabled={!renamable} />
-            <span className="field-hint">Only shown here; the URL and ID never change.</span>
           </label>
           <label className="field">
             <span className="field-label">LLM provider</span>
@@ -45,34 +54,66 @@ export default async function SettingsPage({
             <select name="provider" defaultValue={ep.provider} disabled={!settled}>
               {PROVIDERS.map((p) => (
                 <option key={p} value={p}>
-                  {PROVIDER_INFO[p].label} · {PROVIDER_INFO[p].blurb}
+                  {PROVIDER_INFO[p].label}
                 </option>
               ))}
             </select>
-            <span className="field-hint">
-              {settled
-                ? 'Changing the provider redeploys the endpoint (status updating).'
-                : `The provider can change once the endpoint is ready or failed (now ${ep.status}).`}
-            </span>
+            <span className="field-hint">{settled ? 'Change restarts the endpoint.' : `Locked while ${ep.status}.`}</span>
           </label>
           <div className="form-actions">
             <button className="btn" type="submit" disabled={!renamable}>
-              Save changes
+              Save
             </button>
           </div>
         </form>
       </section>
 
-      <section className="section card danger-zone settings-card">
-        <h2 className="card-title">Danger zone</h2>
-        <div className="danger-row">
-          <div>
-            <strong>Delete this endpoint</strong>
-            <p className="card-sub">
-              Removes the function, its role, logs, secrets and Liquid handlers. Usage history stays for billing.
-              {!settled && ` Available once the endpoint is ready or failed (now ${ep.status}).`}
-            </p>
+      <section className="section card settings-card">
+        <h2 className="card-title">{spec.label}</h2>
+        {masked ? (
+          <code className="masked-url">{masked.display}</code>
+        ) : (
+          <p className="muted">{stored ? 'The stored URL could not be parsed.' : 'No connection URL is stored.'}</p>
+        )}
+        <TestConnection endpointId={ep.endpointId} />
+        <form action={updateConnectorAction} className="form-stack settings-replace">
+          <input type="hidden" name="endpointId" value={ep.endpointId} />
+          <input type="hidden" name="connectorType" value={ep.connectorType} />
+          <label className="field">
+            <span className="field-label">Replace URL</span>
+            <input
+              name="databaseUrl"
+              type="password"
+              autoComplete="off"
+              spellCheck={false}
+              required
+              placeholder={spec.placeholder}
+              disabled={!connectionEditable}
+            />
+            {!connectionEditable && <span className="field-hint">Locked while {ep.status}.</span>}
+          </label>
+          <div className="form-actions">
+            <button className="btn-ghost" type="submit" disabled={!connectionEditable}>
+              {settled ? 'Save and restart' : 'Save'}
+            </button>
           </div>
+        </form>
+      </section>
+
+      <section className="section card settings-card">
+        <dl className="kv">
+          <dt>Endpoint ID</dt>
+          <dd className="mono">{ep.endpointId}</dd>
+          <dt>Created</dt>
+          <dd>{formatDate(ep.createdAt)}</dd>
+          <dt>Updated</dt>
+          <dd>{formatDate(ep.updatedAt)}</dd>
+        </dl>
+      </section>
+
+      <section className="section card danger-zone settings-card">
+        <div className="danger-row">
+          <p className="card-sub">Delete the endpoint, its secrets and handlers.{!settled && ` Locked while ${ep.status}.`}</p>
           <form action={deleteEndpointAction}>
             <input type="hidden" name="endpointId" value={ep.endpointId} />
             <button className="btn-danger" type="submit" disabled={!settled}>

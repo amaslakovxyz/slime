@@ -55,7 +55,7 @@ export class HandlerCache {
   }
 
   summaries(): HandlerSummary[] {
-    return this.#liveRecords().map(({ key, intent, tier, runs, createdAt }) => ({ key, intent, tier, runs, createdAt }));
+    return this.#liveRecords().map(({ key, intent, tier, runs, createdAt, review }) => ({ key, intent, tier, runs, createdAt, review }));
   }
 
   countByTier(): Record<StoredTier, number> {

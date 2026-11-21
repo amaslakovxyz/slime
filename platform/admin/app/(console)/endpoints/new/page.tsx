@@ -13,10 +13,6 @@ export default function NewEndpointPage() {
             <span>New</span>
           </nav>
           <h1 className="page-title">New endpoint</h1>
-          <p className="page-sub">
-            Point Slime at a database. It deploys a dedicated function that synthesizes queries from intents and
-            crystallizes the hot ones.
-          </p>
         </div>
       </header>
       <NewEndpointForm providers={[...PROVIDERS]} />

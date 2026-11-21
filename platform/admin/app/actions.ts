@@ -12,12 +12,16 @@ import {
   connectionUrl,
   createEndpoint,
   isProvider,
+  getEndpoint,
   requestDelete,
+  requestRestart,
   revealToken,
   updateConnector,
   updateSettings,
 } from '@/lib/endpoints';
 import { CodedError, hasCode } from '@/lib/errors';
+import { crystalToken, issueCrystalTokens } from '@/lib/crystal-tokens';
+import { crystallizeOn, type CrystallizeReport } from '@/lib/lifecycle';
 import { withSpan } from '@/lib/telemetry';
 import { checkLogin, createUser } from '@/lib/users';
 
@@ -89,7 +93,7 @@ export async function createEndpointAction(_prev: FormState, form: FormData): Pr
     if (userFacing(err)) return { error: (err as Error).message };
     throw err;
   }
-  redirect(`/endpoints/${endpointId}`);
+  redirect(`/endpoints/${endpointId}/lifecycle`);
 }
 
 /** Tests a URL typed into the create form; the URL already travels to the server for create. */
@@ -119,7 +123,7 @@ export async function updateConnectorAction(form: FormData): Promise<void> {
   const owner = await requireUser();
   const endpointId = field(form, 'endpointId');
   const connectorType = field(form, 'connectorType') || 'postgres';
-  const page = `/endpoints/${endpointId}/connector`;
+  const page = `/endpoints/${endpointId}/settings`;
   try {
     await withSpan(
       'endpoint.update_connector',
@@ -165,7 +169,7 @@ export async function deleteEndpointAction(form: FormData): Promise<void> {
     throw err;
   }
   refreshEndpoint();
-  redirect(`/endpoints/${endpointId}`);
+  redirect('/endpoints');
 }
 
 export async function revealTokenAction(endpointId: string): Promise<string | null> {
@@ -174,4 +178,50 @@ export async function revealTokenAction(endpointId: string): Promise<string | nu
     revealToken(owner, endpointId),
   );
   return token ?? null;
+}
+
+export type CrystallizeResult = { reports: CrystallizeReport[]; restarting: boolean } | { error: string };
+
+/** Lifecycle tab: crystallize the picked handlers, then restart the endpoint so they serve as Crystal. */
+export async function crystallizeAction(endpointId: string, keys: string[]): Promise<CrystallizeResult> {
+  const email = await requireUser();
+  const ep = await getEndpoint(email, endpointId);
+  if (!ep) return { error: 'Endpoint not found.' };
+  if (keys.length === 0) return { error: 'Pick at least one handler.' };
+  try {
+    const reports = await withSpan('endpoint.crystallize', { 'slime.endpoint.id': endpointId, 'slime.handlers': keys.length }, () =>
+      crystallizeOn(ep, keys),
+    );
+    const crystallized = reports.filter((r) => r.outcome === 'crystallized').map((r) => r.key);
+    const restarting = crystallized.length > 0;
+    if (restarting) {
+      // Each new Crystal gets its own token; the restart hands the tokens to the runtime.
+      await issueCrystalTokens(endpointId, crystallized);
+      await requestRestart(email, endpointId);
+    }
+    refreshEndpoint();
+    return { reports, restarting };
+  } catch (err) {
+    return { error: (err as Error).message };
+  }
+}
+
+/** A Crystal made before tokens existed: issue its own token and restart so the runtime accepts it. */
+export async function issueCrystalTokenAction(endpointId: string, key: string): Promise<{ error?: string }> {
+  const email = await requireUser();
+  if (!(await getEndpoint(email, endpointId))) return { error: 'Endpoint not found.' };
+  try {
+    const issued = await withSpan('endpoint.crystal_token.issue', { 'slime.endpoint.id': endpointId }, () => issueCrystalTokens(endpointId, [key]));
+    if (issued.length) await requestRestart(email, endpointId);
+    refreshEndpoint();
+    return {};
+  } catch (err) {
+    return { error: (err as Error).message };
+  }
+}
+
+export async function revealCrystalTokenAction(endpointId: string, key: string): Promise<string | null> {
+  const email = await requireUser();
+  if (!(await getEndpoint(email, endpointId))) return null;
+  return (await withSpan('endpoint.crystal_token.reveal', { 'slime.endpoint.id': endpointId }, () => crystalToken(endpointId, key))) ?? null;
 }

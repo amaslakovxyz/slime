@@ -24,7 +24,6 @@ export default async function OverviewPage() {
         <div>
           <div className="eyebrow">{monthLabel(o.month)}</div>
           <h1 className="page-title">Overview</h1>
-          <p className="page-sub">How your endpoints digest traffic: from Gas through Liquid into Crystal.</p>
         </div>
         <Link className="btn" href="/endpoints/new">
           New endpoint
@@ -51,7 +50,6 @@ export default async function OverviewPage() {
         <div className="card stat">
           <div className="stat-label">LLM tokens</div>
           <div className="stat-value">{formatCompact(o.tokens)}</div>
-          <div className="stat-note">input + output</div>
         </div>
         <div className="card stat stat-bill">
           <div className="stat-label">Estimated bill</div>
@@ -66,14 +64,12 @@ export default async function OverviewPage() {
         <div className="card stat stat-savings">
           <div className="stat-label">Savings</div>
           <div className="stat-value">{formatUsd(o.savingsUsd)}</div>
-          <div className="stat-note">Crystallization vs. all-Gas</div>
         </div>
       </section>
 
       <section className="section card">
         <div className="section-head">
-          <h2 className="section-title">Daily requests by tier</h2>
-          <span className="muted small">UTC days, {monthLabel(o.month)}</span>
+          <h2 className="section-title">Requests by day</h2>
         </div>
         <DailyChart id="overview-daily" daily={o.daily} />
       </section>
@@ -82,7 +78,7 @@ export default async function OverviewPage() {
         <div className="section-head">
           <h2 className="section-title">Endpoints</h2>
           <Link href="/endpoints" className="small">
-            Manage endpoints →
+            All →
           </Link>
         </div>
         {rows.length === 0 ? (

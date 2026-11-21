@@ -26,7 +26,6 @@ export function TestConnection({ url, endpointId }: { url?: string; endpointId?:
         <button className="btn-ghost" type="button" onClick={run} disabled={pending || (!endpointId && !url)}>
           {pending ? 'Testing…' : 'Test connection'}
         </button>
-        <span className="field-hint">Runs from the admin server&apos;s network, 5 s timeout.</span>
       </div>
       {shown && <ConnectionResult result={shown} />}
     </div>

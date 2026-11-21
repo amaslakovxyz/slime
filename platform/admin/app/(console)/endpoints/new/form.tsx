@@ -21,7 +21,7 @@ export function NewEndpointForm({ providers }: { providers: string[] }) {
   };
 
   return (
-    <div className="split">
+    <div className="form-narrow">
       <form onSubmit={submit} className="card form-card">
         {state.error && (
           <div className="alert" role="alert">
@@ -56,7 +56,7 @@ export function NewEndpointForm({ providers }: { providers: string[] }) {
             <span className="step-num">2</span> Connector
           </legend>
           <div className="choices">
-            {CONNECTORS.map((c) => (
+            {CONNECTORS.filter((c) => c.available).map((c) => (
               <label className={`choice${c.available ? '' : ' is-disabled'}`} key={c.type}>
                 <input
                   type="radio"
@@ -92,9 +92,7 @@ export function NewEndpointForm({ providers }: { providers: string[] }) {
               onChange={(e) => setUrl(e.target.value)}
               placeholder={spec.placeholder}
             />
-            <span className="field-hint">
-              Use a read-only role. The URL is stored only in the secret store, never in the control table.
-            </span>
+            <span className="field-hint">Read-only role.</span>
           </label>
           <TestConnection url={url.trim()} />
         </fieldset>
@@ -106,23 +104,6 @@ export function NewEndpointForm({ providers }: { providers: string[] }) {
         </div>
       </form>
 
-      <aside className="card aside-card">
-        <h2 className="card-title">What happens next</h2>
-        <ol className="steps-list">
-          <li>
-            <strong>pending</strong> Secrets go to the secret store, the endpoint record to slime-control.
-          </li>
-          <li>
-            <strong>provisioning</strong> slime-provisioner creates a role, a function on the Gas layer and its URL.
-          </li>
-          <li>
-            <strong>ready</strong> A health check against your database passes; the URL starts answering.
-          </li>
-        </ol>
-        <p className="field-hint">
-          Locally (DynamoDB Local) nothing provisions, so a new endpoint stays <span className="mono">pending</span>.
-        </p>
-      </aside>
     </div>
   );
 }
