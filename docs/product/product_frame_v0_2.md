@@ -53,7 +53,7 @@ day-1 spike, not here.
 | 3 | Source access | Live federation; **no customer data stored** (handlers, schemas, tokens, payload-free logs only) |
 | 4 | Operations | Read-only v0; writes are roadmap (SaaS writes have no rollback — needs its own design) |
 | 5 | Reuse mechanics | **Both, phase-split:** `catalog` for explore; `expect`/`contractId` mandatory on pinned endpoints |
-| 6 | "Crystal" naming | Product-facing Crystal = **export into the client's repo** — roadmap, not v0. The engine's internal git-module tier keeps working but is not called Crystal in product language |
+| 6 | "Crystal" naming | **Crystal = the frozen contract** (product name for `contractId`, `cry_` hash). v0 hosts it in slime-cloud; `slime export` (roadmap) takes it as code into the client's repo. Static-host consumption: [crystal_static_host.md](crystal_static_host.md) |
 | 7 | Integration scope | **Core line: Linear + Postgres. Stretch: Notion** with the cross-source join as the demo finale. Fallback is explicit: Notion is cut first |
 
 Rejected alternatives and the full federation research (rate limits, N+1
