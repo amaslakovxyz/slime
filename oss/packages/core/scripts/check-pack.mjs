@@ -16,6 +16,7 @@ const required = [
   'dist/index.js',
   'dist/index.d.ts',
   'dist/offline/index.js',
+  'dist/postgres/index.js',
   'dist/shaping/shape-worker.js',
 ];
 const forbidden = [/^src\//, /^test\//, /^scripts\//, /^tsconfig/, /^PLAN\.md$/, /^docs\//];

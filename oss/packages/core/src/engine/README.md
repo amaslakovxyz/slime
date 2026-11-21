@@ -36,8 +36,8 @@ classes and functions here are internal.
 - **Locked mode never generates.** A miss throws `HANDLER_NOT_FOUND`.
 - **Generation.** At most `1 + maxRepairs` attempts, while at least 1 s of
   budget is left; provider rate-limit waits extend the budget.
-  `WRITE_REFUSED` is final. An `unsatisfiable` reason that reads like a
-  write becomes `WRITE_REFUSED`.
+  `WRITE_REFUSED` and `ACCESS_DENIED` are final. An `unsatisfiable` reason
+  that reads like a write becomes `WRITE_REFUSED`.
 - **Cached only after it ran.** A generated handler is cached only after its
   first run passed lint, the cost check, the output check and R6.
 - **Parameter types.** Every later run checks the input against the

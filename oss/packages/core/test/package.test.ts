@@ -35,7 +35,15 @@ test('the public entry exports createSlime, the config, the stores and errors, a
   ]);
 });
 
-test('the offline generator has its own subpath, so the main entry never loads it (C7)', async () => {
+test('adapters have their own subpaths, so the main entry never loads them (C7)', async () => {
   assert.deepEqual(pkg.exports['./offline'], { types: './dist/offline/index.d.ts', default: './dist/offline/index.js' });
+  assert.deepEqual(pkg.exports['./postgres'], { types: './dist/postgres/index.d.ts', default: './dist/postgres/index.js' });
   assert.deepEqual(Object.keys(await import('../src/offline/index.js')), ['offlineGenerator']);
+  assert.deepEqual(Object.keys(await import('../src/postgres/index.js')), ['postgresConnector']);
+});
+
+test('database drivers are optional peer dependencies (C7)', () => {
+  assert.equal(pkg.peerDependencies.pg, pkg.devDependencies.pg);
+  assert.deepEqual(pkg.peerDependenciesMeta.pg, { optional: true });
+  assert.equal(pkg.dependencies.pg, undefined);
 });

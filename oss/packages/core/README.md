@@ -31,12 +31,12 @@ input values. Handlers move up through three tiers:
 * **Crystal:** rewritten by an agent into JS modules (with `.d.ts`) in the app's own
   code, and passed to Slime through the config.
 
-> **Status:** M2 is done: `createSlime()` and `slime.query()` work on the
-> Gas path, with the file and memory stores, the QuickJS shaping sandbox,
-> coalescing, rate limits, locked mode and the offline generator
-> (`@slime-cloud/core/offline`). `postgresConnector` (M3) and the Claude and
-> Groq generators (M4) don't exist yet, so the example above shows the target
-> API. Decisions and milestones are in [PLAN.md](PLAN.md).
+> **Status:** M3 is done: `createSlime()` and `slime.query()` work on the
+> Gas path against Postgres (`@slime-cloud/core/postgres`), with the file and
+> memory stores, the QuickJS shaping sandbox, coalescing, rate limits, locked
+> mode and the offline generator (`@slime-cloud/core/offline`). The Claude
+> and Groq generators arrive with M4, so the example's `generator` doesn't
+> exist yet. Decisions and milestones are in [PLAN.md](PLAN.md).
 
 ### Scope
 
@@ -81,6 +81,8 @@ input values. Handlers move up through three tiers:
     from metadata, glossary and rules;
   - [src/offline/](./src/offline/README.md): the offline generator, the
     `@slime-cloud/core/offline` entry;
+  - [src/postgres/](./src/postgres/README.md): the Postgres connector, the
+    `@slime-cloud/core/postgres` entry;
   - [src/config/](./src/config/README.md): `SlimeConfig`'s option types,
     defaults and validation;
   - [src/request/](./src/request/README.md): request parsing, the output
@@ -98,7 +100,7 @@ input values. Handlers move up through three tiers:
 ## Global Invariants
 
 - **One main entry, plus adapter subpaths.** `package.json` `exports` has
-  `.` and `./offline` (C7). `test/package.test.ts` pins the main entry's
+  `.`, `./offline` and `./postgres` (C7). `test/package.test.ts` pins the main entry's
   value exports and the subpath.
 - **What ships.** ESM only (`type: module`), Node `>=22`, compiled `dist/`
   and `README.md` only (`files`). `scripts/check-pack.mjs` enforces this in
@@ -106,7 +108,8 @@ input values. Handlers move up through three tiers:
 - **Private until go-public.** The package is `private: true`. Tests guard
   this, so nothing is published by accident.
 - **One runtime dependency.** `quickjs-emscripten`, for the shaping
-  sandbox. Drivers and model SDKs will be optional peers (C7).
+  sandbox. Drivers and model SDKs are optional peers (C7): `pg` for
+  `./postgres`.
 - **No environment reading.** Core never reads `process.env` or `.env`. The
   app passes everything in through `SlimeConfig` (`src/config.ts`).
 - **No values in keys or prompts.** Input values are never part of a cache

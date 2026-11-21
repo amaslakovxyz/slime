@@ -53,7 +53,7 @@ them.
 
 **`errors.ts`**
 
-- `ErrorCode`: 13 codes, from `INVALID_REQUEST` to `EXECUTION_TIMEOUT`.
+- `ErrorCode`: 14 codes, from `INVALID_REQUEST` to `EXECUTION_TIMEOUT`.
 - `ErrorCode` is derived from the `STATUS_BY_CODE` map, so a code can't
   exist without a status.
 - `SlimeError(code, message, { retryable = false, details }?)`:
@@ -88,6 +88,8 @@ always uses its own QuickJS runner.
 - [shaping/](./shaping/README.md): the QuickJS shaping sandbox.
 - [dictionary/](./dictionary/README.md): the dictionary text and hashes.
 - [offline/](./offline/README.md): the offline generator (its own subpath).
+- [postgres/](./postgres/README.md): the Postgres connector (its own
+  subpath; needs `pg`).
 - [request/](./request/README.md): parsing of `{ intent, input?, output }`,
   the output notation, per-handler parameter types, and the cache keys
   (`requestKey`) and handler provenance (`changedProvenance`).

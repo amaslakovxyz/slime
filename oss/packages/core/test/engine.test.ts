@@ -4,6 +4,7 @@ import { after, describe, test } from 'node:test';
 import { SlimeConfig, type SlimeOptions } from '../src/config.js';
 import type { SlimeEvent } from '../src/config/options.js';
 import { createSlime } from '../src/create-slime.js';
+import { buildDictionary } from '../src/dictionary/dictionary.js';
 import type { HandlerRecord, Slime } from '../src/engine/types.js';
 import { SlimeConfigError, SlimeError, type ErrorCode } from '../src/errors.js';
 import { requestKey } from '../src/request/key.js';
@@ -133,6 +134,25 @@ describe('engine: modes and saved handlers (§4.7, R8)', () => {
     const slime = await startSlime({ store, generator });
     assert.equal((await slime.query(request)).meta.cache, 'miss');
     assert.equal(generator.calls, 1);
+  });
+
+  test('changing rules changes the dictionary and regenerates a saved handler in explore mode (D6)', async () => {
+    const request = topAccounts({ country: 'DE', plan: null });
+    const schema = await fakeConnector().describe();
+    const savedUnderRules = (rules: string[]): HandlerRecord => {
+      const dictionary = buildDictionary({ schema, glossary: {}, rules });
+      const provenance = { schemaHash: dictionary.schemaHash, dictionaryHash: dictionary.hash, promptHash: 'stub-prompt', model: 'stub-model' };
+      return savedRecord(request, { provenance });
+    };
+    const cacheWith = async (rules: string[]) => {
+      const store = memoryStore();
+      const record = savedUnderRules(['Count only paid invoices.']);
+      await store.put('handlers', record.key, record);
+      const slime = await startSlime({ store, rules, generator: stubGenerator(() => filteredArtifact) });
+      return (await slime.query(request)).meta.cache;
+    };
+    assert.equal(await cacheWith(['Count only paid invoices.']), 'hit');
+    assert.equal(await cacheWith(['Count open invoices too.']), 'miss');
   });
 
   test('generated code is in meta only in explore mode (R9, R11)', async () => {

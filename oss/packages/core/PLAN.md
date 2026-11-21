@@ -1,6 +1,6 @@
 # @slime-cloud/core: library plan
 
-* **Status:** draft. M0, M1 and M2 are done; M3 is next.
+* **Status:** draft. M0 to M3 are done; M4 is next.
 * **Date:** 2026-11-20 (review fixes and follow-ups 2026-11-21)
 * **Owner:** Konstantin (core only; server and Slime Cloud are owned by others)
 
@@ -395,7 +395,7 @@ goal. Before a milestone starts, its row gets the files it creates or changes
 | M0 | **Skeleton.** Root `package.json` with workspaces, core `package.json` with an exports map, `tsconfig`, `node:test`, a CI job "Core tests". | `npm test -w @slime-cloud/core` runs; `npm pack` builds a tarball; CI is green. | done |
 | M1 | **Request, contracts and pure parts.** Request parsing, intent normalization and the request key (§4); output notation with `date`/`datetime`; Ports and `SlimeError`; SQL guard and lint; `SlimeConfig` with defaults, validation and `glossary`. | `request`, `shape`, `params`, `key`, `sql`, `config` and `package` tests pass. | done |
 | M2 | **Engine, Gas path.** `createSlime` and the instance API (`query`, `flush`, `close`, `evict`, `handlers`, `stats`; `onEvent` with `generated`, `warning` and `error`), the `memory` and `file` stores and the shared store contract test, offline generator, the shaping sandbox with the QuickJS worker, coalescing, rate limits, locked mode, typed and nullable parameters (R4, R5), the limit check (R6), the R7 warning. Engine rules below. | The M2 tests below pass with no database; no core test is skipped because a database is missing; no `config` singleton anywhere. | done |
-| M3 | **Postgres connector.** Connector with the startup safety check and enum values from the catalog, which the M2 dictionary renders (§4.4). CI gets a Postgres service using `sandbox/db/init.sql` (roles and seed data). | `postgres.test.ts` cases pass against Postgres in CI (database tests require `REQUIRE_DB=1` in CI rather than skipping); the file and memory stores pass the shared contract test; changing `rules` changes the dictionary and regenerates handlers in explore mode. | planned |
+| M3 | **Postgres connector.** Connector with the startup safety check and enum values from the catalog, which the M2 dictionary renders (§4.4). CI gets a Postgres service using `sandbox/db/init.sql` (roles and seed data). | `postgres.test.ts` cases pass against Postgres in CI (database tests require `REQUIRE_DB=1` in CI rather than skipping); the file and memory stores pass the shared contract test; changing `rules` changes the dictionary and regenerates handlers in explore mode. | done |
 | M4 | **Models and Liquid.** Claude and Groq generators and reviewers with prompts updated for §4 (nullable parameters, the dictionary); the review loop; promotion to Liquid (rule below); `reviewed` and `promoted` events. | Review and promotion tests pass; one live run against Groq or Claude. | planned |
 | M5 | **Crystal.** Serving from an imported registry; the crystallize job writing JS with `.d.ts`; the `check` command. | `crystal*.test.ts` ported; a hand-edited Crystal file fails `check`; the output passes the equivalence test. | planned |
 | M6 | **Use it as a package.** An example app that installs the packed tarball and calls `slime.query()` from an endpoint; docs for the request format; the bench ported to run on core. Publishing to npm is not part of v1. | The example (`oss/examples/express`, its own lockfile, run in CI from the packed tarball) answers a query. The bench, ported to `oss/packages/core/bench/`, gets the 5 cases recorded as correct in `concepts_brief.md` right, and refuses the 2 unsafe ones. | planned |
@@ -430,6 +430,14 @@ Required cases:
 `quickjs-emscripten`); `scripts/check-pack.mjs`; tests `engine`, `shaping`,
 `stores` (with `store-contract.ts`), `dictionary` and `package`. `flush()`
 has nothing to wait for until M4 adds reviews and promotion writes.
+
+**M3 files.** `src/postgres/` (`postgres-connector.ts`, `describe.ts`,
+`enum-values.ts`, `safety.ts`, `database-errors.ts`, `index.ts`);
+`ACCESS_DENIED` in `src/errors.ts` (a denied table or column, final like
+`WRITE_REFUSED`); `package.json` (`./postgres` export, `pg` as optional peer
+and dev dependency); `scripts/check-pack.mjs`; `.github/workflows/ci.yml`
+(Postgres service, `REQUIRE_DB=1`); tests `postgres` (with `database.ts`),
+`engine` (rules change) and `package`.
 
 **M4 promotion rule.** A Gas handler with `gasToLiquidRuns` successful runs on
 distinct inputs inside `gasWindowMs` goes to the reviewer. Approved: saved as
@@ -479,12 +487,12 @@ configured, handlers are promoted after the runs and marked `review: 'none'`.
 
 ## 9. Next decision
 
-M0, M1 and M2 are done. Still to decide:
+M0 to M3 are done. Still to decide:
 
-* **Still Proposed, built as proposed in M2:** R4, R5, R7, R11, C12, C15 and
+* **Still Proposed, built as proposed in M2 and M3:** R4, R5, R7, R11, C12, C15 and
   C4's class shape. They stand unless someone objects.
-* **Before M3:** whether the store contract test is exported for custom
-  stores (today it lives in `test/store-contract.ts`).
+* **Before M7:** whether the store contract test is exported for custom
+  stores such as Slime Cloud's (today it lives in `test/store-contract.ts`).
 * **Before M5:** the `CrystalRegistry` shape, the manifest format and hash,
   the `bin` name, the `Optimizer` Port, how the CLI receives its connector,
   store and optimizer (no env), and where `crystalMinRuns` lives.
