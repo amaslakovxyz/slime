@@ -149,6 +149,7 @@ export type LifecycleData =
 
 /** Server only: reads the endpoint's runtime with its own token. */
 export async function readLifecycle(ep: Endpoint): Promise<LifecycleData> {
+  if (ep.status === 'failed') return { ok: false, reason: ep.error ? `Endpoint failed: ${ep.error}` : 'Endpoint failed.' };
   if (!ep.url || (ep.status !== 'ready' && ep.status !== 'updating')) return { ok: false, reason: `Endpoint is ${ep.status}.` };
   const token = await secretStore().get(ep.endpointId, 'SLIME_API_KEY');
   if (!token) return { ok: false, reason: 'Token not found in the secret store.' };
@@ -168,7 +169,7 @@ export async function readLifecycle(ep: Endpoint): Promise<LifecycleData> {
       warnings: l.warnings ?? [],
     };
   } catch {
-    if (ep.status === 'updating') return { ok: false, reason: 'Restarting the endpoint to load the new Crystal…' };
+    if (ep.status === 'updating') return { ok: false, reason: 'Restarting the endpoint…' };
     return { ok: false, reason: 'Endpoint is not running. Is `npm run local` up?' };
   }
 }

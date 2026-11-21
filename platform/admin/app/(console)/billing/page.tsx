@@ -38,7 +38,7 @@ export default async function BillingPage() {
           </div>
           <div className="bill-total mono">{formatUsd(o.estimatedUsd)}</div>
           <p className="card-sub">
-            {formatCount(o.requests)} requests · {formatCount(o.generations)} generations
+            {formatCount(o.requests)} request{o.requests === 1 ? '' : 's'} · {formatCount(o.generations)} generation{o.generations === 1 ? '' : 's'}
           </p>
         </section>
         <section className="card savings-card">

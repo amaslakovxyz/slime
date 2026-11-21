@@ -92,6 +92,19 @@ async function modelsFrom(env: Env): Promise<Models> {
   };
 }
 
+const PROVIDER_KEYS = { claude: 'ANTHROPIC_API_KEY', groq: 'GROQ_API_KEY' } as const;
+
+/**
+ * A warning when the provider that generates has no key: saved and Crystal handlers still
+ * serve, but every new request would be sent to the provider with an empty key and fail.
+ */
+export function missingProviderKey(env: Env): string | undefined {
+  if (env.SLIME_MODE === 'locked' || env.SLIME_PROVIDER === 'offline') return undefined;
+  const name = PROVIDER_KEYS[env.SLIME_PROVIDER === 'groq' ? 'groq' : 'claude'];
+  if (env[name]?.trim()) return undefined;
+  return `${name} is not set: saved handlers still answer, new requests cannot be generated. Set it for the runtime (locally: export it before npm run local), or switch the endpoint to Offline.`;
+}
+
 /** Crystal ships in the bundle (SLIME_CRYSTAL_DIR); SLIME_CRYSTAL=off is the kill switch. */
 async function crystalsFrom(env: Env): Promise<{ crystal?: CrystalRegistry }> {
   if (env.SLIME_CRYSTAL === 'off' || !env.SLIME_CRYSTAL_DIR) return {};

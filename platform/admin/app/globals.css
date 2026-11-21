@@ -1967,6 +1967,8 @@ code.inline {
 .lc-wait.ok { color: var(--gas-accent); }
 .lc-wait.ok i { background: var(--gas-accent); animation: none; }
 
+/* Narrow screens scroll the table inside its card instead of widening the page. */
+.lc-table-wrap { overflow-x: auto; }
 .lc-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
 .lc-table th { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--wireframe-grey); font-weight: 600; text-align: left; padding: 0 10px 10px; }
 .lc-table td { white-space: nowrap; padding: 12px 10px; border-top: 1px solid var(--border-color); vertical-align: middle; }

@@ -57,48 +57,50 @@ export function LifecycleBoard({
       {rows.length === 0 ? (
         <p className="lc-empty">No requests yet.</p>
       ) : (
-        <table className="lc-table">
-          <thead>
-            <tr><th>Hash</th><th>Intent</th><th>Stage</th><th>Progress</th><th aria-label="Action" /></tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <Fragment key={r.key}>
-                <tr className={r.tier === 'crystal' ? 'lc-row-crystal' : undefined}>
-                  <td className="mono lc-hash" title={r.key}>#{r.shortKey}</td>
-                  <td className="lc-intent">{r.intent}</td>
-                  <td><span className={`tier-pill tier-pill-${r.tier}`}>{r.tier}</span></td>
-                  <td>
-                    <div className="lc-prog">
-                      <div className="lc-bar"><i className={`lc-fill-${r.canCrystallize ? 'crystal' : r.tier}`} style={{ width: `${r.progressPct}%` }} /></div>
-                      <span className={r.review.tone === 'run' ? 'lc-review-run' : undefined}>{r.review.tone === 'run' ? r.review.label : r.progressLabel}</span>
-                    </div>
-                  </td>
-                  <td className="lc-action">
-                    {r.canCrystallize && (
-                      <button
-                        className="btn btn-sm lc-btn-crystal"
-                        type="button"
-                        aria-label={`Crystallize ${r.shortKey}`}
-                        onClick={() => crystallize(r.key)}
-                        disabled={busy}
-                      >
-                        {working === r.key ? 'Crystallizing…' : 'Crystallize'}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-                {r.tier === 'crystal' && (
-                  <tr className="lc-sub">
-                    <td colSpan={5}>
-                      <CrystalCard endpointId={endpointId} url={url} crystal={r} tokenHint={tokenHints[r.key]} restarting={restarting} />
+        <div className="lc-table-wrap">
+          <table className="lc-table">
+            <thead>
+              <tr><th>Hash</th><th>Intent</th><th>Stage</th><th>Progress</th><th aria-label="Action" /></tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <Fragment key={r.key}>
+                  <tr className={r.tier === 'crystal' ? 'lc-row-crystal' : undefined}>
+                    <td className="mono lc-hash" title={r.key}>#{r.shortKey}</td>
+                    <td className="lc-intent">{r.intent}</td>
+                    <td><span className={`tier-pill tier-pill-${r.tier}`}>{r.tier}</span></td>
+                    <td>
+                      <div className="lc-prog">
+                        <div className="lc-bar"><i className={`lc-fill-${r.canCrystallize ? 'crystal' : r.tier}`} style={{ width: `${r.progressPct}%` }} /></div>
+                        <span className={r.review.tone === 'run' ? 'lc-review-run' : undefined}>{r.review.tone === 'run' ? r.review.label : r.progressLabel}</span>
+                      </div>
+                    </td>
+                    <td className="lc-action">
+                      {r.canCrystallize && (
+                        <button
+                          className="btn btn-sm lc-btn-crystal"
+                          type="button"
+                          aria-label={`Crystallize ${r.shortKey}`}
+                          onClick={() => crystallize(r.key)}
+                          disabled={busy}
+                        >
+                          {working === r.key ? 'Crystallizing…' : 'Crystallize'}
+                        </button>
+                      )}
                     </td>
                   </tr>
-                )}
-              </Fragment>
-            ))}
-          </tbody>
-        </table>
+                  {r.tier === 'crystal' && (
+                    <tr className="lc-sub">
+                      <td colSpan={5}>
+                        <CrystalCard endpointId={endpointId} url={url} crystal={r} tokenHint={tokenHints[r.key]} restarting={restarting} />
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
       {events.length > 0 && (
         <div className="lc-feed" aria-label="Recent requests">

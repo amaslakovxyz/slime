@@ -1,5 +1,6 @@
 import { deleteEndpointAction, updateConnectorAction, updateSettingsAction } from '@/app/actions';
 import { formatDate } from '@/app/format';
+import { ConfirmSubmit } from '@/app/ui/confirm-submit';
 import { PROVIDER_INFO } from '@/app/ui/providers';
 import { TestConnection } from '@/app/ui/test-connection';
 import { CONNECTOR_SPECS, maskConnectionUrl } from '@/lib/connectors';
@@ -116,9 +117,13 @@ export default async function SettingsPage({
           <p className="card-sub">Delete the endpoint, its secrets and handlers.{!settled && ` Locked while ${ep.status}.`}</p>
           <form action={deleteEndpointAction}>
             <input type="hidden" name="endpointId" value={ep.endpointId} />
-            <button className="btn-danger" type="submit" disabled={!settled}>
+            <ConfirmSubmit
+              className="btn-danger"
+              disabled={!settled}
+              message={`Delete "${ep.name}"? Its URL, token, secrets and handlers are removed; this cannot be undone.`}
+            >
               Delete endpoint
-            </button>
+            </ConfirmSubmit>
           </form>
         </div>
       </section>

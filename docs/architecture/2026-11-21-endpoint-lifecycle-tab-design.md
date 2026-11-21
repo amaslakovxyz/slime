@@ -115,7 +115,10 @@ endpoint (`/mcp`), multi-user concurrency, persistence of the feed.
   `status=ready`. A failed health check writes `failed` with the last stderr
   lines.
 * **Updating:** stop, start, health check, `ready`.
-* **Deleting:** stop the process, delete the item (folder kept).
+* **Deleting:** stop the process, delete the endpoint's Liquid handlers and
+  its `.data/endpoints/<id>/` folder (as the provisioner's teardown does on
+  AWS; ids are never reused, so a kept folder was only litter), then the item,
+  then the secrets.
 * **One command:** `npm run local` in `platform/admin` starts `next dev` and
   the runner together, so the operator still runs a single process.
 
