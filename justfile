@@ -11,7 +11,7 @@ hooks:
 
 # Serve the landing page locally at http://localhost:8000.
 landing:
-    python3 -m http.server 8000 --directory landing
+    python3 -m http.server 8000 --directory platform/landing
 
 # Type-check, test, build and pack-check @slime-cloud/core, as CI does.
 core:
@@ -21,11 +21,11 @@ core:
     npm run build -w @slime-cloud/core
     npm run check:pack -w @slime-cloud/core
 
-# Build the Slime Cloud runtime Lambda bundle (slime-cloud/runtime/dist/lambda).
+# Build the Slime Cloud runtime Lambda bundle (platform/runtime/dist/lambda).
 runtime-build:
-    bash infra/aws/platform/build.sh
+    bash platform/infra/platform/build.sh
 
-# Plan an infra/aws stack with the slime deployer role (e.g. `just tf-plan platform`).
+# Plan a platform/infra stack with the slime deployer role (e.g. `just tf-plan platform`).
 tf-plan stack: (runtime-build)
-    AWS_PROFILE=slime terraform -chdir=infra/aws/{{stack}} init -input=false >/dev/null
-    AWS_PROFILE=slime terraform -chdir=infra/aws/{{stack}} plan
+    AWS_PROFILE=slime terraform -chdir=platform/infra/{{stack}} init -input=false >/dev/null
+    AWS_PROFILE=slime terraform -chdir=platform/infra/{{stack}} plan
