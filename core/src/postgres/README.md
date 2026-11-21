@@ -59,7 +59,7 @@ imports this folder.
 ## Verification
 
 - `test/postgres.test.ts` runs against the demo database from
-  `oss/examples/express/db/init.sql` (`npm run db:up` in that folder
+  `examples/express/db/init.sql` (`npm run db:up` in that folder
   locally; a service in CI). URLs come from `DATABASE_URL` and
   `WRITER_DATABASE_URL`, with local defaults. Locally the database tests are skipped when Postgres is down; CI
   sets `REQUIRE_DB=1`, so they fail instead.

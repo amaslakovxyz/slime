@@ -42,14 +42,14 @@ owned by others.
 | `sandbox/` on `main` | Working engine, about 88 tests. Gas, Liquid in Postgres, background review, Crystal ([PR #6](https://github.com/amaslakovxyz/slime/pull/6)), offline/Groq/Claude providers. Configured through a global `config` that reads env and `.env`. |
 | [PR #7](https://github.com/amaslakovxyz/slime/pull/7) (closed 2026-11-21) | Layers: core → server → platform. Name `@slime-cloud/core` at `oss/packages/core`. Its plan moves `sandbox/` there with `git mv`, and adds `SLIME_META_TABLE`. Lists "config injection instead of the module singleton" as later work. |
 | `chore/gas-v0-plan`, `onboarding` | The other direction (Bun, SQLite, named intents, writes). Not the base for core. Useful later for the write path (`EffectSink`). |
-| `slime-cloud/runtime/` on `main` | **The first consumer of core.** Slime Cloud's runtime on AWS Lambda with handlers in DynamoDB (table `slime-handlers`, partition key `tenantId`, sort key `artifactKey`). It compiles `sandbox/src` through a path mapping and imports deep modules (`@slime-cloud/core/engine.js`, `config.js`, `store.js`). It must set env before importing, because `config` reads env at import time, and it flushes store writes before every response, because Lambda freezes the process afterwards. Its own `DynamoHandlerStore` implements the sandbox's `HandlerStore`. |
+| `platform/runtime/` on `main` | **The first consumer of core.** Slime Cloud's runtime on AWS Lambda with handlers in DynamoDB (table `slime-handlers`, partition key `tenantId`, sort key `artifactKey`). It compiles `sandbox/src` through a path mapping and imports deep modules (`@slime-cloud/core/engine.js`, `config.js`, `store.js`). It must set env before importing, because `config` reads env at import time, and it flushes store writes before every response, because Lambda freezes the process afterwards. Its own `DynamoHandlerStore` implements the sandbox's `HandlerStore`. |
 
 PR #7 planned to move the sandbox to this path as is, with `git mv`. It was
-closed on 2026-11-21; core is built at `oss/packages/core` as a new library
+closed on 2026-11-21; core is built at `core/` as a new library
 instead. Its layering (core → server → platform) and the `@slime-cloud` name
 still hold: server and platform build on `createSlime()`.
 
-`slime-cloud/runtime` switches to the package (agreed with the team; its README
+`platform/runtime` switches to the package (agreed with the team; its README
 still says `sandbox/` gets published, which is now out of date). The runtime
 changes in a few places (§7, M7):
 
@@ -66,8 +66,8 @@ Status: **Decided**, **Proposed** (default unless someone objects) or
 
 | # | Question | Proposal | Status |
 |---|---|---|---|
-| C1 | Name and location | `@slime-cloud/core` in `oss/packages/core/`, inside npm workspaces at the repo root (PR #7 D10). | Decided |
-| C2 | Start from scratch or move the sandbox? | New package. Core is the only engine; `sandbox/` is frozen and not used (team agreement, 2026-11-20). Its code and tests are a quarry to copy from, not a reference to match. It is deleted in M6, once `slime-cloud/runtime` has switched to the package (M7). | Decided |
+| C1 | Name and location | `@slime-cloud/core` in `core/`, inside npm workspaces at the repo root (PR #7 D10). | Decided |
+| C2 | Start from scratch or move the sandbox? | New package. Core is the only engine; `sandbox/` is frozen and not used (team agreement, 2026-11-20). Its code and tests are a quarry to copy from, not a reference to match. It is deleted in M6, once `platform/runtime` has switched to the package (M7). | Decided |
 | C3 | Runtime | v1: Node ≥ 22, ESM only. Built so that other runtimes (Bun, Deno) can be added later without touching the engine. Runtime-specific code stays behind Ports: the shaping sandbox (QuickJS in a worker thread) goes behind a new `SandboxRunner` Port, and database drivers stay behind `Connector`. The engine uses only `node:*` modules that Bun and Deno also provide. | Decided |
 | C4 | Configuration | A `SlimeConfig` class. The app creates it and adds the parts it needs: connector, generator, store, limits. Each part can come from env, a secrets store or anywhere else in the app. The class fills defaults, validates everything at once (reporting every problem, not just the first), and is immutable; `config.with({...})` returns a changed copy for tests. Core never reads `process.env` or `.env`. | Decided (class shape: Proposed) |
 | C5 | Entry point | Three steps in the app: create a connector (where data comes from), create a Slime instance with `createSlime(config)`, then call `slime.query()` inside any endpoint. The instance's methods are listed in §5. | Decided |
@@ -338,7 +338,7 @@ Also exported: `SlimeError`, `SlimeConfigError`, the error codes,
 ## 6. Package layout (target)
 
 ```
-oss/packages/core/
+core/
 ├── package.json          # @slime-cloud/core, "exports" per subpath, peerDeps optional
 ├── tsconfig.json         # typecheck only (noEmit)
 ├── tsconfig.build.json   # build → dist/, declarations on
@@ -398,8 +398,8 @@ goal. Before a milestone starts, its row gets the files it creates or changes
 | M3 | **Postgres connector.** Connector with the startup safety check and enum values from the catalog, which the M2 dictionary renders (§4.4). CI gets a Postgres service using `sandbox/db/init.sql` (roles and seed data). | `postgres.test.ts` cases pass against Postgres in CI (database tests require `REQUIRE_DB=1` in CI rather than skipping); the file and memory stores pass the shared contract test; changing `rules` changes the dictionary and regenerates handlers in explore mode. | done |
 | M4 | **Models and Liquid.** Claude and Groq generators and reviewers with prompts updated for §4 (nullable parameters, the dictionary); the review loop; promotion to Liquid (rule below); `reviewed` and `promoted` events. | Review and promotion tests pass; one live run against Groq or Claude (`npm run live`). | built; live run pending |
 | M5 | **Crystal.** Serving from an imported registry; the crystallize job writing `.mjs` modules with a generated index; the `check` command. | `crystal*.test.ts` ported; a hand-edited Crystal file fails `check`; the output passes the equivalence test. | done |
-| M6 | **Use it as a package, and retire `sandbox/`.** An example app that installs the packed tarball and calls `slime.query()` from an endpoint; docs for the request format; the bench ported to run on core. The example takes over what `sandbox/` still provides: the demo server, the demo database (`db/init.sql` and its Docker Compose file, used by core's tests and CI) and the offline handlers. Then `sandbox/` is deleted, with its CI job. Publishing to npm is not part of v1. | The example (`oss/examples/express`, its own lockfile, run in CI from the packed tarball) answers a query. The bench, ported to `oss/packages/core/bench/`, gets the 5 cases recorded as correct in `concepts_brief.md` right, and refuses the 2 unsafe ones. Core's tests and CI use the moved demo database. `sandbox/` and its CI job are gone. | built; bench with a model pending |
-| M7 | **Switch `slime-cloud/runtime` to the package** (with its owner). Drop the path mapping to `sandbox/src`; build the engine with `createSlime(new SlimeConfig(…))`; replace `DynamoHandlerStore` with a `SlimeStore` over the existing table that serves the items already there; keep `slime.flush()` before each response (C15). After the switch nothing compiles `sandbox/src`, so M6 can delete `sandbox/`. | The runtime's tests pass on the package; a deployed function answers from handlers stored by the new store. Handlers saved before the switch are still served. The previous deploy can be restored. | built; handler copy and deploy pending (runtime owner) |
+| M6 | **Use it as a package, and retire `sandbox/`.** An example app that installs the packed tarball and calls `slime.query()` from an endpoint; docs for the request format; the bench ported to run on core. The example takes over what `sandbox/` still provides: the demo server, the demo database (`db/init.sql` and its Docker Compose file, used by core's tests and CI) and the offline handlers. Then `sandbox/` is deleted, with its CI job. Publishing to npm is not part of v1. | The example (`examples/express`, its own lockfile, run in CI from the packed tarball) answers a query. The bench, ported to `core/bench/`, gets the 5 cases recorded as correct in `concepts_brief.md` right, and refuses the 2 unsafe ones. Core's tests and CI use the moved demo database. `sandbox/` and its CI job are gone. | built; bench with a model pending |
+| M7 | **Switch `platform/runtime` to the package** (with its owner). Drop the path mapping to `sandbox/src`; build the engine with `createSlime(new SlimeConfig(…))`; replace `DynamoHandlerStore` with a `SlimeStore` over the existing table that serves the items already there; keep `slime.flush()` before each response (C15). After the switch nothing compiles `sandbox/src`, so M6 can delete `sandbox/`. | The runtime's tests pass on the package; a deployed function answers from handlers stored by the new store. Handlers saved before the switch are still served. The previous deploy can be restored. | built; handler copy and deploy pending (runtime owner) |
 
 **M2 engine rules.** `createSlime()` awaits `connector.safetyCheck()` (unsafe
 credentials throw `SlimeConfigError`), `store.init()` and the dictionary, in
@@ -496,12 +496,12 @@ a real model as generator and reviewer); tests `promotion`, `groq` and
 export, `slime-crystal` bin, `acorn` and `acorn-walk`); tests
 `crystal-allowlist`, `crystallize` and `package`.
 
-**M6 files.** `oss/examples/express/` (`src/app.mjs` with named routes and
+**M6 files.** `examples/express/` (`src/app.mjs` with named routes and
 a dev-only `POST /dev/query`, `src/config.mjs`, `src/server.mjs`,
 `scripts/crystallize.mjs`, `test/app.test.mjs`, `offline-handlers.json`,
 `db/init.sql` and `docker-compose.yml` copied from `sandbox/`, its own
-lockfile); `oss/packages/core/docs/request-format.md`;
-`oss/packages/core/bench/` (`cases.mjs`, `run.mjs`, `npm run bench`; it runs
+lockfile); `core/docs/request-format.md`;
+`core/bench/` (`cases.mjs`, `run.mjs`, `npm run bench`; it runs
 offline too, which checks the bench but not a model); core's tests and CI
 use the example's `db/init.sql`; `.github/workflows/ci.yml` (an "Example
 app" job that installs the packed tarball, runs the example's tests and
@@ -512,8 +512,8 @@ is deleted.
 review.
 
 * **How the runtime depends on the package:** `"@slime-cloud/core":
-  "file:../../oss/packages/core"`, bundled from its built `dist/`. CI and
-  `infra/aws/platform/build.sh` build the core first.
+  "file:../../core"`, bundled from its built `dist/`. CI and
+  `platform/infra/platform/build.sh` build the core first.
 * **Config:** `src/config.ts` maps the same env variable names the sandbox
   runtime read, so the SSM parameters don't change.
 * **Store:** `DynamoSlimeStore` on the existing table, with sort keys
@@ -530,12 +530,12 @@ review.
 * **The store contract test is exported** on `@slime-cloud/core/testing`,
   and core exports `handlerKeyFor(request)`.
 
-Files: `slime-cloud/runtime/` (`src/config.ts`, `src/store-dynamodb.ts`,
+Files: `platform/runtime/` (`src/config.ts`, `src/store-dynamodb.ts`,
 `src/legacy-handlers.ts`, `src/migrate-cli.ts`, `src/app.ts`,
 `src/lambda.ts`, `scripts/build.mjs`, `offline/handlers.json`, tests,
-README); `infra/aws/platform/` (`build.sh`, the IAM statement in
+README); `platform/infra/platform/` (`build.sh`, the IAM statement in
 `runtime.tf`); `.github/workflows/` (no `sandbox` job; the runtime job builds
-the core; terraform triggers on `oss/packages/core/**`); core
+the core; terraform triggers on `core/**`); core
 (`src/testing/`, `handlerKeyFor`). `sandbox/` is deleted.
 
 **M7 checklist (with the runtime owner):**

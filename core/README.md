@@ -39,7 +39,7 @@ input values. Handlers move up through three tiers:
 > run against a real model is still pending (`npm run live`). Decisions and
 > milestones are in [PLAN.md](PLAN.md). The request format is in
 > [docs/request-format.md](docs/request-format.md), and an app using the
-> package is in [oss/examples/express](../../examples/express/README.md).
+> package is in [examples/express](../examples/express/README.md).
 
 ### Scope
 
@@ -59,12 +59,12 @@ input values. Handlers move up through three tiers:
 
 * HTTP. The app's own endpoints call `slime.query()`. The standalone
   server, API keys and CLI belong to `@slime-cloud/server`, owned by others;
-* Slime Cloud and tenancy (`slime-cloud/`, owned by others);
+* Slime Cloud and tenancy (`platform/`, owned by others);
 * writes.
 
 ### Where this comes from
 
-* [concepts_brief.md](../../../concepts_brief.md): the v0 concept and the
+* [concepts_brief.md](../concepts_brief.md): the v0 concept and the
   benchmark results.
 * `sandbox/`: the first prototype, which core was rebuilt from. It was
   deleted in M6 and stays in git history.
@@ -138,7 +138,7 @@ input values. Handlers move up through three tiers:
   (`src/ports.ts:GenerationRequest.params`).
 - **No Slime Cloud imports.** CI's "Core tests" job fails if `src/` mentions
   `@slime-cloud/runtime`, `@slime-cloud/server`,
-  `@slime-cloud/control-plane` or `slime-cloud/runtime`
+  `@slime-cloud/control-plane` or `platform/runtime`
   (`.github/workflows/ci.yml`).
 
 ## Global Side Effects

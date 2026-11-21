@@ -1,4 +1,4 @@
-// Bench requests against the demo database (oss/examples/express/db/init.sql),
+// Bench requests against the demo database (examples/express/db/init.sql),
 // ported from the sandbox. A checked case has a hand-written reference query; the
 // bench compares Slime's answer to it for the input and for a second input value,
 // which must be a cache hit (the handler is parameterized, not copied values).

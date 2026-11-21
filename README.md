@@ -3,9 +3,9 @@
 ## System Overview
 
 Slime (runtime and CLI `slime`) is a hackathon project in its design phase.
-The engine is [`@slime-cloud/core`](./oss/packages/core/README.md): it answers
+The engine is [`@slime-cloud/core`](./core/README.md): it answers
 `{ intent, input, output }` requests with model-generated, cached, read-only
-SQL against Postgres. [oss/examples/express](./oss/examples/express/README.md)
+SQL against Postgres. [examples/express](./examples/express/README.md)
 shows it behind an app's endpoints, and
 [platform/runtime](./platform/runtime/README.md) runs it on AWS Lambda. The specs in `docs/`
 describe intent, not implemented behaviour.
@@ -22,13 +22,13 @@ Backend -- Slime runtime:
 
 - [landing/](./platform/landing/README.md) - Static marketing page (one `index.html`,
   no build step). Preview with `just landing`.
-- [oss/packages/core/](./oss/packages/core/README.md) - `@slime-cloud/core`,
+- [core/](./core/README.md) - `@slime-cloud/core`,
   the engine as an installable library. It replaced the `sandbox/` prototype,
   which was deleted in M6 (it is in git history).
-  [PLAN.md](./oss/packages/core/PLAN.md) holds the decisions and milestones:
+  [PLAN.md](./core/PLAN.md) holds the decisions and milestones:
   M0–M3 and M5 done, M4 and M6 built (runs against a real model pending).
   The only npm workspace so far.
-- [oss/examples/express/](./oss/examples/express/README.md) - an Express app
+- [examples/express/](./examples/express/README.md) - an Express app
   whose endpoints are answered by `@slime-cloud/core`; its own lockfile. It
   also holds the demo database (`db/init.sql`) that core's tests and CI use.
 - `docs/` (no contract file; documentation only)
@@ -57,13 +57,13 @@ Backend -- Slime runtime:
   runtime on Lambda + DynamoDB).
 - [platform/runtime/](./platform/runtime/README.md) - `@slime-cloud/runtime`:
   the Lambda entry and DynamoDB handler store around the core. Imports
-  `@slime-cloud/core` (`oss/packages/core`); the core never imports it.
+  `@slime-cloud/core` (`core/`); the core never imports it.
 
 Root files: [AGENTS.md](./AGENTS.md) (repository contract for agents),
 [justfile](./justfile) (task runner),
 [.pre-commit-config.yaml](./.pre-commit-config.yaml) (hooks), and
-[package.json](./package.json) (npm workspaces for `oss/packages/*` only;
-`oss/examples/express` and `platform/runtime` keep their own lockfiles).
+[package.json](./package.json) (npm workspaces for `core` only;
+`examples/express` and `platform/runtime` keep their own lockfiles).
 
 ## Global Invariants
 
@@ -82,7 +82,7 @@ Root files: [AGENTS.md](./AGENTS.md) (repository contract for agents),
   `pre-commit/action@v3.0.1` on `push` and `pull_request`.
 - Deploy: [terraform.yml](./.github/workflows/terraform.yml) applies every
   `platform/infra/` stack except `bootstrap/` on each push to `main` that touches
-  `platform/infra/`, `oss/packages/core/`, `platform/` or `landing/` (AWS account `025772230981`,
+  `platform/infra/`, `core/`, `platform/` or `landing/` (AWS account `025772230981`,
   `eu-central-1`); `landing/` is served by CloudFront + Lambda.
 
 ## System Verification

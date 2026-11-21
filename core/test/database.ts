@@ -1,4 +1,4 @@
-// The demo Postgres from oss/examples/express/db/init.sql (its docker compose,
+// The demo Postgres from examples/express/db/init.sql (its docker compose,
 // or CI's service). Tests read these URLs from env; core itself never does.
 import pg from 'pg';
 
@@ -17,7 +17,7 @@ export async function isDatabaseAvailable(): Promise<boolean> {
   } catch (error) {
     const reason = (error as Error).message;
     if (process.env.REQUIRE_DB === '1') throw new Error(`REQUIRE_DB=1 but Postgres is unreachable: ${reason}`);
-    console.warn(`# skipping database tests: ${reason} (start it with: cd oss/examples/express && npm run db:up)`);
+    console.warn(`# skipping database tests: ${reason} (start it with: cd examples/express && npm run db:up)`);
     return false;
   }
 }

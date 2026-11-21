@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import { cases } from './cases.mjs';
 
 const ROOT = new URL('..', import.meta.url).pathname;
-const OFFLINE_HANDLERS = new URL('../../../examples/express/offline-handlers.json', import.meta.url).pathname;
+const OFFLINE_HANDLERS = new URL('../../examples/express/offline-handlers.json', import.meta.url).pathname;
 const DATABASE_URL = process.env.DATABASE_URL ?? 'postgres://slime_reader:slime_reader@localhost:54329/slime';
 const DECIMALS = 100;
 

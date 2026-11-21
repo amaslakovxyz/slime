@@ -33,7 +33,7 @@ flowchart LR
 [`platform/runtime.tf`](platform/runtime.tf): Lambda `slime-runtime` (Function
 URL, arm64, Node 22) built from [`platform/runtime`](../runtime/README.md)
 by `npm run build` (it bundles the built `@slime-cloud/core` from
-`oss/packages/core`), and DynamoDB table `slime-handlers` for reviewed Liquid
+`core/`), and DynamoDB table `slime-handlers` for reviewed Liquid
 handlers (partition key `tenantId`, sort key `artifactKey`, which holds
 `handlers#<request key>`). Post-deploy CI checks that `/healthz`
 answers 401 without a key.

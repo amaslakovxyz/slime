@@ -12,7 +12,7 @@
 * **Date:** 2026-11-20
 * **Protocol under test:** PLAN.md §4 (`input`: `from`, `where`, `orderBy`,
   `limit`, `offset`; `output`: shape notation; names are the caller's words)
-* **Schema:** the demo database (`oss/examples/express/db/init.sql`): `plans`, `accounts`,
+* **Schema:** the demo database (`examples/express/db/init.sql`): `plans`, `accounts`,
   `subscriptions`, `invoices`, `usage_events`.
 
 Verdicts:

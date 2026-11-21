@@ -6,11 +6,11 @@ reviewed Liquid handlers in DynamoDB. Deployed by
 `slime-runtime` function.
 
 **Boundary:** this package imports the core; the core never imports this
-package or anything AWS-specific (CI checks `oss/packages/core/src`).
+package or anything AWS-specific (CI checks `core/src`).
 
 ## How the core is consumed
 
-`package.json` depends on `"@slime-cloud/core": "file:../../oss/packages/core"`.
+`package.json` depends on `"@slime-cloud/core": "file:../../core"`.
 The link resolves to the core's built `dist/`, so build the core first. Its own
 dependencies come from the root workspace. When the package is published,
 replace the `file:` path with a version; nothing else changes.

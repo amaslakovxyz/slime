@@ -27,7 +27,7 @@ jobs:
     name: Core tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # The demo database from oss/examples/express/db/init.sql, for the Postgres connector tests.
+    # The demo database from examples/express/db/init.sql, for the Postgres connector tests.
     services:
       postgres:
         image: postgres:16
@@ -49,9 +49,9 @@ jobs:
           cache-dependency-path: package-lock.json
       # Boundary: the open-source core never imports Slime Cloud packages or AWS.
       - name: Core does not import Slime Cloud or AWS
-        run: "! grep -rnE \"@slime-cloud/(runtime|server|control-plane)|platform/runtime|@aws-sdk/\" oss/packages/core/src"
+        run: "! grep -rnE \"@slime-cloud/(runtime|server|control-plane)|platform/runtime|@aws-sdk/\" core/src"
       - run: npm ci
-      - run: psql "postgres://slime_admin:slime_admin@localhost:54329/slime" -v ON_ERROR_STOP=1 -f oss/examples/express/db/init.sql
+      - run: psql "postgres://slime_admin:slime_admin@localhost:54329/slime" -v ON_ERROR_STOP=1 -f examples/express/db/init.sql
       - run: npm run typecheck -w @slime-cloud/core
       # REQUIRE_DB makes database tests fail instead of skipping if Postgres is missing.
       - run: npm test -w @slime-cloud/core
@@ -85,21 +85,21 @@ jobs:
           cache: npm
           cache-dependency-path: |
             package-lock.json
-            oss/examples/express/package-lock.json
-      - run: psql "postgres://slime_admin:slime_admin@localhost:54329/slime" -v ON_ERROR_STOP=1 -f oss/examples/express/db/init.sql
+            examples/express/package-lock.json
+      - run: psql "postgres://slime_admin:slime_admin@localhost:54329/slime" -v ON_ERROR_STOP=1 -f examples/express/db/init.sql
       # The example runs on the packed tarball, as an app installing the package would (M6).
       - run: npm ci
       - run: npm pack -w @slime-cloud/core --pack-destination "$RUNNER_TEMP"
       - run: npm ci
-        working-directory: oss/examples/express
+        working-directory: examples/express
       - run: npm install --no-save "$RUNNER_TEMP"/slime-cloud-core-*.tgz
-        working-directory: oss/examples/express
+        working-directory: examples/express
       - run: npm test
-        working-directory: oss/examples/express
+        working-directory: examples/express
         env:
           REQUIRE_DB: "1"
       - run: npm run check:crystal
-        working-directory: oss/examples/express
+        working-directory: examples/express
 
   runtime:
     name: Slime Cloud runtime
@@ -117,7 +117,7 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             platform/runtime/package-lock.json
-      # The runtime links @slime-cloud/core (oss/packages/core) and bundles its
+      # The runtime links @slime-cloud/core (core/) and bundles its
       # built dist/; the core's own dependencies come from the root workspace.
       - run: npm ci
         working-directory: .

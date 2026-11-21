@@ -3,7 +3,7 @@
 # before terraform plan/apply). Output: platform/runtime/dist/lambda/.
 set -euo pipefail
 repo="$(cd "$(dirname "$0")/../../.." && pwd)"
-# The runtime links @slime-cloud/core (oss/packages/core) and bundles its built dist/.
+# The runtime links @slime-cloud/core (core/) and bundles its built dist/.
 npm ci --no-audit --no-fund --prefix "$repo"
 npm run build --prefix "$repo" -w @slime-cloud/core
 npm ci --no-audit --no-fund --prefix "$repo/platform/runtime"

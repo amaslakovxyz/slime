@@ -1,7 +1,7 @@
 # Code rules for @slime-cloud/core
 
-These rules apply to every change in `oss/packages/core/`, on top of the
-repository [AGENTS.md](../../../AGENTS.md). The aim: names, types and small
+These rules apply to every change in `core/`, on top of the
+repository [AGENTS.md](../AGENTS.md). The aim: names, types and small
 functions explain the code, so comments are rarely needed.
 
 ## Comments

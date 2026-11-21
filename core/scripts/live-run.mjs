@@ -2,7 +2,7 @@
 // generator and reviewer. Reads its settings from env (core itself never does).
 //   GROQ_API_KEY=... npm run live -w @slime-cloud/core          (openai/gpt-oss-120b)
 //   ANTHROPIC_API_KEY=... npm run live -w @slime-cloud/core     (claude-haiku-5-5 + claude-opus-5-5)
-// Optional: DATABASE_URL (default: the demo database from oss/examples/express/db/init.sql).
+// Optional: DATABASE_URL (default: the demo database from examples/express/db/init.sql).
 const ROOT = new URL('..', import.meta.url).pathname;
 const DATABASE_URL = process.env.DATABASE_URL ?? 'postgres://slime_reader:slime_reader@localhost:54329/slime';
 const TOP_ACCOUNTS = { intent: 'top N accounts by total paid amount, highest first', output: [{ name: 'string', totalPaid: 'integer' }] };

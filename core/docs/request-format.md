@@ -127,4 +127,4 @@ try {
   `null` to drop a filter. Each endpoint should choose its intent and
   `output`, and set identity values (account, user, tenant) on the server.
 
-The [Express example](../../../examples/express/) shows this setup.
+The [Express example](../../examples/express/) shows this setup.

@@ -127,4 +127,4 @@ and `Shape`.
 
 - Run from the repository root: `npm test -w @slime-cloud/core`
 - Tests: `test/request.test.ts`, `test/shape.test.ts`, `test/params.test.ts`, `test/key.test.ts`
-  (under `oss/packages/core/`).
+  (under `core/`).

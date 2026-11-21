@@ -18,7 +18,7 @@
     "@aws-sdk/client-dynamodb": "^3.1173.0",
     "@aws-sdk/client-ssm": "^3.1173.0",
     "@aws-sdk/lib-dynamodb": "~3.1173.0",
-    "@slime-cloud/core": "file:../../oss/packages/core",
+    "@slime-cloud/core": "file:../../core",
     "hono": "^4.13.19",
     "pg": "^8.23.1"
   },

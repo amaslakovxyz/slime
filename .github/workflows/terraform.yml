@@ -22,13 +22,13 @@ on:
   pull_request:
     paths:
       - platform/**
-      - oss/packages/core/**
+      - core/**
       - .github/workflows/terraform.yml
   push:
     branches: [main]
     paths:
       - platform/**
-      - oss/packages/core/**
+      - core/**
       - .github/workflows/terraform.yml
   workflow_dispatch:
     inputs:
