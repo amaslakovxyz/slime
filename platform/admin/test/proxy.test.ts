@@ -15,10 +15,17 @@ const passes = (res: Response) => res.headers.get('x-middleware-next') === '1';
 describe('origin check (proxy.ts)', () => {
   afterEach(() => {
     delete process.env.SLIME_ORIGIN_SECRET;
+    delete process.env.SLIME_RUNTIME_URL;
   });
 
   test('without a configured secret (local) every request passes', () => {
     assert.ok(passes(proxy(request())));
+  });
+
+  test('the hosted admin without a configured secret refuses everything (fails closed)', () => {
+    process.env.SLIME_RUNTIME_URL = 'https://runtime.example/';
+    assert.equal(proxy(request()).status, 403);
+    assert.equal(proxy(request({ 'x-slime-origin': 'anything' })).status, 403);
   });
 
   test('a missing, wrong or prefix-only header is refused with 403 on every path', () => {

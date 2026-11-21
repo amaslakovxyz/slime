@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { once } from 'node:events';
-import { createServer, type Server } from 'node:http';
+import { createServer, type Server, type ServerResponse } from 'node:http';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { connect, type AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -48,13 +48,16 @@ const DB_URL = 'postgres://reader:pw@db.example.com:5432/app';
 const FAST: CheckTiming = { windowMs: 300, retryMs: 25 };
 const owner = (name: string) => `${name}-${suffix}@example.com`;
 
-type Answer = { status: number; body?: string };
+/** `hang`: accept the request and never answer, like a runtime stuck mid-build. */
+type Answer = { status: number; body?: string } | 'hang';
 
 /** The shared runtime as the admin sees it: /ep/<id>/healthz and /ep/<id>/v0/reload, keyed by slm_. */
 class FakeRuntime {
   readonly requests: string[] = [];
   /** Per endpoint id: the next healthz answers (the last one repeats); default 200. */
   readonly healthz = new Map<string, Answer[]>();
+  /** Responses held open by `hang`, ended on stop() so the server can close. */
+  private readonly held: ServerResponse[] = [];
   private server: Server = createServer((req, res) => {
     const path = req.url ?? '';
     this.requests.push(`${req.method} ${path} ${req.headers['x-api-key'] ?? ''}`);
@@ -63,6 +66,7 @@ class FakeRuntime {
     if (match[2] === 'v0/reload') return void res.writeHead(204).end();
     const queue = this.healthz.get(match[1]!) ?? [];
     const answer = (queue.length > 1 ? queue.shift() : queue[0]) ?? { status: 200, body: '{"ok":true}' };
+    if (answer === 'hang') return void this.held.push(res);
     res.writeHead(answer.status, { 'content-type': 'application/json' }).end(answer.body ?? '');
   });
 
@@ -73,6 +77,7 @@ class FakeRuntime {
   }
 
   async stop(): Promise<void> {
+    for (const res of this.held.splice(0)) res.destroy();
     this.server.close();
     await once(this.server, 'close');
   }
@@ -144,6 +149,17 @@ describe('cloud endpoint flows (fake runtime, DynamoDB Local)', { skip }, () => 
     await provision(who, id, { windowMs: 5_000, retryMs: 25 });
     assert.equal((await getEndpoint(who, id))?.status, 'ready');
     assert.equal(runtime.calls(id).length, 3);
+  });
+
+  test('a 503 followed by a runtime that hangs reports the 503 reason, not our own timeout', async () => {
+    const who = owner('hang');
+    const id = await create(who);
+    const reason = 'Database unreachable: connect ECONNREFUSED 10.0.0.1:5432';
+    runtime.healthz.set(id, [{ status: 503, body: JSON.stringify({ error: { code: 'NOT_READY', message: reason } }) }, 'hang']);
+    await provision(who, id, { windowMs: 400, retryMs: 50 });
+    const ep = await getEndpoint(who, id);
+    assert.deepEqual([ep?.status, ep?.error], ['failed', reason]);
+    assert.ok(runtime.calls(id).length >= 2, 'the hanging try happened');
   });
 
   test('a status other than 5xx is final at once', async () => {

@@ -346,7 +346,7 @@ s3://slime-crystals-025772230981/endpoints/<id>/crystal/<crystal key>.mjs
   - Layer: AWS Lambda Web Adapter (arm64, version pinned in `variables.tf`).
   - Env: `AWS_LAMBDA_EXEC_WRAPPER=/opt/bootstrap`, `PORT=8080`, `AWS_LWA_READINESS_CHECK_PATH=/login`, plus Contract 2's admin variables.
   - Function URL with `auth NONE`, buffered (not streaming).
-- **Origin check.** A Next 16 `proxy.ts` (the renamed middleware) refuses with 403 any request whose `x-slime-origin` header is not `SLIME_ORIGIN_SECRET`. It applies only when the variable is set, so local dev is unaffected.
+- **Origin check.** A Next 16 `proxy.ts` (the renamed middleware) refuses with 403 any request whose `x-slime-origin` header is not `SLIME_ORIGIN_SECRET`. Unset, local mode lets every request pass, and cloud mode (`SLIME_RUNTIME_URL` set) refuses everything, so a missed SSM value or env var never exposes the admin on its public Function URL.
 - **CloudFront.**
   - One distribution with alias `admin.amaslakov.com`.
   - ACM certificate in us-east-1 through a new `aws.us_east_1` provider alias with the stack's default tags (`Project=slime` lets the CI apply role manage it). DNS validation and an A/AAAA alias go into the existing `amaslakov.com` hosted zone.
@@ -354,11 +354,11 @@ s3://slime-crystals-025772230981/endpoints/<id>/crystal/<crystal key>.mjs
   - Default behaviour: all methods, `Managed-CachingDisabled`, `Managed-AllViewerExceptHostHeader` (the Function URL rejects a foreign Host), `Managed-SecurityHeadersPolicy`.
   - `/_next/static/*`: GET/HEAD, `Managed-CachingOptimized`.
 - **Observability.** `instrumentation.ts` registers OTel only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set. It is not set in the cloud.
-- **Cloud mode.** A new `lib/runtime-mode.ts` reads `SLIME_RUNTIME_URL`. When it is set:
+- **Cloud mode.** `isCloud()` in `lib/env.ts` reads `SLIME_RUNTIME_URL`. When it is set:
   - the actions use the synchronous flows of Contract 3, from a new `lib/cloud-endpoints.ts`;
   - `readLifecycle` uses an 8 s timeout instead of 3 s and drops the "Is `npm run local` up?" copy;
   - delete uses the shared teardown with `SsmSecretStore` and an S3 prefix remover.
-- **Invite-only.** `createUser` checks the lower-cased email against `ADMIN_ALLOWED_EMAILS` (comma-separated, lower-cased, trimmed) when the variable is set, and throws `NOT_INVITED` otherwise. The login page maps it to "This email is not invited". Existing users can still sign in.
+- **Invite-only.** `createUser` checks the lower-cased email against `ADMIN_ALLOWED_EMAILS` (comma-separated, lower-cased, trimmed) and throws `NOT_INVITED` otherwise. Unset, local mode leaves sign-up open, and cloud mode invites nobody (fail closed). The login page maps it to "This email is not invited". Existing users can still sign in.
 - **Shared teardown.** `lib/teardown.ts` replaces `local-teardown.ts` and the provisioner's `teardown.ts`. Locally it removes, in order: the handlers partition (BatchWrite, with retries), the Crystal folder, the control item, the secrets (the runner treats held secrets as ownership). In the cloud the SSM secrets go first (the shared runtime serves an id exactly as long as its SSM path exists, so access is revoked even if a later step fails), then handlers, every S3 object version, the control item.
 
   Usage items stay. The local runner calls it in local mode and the delete action calls it in cloud mode.
