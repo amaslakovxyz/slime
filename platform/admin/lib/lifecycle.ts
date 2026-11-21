@@ -1,9 +1,11 @@
 // The Lifecycle tab: one endpoint is a dispatch buffer for every request; each
 // distinct request is a handler that moves Gas -> Liquid (automatically: repeated
 // runs, then the review) and Liquid -> Crystal (when the operator picks it). This file
-// reads the endpoint's local runtime (server-side, with its token) and derives
-// what the tab shows. The derivation is pure and unit-tested.
+// reads the endpoint's runtime (server-side, with its token): a local process, or the
+// endpoint's path on the shared runtime Lambda in the cloud, and derives what the
+// tab shows. The derivation is pure and unit-tested.
 import type { Endpoint } from './endpoints';
+import { isCloud } from './env';
 import { secretStore } from './secrets';
 
 export type Tier = 'gas' | 'liquid' | 'crystal';
@@ -144,7 +146,16 @@ export function stagesOf(status: Endpoint['status'], handlers: RuntimeHandler[],
 }
 
 export type LifecycleData =
-  | { ok: true; handlers: RuntimeHandler[]; events: RuntimeEvent[]; total: number; thresholds: Thresholds; warnings: string[] }
+  | {
+      ok: true;
+      handlers: RuntimeHandler[];
+      events: RuntimeEvent[];
+      total: number;
+      thresholds: Thresholds;
+      warnings: string[];
+      /** The feed and Gas rows come from the one instance that answered (the shared Lambda), not every instance. */
+      instance: boolean;
+    }
   | { ok: false; reason: string };
 
 /** Server only: reads the endpoint's runtime with its own token. */
@@ -153,12 +164,15 @@ export async function readLifecycle(ep: Endpoint): Promise<LifecycleData> {
   if (!ep.url || (ep.status !== 'ready' && ep.status !== 'updating')) return { ok: false, reason: `Endpoint is ${ep.status}.` };
   const token = await secretStore().get(ep.endpointId, 'SLIME_API_KEY');
   if (!token) return { ok: false, reason: 'Token not found in the secret store.' };
+  const cloud = isCloud();
   try {
+    // The shared Lambda may cold-start the endpoint (SSM, S3, the database check) on this call.
+    const timeoutMs = cloud ? 8000 : 3000;
     const get = (path: string) =>
-      fetch(new URL(path, ep.url), { headers: { 'x-api-key': token }, cache: 'no-store', signal: AbortSignal.timeout(3000) });
+      fetch(new URL(path, ep.url), { headers: { 'x-api-key': token }, cache: 'no-store', signal: AbortSignal.timeout(timeoutMs) });
     const [life, feed] = await Promise.all([get('v0/lifecycle'), get('v0/events')]);
     if (!life.ok || !feed.ok) return { ok: false, reason: `Runtime answered ${life.status}/${feed.status}.` };
-    const l = (await life.json()) as { handlers: RuntimeHandler[]; thresholds?: Thresholds; warnings?: string[] };
+    const l = (await life.json()) as { handlers: RuntimeHandler[]; thresholds?: Thresholds; warnings?: string[]; instance?: boolean };
     const f = (await feed.json()) as { total: number; events: RuntimeEvent[] };
     return {
       ok: true,
@@ -167,8 +181,10 @@ export async function readLifecycle(ep: Endpoint): Promise<LifecycleData> {
       total: f.total,
       thresholds: l.thresholds ?? DEFAULT_THRESHOLDS,
       warnings: l.warnings ?? [],
+      instance: l.instance === true,
     };
   } catch {
+    if (cloud) return { ok: false, reason: 'Endpoint runtime did not answer.' };
     if (ep.status === 'updating') return { ok: false, reason: 'Restarting the endpoint…' };
     return { ok: false, reason: 'Endpoint is not running. Is `npm run local` up?' };
   }
@@ -189,8 +205,25 @@ export async function crystallizeOn(ep: Endpoint, keys: string[]): Promise<Cryst
     method: 'POST',
     headers: { 'x-api-key': token, 'content-type': 'application/json' },
     body: JSON.stringify({ keys }),
-    signal: AbortSignal.timeout(60_000),
+    // Under the 60 s limit of the admin Lambda and CloudFront, so a slow run reports instead of a 504.
+    signal: AbortSignal.timeout(55_000),
   });
   if (!res.ok) throw new Error(`Runtime answered ${res.status}.`);
   return ((await res.json()) as { reports: CrystallizeReport[] }).reports;
+}
+
+/**
+ * Server only: the answering runtime instance drops its cached settings and engine, so its next
+ * request reads the new secrets and Crystals; other instances catch up within their TTL (30 s).
+ * The local runtime answers 204 and changes nothing (a restart does that job locally).
+ */
+export async function reloadOn(ep: Endpoint): Promise<void> {
+  const token = await secretStore().get(ep.endpointId, 'SLIME_API_KEY');
+  if (!ep.url || !token) throw new Error('Endpoint is not running.');
+  const res = await fetch(new URL('v0/reload', ep.url), {
+    method: 'POST',
+    headers: { 'x-api-key': token },
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!res.ok) throw new Error(`Runtime answered ${res.status} to reload.`);
 }

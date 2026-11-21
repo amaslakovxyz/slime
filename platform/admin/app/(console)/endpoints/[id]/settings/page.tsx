@@ -1,14 +1,16 @@
-import { deleteEndpointAction, updateConnectorAction, updateSettingsAction } from '@/app/actions';
+import { deleteEndpointAction, retryCheckAction, updateConnectorAction, updateSettingsAction } from '@/app/actions';
 import { formatDate } from '@/app/format';
 import { ConfirmSubmit } from '@/app/ui/confirm-submit';
 import { PROVIDER_INFO } from '@/app/ui/providers';
 import { TestConnection } from '@/app/ui/test-connection';
 import { CONNECTOR_SPECS, maskConnectionUrl } from '@/lib/connectors';
 import { connectionUrl, PROVIDERS } from '@/lib/endpoints';
+import { isCloud } from '@/lib/env';
 import { loadEndpoint } from '../data';
 
 // Everything about the endpoint that is not its traffic: name and provider, the
-// database connection, identifiers, and deletion.
+// database connection, identifiers, and deletion. In the cloud a change reloads and
+// re-checks the endpoint in the request instead of restarting a local process.
 export default async function SettingsPage({
   params,
   searchParams,
@@ -21,6 +23,10 @@ export default async function SettingsPage({
   const { email, ep } = await loadEndpoint(id);
   const settled = ep.status === 'ready' || ep.status === 'failed';
   const renamable = ep.status !== 'deleting';
+  const cloud = isCloud();
+  // Cloud: an interrupted action can leave provisioning/updating behind; Delete and Retry check get out of it.
+  const deletable = cloud ? ep.status !== 'deleting' : settled;
+  const recheckable = cloud && (ep.status === 'provisioning' || ep.status === 'updating');
   const spec = CONNECTOR_SPECS[ep.connectorType];
   // Masked on the server: the password never reaches the browser.
   const stored = await connectionUrl(email, ep.endpointId);
@@ -36,7 +42,18 @@ export default async function SettingsPage({
       )}
       {saved && (
         <div className="alert alert-ok" role="status">
-          {ep.status === 'updating' ? 'Saved. Restarting…' : 'Saved.'}
+          {ep.status === 'updating' && !cloud ? 'Saved. Restarting…' : 'Saved.'}
+        </div>
+      )}
+
+      {recheckable && (
+        <div className="alert" role="status">
+          <form action={retryCheckAction.bind(null, ep.endpointId)} className="danger-row">
+            <span>The endpoint is still {ep.status}: check it again to settle it as ready or failed.</span>
+            <button className="btn btn-sm" type="submit">
+              Retry check
+            </button>
+          </form>
         </div>
       )}
 
@@ -59,7 +76,9 @@ export default async function SettingsPage({
                 </option>
               ))}
             </select>
-            <span className="field-hint">{settled ? 'Change restarts the endpoint.' : `Locked while ${ep.status}.`}</span>
+            <span className="field-hint">
+              {settled ? (cloud ? 'Change reloads and re-checks the endpoint.' : 'Change restarts the endpoint.') : `Locked while ${ep.status}.`}
+            </span>
           </label>
           <div className="form-actions">
             <button className="btn" type="submit" disabled={!renamable}>
@@ -95,7 +114,7 @@ export default async function SettingsPage({
           </label>
           <div className="form-actions">
             <button className="btn-ghost" type="submit" disabled={!connectionEditable}>
-              {settled ? 'Save and restart' : 'Save'}
+              {settled ? (cloud ? 'Save and re-check' : 'Save and restart') : 'Save'}
             </button>
           </div>
         </form>
@@ -114,12 +133,12 @@ export default async function SettingsPage({
 
       <section className="section card danger-zone settings-card">
         <div className="danger-row">
-          <p className="card-sub">Delete the endpoint, its secrets and handlers.{!settled && ` Locked while ${ep.status}.`}</p>
+          <p className="card-sub">Delete the endpoint, its secrets and handlers.{!deletable && ` Locked while ${ep.status}.`}</p>
           <form action={deleteEndpointAction}>
             <input type="hidden" name="endpointId" value={ep.endpointId} />
             <ConfirmSubmit
               className="btn-danger"
-              disabled={!settled}
+              disabled={!deletable}
               message={`Delete "${ep.name}"? Its URL, token, secrets and handlers are removed; this cannot be undone.`}
             >
               Delete endpoint

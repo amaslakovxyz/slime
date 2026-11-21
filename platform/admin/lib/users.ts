@@ -13,6 +13,9 @@ const userKey = (email: string) => ({ pk: `USER#${email}`, sk: 'PROFILE' });
 export async function createUser(rawEmail: string, password: string): Promise<string> {
   const email = rawEmail.trim().toLowerCase();
   if (!EMAIL.test(email)) throw new CodedError('INVALID_EMAIL', 'Enter a valid email address');
+  // Invite-only when an allowlist is configured (the hosted admin); existing users still sign in.
+  const { allowedEmails } = env();
+  if (allowedEmails && !allowedEmails.includes(email)) throw new CodedError('NOT_INVITED', 'This email is not invited');
   if (password.length < MIN_PASSWORD_LENGTH) {
     throw new CodedError('WEAK_PASSWORD', `Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
   }

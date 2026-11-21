@@ -1,12 +1,17 @@
-// Endpoint records in slime-control. The admin only writes `pending`,
-// `updating` and `deleting`; slime-provisioner (DynamoDB stream) does the AWS
-// work and moves the item through provisioning -> ready|failed, or removes it.
+// Endpoint records in slime-control; their secrets live in the secret store.
+// Two modes share these writes (Contract 3 of the cloud MVP design):
+// - local: the admin writes `pending`, `updating` and `deleting`, and the local
+//   runner (scripts/local-runner.ts) starts, restarts or tears down the process
+//   and moves the item to ready|failed, or removes it;
+// - cloud (SLIME_RUNTIME_URL set): create writes `provisioning` with the shared
+//   runtime URL, and the server action finishes the transition in the same
+//   request (lib/cloud-endpoints.ts).
 import { randomBytes } from 'node:crypto';
 import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb';
 import { GetCommand, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { CONNECTOR_SPECS, validateConnectionUrl, type ConnectorType } from './connectors';
 import { ddb } from './ddb';
-import { env } from './env';
+import { env, isCloud } from './env';
 import { CodedError } from './errors';
 import { crystallizationSavings, estimateBill, TIERS, type Tier } from './pricing';
 import { secretStore } from './secrets';
@@ -15,7 +20,7 @@ export const PROVIDERS = ['claude', 'groq', 'offline'] as const;
 export type Provider = (typeof PROVIDERS)[number];
 export const STATUSES = ['pending', 'provisioning', 'ready', 'failed', 'updating', 'deleting'] as const;
 export type Status = (typeof STATUSES)[number];
-/** States the provisioner is working on; the UI polls while in one. */
+/** States an endpoint is moving through; the UI polls while in one. */
 export const TRANSIENT_STATUSES: readonly Status[] = ['pending', 'provisioning', 'updating', 'deleting'];
 
 export interface Endpoint {
@@ -26,8 +31,8 @@ export interface Endpoint {
   connectorType: ConnectorType;
   status: Status;
   tokenHint: string;
+  /** Base URL the endpoint answers on, with a trailing slash (`new URL('v0/…', url)`). */
   url?: string;
-  layerArn?: string;
   error?: string;
   createdAt: string;
   updatedAt: string;
@@ -75,7 +80,7 @@ export interface Overview extends Usage {
 export const isProvider = (value: string): value is Provider => (PROVIDERS as readonly string[]).includes(value);
 
 const ownerKey = (owner: string) => `USER#${owner}`;
-const endpointKey = (owner: string, endpointId: string) => ({ pk: ownerKey(owner), sk: `ENDPOINT#${endpointId}` });
+export const endpointKey = (owner: string, endpointId: string) => ({ pk: ownerKey(owner), sk: `ENDPOINT#${endpointId}` });
 /** Usage is bucketed per UTC day; a month is the days whose key starts with YYYY-MM. */
 export const currentMonth = () => new Date().toISOString().slice(0, 7);
 
@@ -102,9 +107,11 @@ export async function createEndpoint(
   const endpointId = 'ep-' + randomBytes(5).toString('hex');
   const token = 'slm_' + randomBytes(24).toString('base64url');
   const secrets = secretStore();
-  // Secrets first: the provisioner starts as soon as the item appears and reads them.
+  // Secrets first: the runner (local) or the runtime (cloud) reads them as soon as the item exists.
   await secrets.put(endpointId, CONNECTOR_SPECS[connectorType].secret, databaseUrl);
   await secrets.put(endpointId, 'SLIME_API_KEY', token);
+  await secrets.put(endpointId, 'SLIME_PROVIDER', provider);
+  const { runtimeUrl } = env();
 
   const now = new Date().toISOString();
   const item: Endpoint & { pk: string; sk: string; type: 'endpoint' } = {
@@ -115,7 +122,8 @@ export async function createEndpoint(
     name,
     provider,
     connectorType,
-    status: 'pending',
+    // Cloud: the shared runtime already serves this id; the create action health-checks it next.
+    ...(runtimeUrl ? { status: 'provisioning' as const, url: `${runtimeUrl}ep/${endpointId}/` } : { status: 'pending' as const }),
     tokenHint: token.slice(-4),
     createdAt: now,
     updatedAt: now,
@@ -159,7 +167,7 @@ export async function getEndpoint(owner: string, endpointId: string): Promise<En
   return out.Item ? toEndpoint(out.Item) : undefined;
 }
 
-async function requireEndpoint(owner: string, endpointId: string): Promise<Endpoint> {
+export async function requireEndpoint(owner: string, endpointId: string): Promise<Endpoint> {
   const ep = await getEndpoint(owner, endpointId);
   if (!ep) throw new CodedError('NOT_FOUND', 'Endpoint not found');
   return ep;
@@ -167,26 +175,34 @@ async function requireEndpoint(owner: string, endpointId: string): Promise<Endpo
 
 const notUpdatable = (message: string) => new CodedError('NOT_UPDATABLE', message);
 
+/**
+ * Moves the item to `deleting`. Locally only from ready|failed (the runner owns the
+ * other states). In the cloud from any state but deleting: an admin Lambda that timed
+ * out mid-action can leave `provisioning` or `updating` behind, and Delete is the way out.
+ */
 export async function requestDelete(owner: string, endpointId: string): Promise<void> {
+  const cloud = isCloud();
   try {
     await ddb().send(
       new UpdateCommand({
         TableName: env().controlTable,
         Key: endpointKey(owner, endpointId),
         UpdateExpression: 'SET #s = :deleting, updatedAt = :now',
-        ConditionExpression: '#s IN (:ready, :failed)',
+        ConditionExpression: cloud ? 'attribute_exists(pk) AND #s <> :deleting' : '#s IN (:ready, :failed)',
         ExpressionAttributeNames: { '#s': 'status' },
         ExpressionAttributeValues: {
           ':deleting': 'deleting',
-          ':ready': 'ready',
-          ':failed': 'failed',
           ':now': new Date().toISOString(),
+          ...(cloud ? {} : { ':ready': 'ready', ':failed': 'failed' }),
         },
       }),
     );
   } catch (err) {
     if (err instanceof ConditionalCheckFailedException) {
-      throw new CodedError('NOT_DELETABLE', 'Only ready or failed endpoints can be deleted');
+      throw new CodedError(
+        'NOT_DELETABLE',
+        cloud ? 'The endpoint is already being deleted' : 'Only ready or failed endpoints can be deleted',
+      );
     }
     throw err;
   }
@@ -194,14 +210,15 @@ export async function requestDelete(owner: string, endpointId: string): Promise<
 
 /**
  * Replaces the connection secret. A pending endpoint has not read it yet, so the
- * secret is all that changes; a ready|failed one goes to `updating` and the
- * provisioner redeploys it so fresh instances load the new secret.
+ * secret is all that changes; a ready|failed one goes to `updating` so the runner
+ * restarts it (local) or the action reloads and re-checks it (cloud).
+ * Returns whether the endpoint went to `updating`.
  */
 export async function updateConnector(
   owner: string,
   endpointId: string,
   input: { connectorType: string; databaseUrl: string },
-): Promise<void> {
+): Promise<boolean> {
   const databaseUrl = validateConnectionUrl(input.connectorType, input.databaseUrl);
   const connectorType = input.connectorType as ConnectorType;
   const ep = await requireEndpoint(owner, endpointId);
@@ -237,14 +254,18 @@ export async function updateConnector(
     if (previous !== undefined) await secrets.put(endpointId, secretName, previous, { overwrite: true });
     throw notUpdatable('The endpoint changed state meanwhile; reload and try again');
   }
+  return redeploy;
 }
 
-/** Rename works in any state but deleting; a provider change redeploys, so only from ready|failed. */
+/**
+ * Rename works in any state but deleting; a provider change goes to `updating`, so
+ * only from ready|failed. Returns whether the endpoint went to `updating`.
+ */
 export async function updateSettings(
   owner: string,
   endpointId: string,
   input: { name: string; provider: string },
-): Promise<void> {
+): Promise<boolean> {
   const name = validateName(input.name);
   const provider = validateProvider(input.provider);
   const ep = await requireEndpoint(owner, endpointId);
@@ -253,8 +274,13 @@ export async function updateSettings(
   if (providerChanged && ep.status !== 'ready' && ep.status !== 'failed') {
     throw notUpdatable(`The provider can change only when ready or failed (now ${ep.status})`);
   }
-  if (!providerChanged && name === ep.name) return;
+  if (!providerChanged && name === ep.name) return false;
 
+  // The runtime reads the provider from the secrets (the item keeps it for display): write it
+  // first, so the restart or reload that `updating` starts already sees it.
+  const secrets = secretStore();
+  const previous = providerChanged ? await secrets.get(endpointId, 'SLIME_PROVIDER') : undefined;
+  if (providerChanged) await secrets.put(endpointId, 'SLIME_PROVIDER', provider, { overwrite: true });
   try {
     await ddb().send(
       new UpdateCommand({
@@ -275,14 +301,15 @@ export async function updateSettings(
       }),
     );
   } catch (err) {
-    if (err instanceof ConditionalCheckFailedException) {
-      throw notUpdatable('The endpoint changed state meanwhile; reload and try again');
-    }
-    throw err;
+    if (!(err instanceof ConditionalCheckFailedException)) throw err;
+    // Endpoints created before the provider secret existed fall back to the item's provider.
+    if (providerChanged) await secrets.put(endpointId, 'SLIME_PROVIDER', previous ?? ep.provider, { overwrite: true });
+    throw notUpdatable('The endpoint changed state meanwhile; reload and try again');
   }
+  return providerChanged;
 }
 
-/** After a Crystallize: the runner restarts the endpoint so it loads the new Crystal modules. */
+/** Local mode, after a Crystallize: the runner restarts the endpoint so it loads the new Crystal modules. */
 export async function requestRestart(owner: string, endpointId: string): Promise<void> {
   try {
     await ddb().send(

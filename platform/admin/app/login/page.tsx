@@ -7,6 +7,7 @@ const ERRORS: Record<string, string> = {
   taken: 'Email already registered',
   weak: 'Password must be at least 8 characters',
   email: 'Enter a valid email address',
+  invite: 'This email is not invited',
 };
 
 // One form, two submit buttons: Enter logs in, "Create account" posts the same

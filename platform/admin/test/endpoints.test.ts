@@ -78,7 +78,7 @@ describe('users and endpoints (DynamoDB Local)', { skip }, () => {
     await assert.rejects(createUser('not-an-email', 'password123'), (err) => hasCode(err, 'INVALID_EMAIL'));
   });
 
-  test('createEndpoint stores a pending item and both secrets', async () => {
+  test('createEndpoint (local mode) stores a pending item without a URL and its secrets', async () => {
     const owner = email('a');
     const id = await createEndpoint(owner, { name: 'shop', provider: 'offline', databaseUrl: DB_URL });
     assert.match(id, /^ep-[0-9a-f]{10}$/);
@@ -93,6 +93,9 @@ describe('users and endpoints (DynamoDB Local)', { skip }, () => {
     assert.ok(token?.startsWith('slm_'));
     assert.equal(ep?.tokenHint, token!.slice(-4));
     assert.equal(await secretStore().get(id, 'DATABASE_URL'), DB_URL);
+    // The runtime reads the provider from the secrets; the item keeps it for display.
+    assert.equal(await secretStore().get(id, 'SLIME_PROVIDER'), 'offline');
+    assert.equal(ep?.url, undefined);
 
     const file = process.env.SLIME_SECRETS_FILE!;
     const saved = JSON.parse(await readFile(file, 'utf8'));
@@ -245,7 +248,7 @@ describe('users and endpoints (DynamoDB Local)', { skip }, () => {
     assert.equal((await getEndpoint(owner, id))?.status, 'failed');
   });
 
-  test('updateSettings renames in place; a provider change needs ready or failed and redeploys', async () => {
+  test('updateSettings renames in place; a provider change needs ready or failed, moves the provider secret and redeploys', async () => {
     const owner = email('settings');
     const id = await createEndpoint(owner, { name: 'before', provider: 'offline', databaseUrl: DB_URL });
 
@@ -257,11 +260,13 @@ describe('users and endpoints (DynamoDB Local)', { skip }, () => {
       hasCode(err, 'NOT_UPDATABLE'),
     );
     assert.equal((await getEndpoint(owner, id))?.provider, 'offline');
+    assert.equal(await secretStore().get(id, 'SLIME_PROVIDER'), 'offline');
 
     await setStatus(owner, id, 'ready');
-    await updateSettings(owner, id, { name: 'switched', provider: 'groq' });
+    assert.equal(await updateSettings(owner, id, { name: 'switched', provider: 'groq' }), true);
     ep = await getEndpoint(owner, id);
     assert.deepEqual([ep?.name, ep?.provider, ep?.status], ['switched', 'groq', 'updating']);
+    assert.equal(await secretStore().get(id, 'SLIME_PROVIDER'), 'groq');
 
     await setStatus(owner, id, 'deleting');
     await assert.rejects(updateSettings(owner, id, { name: 'late', provider: 'groq' }), (err) =>
