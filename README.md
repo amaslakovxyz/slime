@@ -52,7 +52,7 @@ Backend -- Slime runtime:
     `slime-provisioner` Lambda: turns `pending` endpoints in `slime-control`
     into `slime-ep-<id>` functions on the shared Gas layer, reconfigures and
     deletes them.
-  - [platform/admin/](./platform/admin) - slime cloud admin (Next.js, runs
+  - [platform/admin/](./platform/admin/README.md) - slime cloud admin (Next.js, runs
     locally): sign-up, endpoints, connector settings, tier usage and bill
     estimate, OpenTelemetry. Design:
     [docs/architecture/slime-cloud.html](./docs/architecture/slime-cloud.html).
