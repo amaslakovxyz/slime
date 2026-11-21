@@ -15,6 +15,8 @@ const KEPT_VALUE_FIELDS = ['title', 'rich_text', 'number', 'select', 'status', '
 const realIds = { feedback: required('NOTION_FEEDBACK_ID'), movieNights: required('NOTION_MOVIE_NIGHTS_ID') };
 const idMap = new Map(Object.entries(realIds).map(([alias, id]) => [id, PLACEHOLDER_IDS[alias]]));
 const recorded = [];
+// Real page ids → stable placeholders; declared before any top-level await uses it.
+const pageIds = new Map();
 
 const recordingFetch = async (url, init = {}) => {
   const response = await fetch(url, init);
@@ -75,7 +77,6 @@ function scrubValue(type, value) {
   return value;
 }
 
-const pageIds = new Map();
 function placeholderPageId(id) {
   if (!pageIds.has(id)) pageIds.set(id, `00000000-0000-4000-8000-${String(pageIds.size + 1).padStart(12, '0')}`);
   return pageIds.get(id);

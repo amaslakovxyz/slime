@@ -14,30 +14,13 @@
         }
       ],
       "properties": {
-        "Title": {
-          "name": "Title",
-          "type": "title"
+        "Created": {
+          "name": "Created",
+          "type": "date"
         },
         "Account": {
           "name": "Account",
           "type": "rich_text"
-        },
-        "Sentiment": {
-          "name": "Sentiment",
-          "type": "select",
-          "select": {
-            "options": [
-              {
-                "name": "positive"
-              },
-              {
-                "name": "neutral"
-              },
-              {
-                "name": "negative"
-              }
-            ]
-          }
         },
         "Status": {
           "name": "Status",
@@ -60,9 +43,26 @@
           "name": "Area",
           "type": "multi_select"
         },
-        "Created": {
-          "name": "Created",
-          "type": "date"
+        "Sentiment": {
+          "name": "Sentiment",
+          "type": "select",
+          "select": {
+            "options": [
+              {
+                "name": "positive"
+              },
+              {
+                "name": "neutral"
+              },
+              {
+                "name": "negative"
+              }
+            ]
+          }
+        },
+        "Title": {
+          "name": "Title",
+          "type": "title"
         }
       }
     }

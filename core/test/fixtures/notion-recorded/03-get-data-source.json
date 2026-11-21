@@ -14,9 +14,9 @@
         }
       ],
       "properties": {
-        "Film": {
-          "name": "Film",
-          "type": "title"
+        "Date": {
+          "name": "Date",
+          "type": "date"
         },
         "Host": {
           "name": "Host",
@@ -35,13 +35,13 @@
             ]
           }
         },
-        "Date": {
-          "name": "Date",
-          "type": "date"
-        },
         "Rating": {
           "name": "Rating",
           "type": "number"
+        },
+        "Film": {
+          "name": "Film",
+          "type": "title"
         }
       }
     }
