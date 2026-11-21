@@ -1,0 +1,115 @@
+{
+  "request": {
+    "method": "POST",
+    "url": "https://api.notion.com/v1/data_sources/1a1b1c1d-1e1f-4a2b-8c3d-4e5f60718293/query",
+    "body": {
+      "page_size": 100,
+      "sorts": [
+        {
+          "timestamp": "created_time",
+          "direction": "descending"
+        }
+      ]
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "object": "list",
+      "results": [
+        {
+          "object": "page",
+          "id": "night-1",
+          "properties": {
+            "Film": {
+              "type": "title",
+              "title": [
+                {
+                  "plain_text": "My Neighbor Totoro"
+                }
+              ]
+            },
+            "Host": {
+              "type": "select",
+              "select": {
+                "name": "Anna"
+              }
+            },
+            "Date": {
+              "type": "date",
+              "date": {
+                "start": "2026-11-14"
+              }
+            },
+            "Rating": {
+              "type": "number",
+              "number": 4.5
+            }
+          }
+        },
+        {
+          "object": "page",
+          "id": "night-2",
+          "properties": {
+            "Film": {
+              "type": "title",
+              "title": [
+                {
+                  "plain_text": "Grave of the Fireflies"
+                }
+              ]
+            },
+            "Host": {
+              "type": "select",
+              "select": {
+                "name": "Ben"
+              }
+            },
+            "Date": {
+              "type": "date",
+              "date": {
+                "start": "2026-11-07"
+              }
+            },
+            "Rating": {
+              "type": "number",
+              "number": 5
+            }
+          }
+        },
+        {
+          "object": "page",
+          "id": "night-3",
+          "properties": {
+            "Film": {
+              "type": "title",
+              "title": [
+                {
+                  "plain_text": "Castle in the Sky"
+                }
+              ]
+            },
+            "Host": {
+              "type": "select",
+              "select": {
+                "name": "Chen"
+              }
+            },
+            "Date": {
+              "type": "date",
+              "date": {
+                "start": "2026-10-31"
+              }
+            },
+            "Rating": {
+              "type": "number",
+              "number": 4
+            }
+          }
+        }
+      ],
+      "has_more": false,
+      "next_cursor": null
+    }
+  }
+}

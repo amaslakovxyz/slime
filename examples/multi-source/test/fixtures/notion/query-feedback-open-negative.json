@@ -1,0 +1,233 @@
+{
+  "request": {
+    "method": "POST",
+    "url": "https://api.notion.com/v1/data_sources/0f0e0d0c-0b0a-4908-8706-050403020100/query",
+    "body": {
+      "page_size": 100,
+      "sorts": [
+        {
+          "timestamp": "created_time",
+          "direction": "descending"
+        }
+      ],
+      "filter": {
+        "and": [
+          {
+            "property": "Sentiment",
+            "select": {
+              "equals": "negative"
+            }
+          },
+          {
+            "property": "Status",
+            "status": {
+              "equals": "Open"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "object": "list",
+      "results": [
+        {
+          "object": "page",
+          "id": "feedback-1",
+          "properties": {
+            "Title": {
+              "type": "title",
+              "title": [
+                {
+                  "plain_text": "Exports time out"
+                }
+              ]
+            },
+            "Account": {
+              "type": "rich_text",
+              "rich_text": [
+                {
+                  "plain_text": "Iron Analytics 15"
+                }
+              ]
+            },
+            "Sentiment": {
+              "type": "select",
+              "select": {
+                "name": "negative"
+              }
+            },
+            "Status": {
+              "type": "status",
+              "status": {
+                "name": "Open"
+              }
+            },
+            "Area": {
+              "type": "multi_select",
+              "multi_select": [
+                {
+                  "name": "Performance"
+                }
+              ]
+            },
+            "Created": {
+              "type": "date",
+              "date": {
+                "start": "2026-11-12"
+              }
+            }
+          }
+        },
+        {
+          "object": "page",
+          "id": "feedback-2",
+          "properties": {
+            "Title": {
+              "type": "title",
+              "title": [
+                {
+                  "plain_text": "Invoice PDF is blank"
+                }
+              ]
+            },
+            "Account": {
+              "type": "rich_text",
+              "rich_text": [
+                {
+                  "plain_text": "Iron Analytics 15"
+                }
+              ]
+            },
+            "Sentiment": {
+              "type": "select",
+              "select": {
+                "name": "negative"
+              }
+            },
+            "Status": {
+              "type": "status",
+              "status": {
+                "name": "Open"
+              }
+            },
+            "Area": {
+              "type": "multi_select",
+              "multi_select": [
+                {
+                  "name": "Billing"
+                }
+              ]
+            },
+            "Created": {
+              "type": "date",
+              "date": {
+                "start": "2026-11-08"
+              }
+            }
+          }
+        },
+        {
+          "object": "page",
+          "id": "feedback-3",
+          "properties": {
+            "Title": {
+              "type": "title",
+              "title": [
+                {
+                  "plain_text": "SSO login loops"
+                }
+              ]
+            },
+            "Account": {
+              "type": "rich_text",
+              "rich_text": [
+                {
+                  "plain_text": "Swift Labs 12"
+                }
+              ]
+            },
+            "Sentiment": {
+              "type": "select",
+              "select": {
+                "name": "negative"
+              }
+            },
+            "Status": {
+              "type": "status",
+              "status": {
+                "name": "Open"
+              }
+            },
+            "Area": {
+              "type": "multi_select",
+              "multi_select": [
+                {
+                  "name": "Security"
+                }
+              ]
+            },
+            "Created": {
+              "type": "date",
+              "date": {
+                "start": "2026-11-05"
+              }
+            }
+          }
+        },
+        {
+          "object": "page",
+          "id": "feedback-4",
+          "properties": {
+            "Title": {
+              "type": "title",
+              "title": [
+                {
+                  "plain_text": "Dashboard is slow"
+                }
+              ]
+            },
+            "Account": {
+              "type": "rich_text",
+              "rich_text": [
+                {
+                  "plain_text": "Lunar Works 14"
+                }
+              ]
+            },
+            "Sentiment": {
+              "type": "select",
+              "select": {
+                "name": "negative"
+              }
+            },
+            "Status": {
+              "type": "status",
+              "status": {
+                "name": "Open"
+              }
+            },
+            "Area": {
+              "type": "multi_select",
+              "multi_select": [
+                {
+                  "name": "Performance"
+                }
+              ]
+            },
+            "Created": {
+              "type": "date",
+              "date": {
+                "start": "2026-10-30"
+              }
+            }
+          }
+        }
+      ],
+      "has_more": false,
+      "next_cursor": null
+    }
+  }
+}

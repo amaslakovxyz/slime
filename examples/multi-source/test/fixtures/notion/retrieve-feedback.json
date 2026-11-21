@@ -1,0 +1,70 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "https://api.notion.com/v1/data_sources/0f0e0d0c-0b0a-4908-8706-050403020100"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "object": "data_source",
+      "id": "0f0e0d0c-0b0a-4908-8706-050403020100",
+      "title": [
+        {
+          "plain_text": "Customer feedback"
+        }
+      ],
+      "properties": {
+        "Title": {
+          "name": "Title",
+          "type": "title"
+        },
+        "Account": {
+          "name": "Account",
+          "type": "rich_text"
+        },
+        "Sentiment": {
+          "name": "Sentiment",
+          "type": "select",
+          "select": {
+            "options": [
+              {
+                "name": "positive"
+              },
+              {
+                "name": "neutral"
+              },
+              {
+                "name": "negative"
+              }
+            ]
+          }
+        },
+        "Status": {
+          "name": "Status",
+          "type": "status",
+          "status": {
+            "options": [
+              {
+                "name": "Open"
+              },
+              {
+                "name": "Triaged"
+              },
+              {
+                "name": "Done"
+              }
+            ]
+          }
+        },
+        "Area": {
+          "name": "Area",
+          "type": "multi_select"
+        },
+        "Created": {
+          "name": "Created",
+          "type": "date"
+        }
+      }
+    }
+  }
+}
