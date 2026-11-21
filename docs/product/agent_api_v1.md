@@ -213,6 +213,29 @@ crystal as its own endpoint, 12 steps — must pass as **one bash script of
 curl calls with zero browser launches**. That script is the contract test
 for this spec; today the same journey needs two Playwright scripts.
 
+## Relation to product frame v0.2
+
+This spec is written against the shipped local build (PR #29) and inherits
+its state mechanics; [product_frame_v0_2.md](product_frame_v0_2.md) — the
+declared frame going forward — resolves some of them differently. The
+divergence predates this spec; naming it here so the API does not read as a
+competing model:
+
+- **Route 4 is the API form of the frame's `pin`.** The frame already
+  grants the explicit promotion action to "the client **or its Dev Agent**"
+  (glossary: Pin; decision 2). This spec mechanizes exactly that action over
+  HTTP; "no auto-promotion" is preserved — nothing promotes by run count
+  alone, the agent must call the route.
+- **"Crystal" means two things today.** In the build (and here): a handler
+  promoted to its own hosted route. In the frame (decision 6): code
+  *exported* into the client's repo — roadmap, not v0. If the frame's naming
+  wins, route 4 renames to `/pin` and "crystal route" becomes the pinned
+  endpoint; the surface of this API does not change, only the words.
+- **The review slot.** The frame's background review is one more entry in
+  the mechanical criteria list of route 4 (alongside run count and the
+  replay check); `409 REVIEW_REQUIRED` already covers "review has not
+  passed yet" as well as "policy is manual".
+
 ## Out of scope for v1
 
 Endpoint update/delete, token rotation, reviewer workflows, usage/billing
