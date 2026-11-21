@@ -113,7 +113,10 @@ URL=$(terraform -chdir=platform/infra/platform output -raw runtime_url)
 curl -s "${URL}ep/<id>/healthz" -H "x-api-key: <slm_ key>" | jq
 ```
 
-### Cutover apply order (cloud MVP, from the branch)
+### Cutover apply order (cloud MVP, ran from the branch on 2026-11-21)
+
+Done once; kept as the record of how the provisioner was retired. Steps 1–6 ran
+from `feat/cloud-mvp`; step 7 runs on merge.
 
 1. Check that no `slime-ep-*` functions or roles exist and that `slime-control`
    holds no endpoint items.

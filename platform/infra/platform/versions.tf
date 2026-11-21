@@ -53,13 +53,3 @@ provider "aws" {
     tags = local.tags
   }
 }
-
-# Same account and region, no default_tags. Kept for one apply only: the removed
-# provisioner's event source mapping was created through it, and Terraform needs
-# the alias to delete that mapping (no resource here references it any more,
-# hence the tflint annotation). Remove it once that apply has run.
-# tflint-ignore: terraform_unused_declarations
-provider "aws" {
-  alias  = "untagged"
-  region = var.region
-}
