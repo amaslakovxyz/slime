@@ -38,7 +38,7 @@ classes and functions here are internal.
 ## Invariants
 
 - **Crystal first.** A request whose key is in `config.crystal` is answered
-  by that Crystal handler (`../crystal/`), before the cache or generation.
+  by that Crystal handler (`./crystal/`), before the cache or generation.
 - **Keys.** A handler's key is the request key (`request/key.ts`); its
   provenance is stored inside it (§4.7).
 - **Saved handlers.** Explore mode treats a saved handler whose provenance
@@ -80,5 +80,5 @@ classes and functions here are internal.
 
 ## Verification
 
-- `test/engine.test.ts`: the M2 cases from PLAN.md §7, with a scripted
-  connector and a stub generator (`test/helpers.ts`), no database or model.
+- `test/engine/engine.test.ts`: the M2 cases from PLAN.md §7, with a scripted
+  connector and a stub generator (`src/testing/fakes.ts`), no database or model.

@@ -1,7 +1,7 @@
 // R4, R5: a handler records each parameter's type from its first non-null value
 // and refuses other types later. null means "not given" and fits every type, so
 // one handler serves every combination of optional filters.
-import { SlimeError } from '../errors.js';
+import { SlimeError } from '../shared/errors.js';
 import type { InputValue, InputValues } from './parse.js';
 
 export type ParamType = 'string' | 'number' | 'boolean' | 'list';

@@ -1,6 +1,6 @@
 import type { SlimeMode } from '../config/options.js';
 import { changedProvenance, type HandlerProvenance } from '../request/key.js';
-import type { SlimeStore } from '../store/types.js';
+import type { SlimeStore } from '../stores/types.js';
 import type { HandlerRecord, HandlerSummary, StoredTier } from './types.js';
 
 export const HANDLERS_NS = 'handlers';

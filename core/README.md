@@ -36,7 +36,7 @@ input values. Handlers move up through three tiers:
 > app passes the generated `index.mjs` as `crystal`. `slime-crystal check`
 > re-checks the folder in CI: Crystal runs without a sandbox, so **run it in
 > your CI**. M4 (Claude and Groq models, review, promotion) is built; its live
-> run against a real model is still pending (`npm run live`). Decisions and
+> run against a real model is still pending (`npm run bench` with an API key). Decisions and
 > milestones are in [PLAN.md](PLAN.md). The request format is in
 > [docs/request-format.md](docs/request-format.md), and an app using the
 > package is in [examples/express](../examples/express/README.md).
@@ -73,53 +73,33 @@ input values. Handlers move up through three tiers:
 
 ## Subdirectories & System Boundaries
 
-- [src/](./src/README.md): the package sources and its public entry
-  `index.ts`: `SlimeConfig`, the errors, the Port
-  types, `createSlime()` and the two stores. Building blocks live in:
-  - [src/engine/](./src/engine/README.md): the Slime instance: handler
-    cache, generation with repairs, coalescing, rate limits;
-  - [src/shaping/](./src/shaping/README.md): the QuickJS shaping sandbox in
-    worker threads;
-  - [src/dictionary/](./src/dictionary/README.md): the dictionary rendered
-    from metadata, glossary and rules;
-  - [src/offline/](./src/offline/README.md): the offline generator, the
-    `@slime-cloud/core/offline` entry;
-  - [src/postgres/](./src/postgres/README.md): the Postgres connector, the
-    `@slime-cloud/core/postgres` entry;
-  - [src/models/](./src/models/README.md): the prompts and reply schemas the
-    model adapters share;
-  - [src/claude/](./src/claude/README.md) and
-    [src/groq/](./src/groq/README.md): generators, reviewers and
-    optimizers, the `@slime-cloud/core/claude` and `/groq` entries;
-  - [src/crystal/](./src/crystal/README.md): serving Crystal handlers;
-  - [src/crystallize/](./src/crystallize/README.md): the crystallize job, the
-    allowlist and `slime-crystal check`, the `@slime-cloud/core/crystallize`
-    entry;
-  - [src/config/](./src/config/README.md): `SlimeConfig`'s option types,
-    defaults and validation;
-  - [src/request/](./src/request/README.md): request parsing, the output
-    notation, parameter types and cache keys;
-  - [src/checks/](./src/checks/README.md): SQL lint;
-  - [src/store/](./src/store/README.md): the key-value store contract.
-- [scripts/](./scripts/README.md): `check-pack.mjs`, which guards what
-  `npm pack` ships, and `live-run.mjs` (M4's live run).
-- `bench/`: the bench ported from the sandbox (`npm run bench`). `cases.mjs`
-  holds 8 cases with reference queries; `run.mjs` runs them through the
-  built package against the demo database, with Groq, Claude, or the
-  example's offline handlers.
-- `test/`: `node:test` suites run through `tsx` (no contract file; tests
-  only).
+- [src/](./src/README.md): the package sources, grouped by what the system
+  is made of. Its README is the map: the four ports (`connectors/`,
+  `models/`, `stores/`, `sandbox/`, each a `types.ts` contract plus
+  implementations), the engine (`engine/`, `request/`, `dictionary/`),
+  `config/`, `shared/`, and the tooling (`crystallize/`, `testing/`).
+  - [src/connectors/](./src/connectors/README.md) and
+    [src/models/](./src/models/README.md) say how to add a connector or a
+    model provider.
+- `scripts/check-pack.mjs`: guards what `npm pack` ships; its required files
+  come from `package.json` `exports` and `bin`.
+- `bench/`: `npm run bench`. `cases.mjs` holds 8 cases with reference
+  queries; `run.mjs` runs them through the built package against the demo
+  database, with Groq, Claude (given an API key), or the example's offline
+  handlers. [protocol-cases.md](./bench/protocol-cases.md) records the dropped
+  structured protocol and 35 request cases kept as benchmark material.
+- `test/`: `node:test` suites run through `tsx`, mirroring `src/`;
+  `test/support/` holds the database helpers.
 - `docs/`: [request-format.md](./docs/request-format.md) is the request
   format for app developers: fields, output notation, parameters, `meta`,
-  errors and modes. [protocol-cases.md](./docs/protocol-cases.md) records the
-  dropped structured protocol and 35 request cases kept for benchmarks.
+  errors and modes.
 
 ## Global Invariants
 
 - **One main entry, plus adapter subpaths.** `package.json` `exports` has
-  `.`, `./offline`, `./postgres`, `./claude`, `./groq` and `./crystallize`
-  (C7), plus the `slime-crystal` bin. `test/package.test.ts` pins the main entry's
-  value exports and the subpath.
+  `.`, `./postgres`, `./models`, `./claude`, `./groq`, `./offline`,
+  `./crystallize`, `./testing` and `./shape-worker` (C7), plus the
+  `slime-crystal` bin. `test/package.test.ts` pins every entry's value exports.
 - **What ships.** ESM only (`type: module`), Node `>=22`, compiled `dist/`
   and `README.md` only (`files`). `scripts/check-pack.mjs` enforces this in
   CI.
@@ -131,11 +111,11 @@ input values. Handlers move up through three tiers:
   optional peers (C7): `pg` for `./postgres`, `@anthropic-ai/sdk` for
   `./claude`. Groq is called with `fetch`.
 - **No environment reading.** Core never reads `process.env` or `.env`. The
-  app passes everything in through `SlimeConfig` (`src/config.ts`).
+  app passes everything in through `SlimeConfig` (`src/config/slime-config.ts`).
 - **No values in keys or prompts.** Input values are never part of a cache
   key (`src/request/key.ts:requestKey`). The generation and review requests
   carry only parameter names and coarse types
-  (`src/ports.ts:GenerationRequest.params`).
+  (`src/models/types.ts:GenerationRequest.params`).
 - **No Slime Cloud imports.** CI's "Core tests" job fails if `src/` mentions
   `@slime-cloud/runtime`, `@slime-cloud/server`,
   `@slime-cloud/control-plane` or `platform/runtime`

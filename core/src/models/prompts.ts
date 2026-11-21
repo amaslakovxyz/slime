@@ -1,7 +1,7 @@
 // The prompts every model adapter shares, so a bench compares models, not prompts.
 // Kept byte-stable: they are the cached prompt prefix, and their hash is each handler's promptHash.
-import type { GenerationRequest, OptimizeRequest, ReviewRequest } from '../ports.js';
-import { sha256 } from '../request/key.js';
+import type { GenerationRequest, OptimizeRequest, ReviewRequest } from './types.js';
+import { sha256 } from '../shared/hash.js';
 
 export const GENERATION_INSTRUCTIONS = `You write read-only data handlers for Slime, a library that answers application data requests.
 

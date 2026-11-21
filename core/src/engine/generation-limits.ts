@@ -1,5 +1,5 @@
 import { HOUR_MS } from '../config/defaults.js';
-import { SlimeError } from '../errors.js';
+import { SlimeError } from '../shared/errors.js';
 
 export interface GenerationLimitSettings {
   maxPerHour: number;
