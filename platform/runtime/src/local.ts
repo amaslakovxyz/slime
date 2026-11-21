@@ -12,7 +12,7 @@ import { changedProvenance, createSlime, type HandlerProvenance, type SlimeStore
 import { crystallize, DEFAULT_MIN_RUNS } from '@slime-cloud/core/crystallize';
 import { createApp, type SavedHandler } from './app.js';
 import { isAuthorized, parseCrystalTokens } from './auth.js';
-import { slimeConfigFromEnv } from './config.js';
+import { missingProviderKey, slimeConfigFromEnv } from './config.js';
 import { RecentRequests } from './events.js';
 import { UsageMeter } from './usage.js';
 import { syncLiveRuns } from './live-runs.js';
@@ -23,6 +23,8 @@ const HANDLERS_NS = 'handlers';
 const MAX_BODY_BYTES = 64 * 1024;
 /** Same knob and default as the Lambda entry. */
 const FLUSH_LIMIT_MS = Number(process.env.SLIME_FLUSH_LIMIT_MS || 5_000);
+/** The runner SIGKILLs 3 s after SIGTERM. */
+const STOP_SAVE_LIMIT_MS = 2_000;
 
 /**
  * A read-only view whose list() returns only `keys`: crystallize() has no key
@@ -77,6 +79,11 @@ async function main(): Promise<void> {
   let meter: UsageMeter | undefined;
   // Engine warnings (for example Crystals made against another schema) go to the log and the Lifecycle tab.
   const warnings: string[] = [];
+  const keyWarning = missingProviderKey(process.env);
+  if (keyWarning) {
+    warnings.push(keyWarning);
+    console.warn(JSON.stringify({ warning: keyWarning }));
+  }
   const config = await slimeConfigFromEnv(process.env, {
     onEvent: (event) => {
       if (event.type === 'generated') meter?.recordTokens(event.tokens);
@@ -115,9 +122,10 @@ async function main(): Promise<void> {
     ...(store && crystalDir
       ? {
           crystallize: async (keys?: string[]) => {
-            // Liquid run counts and fixtures must be in the store before the job reads them.
+            // Liquid run counts and fixtures must be in the store before the job reads them. Every
+            // handler's, not only the picked ones: the restart that follows drops the live counts.
             await slime.flush();
-            await syncLiveRuns(store, slime.handlers(), keys);
+            await syncLiveRuns(store, slime.handlers());
             return crystallize({
               connector: config.connector,
               store: keys ? storeLimitedTo(store, keys) : store,
@@ -154,7 +162,25 @@ async function main(): Promise<void> {
     const crystals = Object.keys(config.crystal || {}).length;
     console.log(JSON.stringify({ listening: `http://localhost:${port}/`, crystals, mode: config.mode }));
   });
-  const stop = () => server.close(() => process.exit(0));
+  server.on('error', (err) => {
+    console.error(JSON.stringify({ fatal: startupErrorMessage(err) }));
+    process.exit(1);
+  });
+  // The runner restarts this process for every provider, connector or Crystal change. The core
+  // saves a handler's runs only when it turns Liquid, so save the live counts first, or every
+  // restart sets Liquid progress back. Capped below the runner's 3 s SIGKILL.
+  let stopping = false;
+  const stop = async () => {
+    if (stopping) return;
+    stopping = true;
+    server.close();
+    if (store) {
+      await Promise.race([slime.flush().then(() => syncLiveRuns(store, slime.handlers())), sleep(STOP_SAVE_LIMIT_MS, undefined, { ref: false })]).catch(
+        (err) => console.error(JSON.stringify({ warning: `Could not save live run counts: ${startupErrorMessage(err)}` })),
+      );
+    }
+    process.exit(0);
+  };
   process.on('SIGTERM', stop);
   process.on('SIGINT', stop);
 }
@@ -188,4 +214,20 @@ async function send(res: ServerResponse, response: Response): Promise<void> {
   res.end(Buffer.from(await response.arrayBuffer()));
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) await main();
+/** One line for the runner to show as the failure reason (the stack trace goes to stderr before it). */
+export function startupErrorMessage(err: unknown): string {
+  // pg reports a refused connection as an AggregateError with an empty message, one error per address.
+  if (err instanceof AggregateError && !err.message && err.errors.length > 0) return startupErrorMessage(err.errors[0]);
+  const text = err instanceof Error ? err.message || (err as { code?: string }).code || err.name : String(err);
+  return text.replace(/\s+/g, ' ').trim();
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  try {
+    await main();
+  } catch (err) {
+    console.error(err);
+    console.error(JSON.stringify({ fatal: startupErrorMessage(err) }));
+    process.exit(1);
+  }
+}
