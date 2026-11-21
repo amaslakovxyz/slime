@@ -132,7 +132,10 @@ from `feat/cloud-mvp`; step 7 runs on merge.
 5. Run the post-deploy checks and the cloud smoke.
 6. Remove the `aws.untagged` provider alias from `versions.tf` (it existed only
    to delete the event-source mapping) and apply again: "No changes".
-7. After merge, the CI apply on `main` must show no changes.
+7. After merge, the first CI apply on `main` re-uploads `slime-runtime` once:
+   the bundle built on macOS and on CI's Linux differs byte-wise for the same
+   code. The next CI plan shows no changes. Build branch applies in Linux
+   (`node:22`) to avoid it; admin (input-hash trigger) and landing already match.
 
 ## Rules for `platform/`
 
