@@ -62,6 +62,8 @@ test('adapters have their own subpaths, so the main entry never loads them (C7)'
     'fakeConnector',
     'fakeGenerator',
     'fakeReviewer',
+    'fixtureFetch',
+    'fixtureKey',
     'stubGenerator',
     'stubReviewer',
   ]);

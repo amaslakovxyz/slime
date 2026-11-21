@@ -13,6 +13,7 @@ export {
   type StubReviewer,
   type Verdict,
 } from './fakes.js';
+export { fixtureFetch, fixtureKey, type Fixture, type FixtureFetch, type FixtureRequest, type FixtureResponse } from './fixture-fetch.js';
 export {
   FAKE_SECRET,
   fakeApiSource,
