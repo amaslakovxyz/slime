@@ -18,6 +18,8 @@ const MAX_TOKENS = 16_000;
 const DEFAULT_MAX_RETRIES = 1;
 const FALLBACK_BETA = 'server-side-fallback-2026-07-01';
 // Server-side refusal fallbacks exist only for these models; others get no fallback.
+// The SDK throws this when the reply doesn't match the schema; sampling again usually fixes it.
+const STRUCTURED_OUTPUT_MISMATCH = /^Failed to parse structured output/;
 const MODELS_WITH_FALLBACKS = new Set(['claude-fable-5-2', 'claude-fable-5-1', 'claude-opus-5-5', 'claude-opus-5', 'claude-sonnet-5-5']);
 
 // Claude's structured output enforces the reply schema, so no JSON format goes in the prompt.
@@ -64,6 +66,9 @@ function toSlimeError(error: unknown, label: string): SlimeError {
   if (error instanceof Anthropic.AuthenticationError) return new SlimeError('GENERATION_FAILED', 'The Claude API rejected the API key.');
   if (error instanceof Anthropic.RateLimitError) return new SlimeError('GENERATION_RATE_LIMITED', 'Claude API rate limit reached.', { retryable: true });
   if (error instanceof Anthropic.APIConnectionTimeoutError) return new SlimeError('GENERATION_TIMEOUT', `${label} took too long.`, { retryable: true });
+  if (error instanceof Error && STRUCTURED_OUTPUT_MISMATCH.test(error.message)) {
+    return new SlimeError('GENERATION_FAILED', `${label}: the model's reply has wrong or missing fields.`, { retryable: true });
+  }
   if (error instanceof Anthropic.APIError) {
     const isServerError = (error.status ?? 0) >= 500;
     return new SlimeError('GENERATION_FAILED', `Claude API error ${error.status ?? ''}: ${error.message}`, { retryable: isServerError });
