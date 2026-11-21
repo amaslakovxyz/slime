@@ -304,7 +304,9 @@ sequenceDiagram
 
 - **One composition function.** `endpointRuntime(env, deps)` builds the config, `createSlime`, the usage meter, live-run sync and the Hono app with every route (lifecycle, events, warnings, crystallize). It never reads `process.env`. `local.ts` calls it with `process.env`, so local keeps one process per endpoint. The Lambda `TenantCache` calls it once per endpoint. This removes the reduced app that `lambda.ts:82` builds today.
 - **TenantCache.** It holds at most `SLIME_TENANT_CACHE_MAX` (8) engines per instance, evicting the least recently used. Eviction and replacement run `slime.flush()`, then `syncLiveRuns(store, slime.handlers())`, then `slime.close()`, so Liquid progress survives. Concurrent first requests for one id share one build promise, and a failed build is not cached.
-- **Change fingerprint.** The fingerprint is a hash of the endpoint's SSM values (names and values), the shared values, and the manifest ETag. It is checked at most once per TTL per endpoint per instance.
+- **Change fingerprint, in two parts.** Checked at most once per TTL per endpoint per instance.
+  - *Auth part* (`SLIME_API_KEY`, `CRYSTAL_TOKENS`): a change is swapped into the cached entry in place. The engine, its Gas handlers, generation counters and Postgres pool stay. Issuing an `slc_` token or rotating the key therefore costs no rebuild.
+  - *Engine part* (`DATABASE_URL`, `SLIME_PROVIDER`, every other endpoint value, the shared values, and the manifest ETag): a change rebuilds the engine. A Crystallize on another instance changes the ETag, so this instance rebuilds and loads the new Crystal registry.
 - **Resource bounds.** Each tenant's Postgres pool gets `maxConnections: 2`. All tenants share one QuickJS runner per process, created once and injected into `createSlime` and `crystallize` (core change below). The runtime starts at 1024 MB and logs `process.memoryUsage().rss` with every tenant build and eviction. If peak RSS exceeds about 70 % of the function memory with 8 cached tenants, the function memory is raised in `runtime.tf` (2048 MB as the next step); the cache cap stays at 8.
 - **Usage metering.** Metering is on for every tenant (`SLIME_USAGE_TABLE=slime-control`). The runtime role may write only items whose key starts with `USAGE#` and only the usage attributes, the same list the provisioner used to write (`provision.ts:37-53`).
 - **Logs.** Every log line is JSON with `endpointId`, `requestId`, `route`, `status`, `ms`, plus `tier` for queries. Boot failures log `endpointId` and the cause.
@@ -382,7 +384,7 @@ s3://slime-crystals-025772230981/endpoints/<id>/crystal/<crystal key>.mjs
 
 1. Check that no `slime-ep-*` functions or roles exist and that `slime-control` holds no endpoint items.
 2. Create SSM parameters by hand: `/slime/admin/SESSION_SECRET` (random, 48 characters, never printed), `/slime/admin/ADMIN_ALLOWED_EMAILS`, and `/slime/shared/GROQ_API_KEY` or `ANTHROPIC_API_KEY` if Anthropic is used (the user supplies the value).
-3. Apply 1: the full change. It deletes the provisioner, the layer and the mapping (still through the `untagged` alias), and creates the bucket, the admin and CloudFront.
+3. Apply 1: the full change. It deletes the provisioner, the boundary policy and the mapping (still through the `untagged` alias), and creates the bucket, the admin and CloudFront. `aws_lambda_layer_version.gas` has `skip_destroy = true` (`gas-layer.tf:25`), so Terraform only drops it from state. Every `slime-gas` layer version is then deleted by hand with `aws lambda delete-layer-version`, and `aws lambda list-layer-versions --layer-name slime-gas` must return an empty list (Goal 8).
 4. Smoke (Goal 10).
 5. Commit 2 removes the `untagged` alias. Apply 2 must show no changes.
 6. After merge, CI apply on `main` shows no changes, so "Refuse pure deletes" passes.
@@ -755,13 +757,15 @@ Work happens in `.worktrees/cloud-mvp` on branch `feat/cloud-mvp`. Commits follo
 
     End to end: Liquid handler with 10 runs → `/ep/<id>/v0/crystallize` → S3 holds the module and manifest → the same instance answers `/v0/e/<key>` with `meta.tier = 'crystal'`.
 
-##### 25. `platform/runtime/test/lambda.test.ts`, `local.test.ts`, `startup.test.ts` (Modify)
+##### 25. `platform/runtime/test/lambda.test.ts`, `local.test.ts`, `startup.test.ts`, `setup.ts`, `usage.test.ts` (Modify)
 
 *   **Type / Scope**: Existing tests.
 *   **Proposed Changes**:
     - Drop the `envNameFor('/slime/runtime/…')` case.
     - Add `DATABASE_URL` to `BASE_ENV`, since the fallback is gone, and add a "missing DATABASE_URL throws" case.
     - Local tests use `endpointRuntime` through `local.ts` as before.
+    - `setup.ts`: drop `delete process.env.SLIME_SSM_PREFIX` (the variable no longer exists); keep the rest of the setup.
+    - `usage.test.ts`: the comment at line 21 points to `platform/infra/platform/runtime.tf` instead of `provision.ts`. The test asserts that every attribute the meter writes is in the exported `USAGE_ATTRIBUTES`.
 
 ##### 26. `platform/runtime/README.md` (Modify)
 
@@ -868,6 +872,7 @@ Work happens in `.worktrees/cloud-mvp` on branch `feat/cloud-mvp`. Commits follo
 *   **Type / Scope**: Packaging.
 *   **Proposed Changes**:
     - `build-lambda.mjs` copies `.next/standalone`, `.next/static` → `.next/static`, `public`, and `lambda/*` into `dist/lambda/`, deterministically (sorted copy, fixed mtimes) so the Terraform zip hash is stable.
+    - Size guard: the script prints the unzipped size of `dist/lambda/` and fails above 200 MB. A direct-upload zip is capped at 50 MB, and the unzipped function plus layers at 250 MB. If the zip measured at the first build is above 40 MB, `admin.tf` uploads the code through `s3_bucket`/`s3_key` (in the crystals bucket under `artifacts/`) instead of `filename`, and `/_next/static/*` is served from that bucket through a second CloudFront origin.
     - New scripts: `build:lambda` (`next build && node scripts/build-lambda.mjs`), `e2e` (`playwright test -c e2e/playwright.config.ts --project=local`), `e2e:cloud`.
     - Add dev dependency `@playwright/test`, and `@aws-sdk/client-s3` for teardown.
 
@@ -933,7 +938,7 @@ Work happens in `.worktrees/cloud-mvp` on branch `feat/cloud-mvp`. Commits follo
 ##### 47. `platform/infra/platform/provisioner.tf`, `platform/infra/platform/gas-layer.tf` (Delete)
 
 *   **Type / Scope**: Terraform.
-*   **Proposed Changes**: Remove the provisioner function, role, log group, boundary policy, event-source mapping, layer and shim archive.
+*   **Proposed Changes**: Remove the provisioner function, role, log group, boundary policy, event-source mapping, layer resource and shim archive. The layer versions in AWS remain after this (`skip_destroy`); they are deleted by hand in the apply order (step 3).
 
 ##### 48. `platform/infra/platform/runtime.tf` (Modify)
 
