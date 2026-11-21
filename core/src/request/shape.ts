@@ -11,6 +11,13 @@ interface ShapeCheck<S extends Shape = Shape> {
   shape: S;
   value: unknown;
   path: string;
+  /** Leave values and data-derived key names out of messages (MS15). */
+  isValueFree: boolean;
+}
+
+export interface ValidateOptions {
+  /** For multi-source handlers, whose repair messages must not carry row data (MS15). */
+  isValueFree?: boolean;
 }
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -64,26 +71,27 @@ export function assertValidShape(shape: unknown): asserts shape is Shape {
 }
 
 /** A top-level object means one row, so null (no row) matches it. */
-export function validateData(shape: Shape, data: unknown): string[] {
+export function validateData(shape: Shape, data: unknown, options: ValidateOptions = {}): string[] {
   if (data === null && isObjectShape(shape)) return [];
-  return validateAgainstShape(shape, data);
+  return validateAgainstShape(shape, data, options);
 }
 
-export function validateAgainstShape(shape: Shape, value: unknown): string[] {
+export function validateAgainstShape(shape: Shape, value: unknown, { isValueFree = false }: ValidateOptions = {}): string[] {
   const mismatches: string[] = [];
-  collectMismatches({ shape, value, path: ROOT_PATH }, mismatches);
+  collectMismatches({ shape, value, path: ROOT_PATH, isValueFree }, mismatches);
   return mismatches;
 }
 
-function collectMismatches({ shape, value, path }: ShapeCheck, mismatches: string[]): void {
+function collectMismatches(check: ShapeCheck, mismatches: string[]): void {
   if (mismatches.length >= MAX_MISMATCHES) return;
+  const { shape } = check;
   if (typeof shape === 'string') {
-    const mismatch = leafMismatch({ shape, value, path });
+    const mismatch = leafMismatch({ ...check, shape });
     if (mismatch) mismatches.push(mismatch);
   } else if (isListShape(shape)) {
-    collectListMismatches({ shape, value, path }, mismatches);
+    collectListMismatches({ ...check, shape }, mismatches);
   } else {
-    collectObjectMismatches({ shape, value, path }, mismatches);
+    collectObjectMismatches({ ...check, shape }, mismatches);
   }
 }
 
@@ -99,36 +107,37 @@ export function matchesLeaf(type: string, value: unknown): boolean {
   return isLeafType(typeName) && LEAF_CHECKS[typeName](value);
 }
 
-function leafMismatch({ shape, value, path }: ShapeCheck<string>): string | undefined {
+function leafMismatch({ shape, value, path, isValueFree }: ShapeCheck<string>): string | undefined {
   const isNullable = shape.endsWith(NULLABLE_SUFFIX);
   if (value === null) return isNullable ? undefined : `${path}: null but "${shape}" is not nullable`;
   const typeName = isNullable ? shape.slice(0, -NULLABLE_SUFFIX.length) : shape;
   const matches = isLeafType(typeName) && LEAF_CHECKS[typeName](value);
-  return matches ? undefined : `${path}: expected ${shape}, got ${describeValue(value)}`;
+  return matches ? undefined : `${path}: expected ${shape}, got ${describeValue(value, isValueFree)}`;
 }
 
-function collectListMismatches({ shape, value, path }: ShapeCheck<readonly Shape[]>, mismatches: string[]): void {
+function collectListMismatches({ shape, value, path, isValueFree }: ShapeCheck<readonly Shape[]>, mismatches: string[]): void {
   if (!Array.isArray(value)) {
-    mismatches.push(`${path}: expected a list, got ${describeValue(value)}`);
+    mismatches.push(`${path}: expected a list, got ${describeValue(value, isValueFree)}`);
     return;
   }
   const itemShape = shape[0]!;
-  value.forEach((item, index) => collectMismatches({ shape: itemShape, value: item, path: `${path}[${index}]` }, mismatches));
+  value.forEach((item, index) => collectMismatches({ shape: itemShape, value: item, path: `${path}[${index}]`, isValueFree }, mismatches));
 }
 
-function collectObjectMismatches({ shape, value, path }: ShapeCheck<ObjectShape>, mismatches: string[]): void {
+function collectObjectMismatches({ shape, value, path, isValueFree }: ShapeCheck<ObjectShape>, mismatches: string[]): void {
   if (!isObjectValue(value)) {
-    mismatches.push(`${path}: expected an object, got ${describeValue(value)}`);
+    mismatches.push(`${path}: expected an object, got ${describeValue(value, isValueFree)}`);
     return;
   }
   for (const key of Object.keys(shape)) {
     const fieldPath = `${path}.${key}`;
-    if (key in value) collectMismatches({ shape: shape[key]!, value: value[key], path: fieldPath }, mismatches);
+    if (key in value) collectMismatches({ shape: shape[key]!, value: value[key], path: fieldPath, isValueFree }, mismatches);
     else mismatches.push(`${fieldPath}: missing`);
   }
-  for (const key of Object.keys(value)) {
-    if (!(key in shape)) mismatches.push(`${path}.${key}: not requested`);
-  }
+  const unrequested = Object.keys(value).filter((key) => !(key in shape));
+  // Returned key names can come from data (for example grouping by account name).
+  if (isValueFree && unrequested.length > 0) mismatches.push(`${path}: ${unrequested.length} key(s) not requested`);
+  else for (const key of unrequested) mismatches.push(`${path}.${key}: not requested`);
 }
 
 /** Rejects strings like 2026-02-30 that match the pattern but name no day. */
@@ -149,11 +158,11 @@ function isObjectValue(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-function describeValue(value: unknown): string {
+function describeValue(value: unknown, isValueFree = false): string {
   if (value === null) return 'null';
   if (Array.isArray(value)) return 'a list';
   if (typeof value === 'number' && !Number.isInteger(value)) return 'a decimal number';
-  if (typeof value === 'string') return `the string ${JSON.stringify(preview(value))}`;
+  if (typeof value === 'string') return isValueFree ? 'a string' : `the string ${JSON.stringify(preview(value))}`;
   return typeof value;
 }
 

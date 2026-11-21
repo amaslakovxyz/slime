@@ -41,8 +41,8 @@ export async function executeArtifact({ connector, runner, limits }: ExecutionDe
 }
 
 /** The checks every handler's result must pass, whatever tier ran it: the output shape and R6. */
-export function assertValidOutput(output: Shape, data: unknown, input: InputValues): void {
-  const mismatches = validateData(output, data);
+export function assertValidOutput(output: Shape, data: unknown, input: InputValues, isValueFree = false): void {
+  const mismatches = validateData(output, data, { isValueFree });
   if (mismatches.length > 0) {
     throw new SlimeError('SHAPE_MISMATCH', `Result does not match the requested output: ${mismatches.join('; ')}`, { details: { mismatches } });
   }

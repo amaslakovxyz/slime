@@ -3,12 +3,13 @@ import { asV1, type AnyArtifact } from '../models/artifact-v2.js';
 import type { LimitOptions } from '../config/options.js';
 import { SlimeError } from '../shared/errors.js';
 import type { Connector } from '../connectors/types.js';
-import type { Generator, ModelUsage, ParamTypesForModel } from '../models/types.js';
+import type { ArtifactFormat, Generator, ModelUsage, ParamTypesForModel } from '../models/types.js';
 import type { SandboxRunner } from '../sandbox/types.js';
 import type { HandlerProvenance } from '../request/key.js';
 import type { ParsedRequest } from '../request/parse.js';
 import { checkParamTypes, type ParamTypes } from '../request/params.js';
 import { bindParams, executeArtifact, queryLimits, type Execution } from './execute.js';
+import { repairMessage } from './repair-message.js';
 import type { HandlerRecord } from './types.js';
 
 export interface GenerationDeps {
@@ -18,6 +19,8 @@ export interface GenerationDeps {
   limits: Readonly<LimitOptions>;
   dictionaryText: string;
   provenance: HandlerProvenance;
+  /** 'v2' when the instance has API sources (MS3); missing means 'v1'. */
+  format?: ArtifactFormat;
 }
 
 export interface GenerationJob {
@@ -42,7 +45,8 @@ export interface PreviousAttempt {
 const MIN_ATTEMPT_MS = 1_000;
 const WRITE_LIKE_REASON = /\b(writ|delet|updat|insert|modif|chang|remov|creat)/i;
 // Retrying can't make a write or a denied table allowed.
-const FINAL_CODES = new Set(['WRITE_REFUSED', 'ACCESS_DENIED']);
+// MS7: the model can't fix a source outage. QUERY_TOO_LARGE stays repairable: a filter may fix it (MS6).
+const FINAL_CODES = new Set(['WRITE_REFUSED', 'ACCESS_DENIED', 'SOURCE_ERROR']);
 
 /** Generates, checks and runs a handler, repairing up to limits.maxRepairs times within the time budget. */
 export async function generateHandler(deps: GenerationDeps, { key, request, previous: startingPoint }: GenerationJob): Promise<GenerationOutcome> {
@@ -66,7 +70,7 @@ export async function generateHandler(deps: GenerationDeps, { key, request, prev
     } catch (error) {
       lastError = asSlimeError(error);
       if (FINAL_CODES.has(lastError.code)) throw lastError;
-      previous = { artifact: generation.artifact, error: `${lastError.code}: ${lastError.message}` };
+      previous = { artifact: generation.artifact, error: repairMessage(lastError, deps.format ?? 'v1') };
     }
   }
   throw lastError ?? new SlimeError('GENERATION_TIMEOUT', 'Ran out of generation time budget.', { retryable: true });
