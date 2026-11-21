@@ -14,6 +14,16 @@ export {
   type Verdict,
 } from './fakes.js';
 export {
+  FAKE_SECRET,
+  fakeApiSource,
+  type FakeApiSource,
+  type FakeApiSourceOptions,
+  type FakeCall,
+  type FakeFailure,
+  type FakeOperation,
+  type FakeRow,
+} from './fake-api-source.js';
+export {
   describeConnectorContract,
   type ConnectorContractOptions,
   type ConnectorContractQueries,

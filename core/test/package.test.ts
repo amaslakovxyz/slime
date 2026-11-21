@@ -51,10 +51,12 @@ test('adapters have their own subpaths, so the main entry never loads them (C7)'
   assert.deepEqual(pkg.exports['./crystallize'], { types: './dist/crystallize/index.d.ts', default: './dist/crystallize/index.js' });
   assert.deepEqual(pkg.exports['./testing'], { types: './dist/testing/index.d.ts', default: './dist/testing/index.js' });
   assert.deepEqual(Object.keys(await import('../src/testing/index.js')).sort(), [
+    'FAKE_SECRET',
     'artifact',
     'describeConnectorContract',
     'describeModelClientContract',
     'describeStoreContract',
+    'fakeApiSource',
     'fakeConnector',
     'fakeGenerator',
     'fakeReviewer',
