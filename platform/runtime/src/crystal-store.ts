@@ -14,12 +14,9 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
-  DeleteObjectsCommand,
   GetObjectCommand,
   HeadObjectCommand,
-  ListObjectVersionsCommand,
   PutObjectCommand,
-  type ObjectIdentifier,
 } from '@aws-sdk/client-s3';
 import type { CrystalHandler, CrystalRegistry } from '@slime-cloud/core';
 import { MANIFEST_FILE, moduleFileFor, parseManifest, parseModule, readManifest, type Manifest } from '@slime-cloud/core/crystallize';
@@ -51,7 +48,6 @@ export interface CrystalStore {
   publish(endpointId: string, work: CrystalWork): Promise<string | undefined>;
   /** Deletes the work folder when it is a private copy. */
   discardWork(work: CrystalWork): Promise<void>;
-  remove(endpointId: string): Promise<void>;
 }
 
 /** Another Crystallize published a manifest after this one prepared its work folder. */
@@ -103,7 +99,7 @@ export async function crystalsFromFolder(dir: string): Promise<Omit<CrystalLoad,
 
 /** The slice of S3Client the store uses; tests pass a fake. */
 export interface S3Port {
-  send(command: GetObjectCommand | PutObjectCommand | HeadObjectCommand | ListObjectVersionsCommand | DeleteObjectsCommand): Promise<any>;
+  send(command: GetObjectCommand | PutObjectCommand | HeadObjectCommand): Promise<any>;
 }
 
 export interface S3CrystalStoreOptions {
@@ -113,7 +109,6 @@ export interface S3CrystalStoreOptions {
   workRoot?: string;
 }
 
-const DELETE_BATCH = 1_000;
 const HTTP_NOT_FOUND = 404;
 const HTTP_CONFLICT = 409;
 const HTTP_PRECONDITION_FAILED = 412;
@@ -188,25 +183,6 @@ export class S3CrystalStore implements CrystalStore {
     await rm(work.dir, { recursive: true, force: true });
   }
 
-  /** Every version of every object under endpoints/<id>/: the bucket is versioned, and a delete must leave nothing. */
-  async remove(endpointId: string): Promise<void> {
-    const prefix = `endpoints/${endpointId}/`;
-    let KeyMarker: string | undefined;
-    let VersionIdMarker: string | undefined;
-    do {
-      const page = await this.#client.send(new ListObjectVersionsCommand({ Bucket: this.#bucket, Prefix: prefix, KeyMarker, VersionIdMarker }));
-      const objects: ObjectIdentifier[] = [...(page.Versions ?? []), ...(page.DeleteMarkers ?? [])].map(({ Key, VersionId }) => ({ Key, VersionId }));
-      for (let start = 0; start < objects.length; start += DELETE_BATCH) {
-        const result = await this.#client.send(
-          new DeleteObjectsCommand({ Bucket: this.#bucket, Delete: { Objects: objects.slice(start, start + DELETE_BATCH), Quiet: true } }),
-        );
-        const failed = result.Errors ?? [];
-        if (failed.length > 0) throw new Error(`S3 refused to delete ${failed.length} object version(s) under ${prefix}: ${failed[0].Code} ${failed[0].Message}`);
-      }
-      [KeyMarker, VersionIdMarker] = page.IsTruncated ? [page.NextKeyMarker, page.NextVersionIdMarker] : [undefined, undefined];
-    } while (KeyMarker);
-  }
-
   #key(endpointId: string, file: string): string {
     return `endpoints/${endpointId}/crystal/${file}`;
   }
@@ -258,10 +234,6 @@ export class DirCrystalStore implements CrystalStore {
   }
 
   async discardWork(): Promise<void> {}
-
-  async remove(): Promise<void> {
-    await rm(this.#dir, { recursive: true, force: true });
-  }
 }
 
 function sha256(text: string): string {

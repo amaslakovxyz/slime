@@ -31,6 +31,8 @@ export const ENDPOINTS_SSM_PREFIX = '/slime/endpoints/';
 const AUTH_NAMES = ['SLIME_API_KEY', 'CRYSTAL_TOKENS'];
 /** An engine that goes may still be finishing a review; past this the request goes on and the close continues. */
 const DEFAULT_RETIRE_LIMIT_MS = 5_000;
+/** Unknown ids remembered per instance; past this, expired and then oldest entries go. */
+const MISSING_MAX = 1_000;
 
 /** Parameter path -> env var name: the last path segment. */
 export function parameterName(path: string): string {
@@ -145,7 +147,14 @@ export class TenantCache {
       refreshing = this.#refresh(id).finally(() => this.#refreshing.delete(id));
       this.#refreshing.set(id, refreshing);
     }
-    return refreshing;
+    if (!entry) return refreshing;
+    // A settings check that fails (SSM throttled, say by someone probing random ids) must not
+    // take down an endpoint this instance already serves: keep the known settings, try again later.
+    return refreshing.catch((err: unknown) => {
+      this.#log({ warning: `Settings check failed; serving cached settings: ${(err as Error).message}`, endpointId: id });
+      entry.checkedAt = this.#now();
+      return entry;
+    });
   }
 
   /** Forgets the endpoint's settings and engine on this instance: the next request reads and builds afresh. */
@@ -153,6 +162,17 @@ export class TenantCache {
     this.#missingUntil.delete(id);
     const entry = this.#entries.get(id);
     if (entry) await this.#drop(entry);
+  }
+
+  /** Unknown ids are remembered for one TTL, in a bounded map: random ids must not grow memory without limit. */
+  #rememberMissing(id: string): void {
+    const now = this.#now();
+    if (this.#missingUntil.size >= MISSING_MAX) {
+      for (const [known, until] of this.#missingUntil) if (until <= now) this.#missingUntil.delete(known);
+      // Still full of live entries: forget the oldest (insertion order) rather than grow.
+      while (this.#missingUntil.size >= MISSING_MAX) this.#missingUntil.delete(this.#missingUntil.keys().next().value!);
+    }
+    this.#missingUntil.set(id, now + this.#options.ttlMs);
   }
 
   /** After a Crystallize on this instance: the same settings, the Crystals it just published. */
@@ -167,7 +187,7 @@ export class TenantCache {
   async #refresh(id: string): Promise<Entry | undefined> {
     const own = await this.#readParameters(`${ENDPOINTS_SSM_PREFIX}${id}/`);
     if (Object.keys(own).length === 0) {
-      this.#missingUntil.set(id, this.#now() + this.#options.ttlMs);
+      this.#rememberMissing(id);
       const deleted = this.#entries.get(id);
       if (deleted) await this.#drop(deleted);
       return undefined;

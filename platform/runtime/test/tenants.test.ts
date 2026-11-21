@@ -44,6 +44,16 @@ describe('router: ids and paths, before any engine', () => {
     assert.equal(h.ssm.calls, calls + 1, 'looked up again after the TTL');
   });
 
+  test('unknown ids are remembered in a bounded map: probing random ids cannot grow memory without limit', async () => {
+    for (let i = 0; i < 1_100; i++) await h.call(`/ep/ep-${i.toString(16).padStart(10, 'f')}/healthz`, { key: 'k' });
+    const calls = h.ssm.calls;
+    // The newest ones are still remembered; the oldest were forgotten to stay under the cap.
+    await h.call(`/ep/ep-${(1_099).toString(16).padStart(10, 'f')}/healthz`, { key: 'k' });
+    assert.equal(h.ssm.calls, calls);
+    await h.call(`/ep/ep-${(0).toString(16).padStart(10, 'f')}/healthz`, { key: 'k' });
+    assert.equal(h.ssm.calls, calls + 1);
+  });
+
   test('paths outside /ep/<id>/ are 401, root /healthz included', async () => {
     for (const path of ['/healthz', '/', '/v0/query', '/ep//healthz']) {
       const { status, json } = await h.call(path, { key: keyOf(A) });
@@ -148,6 +158,37 @@ describe('tenant cache with live engines', { skip: !hasDatabase && 'demo Postgre
       assert.equal((await h.call(`/ep/${A}/healthz`, { key: keyOf(A) })).status, 200);
       assert.equal(h.ssm.calls, calls + 1, 'one fresh read of the endpoint path, within the TTL');
       assert.notEqual(await h.runtimeOf(A), first);
+    } finally {
+      await h.close();
+    }
+  });
+
+  test('GET /healthz?fresh=1 re-reads the settings before checking them, in the same call', async () => {
+    const h = await harness({ ttlMs: TTL_MS });
+    try {
+      h.addEndpoint(A);
+      assert.equal((await h.call(`/ep/${A}/healthz`, { key: keyOf(A) })).status, 200);
+      // A connector change this instance has not seen yet (its TTL has not passed).
+      h.addEndpoint(A, { DATABASE_URL: 'postgres://nobody:nothing@127.0.0.1:1/none' });
+      assert.equal((await h.call(`/ep/${A}/healthz`, { key: keyOf(A) })).status, 200, 'cached settings still answer');
+      const fresh = await h.call(`/ep/${A}/healthz?fresh=1`, { key: keyOf(A) });
+      assert.equal(fresh.status, 503, 'the new, broken settings are what got checked');
+      assert.equal((await h.call(`/ep/${A}/healthz?fresh=1`, { key: 'wrong' })).status, 401);
+    } finally {
+      await h.close();
+    }
+  });
+
+  test('a failed settings check keeps serving the cached endpoint instead of failing it', async () => {
+    const h = await harness({ ttlMs: TTL_MS });
+    try {
+      h.addEndpoint(A);
+      assert.equal((await h.call(`/ep/${A}/healthz`, { key: keyOf(A) })).status, 200);
+      h.ssm.failWith = Object.assign(new Error('Rate exceeded'), { name: 'ThrottlingException' });
+      h.clock.now += TTL_MS;
+      assert.equal((await h.call(`/ep/${A}/healthz`, { key: keyOf(A) })).status, 200);
+      // An endpoint this instance never saw has nothing to fall back to.
+      assert.equal((await h.call(`/ep/${B}/healthz`, { key: keyOf(B) })).status, 500);
     } finally {
       await h.close();
     }

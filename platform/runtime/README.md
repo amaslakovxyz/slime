@@ -43,7 +43,7 @@ Paths are the endpoint's own; the Lambda serves them under `/ep/<id>/`.
 |---|---|---|
 | `POST /v0/query` | endpoint `slm_` | Gas, Liquid or Crystal answer |
 | `POST /v0/e/<crystal key>` | that Crystal's `slc_` token, or `slm_` | the Crystal's answer; body `{"input": {…}}` with exactly its input names |
-| `GET /healthz` | `slm_` | `{ok, database, …stats}`; 503 when the database safety check fails |
+| `GET /healthz` | `slm_` | `{ok, database, …stats}`; 503 when the database safety check fails. `?fresh=1` (Lambda): re-read the endpoint's settings first, in the same call |
 | `GET /v0/handlers`, `DELETE /v0/handlers/<key>` | `slm_` | live handlers and Crystals; evict one |
 | `GET /v0/lifecycle` | `slm_` | saved, live and Crystal rows, thresholds, warnings; `instance: true` on Lambda, where Gas and the feed are this instance's only |
 | `GET /v0/events` | `slm_` | the recent requests feed (per process) |

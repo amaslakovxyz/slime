@@ -136,16 +136,6 @@ describe('S3CrystalStore', () => {
     await store.publish(ID, third);
     await assert.rejects(store.publish(ID, fourth), (error: unknown) => error instanceof CrystallizeConflictError && /try again/.test(error.message));
   });
-
-  test("remove deletes every version under the endpoint's prefix and nothing else", async () => {
-    const s3 = new FakeS3(2);
-    await seed(s3, { [KEY_1]: MODULE });
-    await seed(s3, { [KEY_1]: MODULE, [KEY_2]: MODULE });
-    const other = 'endpoints/ep-00000000b2/crystal/manifest.json';
-    await s3.send(new PutObjectCommand({ Bucket: BUCKET, Key: other, Body: '{}' }));
-    await (await storeOver(s3)).remove(ID);
-    assert.deepEqual(s3.keys(), [other]);
-  });
 });
 
 const hasDatabase = await isDatabaseAvailable();

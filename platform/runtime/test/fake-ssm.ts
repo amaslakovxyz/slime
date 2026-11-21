@@ -7,6 +7,8 @@ export class FakeSsm implements SsmPort {
   /** Parameter name -> value. */
   readonly parameters = new Map<string, string>();
   calls = 0;
+  /** When set, every call throws this (an SSM throttle, say). */
+  failWith: Error | undefined;
   readonly #pageSize: number;
 
   constructor(pageSize = 10) {
@@ -24,6 +26,7 @@ export class FakeSsm implements SsmPort {
 
   async send(command: GetParametersByPathCommand): Promise<GetParametersByPathCommandOutput> {
     this.calls++;
+    if (this.failWith) throw this.failWith;
     const { Path = '', NextToken } = command.input;
     const matching = [...this.parameters.entries()]
       .filter(([name]) => name.startsWith(Path) && !name.slice(Path.length).includes('/'))

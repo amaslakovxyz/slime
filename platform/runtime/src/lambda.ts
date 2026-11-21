@@ -6,6 +6,8 @@
 //                     wrong or missing x-api-key               -> 401 UNAUTHORIZED
 //                     POST /v0/reload                          -> 204, this instance forgets
 //                                                                 the endpoint (tenants.ts)
+//                     GET /healthz?fresh=1 (endpoint key)      -> reload, then healthz on the
+//                                                                 new settings, in one invocation
 //                     engine cannot start                      -> 503 NOT_READY with the cause
 //                     otherwise the endpoint's own app (app.ts) answers <route>
 //   anything else     401, including /healthz: there is no key to check it against
@@ -83,7 +85,7 @@ async function serveEndpoint(
   flushLimitMs: number,
   log: (line: LogLine) => void,
 ): Promise<Response> {
-  const tenant: Tenant | undefined = ENDPOINT_ID.test(id) ? await tenants.get(id) : undefined;
+  let tenant: Tenant | undefined = ENDPOINT_ID.test(id) ? await tenants.get(id) : undefined;
   if (!tenant) return refuse(c, 404, 'ENDPOINT_NOT_FOUND', 'No endpoint with this id.');
   const method = c.req.method;
   if (!isAuthorized(method, route, c.req.header('x-api-key'), tenant.apiKey, tenant.crystalTokens)) {
@@ -92,6 +94,14 @@ async function serveEndpoint(
   if (method === 'POST' && route === '/v0/reload') {
     await tenants.reload(id);
     return c.body(null, 204);
+  }
+  // The admin's check after a settings change: a separate reload could land on another
+  // instance, which would then answer from settings up to one TTL old.
+  if (route === '/healthz' && url.searchParams.get('fresh') === '1') {
+    await tenants.reload(id);
+    const fresh = await tenants.get(id);
+    if (!fresh) return refuse(c, 404, 'ENDPOINT_NOT_FOUND', 'No endpoint with this id.');
+    tenant = fresh;
   }
   let runtime;
   try {
