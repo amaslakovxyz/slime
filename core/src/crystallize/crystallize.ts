@@ -1,5 +1,6 @@
 // The crystallize job: turns proven Liquid handlers into Crystal modules in the
 // app's own code (C10). The app runs it from its own script with its own config.
+import { asV1 } from '../models/artifact-v2.js';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { DEFAULT_LIMITS } from '../config/defaults.js';
@@ -109,7 +110,7 @@ function readinessProblem({ tier, review, runs, fixtures }: HandlerRecord, minRu
 
 /** The optimized version first, when there is an optimizer; the unchanged Liquid code always. */
 async function candidatesFor({ options }: JobContext, record: HandlerRecord, report: CrystalReport): Promise<Candidate[]> {
-  const { sql, params, shapeJs } = record.artifact;
+  const { sql, params, shapeJs } = asV1(record.artifact, 'crystallize'); // MS9: P2.10 skips v2 records first
   const unchanged: Candidate = { code: { sql, params, shape: shapeJs }, isOptimized: false, notes: [] };
   if (!options.optimizer) return [unchanged];
   try {

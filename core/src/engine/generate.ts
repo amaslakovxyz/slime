@@ -1,8 +1,9 @@
 import { lintArtifact } from './checks/sql.js';
+import { asV1, type AnyArtifact } from '../models/artifact-v2.js';
 import type { LimitOptions } from '../config/options.js';
 import { SlimeError } from '../shared/errors.js';
 import type { Connector } from '../connectors/types.js';
-import type { Artifact, Generator, ModelUsage, ParamTypesForModel } from '../models/types.js';
+import type { Generator, ModelUsage, ParamTypesForModel } from '../models/types.js';
 import type { SandboxRunner } from '../sandbox/types.js';
 import type { HandlerProvenance } from '../request/key.js';
 import type { ParsedRequest } from '../request/parse.js';
@@ -33,7 +34,7 @@ export interface GenerationOutcome {
 }
 
 export interface PreviousAttempt {
-  artifact: Artifact;
+  artifact: AnyArtifact;
   error: string;
 }
 
@@ -71,7 +72,8 @@ export async function generateHandler(deps: GenerationDeps, { key, request, prev
   throw lastError ?? new SlimeError('GENERATION_TIMEOUT', 'Ran out of generation time budget.', { retryable: true });
 }
 
-async function tryArtifact(deps: GenerationDeps, artifact: Artifact, request: ParsedRequest): Promise<Execution> {
+async function tryArtifact(deps: GenerationDeps, generated: AnyArtifact, request: ParsedRequest): Promise<Execution> {
+  const artifact = asV1(generated, 'generation'); // MS3: P2.8 adds v2 generation
   lintArtifact(artifact, request.input);
   const plan = await deps.connector.check(artifact.sql, bindParams(artifact.params, request.input), queryLimits(deps.limits));
   if (plan.cost !== null && plan.cost > deps.limits.maxQueryCost) {
@@ -80,7 +82,7 @@ async function tryArtifact(deps: GenerationDeps, artifact: Artifact, request: Pa
   return executeArtifact(deps, { artifact, output: request.output, input: request.input });
 }
 
-function assertSatisfiable({ unsatisfiable }: Artifact): void {
+function assertSatisfiable({ unsatisfiable }: AnyArtifact): void {
   if (!unsatisfiable) return;
   const code = WRITE_LIKE_REASON.test(unsatisfiable) ? 'WRITE_REFUSED' : 'INTENT_UNSATISFIABLE';
   throw new SlimeError(code, unsatisfiable, { details: { enforcedBy: 'model' } });
@@ -90,7 +92,7 @@ interface NewRecordParts {
   deps: GenerationDeps;
   key: string;
   request: ParsedRequest;
-  artifact: Artifact;
+  artifact: AnyArtifact;
   paramTypes: ParamTypes;
 }
 

@@ -1,6 +1,6 @@
 // The Slime instance API (PLAN.md §5).
 import type { SlimeMode } from '../config/options.js';
-import type { Artifact } from '../models/types.js';
+import type { AnyArtifact } from '../models/artifact-v2.js';
 import type { HandlerProvenance } from '../request/key.js';
 import type { InputValues, SlimeRequest } from '../request/parse.js';
 import type { ParamTypes } from '../request/params.js';
@@ -16,7 +16,7 @@ export interface HandlerRecord {
   key: string;
   intent: string;
   output: Shape;
-  artifact: Artifact;
+  artifact: AnyArtifact;
   paramTypes: ParamTypes;
   provenance: HandlerProvenance;
   tier: StoredTier;

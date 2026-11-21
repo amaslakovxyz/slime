@@ -1,5 +1,6 @@
 // The v2 artifact: a handler made of steps across sources (MS3, MS4;
 // docs/request-format.md "Multi-source handlers").
+import { SlimeError } from '../shared/errors.js';
 import type { Artifact } from './types.js';
 
 export const ARTIFACT_V2 = 2;
@@ -47,4 +48,24 @@ export function isArtifactV2(artifact: AnyArtifact): artifact is ArtifactV2 {
 
 export function isApiStep(step: Step): step is ApiStep {
   return 'operation' in step;
+}
+
+const STEP_SEPARATOR = (name: string): string => `\n-- step ${name}\n`;
+
+/** The SQL a handler runs: v1's statement, or v2's SQL steps joined, for meta and events (R9). */
+export function sqlOf(artifact: AnyArtifact): string {
+  if (!isArtifactV2(artifact)) return artifact.sql;
+  return artifact.steps
+    .filter((step): step is SqlStep => !isApiStep(step))
+    .map((step, index) => (index === 0 ? step.sql : `${STEP_SEPARATOR(step.name)}${step.sql}`))
+    .join('');
+}
+
+/**
+ * For code that handles only v1 handlers until its multi-source step lands
+ * (MS3). Every stored v2 handler has an API step, which needs the step executor.
+ */
+export function asV1(artifact: AnyArtifact, where: string): Artifact {
+  if (!isArtifactV2(artifact)) return artifact;
+  throw new SlimeError('INVALID_HANDLER', `${where} does not support multi-source handlers yet.`);
 }

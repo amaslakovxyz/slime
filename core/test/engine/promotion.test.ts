@@ -1,4 +1,5 @@
 // Gas → Liquid and the review loop (PLAN.md §7, M4 promotion rule), with stub models.
+import { sqlOf } from '../../src/models/artifact-v2.js';
 import assert from 'node:assert/strict';
 import { after, describe, test } from 'node:test';
 import { SlimeConfig, type SlimeOptions } from '../../src/config/slime-config.js';
@@ -76,7 +77,7 @@ describe('promotion to Liquid (M4)', () => {
     const metas = await runAndFlush(slime);
     const saved = await savedHandler(store, metas[0]!.handlerKey);
     assert.match(requests[1]?.previous?.error ?? '', /reviewer rejected this handler: ranks the least active/);
-    assert.deepEqual([saved?.artifact.sql, saved?.runs], [REVISED_SQL, 1]);
+    assert.deepEqual([saved && sqlOf(saved.artifact), saved?.runs], [REVISED_SQL, 1]);
     assert.deepEqual(eventTypes(events), ['generated', 'reviewed', 'generated', 'reviewed', 'promoted']);
   });
 

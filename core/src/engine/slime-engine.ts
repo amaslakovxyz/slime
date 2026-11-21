@@ -1,4 +1,5 @@
 import type { SlimeConfig } from '../config/slime-config.js';
+import { sqlOf } from '../models/artifact-v2.js';
 import type { SlimeEvent } from '../config/options.js';
 import type { Dictionary } from '../dictionary/dictionary.js';
 import { SlimeError } from '../shared/errors.js';
@@ -114,7 +115,7 @@ export class SlimeEngine implements Slime {
     const { record, cache, firstRun, generateMs } = await this.#resolve(key, request);
     const execution = firstRun ?? (await this.#runSaved(record, request.input));
     const { tier, review, artifact, intent } = record;
-    const meta = queryMeta({ handlerKey: key, tier, cache, review, execution, code: artifact, mode: this.#parts.config.mode, intent, totalMs: performance.now() - startedAt, ...(generateMs === undefined ? {} : { generateMs }) });
+    const meta = queryMeta({ handlerKey: key, tier, cache, review, execution, code: { sql: sqlOf(artifact), shapeJs: artifact.shapeJs, assumptions: artifact.assumptions }, mode: this.#parts.config.mode, intent, totalMs: performance.now() - startedAt, ...(generateMs === undefined ? {} : { generateMs }) });
     return { data: execution.data, meta };
   }
 

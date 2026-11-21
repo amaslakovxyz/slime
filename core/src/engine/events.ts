@@ -1,4 +1,5 @@
 import type { ErrorEvent, GeneratedEvent, SlimeEvent } from '../config/options.js';
+import { sqlOf } from '../models/artifact-v2.js';
 import { SlimeError } from '../shared/errors.js';
 import type { ModelUsage } from '../models/types.js';
 import type { HandlerRecord } from './types.js';
@@ -23,7 +24,7 @@ export function generatedEvent({ key, artifact }: HandlerRecord, usage: ModelUsa
   return {
     type: 'generated',
     handlerKey: key,
-    sql: artifact.sql,
+    sql: sqlOf(artifact),
     assumptions: artifact.assumptions,
     tokens: usage.inputTokens + usage.outputTokens,
     ms: usage.ms,
