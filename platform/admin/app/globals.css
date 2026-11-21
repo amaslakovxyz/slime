@@ -2028,3 +2028,7 @@ code.inline {
   .lc-rail { grid-template-columns: repeat(2, 1fr); row-gap: 16px; }
   .lc-table th:nth-child(6), .lc-table td:nth-child(6), .lc-table th:nth-child(5), .lc-table td:nth-child(5) { display: none; }
 }
+.lc-route-body { display: grid; gap: 4px; min-width: 0; }
+.lc-route-token { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.lc-route-actions { display: flex; gap: 6px; align-self: flex-start; }
+.lc-route > .lc-route-actions { flex: 0 0 auto; }

@@ -5,8 +5,8 @@
 // checkbox in the table drives the button below it.
 import { useState, useTransition } from 'react';
 import { crystallizeAction, type CrystallizeResult } from '@/app/actions';
-import { CopyButton } from '@/app/ui/copy-button';
 import type { HandlerRow, RuntimeEvent, Thresholds } from '@/lib/lifecycle';
+import { CrystalCard } from './crystal-card';
 
 const time = (iso: string) => new Date(iso).toLocaleTimeString('en-GB');
 
@@ -17,6 +17,7 @@ export function LifecycleBoard({
   events,
   thresholds,
   restarting,
+  tokenHints,
 }: {
   endpointId: string;
   url: string;
@@ -24,6 +25,7 @@ export function LifecycleBoard({
   events: RuntimeEvent[];
   thresholds: Thresholds;
   restarting: boolean;
+  tokenHints: Record<string, string>;
 }) {
   const [unpicked, setUnpicked] = useState<Set<string>>(new Set());
   const [result, setResult] = useState<CrystallizeResult | null>(null);
@@ -131,21 +133,9 @@ export function LifecycleBoard({
         )}
         {crystals.length > 0 && (
           <div className="lc-routes">
-            {crystals.map((c) => {
-              const route = `${url}v0/e/${c.key}`;
-              const curl = `curl -X POST ${route} \\\n  -H "x-api-key: $SLIME_TOKEN" -H 'content-type: application/json' \\\n  -d '${c.exampleBody ?? '{"input":{}}'}'`;
-              return (
-                <div key={c.key} className="lc-route">
-                  <span className="tier-pill tier-pill-crystal">crystal</span>
-                  <div>
-                    <div>{c.intent}</div>
-                    <code className="mono small">POST {url}v0/e/{c.shortKey}…  body {c.exampleBody}</code>
-                  </div>
-                  <CopyButton value={route} label="Copy URL" />
-                  <CopyButton value={curl} label="Copy curl" />
-                </div>
-              );
-            })}
+            {crystals.map((c) => (
+              <CrystalCard key={c.key} endpointId={endpointId} url={url} crystal={c} tokenHint={tokenHints[c.key]} restarting={restarting} />
+            ))}
           </div>
         )}
       </section>

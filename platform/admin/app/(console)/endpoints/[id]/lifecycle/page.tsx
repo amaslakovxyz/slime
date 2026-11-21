@@ -1,4 +1,5 @@
 import { LivePoller } from '@/app/ui/live-poller';
+import { crystalTokenHints } from '@/lib/crystal-tokens';
 import { readLifecycle, stagesOf, toRow } from '@/lib/lifecycle';
 import { loadEndpoint } from '../data';
 import { AgentSnippet } from './agent-snippet';
@@ -10,7 +11,7 @@ import { LifecycleBoard } from './board';
 export default async function LifecyclePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { ep } = await loadEndpoint(id);
-  const data = await readLifecycle(ep);
+  const [data, tokenHints] = await Promise.all([readLifecycle(ep), crystalTokenHints(ep.endpointId)]);
   const handlers = data.ok ? data.handlers : [];
   const total = data.ok ? data.total : 0;
   const stages = stagesOf(ep.status, handlers, total);
@@ -67,6 +68,7 @@ export default async function LifecyclePage({ params }: { params: Promise<{ id: 
           events={data.events}
           thresholds={data.thresholds}
           restarting={ep.status === 'updating'}
+          tokenHints={tokenHints}
         />
       )}
     </>

@@ -74,9 +74,10 @@ async function portFor(endpointId: string, previous: number | undefined): Promis
 
 async function start(item: Item): Promise<string> {
   const secrets = secretStore();
-  const [databaseUrl, apiKey] = await Promise.all([
+  const [databaseUrl, apiKey, crystalTokens] = await Promise.all([
     secrets.get(item.endpointId, 'DATABASE_URL'),
     secrets.get(item.endpointId, 'SLIME_API_KEY'),
+    secrets.get(item.endpointId, 'CRYSTAL_TOKENS'),
   ]);
   if (!databaseUrl || !apiKey) throw new Error('Endpoint secrets are missing');
   const port = await portFor(item.endpointId, portFromUrl(item.url));
@@ -91,6 +92,7 @@ async function start(item: Item): Promise<string> {
       PORT: String(port),
       DATABASE_URL: databaseUrl,
       SLIME_API_KEY: apiKey,
+      CRYSTAL_TOKENS: crystalTokens ?? '',
       SLIME_PROVIDER: item.provider,
       SLIME_TENANT_ID: item.endpointId,
       SLIME_HANDLERS_TABLE: process.env.SLIME_HANDLERS_TABLE || 'slime-handlers',
