@@ -28,8 +28,8 @@ type PreviousAttempt = { artifact: Artifact; error: string };
 // A repair with less time than this left would only time out.
 const MIN_ATTEMPT_MS = 1_000;
 const WRITE_LIKE_REASON = /\b(writ|delet|updat|insert|modif|chang|remov|creat)/i;
-// Retrying can't make these allowed.
-const FINAL_CODES = new Set(['WRITE_REFUSED', 'FIELD_NOT_EXPOSED']);
+// Retrying can't make a write allowed.
+const FINAL_CODE = 'WRITE_REFUSED';
 
 /** Generates, checks and runs a handler, repairing up to limits.maxRepairs times within the time budget. */
 export async function generateHandler(deps: GenerationDeps, key: string, request: ParsedRequest): Promise<GenerationOutcome> {
@@ -52,7 +52,7 @@ export async function generateHandler(deps: GenerationDeps, key: string, request
       return { record: newRecord({ deps, key, request, artifact: generation.artifact, paramTypes }), execution, usage };
     } catch (error) {
       lastError = asSlimeError(error);
-      if (FINAL_CODES.has(lastError.code)) throw lastError;
+      if (lastError.code === FINAL_CODE) throw lastError;
       previous = { artifact: generation.artifact, error: `${lastError.code}: ${lastError.message}` };
     }
   }

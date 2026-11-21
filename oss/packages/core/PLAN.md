@@ -1,7 +1,7 @@
 # @slime-cloud/core: library plan
 
 * **Status:** draft. M0, M1 and M2 are done; M3 is next.
-* **Date:** 2026-11-20 (review fixes applied 2026-11-21)
+* **Date:** 2026-11-20 (review fixes and follow-ups 2026-11-21)
 * **Owner:** Konstantin (core only; server and Slime Cloud are owned by others)
 
 ## 1. Goal
@@ -39,17 +39,15 @@ owned by others.
 | Source | What it says about core |
 |---|---|
 | `concepts_brief.md` | Library first (`@slime/core`), standalone server later. Read-only, Postgres, `{ intent, input, output }`, Gas → Liquid → Crystal. First next step: "turn the sandbox into the library plus an example app". |
-| `sandbox/` on `main` | Working engine, about 88 tests. Gas, Liquid in Postgres, background review, Crystal (PR #6), offline/Groq/Claude providers. Configured through a global `config` that reads env and `.env`. |
-| PR #7 (open) | Layers: core → server → platform. Name `@slime-cloud/core` at `oss/packages/core`. Its plan moves `sandbox/` there with `git mv`, and adds `SLIME_META_TABLE`. Lists "config injection instead of the module singleton" as later work. |
+| `sandbox/` on `main` | Working engine, about 88 tests. Gas, Liquid in Postgres, background review, Crystal ([PR #6](https://github.com/amaslakovxyz/slime/pull/6)), offline/Groq/Claude providers. Configured through a global `config` that reads env and `.env`. |
+| [PR #7](https://github.com/amaslakovxyz/slime/pull/7) (closed 2026-11-21) | Layers: core → server → platform. Name `@slime-cloud/core` at `oss/packages/core`. Its plan moves `sandbox/` there with `git mv`, and adds `SLIME_META_TABLE`. Lists "config injection instead of the module singleton" as later work. |
 | `chore/gas-v0-plan`, `onboarding` | The other direction (Bun, SQLite, named intents, writes). Not the base for core. Useful later for the write path (`EffectSink`). |
 | `slime-cloud/runtime/` on `main` | **The first consumer of core.** Slime Cloud's runtime on AWS Lambda with handlers in DynamoDB (table `slime-handlers`, partition key `tenantId`, sort key `artifactKey`). It compiles `sandbox/src` through a path mapping and imports deep modules (`@slime-cloud/core/engine.js`, `config.js`, `store.js`). It must set env before importing, because `config` reads env at import time, and it flushes store writes before every response, because Lambda freezes the process afterwards. Its own `DynamoHandlerStore` implements the sandbox's `HandlerStore`. |
 
-Where this plan differs from PR #7: PR #7's Tasks 1–3 move the sandbox as is.
-This plan builds core as a library at the same path instead. Server and
-platform (PR #7 Tasks 2 and 4) then build on `createSlime()`. Core is built at
-`oss/packages/core` (M0 and M1 have landed there). If PR #7's tasks that move
-`sandbox/` merge as written, they land on the same path, so they need to be
-dropped or rebased onto core first (§8).
+PR #7 planned to move the sandbox to this path as is, with `git mv`. It was
+closed on 2026-11-21; core is built at `oss/packages/core` as a new library
+instead. Its layering (core → server → platform) and the `@slime-cloud` name
+still hold: server and platform build on `createSlime()`.
 
 `slime-cloud/runtime` switches to the package (agreed with the team; its README
 still says `sandbox/` gets published, which is now out of date). The runtime
@@ -70,7 +68,7 @@ Status: **Decided**, **Proposed** (default unless someone objects) or
 |---|---|---|---|
 | C1 | Name and location | `@slime-cloud/core` in `oss/packages/core/`, inside npm workspaces at the repo root (PR #7 D10). | Decided |
 | C2 | Start from scratch or move the sandbox? | New package. Core is the only engine; `sandbox/` is frozen and not used (team agreement, 2026-11-20). Its code and tests are a quarry to copy from, not a reference to match. It is deleted once `slime-cloud/runtime` has switched to the package (M7). | Decided |
-| C3 | Runtime | v1: Node ≥ 22, ESM only. Built so that other runtimes (Bun, Deno, edge) can be added later without touching the engine. Runtime-specific code stays behind Ports: the shaping sandbox (QuickJS in a worker thread) goes behind a new `SandboxRunner` Port, and database drivers stay behind `Connector`. The engine uses only `node:*` modules that Bun and Deno also provide. | Decided |
+| C3 | Runtime | v1: Node ≥ 22, ESM only. Built so that other runtimes (Bun, Deno) can be added later without touching the engine. Runtime-specific code stays behind Ports: the shaping sandbox (QuickJS in a worker thread) goes behind a new `SandboxRunner` Port, and database drivers stay behind `Connector`. The engine uses only `node:*` modules that Bun and Deno also provide. | Decided |
 | C4 | Configuration | A `SlimeConfig` class. The app creates it and adds the parts it needs: connector, generator, store, limits. Each part can come from env, a secrets store or anywhere else in the app. The class fills defaults, validates everything at once (reporting every problem, not just the first), and is immutable; `config.with({...})` returns a changed copy for tests. Core never reads `process.env` or `.env`. | Decided (class shape: Proposed) |
 | C5 | Entry point | Three steps in the app: create a connector (where data comes from), create a Slime instance with `createSlime(config)`, then call `slime.query()` inside any endpoint. The instance's methods are listed in §5. | Decided |
 | C6 | Locked mode | Locked means no `generator` is passed. Then no model client is ever imported, by construction. An explicit `mode` setting can be added later without breaking this. Explore mode is the opposite: a `generator` is passed, and Slime generates handlers for new requests. | Decided |
@@ -98,17 +96,18 @@ separately, and gives the shape it wants back:
 }
 ```
 
-The more precisely the intent is written, the more precise the generated
-query. If a result is wrong, the developer rewords the intent: that is a new
+A vague intent leaves the model to guess, and its guesses show in
+`meta.assumptions` (R9). If a result is wrong, the developer rewords the intent: that is a new
 key, so Slime generates again, and the old handler stays until it expires
 (Gas) or is deleted (Liquid).
 
 A structured protocol (`from`, `where` with operators, `groupBy`, paths) was
 designed and dropped on 2026-11-20. It turned the request into a query
-language to learn, and the mistakes seen so far were about meaning, which
-structure doesn't fix. It is in this file's git history, and the 35 cases it
-was tested on stay in [docs/protocol-cases.md](docs/protocol-cases.md) as
-benchmark material.
+language to learn. In the 35 cases analysed in
+[docs/protocol-cases.md](docs/protocol-cases.md), 5 needed new operators and
+grouping was the weak spot, while the ambiguous cases (#18, #19, #23) were
+about what a term means, which structure doesn't fix. The protocol is in this
+file's git history, and the cases stay as benchmark material.
 
 ### 4.1 Fields
 
@@ -131,7 +130,7 @@ benchmark material.
     than one is a `SHAPE_MISMATCH`.
 * **Limits:** at most 6 levels deep and 50 fields.
 
-### 4.3 Decisions
+### 4.3 Request decisions
 
 | # | Question | Decision | Status |
 |---|---|---|---|
@@ -213,19 +212,21 @@ hash differs.
 The app picks the store in `SlimeConfig`:
 
 ```ts
-store: fileStore('./.slime')   // the default
-store: memoryStore()           // tests
-store: myStore                 // anything implementing SlimeStore
+new SlimeConfig({ connector, store: fileStore('./.slime') }); // the default when store is left out
+new SlimeConfig({ connector, store: memoryStore() });         // tests
+new SlimeConfig({ connector, store: myStore });               // anything implementing SlimeStore
 ```
 
-**Why files are the default.** They follow the explore → locked flow (R8).
+#### Why files are the default
+
+They follow the explore → locked flow (R8).
 In development, handlers are written to `./.slime/`. The developer commits
 that folder, like Crystal. In production, locked mode only reads it: no
 database for Slime's own state, and no model. A team that doesn't want state
 in git uses a custom shared store; in production they then work in locked
 mode too, against a store filled during development.
 
-**The file store's rules:**
+#### File store rules
 
 * one JSON file per key: `.slime/<ns>/<key>.json`;
 * writes go to a temporary file first, then a rename, so a crash never leaves
@@ -237,8 +238,10 @@ mode too, against a store filled during development.
 A shared store for several instances is a custom store: one table keyed by
 `(ns, key)` is enough.
 
-**One contract test** runs against every store, the built-in ones and any
-custom store, so an adapter either passes or it doesn't.
+#### Contract test
+
+One contract test (`test/store-contract.ts`) runs against every store, the
+built-in ones and any custom store.
 
 ## 5. Draft public API
 
@@ -302,7 +305,7 @@ interface QueryMeta {
   tier: 'gas' | 'liquid' | 'crystal';
   cache: 'hit' | 'miss' | 'coalesced';
   truncated: boolean;                        // rowCap cut the rows
-  timingsMs: { total: number; generate?: number; run?: number; shape?: number };
+  timingsMs: { total: number; generate?: number; run: number; shape: number };
   warnings: string[];
   review: 'none' | 'pending' | 'approved' | 'rejected';
   sql?: string; shapeJs?: string; assumptions?: string[]; // explore mode only (R9)
@@ -467,8 +470,6 @@ configured, handlers are promoted after the runs and marked `review: 'none'`.
   locked mode still serves it and warns once at startup. A query that no
   longer fits fails with `QUERY_ERROR`. Regenerate in development after a
   migration.
-* **PR #7 overlap.** Its Tasks 1–3 move `sandbox/` onto the same path. They
-  need to be dropped or rebased onto core before PR #7 merges.
 * **Crystal checks move from startup to CI (C10).** Crystal runs in the app
   process outside the shaping sandbox. If an app skips `check` in CI, an
   edited module runs unchecked. The README must say this plainly, and the

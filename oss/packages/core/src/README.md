@@ -53,7 +53,7 @@ them.
 
 **`errors.ts`**
 
-- `ErrorCode`: 14 codes, from `INVALID_REQUEST` to `EXECUTION_TIMEOUT`.
+- `ErrorCode`: 13 codes, from `INVALID_REQUEST` to `EXECUTION_TIMEOUT`.
 - `ErrorCode` is derived from the `STATUS_BY_CODE` map, so a code can't
   exist without a status.
 - `SlimeError(code, message, { retryable = false, details }?)`:

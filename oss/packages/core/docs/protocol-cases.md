@@ -3,8 +3,11 @@
 > **Status: the structured protocol tested here was dropped on 2026-11-20.**
 > v1 keeps the free-text `{ intent, input, output }` format (PLAN.md §4).
 > The cases stay as benchmark material: almost all of them can be written as
-> an intent, and the ambiguous ones (#18, #19, #23) are the cases the startup
-> dictionary (§4.4) should make reliable.
+> an intent, and the ambiguous ones (#18, #19, #23) are the cases the
+> dictionary's glossary and rules (§4.4) should make reliable.
+>
+> Rule numbers here (R8, R12, R13–R19) refer to the dropped protocol's
+> PLAN.md §4, kept in git history. Today's R1–R11 are different rules.
 
 * **Date:** 2026-11-20
 * **Protocol under test:** PLAN.md §4 (`input`: `from`, `where`, `orderBy`,
