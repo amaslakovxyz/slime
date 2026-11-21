@@ -34,6 +34,8 @@ describe('toRow', () => {
     assert.equal(row.canCrystallize, false);
     assert.equal(row.progressLabel, 'stale · regenerates on next request');
     assert.equal(row.progressPct, 0);
+    const stages = stagesOf('ready', [h({ tier: 'liquid', runs: 12, stale: true })], 12);
+    assert.deepEqual(stages.map((s) => s.state), ['done', 'done', 'now', 'todo']);
   });
 
   test('a Crystal is its own endpoint and is never picked again', () => {

@@ -71,9 +71,10 @@ export function mergeHandlers(lists: LifecycleHandler[][]): LifecycleHandler[] {
     }
     const isNewer = rank(handler) > rank(seen);
     const [winner, loser] = isNewer ? [handler, seen] : [seen, handler];
-    const merged: LifecycleHandler = { ...loser, ...winner };
-    if (!winner.stale) delete merged.stale;
+    // Regenerated code shares nothing with the stale record: not its runs, fixtures or review.
     const isRegenerated = Boolean(loser.stale) && !winner.stale && winner.tier !== 'crystal';
+    const merged: LifecycleHandler = isRegenerated ? { ...winner } : { ...loser, ...winner };
+    if (!winner.stale) delete merged.stale;
     if (!isRegenerated) merged.runs = Math.max(seen.runs, handler.runs);
     byKey.set(handler.key, merged);
   }

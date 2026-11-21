@@ -33,9 +33,9 @@ folder.
 
 - **Ready means:** a Liquid handler whose review is `approved` (or `none`,
   when no reviewer was configured), with at least `minRuns` successful runs
-  and at least one recorded input, made with the given `provenance` (when
-  passed; otherwise "made with another schemaHash, …"), and not already in
-  the manifest.
+  and at least one recorded input, not already in the manifest, and, when
+  `provenance` is passed, made with that provenance (otherwise `not-ready`:
+  "made with another schemaHash, …").
 - **Candidates:** the optimizer's version first (when there is an
   optimizer), then the unchanged Liquid code. The first that passes is
   written.

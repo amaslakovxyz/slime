@@ -52,11 +52,12 @@ describe('mergeHandlers', () => {
 
   test('a stale saved row loses to a live row: regenerated Gas keeps its own runs, a Crystal keeps the history', () => {
     const merged = mergeHandlers([
-      [{ key: 'x', intent: 'i', tier: 'liquid', runs: 9, review: 'approved', stale: true, createdAt: '1' }],
-      [{ key: 'x', intent: 'i', tier: 'gas', runs: 1, review: 'none', createdAt: '2' }],
+      [{ key: 'x', intent: 'i', tier: 'liquid', runs: 9, review: 'approved', fixtures: 5, stale: true, createdAt: '1' }],
+      [{ key: 'x', intent: 'i', tier: 'gas', runs: 1, createdAt: '2' }],
     ]);
     assert.equal(merged.length, 1);
-    assert.deepEqual([merged[0]?.tier, merged[0]?.runs, merged[0]?.review, 'stale' in merged[0]!], ['gas', 1, 'none', false]);
+    // Nothing of the stale record leaks into the regenerated row.
+    assert.deepEqual(merged[0], { key: 'x', intent: 'i', tier: 'gas', runs: 1, createdAt: '2' });
     const crystal = mergeHandlers([
       [{ key: 'x', intent: 'i', tier: 'liquid', runs: 13, stale: true }],
       [{ key: 'x', intent: 'i', tier: 'crystal', runs: 0 }],

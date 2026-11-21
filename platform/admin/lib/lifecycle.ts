@@ -116,7 +116,8 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 export function stagesOf(status: Endpoint['status'], handlers: RuntimeHandler[], total: number, t: Thresholds = DEFAULT_THRESHOLDS): Stage[] {
   const ready = status === 'ready' || status === 'updating';
   const linked = handlers.length > 0;
-  const liquid = handlers.filter((h) => h.tier !== 'gas').length;
+  // A stale saved row is neither Liquid progress nor pickable.
+  const liquid = handlers.filter((h) => h.tier !== 'gas' && !h.stale).length;
   const crystal = handlers.filter((h) => h.tier === 'crystal').length;
   const state = (done: boolean, reachable: boolean): StageState => (done ? 'done' : reachable ? 'now' : 'todo');
   return [
