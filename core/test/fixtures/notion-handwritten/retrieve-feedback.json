@@ -53,6 +53,14 @@
         "Created": {
           "name": "Created",
           "type": "date"
+        },
+        "Owner": {
+          "name": "Owner",
+          "type": "people"
+        },
+        "Internal notes": {
+          "name": "Internal notes",
+          "type": "rich_text"
         }
       }
     }
