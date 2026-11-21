@@ -43,8 +43,9 @@ test('adapters have their own subpaths, so the main entry never loads them (C7)'
   for (const provider of ['claude', 'groq'] as const) {
     assert.deepEqual(pkg.exports[`./${provider}`], { types: `./dist/${provider}/index.d.ts`, default: `./dist/${provider}/index.js` });
   }
-  assert.deepEqual(Object.keys(await import('../src/claude/index.js')).sort(), ['claude', 'claudeGenerator', 'claudeReviewer']);
-  assert.deepEqual(Object.keys(await import('../src/groq/index.js')).sort(), ['groq', 'groqGenerator', 'groqReviewer']);
+  assert.deepEqual(Object.keys(await import('../src/claude/index.js')).sort(), ['claude', 'claudeGenerator', 'claudeOptimizer', 'claudeReviewer']);
+  assert.deepEqual(Object.keys(await import('../src/groq/index.js')).sort(), ['groq', 'groqGenerator', 'groqOptimizer', 'groqReviewer']);
+  assert.deepEqual(pkg.exports['./crystallize'], { types: './dist/crystallize/index.d.ts', default: './dist/crystallize/index.js' });
 });
 
 test('database drivers and model SDKs are optional peer dependencies (C7)', () => {
@@ -53,4 +54,8 @@ test('database drivers and model SDKs are optional peer dependencies (C7)', () =
     assert.deepEqual(pkg.peerDependenciesMeta[name], { optional: true }, name);
     assert.equal(pkg.dependencies[name], undefined, name);
   }
+});
+
+test('ships the slime-crystal bin for the app\'s CI (C10)', () => {
+  assert.deepEqual(pkg.bin, { 'slime-crystal': './dist/crystallize/bin.js' });
 });

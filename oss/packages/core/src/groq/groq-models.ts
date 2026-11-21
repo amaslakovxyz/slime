@@ -1,14 +1,17 @@
 import {
   ARTIFACT_JSON_FORMAT,
   GENERATION_INSTRUCTIONS,
+  OPTIMIZE_INSTRUCTIONS,
+  OPTIMIZED_JSON_FORMAT,
   REVIEW_INSTRUCTIONS,
   REVIEW_JSON_FORMAT,
   generationMessage,
+  optimizeMessage,
   promptHash,
   reviewMessage,
 } from '../models/prompts.js';
-import { ArtifactSchema, ReviewVerdictSchema } from '../models/schemas.js';
-import type { Generator, Reviewer } from '../ports.js';
+import { ArtifactSchema, OptimizedCodeSchema, ReviewVerdictSchema } from '../models/schemas.js';
+import type { Generator, Optimizer, Reviewer } from '../ports.js';
 import { callGroqJson, type GroqOptions } from './groq-client.js';
 
 const PROVIDER = 'groq';
@@ -42,6 +45,22 @@ export function groqReviewer(options: GroqOptions): Reviewer {
         label: 'review',
       });
       return { ...reply.value, ...reply.usage };
+    },
+  };
+}
+
+export function groqOptimizer(options: GroqOptions): Optimizer {
+  return {
+    model: options.model,
+    async optimize(request, { timeoutMs }) {
+      const reply = await callGroqJson(options, {
+        system: `${OPTIMIZE_INSTRUCTIONS}\n\n${OPTIMIZED_JSON_FORMAT}`,
+        user: optimizeMessage(request),
+        schema: OptimizedCodeSchema,
+        timeoutMs,
+        label: 'crystal optimize',
+      });
+      return { code: reply.value, ...reply.usage };
     },
   };
 }

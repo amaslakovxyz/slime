@@ -71,7 +71,7 @@ export async function generateHandler(deps: GenerationDeps, { key, request, prev
 
 async function tryArtifact(deps: GenerationDeps, artifact: Artifact, request: ParsedRequest): Promise<Execution> {
   lintArtifact(artifact, request.input);
-  const plan = await deps.connector.check(artifact.sql, bindParams(artifact, request.input), queryLimits(deps.limits));
+  const plan = await deps.connector.check(artifact.sql, bindParams(artifact.params, request.input), queryLimits(deps.limits));
   if (plan.cost > deps.limits.maxQueryCost) {
     throw new SlimeError('QUERY_TOO_EXPENSIVE', `Query cost ${plan.cost} is above the limit of ${deps.limits.maxQueryCost}.`);
   }

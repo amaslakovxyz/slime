@@ -1,6 +1,6 @@
-import { GENERATION_INSTRUCTIONS, REVIEW_INSTRUCTIONS, generationMessage, promptHash, reviewMessage } from '../models/prompts.js';
-import { ArtifactSchema, ReviewVerdictSchema } from '../models/schemas.js';
-import type { Generator, Reviewer } from '../ports.js';
+import { GENERATION_INSTRUCTIONS, OPTIMIZE_INSTRUCTIONS, REVIEW_INSTRUCTIONS, generationMessage, optimizeMessage, promptHash, reviewMessage } from '../models/prompts.js';
+import { ArtifactSchema, OptimizedCodeSchema, ReviewVerdictSchema } from '../models/schemas.js';
+import type { Generator, Optimizer, Reviewer } from '../ports.js';
 import { structuredCaller, type ClaudeOptions } from './structured-call.js';
 
 const PROVIDER = 'claude';
@@ -40,6 +40,25 @@ export function claudeReviewer(options: ClaudeOptions): Reviewer {
         ...(signal ? { signal } : {}),
       });
       return { ...reply.value, ...reply.usage };
+    },
+  };
+}
+
+/** Runs offline in the crystallize job, so a stronger model is usually worth it. */
+export function claudeOptimizer(options: ClaudeOptions): Optimizer {
+  const call = structuredCaller(options);
+  return {
+    model: options.model,
+    async optimize(request, { timeoutMs, signal }) {
+      const reply = await call({
+        instructions: OPTIMIZE_INSTRUCTIONS,
+        message: optimizeMessage(request),
+        schema: OptimizedCodeSchema,
+        timeoutMs,
+        label: 'crystal optimize',
+        ...(signal ? { signal } : {}),
+      });
+      return { code: reply.value, ...reply.usage };
     },
   };
 }

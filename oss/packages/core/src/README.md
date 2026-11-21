@@ -68,6 +68,7 @@ them.
 | `Connector` | `name`, `describe()`, `check(sql, params, limits)`, `run(sql, params, limits)`, `safetyCheck()`, `close()` |
 | `Generator` | `model`, `promptHash`, `generate(request, options: ModelCallOptions)` |
 | `Reviewer` | `model`, `review(request, options: ModelCallOptions)` |
+| `Optimizer` | `model`, `optimize(request, options: ModelCallOptions)` (M5; sees only code) |
 | `SandboxRunner` | `run(job: ShapeJob, limits)`, `close()` |
 
 Supporting types: `SchemaInfo`, `TableInfo`, `ColumnInfo` (with
@@ -92,9 +93,13 @@ always uses its own QuickJS runner.
   subpath; needs `pg`).
 - [models/](./models/README.md): prompts and reply schemas shared by the
   model adapters.
-- [claude/](./claude/README.md): Claude generator and reviewer (its own
-  subpath; needs `@anthropic-ai/sdk`).
-- [groq/](./groq/README.md): Groq generator and reviewer (its own subpath).
+- [claude/](./claude/README.md): Claude generator, reviewer and optimizer
+  (its own subpath; needs `@anthropic-ai/sdk`).
+- [groq/](./groq/README.md): Groq generator, reviewer and optimizer (its own
+  subpath).
+- [crystal/](./crystal/README.md): Crystal handler types and serving them.
+- [crystallize/](./crystallize/README.md): the crystallize job and
+  `slime-crystal check` (its own subpath).
 - [request/](./request/README.md): parsing of `{ intent, input?, output }`,
   the output notation, per-handler parameter types, and the cache keys
   (`requestKey`) and handler provenance (`changedProvenance`).

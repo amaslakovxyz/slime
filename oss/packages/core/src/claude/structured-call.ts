@@ -17,7 +17,7 @@ export interface ClaudeOptions {
 export interface StructuredCall<T> {
   instructions: string;
   /** The dictionary; it is the same for every call, so it is cached with the instructions. */
-  context: string;
+  context?: string;
   message: string;
   schema: z.ZodType<T>;
   timeoutMs: number;
@@ -53,7 +53,7 @@ export function structuredCaller({ apiKey, model, effort, maxRetries = DEFAULT_M
           max_tokens: MAX_TOKENS,
           system: [
             { type: 'text', text: call.instructions },
-            { type: 'text', text: call.context, cache_control: { type: 'ephemeral' } },
+            ...(call.context ? [{ type: 'text' as const, text: call.context, cache_control: { type: 'ephemeral' as const } }] : []),
           ],
           messages: [{ role: 'user', content: call.message }],
           output_config: { format: betaZodOutputFormat(call.schema), ...(effort ? { effort } : {}) },

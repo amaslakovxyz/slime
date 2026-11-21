@@ -2,18 +2,19 @@
 
 ## Overview
 
-The `@slime-cloud/core/groq` entry (PLAN.md C7, M4): a `Generator` and a
-`Reviewer` on Groq's OpenAI-compatible chat API, called with `fetch`, so it
-needs no extra package.
+The `@slime-cloud/core/groq` entry (PLAN.md C7, M4): a `Generator`, a
+`Reviewer` and an `Optimizer` (M5) on Groq's OpenAI-compatible chat API,
+called with `fetch`, so it needs no extra package.
 
 - `groq-client.ts`: one JSON-mode request, with retries and reply checks.
-- `groq-models.ts`: `groqGenerator` and `groqReviewer`.
+- `groq-models.ts`: `groqGenerator`, `groqReviewer` and `groqOptimizer`.
 
 ## Interface
 
-- `groq.generator({ apiKey, model, reasoningEffort? })` and
-  `groq.reviewer({ ... })` (also exported as `groqGenerator`,
-  `groqReviewer`). The sandbox benchmark used `openai/gpt-oss-120b`.
+- `groq.generator({ apiKey, model, reasoningEffort? })`,
+  `groq.reviewer({ ... })` and `groq.optimizer({ ... })` (also exported as
+  `groqGenerator`, `groqReviewer`, `groqOptimizer`). The sandbox benchmark
+  used `openai/gpt-oss-120b`.
 
 ## Invariants
 

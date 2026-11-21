@@ -23,6 +23,7 @@ export async function createSlime(config: SlimeConfig): Promise<Slime> {
   const dictionary = buildDictionary({ schema: await config.connector.describe(), glossary: config.glossary, rules: config.rules });
   const provenance = currentProvenance(config, dictionary);
   if (config.mode === 'locked') await warnAboutOtherSchemas(config, store, provenance.schemaHash);
+  warnAboutOtherSchemaCrystals(config, provenance.schemaHash);
   return new SlimeEngine({ config, store, runner: new QuickJSRunner(), dictionary, provenance });
 }
 
@@ -49,5 +50,16 @@ async function warnAboutOtherSchemas(config: SlimeConfig, store: SlimeStore, sch
   emitSafely(config.onEvent, {
     type: 'warning',
     message: `${otherSchemaCount} saved handler(s) were made against another schema and are served as they are; regenerate them in development after a migration.`,
+  });
+}
+
+/** Crystal ships with the app and is served as it is; a schema change is reported once, at startup (C10). */
+function warnAboutOtherSchemaCrystals(config: SlimeConfig, schemaHash: string): void {
+  const crystals = config.crystal ? Object.values(config.crystal) : [];
+  const otherSchemaCount = crystals.filter((crystal) => crystal.schemaHash !== schemaHash).length;
+  if (otherSchemaCount === 0) return;
+  emitSafely(config.onEvent, {
+    type: 'warning',
+    message: `${otherSchemaCount} Crystal handler(s) were made against another schema and are served as they are; run crystallize again after a migration.`,
   });
 }

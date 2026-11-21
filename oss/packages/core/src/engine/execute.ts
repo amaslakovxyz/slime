@@ -25,24 +25,29 @@ export interface Execution {
 }
 
 export async function executeArtifact({ connector, runner, limits }: ExecutionDeps, { artifact, output, input }: ExecutionJob): Promise<Execution> {
-  const result = await connector.run(artifact.sql, bindParams(artifact, input), queryLimits(limits));
+  const result = await connector.run(artifact.sql, bindParams(artifact.params, input), queryLimits(limits));
   const shapeStartedAt = performance.now();
   const data = artifact.shapeJs
     ? await runner.run({ code: artifact.shapeJs, rows: result.rows, input }, { timeoutMs: limits.shapeTimeoutMs, memoryBytes: limits.shapeMemoryBytes })
     : result.rows;
   const shapeMs = artifact.shapeJs ? performance.now() - shapeStartedAt : 0;
 
+  assertValidOutput(output, data, input);
+  return { data, truncated: result.truncated, runMs: result.ms, shapeMs };
+}
+
+/** The checks every handler's result must pass, whatever tier ran it: the output shape and R6. */
+export function assertValidOutput(output: Shape, data: unknown, input: InputValues): void {
   const mismatches = validateData(output, data);
   if (mismatches.length > 0) {
     throw new SlimeError('SHAPE_MISMATCH', `Result does not match the requested output: ${mismatches.join('; ')}`, { details: { mismatches } });
   }
   assertWithinLimit(data, input);
-  return { data, truncated: result.truncated, runMs: result.ms, shapeMs };
 }
 
 /** A parameter that is missing from the input is bound as null: "not given" (R5). */
-export function bindParams(artifact: Artifact, input: InputValues): unknown[] {
-  return artifact.params.map((name) => input[name] ?? null);
+export function bindParams(paramNames: readonly string[], input: InputValues): unknown[] {
+  return paramNames.map((name) => input[name] ?? null);
 }
 
 export function queryLimits(limits: Readonly<LimitOptions>): QueryLimits {

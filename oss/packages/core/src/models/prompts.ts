@@ -1,6 +1,6 @@
 // The prompts every model adapter shares, so a bench compares models, not prompts.
 // Kept byte-stable: they are the cached prompt prefix, and their hash is each handler's promptHash.
-import type { GenerationRequest, ReviewRequest } from '../ports.js';
+import type { GenerationRequest, OptimizeRequest, ReviewRequest } from '../ports.js';
 import { sha256 } from '../request/key.js';
 
 export const GENERATION_INSTRUCTIONS = `You write read-only data handlers for Slime, a library that answers application data requests.
@@ -49,9 +49,30 @@ Decide whether the handler answers the request correctly for ANY input values, i
 
 Approve if the handler is correct or a reasonable interpretation of an ambiguous intent. Reject only for errors that give wrong answers. For each problem, say what is wrong and how to fix it, concretely.`;
 
+export const OPTIMIZE_INSTRUCTIONS = `You convert a verified, read-only data handler into its Crystal form. Crystal code runs inside the application with no sandbox, so it must follow strict rules, and it must return exactly the same result as the original for every input.
+
+You get the handler's PostgreSQL query (inputs bound as $1, $2, ...), the input parameter name for each placeholder, its JavaScript shaping function (or null when the SQL rows are the output), the JSON output shape, and the input names and types. Every input may be null, meaning "not given".
+
+Return:
+- sql: one PostgreSQL SELECT. Keep the same results, row order, rounding, null handling and filters.
+- params: the input name for each $n placeholder, in order.
+- shape: null when the SQL rows already are the output (a list of flat objects whose column aliases are exactly the output keys). Otherwise the source of exactly one function: function shape(rows, input) { ... }.
+- notes: short notes on what you changed and why. [] if nothing.
+
+Optimize where it is safe: fold renaming and simple formatting into SQL aliases so shape can be null, and drop work whose result is unused. Do not change what the handler means. If unsure, keep the original logic.
+
+Rules for shape (anything else is refused):
+- A plain synchronous function. No async, generators, classes or this.
+- Only these globals: Math, Object.keys/values/entries/fromEntries, Array.isArray/from/of, JSON.stringify/parse, Number(...), Number.isInteger/isFinite/isNaN/parseFloat/parseInt, String(...), Boolean(...), new Date(...), Date.UTC/parse, new Map(), new Set(), Intl formatters, parseInt, parseFloat, isNaN, isFinite.
+- Loops: only for...of and array methods (map, filter, reduce, ...). No while, do...while, for(;;), for...in or labels.
+- No computed property access with a variable key (obj[key]); use a Map for grouping. obj[0] and obj["literal"] are fine.
+- Never use constructor, prototype, __proto__ or defineProperty, and never assign to or delete properties of globals.`;
+
 // For providers without schema-constrained output: the keys are spelled out, and replies are still validated.
 export const ARTIFACT_JSON_FORMAT = `Reply with ONLY a JSON object with exactly these keys:
 {"unsatisfiable": string or null, "sql": string, "params": string[], "shapeJs": string or null, "assumptions": string[]}`;
+export const OPTIMIZED_JSON_FORMAT = `Reply with ONLY a JSON object with exactly these keys:
+{"sql": string, "params": string[], "shape": string or null, "notes": string[]}`;
 export const REVIEW_JSON_FORMAT = `Reply with ONLY a JSON object with exactly these keys:
 {"verdict": "approve" or "reject", "problems": string[]}`;
 
@@ -75,6 +96,16 @@ export function reviewMessage({ intent, params, output, artifact }: ReviewReques
     `params ($1, $2, ...): ${JSON.stringify(artifact.params)}`,
     `shapeJs: ${artifact.shapeJs ?? 'null (rows are returned as they are)'}`,
     `Generator's assumptions: ${assumptions}`,
+  ].join('\n');
+}
+
+export function optimizeMessage({ sql, params, shapeJs, output, paramTypes }: OptimizeRequest): string {
+  return [
+    `SQL:\n${sql}`,
+    `params ($1, $2, ...): ${JSON.stringify(params)}`,
+    `shape: ${shapeJs ?? 'null'}`,
+    `Output shape: ${JSON.stringify(output)}`,
+    `Input parameters (name: type): ${JSON.stringify(paramTypes)}`,
   ].join('\n');
 }
 

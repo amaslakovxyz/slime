@@ -142,6 +142,35 @@ export interface Reviewer {
 }
 
 // ---------------------------------------------------------------------------
+// Optimizer: rewrites a proven Liquid handler into Crystal form (M5). It sees
+// only code, never the intent (a crafted intent can't instruct it) and never data.
+
+export interface OptimizeRequest {
+  sql: string;
+  params: string[];
+  shapeJs: string | null;
+  output: Shape;
+  paramTypes: ParamTypesForModel;
+}
+
+export interface OptimizedCode {
+  sql: string;
+  params: string[];
+  /** Source of `function shape(rows, input)`, or null when SQL rows are the output. */
+  shape: string | null;
+  notes: string[];
+}
+
+export interface OptimizeResult extends ModelUsage {
+  code: OptimizedCode;
+}
+
+export interface Optimizer {
+  readonly model: string;
+  optimize(request: OptimizeRequest, options: ModelCallOptions): Promise<OptimizeResult>;
+}
+
+// ---------------------------------------------------------------------------
 // SandboxRunner: where generated shaping code runs (C3). A type only in v1:
 // core always uses its own QuickJS runner (§5).
 

@@ -1,6 +1,6 @@
 # @slime-cloud/core: library plan
 
-* **Status:** draft. M0 to M3 are done; M4 is built and waits for its live run.
+* **Status:** draft. M0 to M3 and M5 are done; M4 is built and waits for its live run.
 * **Date:** 2026-11-20 (review fixes and follow-ups 2026-11-21)
 * **Owner:** Konstantin (core only; server and Slime Cloud are owned by others)
 
@@ -75,7 +75,7 @@ Status: **Decided**, **Proposed** (default unless someone objects) or
 | C7 | Packaging of adapters | Subpath exports from one package: `@slime-cloud/core/postgres`, `/claude`, `/groq`, `/offline`. Model SDKs and database drivers are optional peer dependencies. | Decided |
 | C8 | What ships | Compiled JS and `.d.ts` in `dist/` (built with `tsc`), plus the shaping sandbox's worker file. Not TS source. | Decided |
 | C9 | HTTP | No HTTP in core. The app calls `slime.query()` from its own endpoint in any framework. A thrown `SlimeError` carries `status` and `toJSON()`, so the endpoint can return it directly. Admin data comes from methods only (`handlers()`, `stats()`, `evict()`); exposing and protecting them over HTTP is up to the app or `@slime-cloud/server`. | Decided |
-| C10 | Crystal | Crystal handlers are ordinary modules in the app's own code. The crystallize job writes JS modules with `.d.ts` files, plus a generated `index` and a manifest. The app imports the index and passes it as `crystal` in `SlimeConfig`; leaving it out (or `false`) turns Crystal off. Because the code is compiled with the app, safety is checked when the job writes it (allowlist, SQL lint, equivalence test on recorded runs) and by a `check` command in the app's CI, which re-parses the sources and compares manifest hashes. Core doesn't re-check at startup. The job and `check` are a separate entry (`@slime-cloud/core/crystallize`, plus a bin), so the runtime never imports them. | Decided |
+| C10 | Crystal | Crystal handlers are ordinary modules in the app's own code. The crystallize job writes JS modules (`.mjs`), plus a generated `index.mjs` with `index.d.mts` and a manifest. The app imports the index and passes it as `crystal` in `SlimeConfig`; leaving it out (or `false`) turns Crystal off. Because the code is compiled with the app, safety is checked when the job writes it (allowlist, SQL lint, equivalence test on recorded runs) and by a `check` command in the app's CI, which re-parses the sources and compares manifest hashes. Core doesn't re-check at startup. The job and `check` are a separate entry (`@slime-cloud/core/crystallize`, plus a bin), so the runtime never imports them. | Decided |
 | C11 | Observability | An `onEvent(event)` option (the `SlimeEvent` types in §5). Core doesn't log on its own. Metering builds on this later. | Decided |
 | C12 | Out of scope for core v1 | Writes, tenancy (core has no tenant concept; a store isolates tenants if needed), connectors other than Postgres, built-in stores other than file and memory, semantic matching. | Proposed |
 | C13 | Store contract | A small key-value Port, `SlimeStore`: `get(ns, key)`, `put(ns, key, value)`, `list(ns, prefix?)`, `delete(ns, key)`. Values are JSON. Namespace: `handlers`. The engine builds the keys (the request key, §4.7), so a backend is only a mapping to 4 calls. It replaces the sandbox's domain-shaped `HandlerStore`. | Decided |
@@ -252,7 +252,7 @@ import express from 'express';
 import { createSlime, SlimeConfig, SlimeError, fileStore } from '@slime-cloud/core';
 import { postgresConnector } from '@slime-cloud/core/postgres';
 import { claude } from '@slime-cloud/core/claude';
-import { crystals } from './slime-crystal/index.js';
+import { crystals } from './slime-crystal/index.mjs';
 
 // The app decides where values come from: env here, but any source works.
 const config = new SlimeConfig({
@@ -397,7 +397,7 @@ goal. Before a milestone starts, its row gets the files it creates or changes
 | M2 | **Engine, Gas path.** `createSlime` and the instance API (`query`, `flush`, `close`, `evict`, `handlers`, `stats`; `onEvent` with `generated`, `warning` and `error`), the `memory` and `file` stores and the shared store contract test, offline generator, the shaping sandbox with the QuickJS worker, coalescing, rate limits, locked mode, typed and nullable parameters (R4, R5), the limit check (R6), the R7 warning. Engine rules below. | The M2 tests below pass with no database; no core test is skipped because a database is missing; no `config` singleton anywhere. | done |
 | M3 | **Postgres connector.** Connector with the startup safety check and enum values from the catalog, which the M2 dictionary renders (§4.4). CI gets a Postgres service using `sandbox/db/init.sql` (roles and seed data). | `postgres.test.ts` cases pass against Postgres in CI (database tests require `REQUIRE_DB=1` in CI rather than skipping); the file and memory stores pass the shared contract test; changing `rules` changes the dictionary and regenerates handlers in explore mode. | done |
 | M4 | **Models and Liquid.** Claude and Groq generators and reviewers with prompts updated for §4 (nullable parameters, the dictionary); the review loop; promotion to Liquid (rule below); `reviewed` and `promoted` events. | Review and promotion tests pass; one live run against Groq or Claude (`npm run live`). | built; live run pending |
-| M5 | **Crystal.** Serving from an imported registry; the crystallize job writing JS with `.d.ts`; the `check` command. | `crystal*.test.ts` ported; a hand-edited Crystal file fails `check`; the output passes the equivalence test. | planned |
+| M5 | **Crystal.** Serving from an imported registry; the crystallize job writing `.mjs` modules with a generated index; the `check` command. | `crystal*.test.ts` ported; a hand-edited Crystal file fails `check`; the output passes the equivalence test. | done |
 | M6 | **Use it as a package, and retire `sandbox/`.** An example app that installs the packed tarball and calls `slime.query()` from an endpoint; docs for the request format; the bench ported to run on core. The example takes over what `sandbox/` still provides: the demo server, the demo database (`db/init.sql` and its Docker Compose file, used by core's tests and CI) and the offline handlers. Then `sandbox/` is deleted, with its CI job. Publishing to npm is not part of v1. | The example (`oss/examples/express`, its own lockfile, run in CI from the packed tarball) answers a query. The bench, ported to `oss/packages/core/bench/`, gets the 5 cases recorded as correct in `concepts_brief.md` right, and refuses the 2 unsafe ones. Core's tests and CI use the moved demo database. `sandbox/` and its CI job are gone. | planned |
 | M7 | **Switch `slime-cloud/runtime` to the package** (with its owner). Drop the path mapping to `sandbox/src`; build the engine with `createSlime(new SlimeConfig(…))`; replace `DynamoHandlerStore` with a `SlimeStore` over the existing table that serves the items already there; keep `slime.flush()` before each response (C15). After the switch nothing compiles `sandbox/src`, so M6 can delete `sandbox/`. | The runtime's tests pass on the package; a deployed function answers from handlers stored by the new store. Handlers saved before the switch are still served. The previous deploy can be restored. | planned |
 
@@ -460,6 +460,42 @@ exports, `zod`, `@anthropic-ai/sdk` as optional peer, `npm run live`);
 a real model as generator and reviewer); tests `promotion`, `groq` and
 `package`.
 
+**M5 decisions** (Proposed; they settle the items §9 listed before M5):
+
+* **How the job gets its parts without env.** `crystallize({ connector,
+  store, dir, optimizer?, minRuns?, limits? })` is a library function on
+  `@slime-cloud/core/crystallize`. The app calls it from its own script, with
+  the same config it builds for `createSlime()`.
+* **The bin** is `slime-crystal check <dir>`. It only checks, so it needs no
+  database, model or env.
+* **The registry** is the generated `index.mjs`. It exports `crystals`, keyed
+  by request key, each entry with `sql`, `params`, `shape` and the metadata
+  the engine needs (`intent`, `output`, `paramTypes`, `schemaHash`,
+  `review`). `index.d.mts` types it as `CrystalRegistry`. Files are `.mjs`,
+  so they load as ES modules whatever the app's package type.
+* **The manifest** (`manifest.json`, version 1) pins each module's sha256
+  and holds everything the index is generated from. `check` re-runs the
+  allowlist and the read-only lint on every module (so a re-pinned hand edit
+  still fails), compares the index with one rendered from the manifest, and
+  refuses modules missing from it.
+* **The Optimizer** is a Port (`optimize(request, options)`). It sees only
+  code, never the intent or data. `claude.optimizer` and `groq.optimizer`
+  implement it. Without one, the Liquid code moves over unchanged if it passes
+  the allowlist.
+* **`crystalMinRuns`** is `crystallize()`'s `minRuns` option (default 10),
+  not a config tier.
+* **Crystal is keyed by request key**, like saved handlers. A Crystal handler
+  made against another schema is served as it is, with one startup warning.
+
+**M5 files.** `src/crystal/` (`types.ts`, `run-crystal.ts`); `src/crystallize/`
+(`allowlist-rules.ts`, `allowlist.ts`, `module-format.ts`, `manifest.ts`,
+`import-module.ts`, `equivalence.ts`, `crystallize.ts`, `check.ts`, `bin.ts`,
+`index.ts`); the Optimizer Port in `src/ports.ts`, its prompt and schema in
+`src/models/`, and `claude.optimizer` and `groq.optimizer`; `src/engine/`
+(`meta.ts`; the engine serves Crystal first); `package.json` (`./crystallize`
+export, `slime-crystal` bin, `acorn` and `acorn-walk`); tests
+`crystal-allowlist`, `crystallize` and `package`.
+
 **M7 checklist (with the runtime owner):**
 
 * how the runtime depends on the package (workspace, `file:` or tarball);
@@ -496,9 +532,10 @@ a real model as generator and reviewer); tests `promotion`, `groq` and
   longer fits fails with `QUERY_ERROR`. Regenerate in development after a
   migration.
 * **Crystal checks move from startup to CI (C10).** Crystal runs in the app
-  process outside the shaping sandbox. If an app skips `check` in CI, an
-  edited module runs unchecked. The README must say this plainly, and the
-  example app's CI runs `check`.
+  process outside the shaping sandbox, with no CPU or memory limit; the
+  allowlist is its only boundary. If an app skips `slime-crystal check` in
+  CI, an edited module runs unchecked. The README must say this plainly, and
+  the example app's CI runs `check`.
 * **Token cost grows with the schema.** The whole dictionary goes into every
   generation. v1 has no table selection.
 
@@ -510,9 +547,6 @@ M0 to M3 are done. Still to decide:
   C4's class shape. They stand unless someone objects.
 * **Before M7:** whether the store contract test is exported for custom
   stores such as Slime Cloud's (today it lives in `test/store-contract.ts`).
-* **Before M5:** the `CrystalRegistry` shape, the manifest format and hash,
-  the `bin` name, the `Optimizer` Port, how the CLI receives its connector,
-  store and optimizer (no env), and where `crystalMinRuns` lives.
 * **Before M7, with the runtime owner:** Slime Cloud's production mode
   (explore, locked, or chosen per tenant), and how its custom store serves
   the items already in `slime-handlers`.

@@ -31,12 +31,13 @@ input values. Handlers move up through three tiers:
 * **Crystal:** rewritten by an agent into JS modules (with `.d.ts`) in the app's own
   code, and passed to Slime through the config.
 
-> **Status:** M4 is built: Claude and Groq generators and reviewers
-> (`@slime-cloud/core/claude`, `/groq`), background review and promotion to
-> Liquid, on top of the Postgres connector, the stores, the QuickJS shaping
-> sandbox and the offline generator. Its live run against a real model is
-> still pending (`npm run live`). Decisions and milestones are in
-> [PLAN.md](PLAN.md).
+> **Status:** M5 is done: Crystal. `crystallize()` (`@slime-cloud/core/crystallize`)
+> turns proven Liquid handlers into `.mjs` modules in the app's code, and the
+> app passes the generated `index.mjs` as `crystal`. `slime-crystal check`
+> re-checks the folder in CI: Crystal runs without a sandbox, so **run it in
+> your CI**. M4 (Claude and Groq models, review, promotion) is built; its live
+> run against a real model is still pending (`npm run live`). Decisions and
+> milestones are in [PLAN.md](PLAN.md).
 
 ### Scope
 
@@ -86,8 +87,12 @@ input values. Handlers move up through three tiers:
   - [src/models/](./src/models/README.md): the prompts and reply schemas the
     model adapters share;
   - [src/claude/](./src/claude/README.md) and
-    [src/groq/](./src/groq/README.md): generators and reviewers, the
-    `@slime-cloud/core/claude` and `/groq` entries;
+    [src/groq/](./src/groq/README.md): generators, reviewers and
+    optimizers, the `@slime-cloud/core/claude` and `/groq` entries;
+  - [src/crystal/](./src/crystal/README.md): serving Crystal handlers;
+  - [src/crystallize/](./src/crystallize/README.md): the crystallize job, the
+    allowlist and `slime-crystal check`, the `@slime-cloud/core/crystallize`
+    entry;
   - [src/config/](./src/config/README.md): `SlimeConfig`'s option types,
     defaults and validation;
   - [src/request/](./src/request/README.md): request parsing, the output
@@ -105,15 +110,17 @@ input values. Handlers move up through three tiers:
 ## Global Invariants
 
 - **One main entry, plus adapter subpaths.** `package.json` `exports` has
-  `.`, `./offline`, `./postgres`, `./claude` and `./groq` (C7). `test/package.test.ts` pins the main entry's
+  `.`, `./offline`, `./postgres`, `./claude`, `./groq` and `./crystallize`
+  (C7), plus the `slime-crystal` bin. `test/package.test.ts` pins the main entry's
   value exports and the subpath.
 - **What ships.** ESM only (`type: module`), Node `>=22`, compiled `dist/`
   and `README.md` only (`files`). `scripts/check-pack.mjs` enforces this in
   CI.
 - **Private until go-public.** The package is `private: true`. Tests guard
   this, so nothing is published by accident.
-- **Two runtime dependencies.** `quickjs-emscripten` for the shaping
-  sandbox, and `zod` for checking model replies. Drivers and model SDKs are
+- **Runtime dependencies.** `quickjs-emscripten` for the shaping sandbox,
+  `zod` for checking model replies, and `acorn` with `acorn-walk` for the
+  Crystal allowlist (loaded only by `./crystallize`). Drivers and model SDKs are
   optional peers (C7): `pg` for `./postgres`, `@anthropic-ai/sdk` for
   `./claude`. Groq is called with `fetch`.
 - **No environment reading.** Core never reads `process.env` or `.env`. The

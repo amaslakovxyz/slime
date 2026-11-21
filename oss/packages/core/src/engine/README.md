@@ -25,6 +25,7 @@ miss, then run and checked against `output`.
   `flush()` waits for it.
 - `events.ts`: `emitSafely` (a throwing `onEvent` never fails a query) and
   the `generated` and `error` event builders.
+- `meta.ts`: builds `meta` for every tier.
 - `types.ts`: the public instance API types.
 
 ## Interface
@@ -36,6 +37,8 @@ classes and functions here are internal.
 
 ## Invariants
 
+- **Crystal first.** A request whose key is in `config.crystal` is answered
+  by that Crystal handler (`../crystal/`), before the cache or generation.
 - **Keys.** A handler's key is the request key (`request/key.ts`); its
   provenance is stored inside it (§4.7).
 - **Saved handlers.** Explore mode treats a saved handler whose provenance

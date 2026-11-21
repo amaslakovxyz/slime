@@ -16,6 +16,7 @@ export type {
   StoredTier,
   Tier,
 } from './engine/types.js';
+export type { CrystalHandler, ShapeFunction } from './crystal/types.js';
 export type { HandlerProvenance } from './request/key.js';
 export type { ParamTypes } from './request/params.js';
 
@@ -47,6 +48,10 @@ export type {
   Generator,
   ModelCallOptions,
   ModelUsage,
+  OptimizeRequest,
+  OptimizeResult,
+  OptimizedCode,
+  Optimizer,
   ParamTypesForModel,
   QueryLimits,
   QueryPlan,

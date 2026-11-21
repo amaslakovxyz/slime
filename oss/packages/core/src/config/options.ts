@@ -1,3 +1,4 @@
+import type { CrystalRegistry } from '../crystal/types.js';
 import type { Connector, Generator, Reviewer } from '../ports.js';
 import type { SlimeStore } from '../store/types.js';
 
@@ -29,8 +30,7 @@ export interface LimitOptions {
   shapeMemoryBytes: number;
 }
 
-/** Its exact shape arrives with M5 (C10). */
-export type CrystalRegistry = Readonly<Record<string, unknown>>;
+export type { CrystalRegistry };
 
 export type SlimeMode = 'explore' | 'locked';
 

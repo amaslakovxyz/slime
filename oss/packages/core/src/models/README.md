@@ -5,11 +5,11 @@
 What the model adapters (`../claude/`, `../groq/`) share, so a bench
 compares models, not prompts.
 
-- `prompts.ts`: the generation and review instructions, the JSON reply
-  formats for providers without schema-constrained output, the user messages
-  built from a request, and `promptHash()`.
-- `schemas.ts`: the zod schemas a reply must match, `ArtifactSchema` and
-  `ReviewVerdictSchema`.
+- `prompts.ts`: the generation, review and Crystal optimizer instructions,
+  the JSON reply formats for providers without schema-constrained output,
+  the user messages built from a request, and `promptHash()`.
+- `schemas.ts`: the zod schemas a reply must match: `ArtifactSchema`,
+  `ReviewVerdictSchema` and `OptimizedCodeSchema`.
 
 ## Interface
 

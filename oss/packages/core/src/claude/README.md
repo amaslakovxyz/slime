@@ -2,20 +2,22 @@
 
 ## Overview
 
-The `@slime-cloud/core/claude` entry (PLAN.md C7, M4): a `Generator` and a
-`Reviewer` on the Claude API. Needs the optional peer dependency
-`@anthropic-ai/sdk`.
+The `@slime-cloud/core/claude` entry (PLAN.md C7, M4): a `Generator`, a
+`Reviewer` and an `Optimizer` (M5) on the Claude API. Needs the optional peer
+dependency `@anthropic-ai/sdk`.
 
 - `structured-call.ts`: one Claude request whose reply is parsed and checked
   against a zod schema.
-- `claude-models.ts`: `claudeGenerator` and `claudeReviewer`.
+- `claude-models.ts`: `claudeGenerator`, `claudeReviewer` and
+  `claudeOptimizer`.
 
 ## Interface
 
-- `claude.generator({ apiKey, model, effort?, maxRetries? })` and
-  `claude.reviewer({ ... })` (also exported as `claudeGenerator`,
-  `claudeReviewer`). The plan's example uses `claude-haiku-5-5` to generate
-  and `claude-opus-5-5` to review.
+- `claude.generator({ apiKey, model, effort?, maxRetries? })`,
+  `claude.reviewer({ ... })` and `claude.optimizer({ ... })` (also exported
+  as `claudeGenerator`, `claudeReviewer`, `claudeOptimizer`). The optimizer
+  sends no dictionary: it sees only code. The plan's example uses
+  `claude-haiku-5-5` to generate and `claude-opus-5-5` to review.
 
 ## Invariants
 

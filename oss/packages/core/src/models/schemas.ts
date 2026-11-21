@@ -9,6 +9,13 @@ export const ArtifactSchema = z.object({
   assumptions: z.array(z.string()),
 });
 
+export const OptimizedCodeSchema = z.object({
+  sql: z.string(),
+  params: z.array(z.string()),
+  shape: z.string().nullable(),
+  notes: z.array(z.string()),
+});
+
 export const ReviewVerdictSchema = z.object({
   verdict: z.enum(['approve', 'reject']),
   problems: z.array(z.string()),
