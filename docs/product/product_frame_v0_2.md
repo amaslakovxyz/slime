@@ -38,20 +38,23 @@ tokens, and logs without payloads. **Never stores rows or content — not even
 as a response cache** (live federation: every call hits the source API at
 request time).
 
+Per source, a schema fingerprint plays the role the Postgres schema hash
+plays today — in the cache key and in stale-schema detection, so a renamed
+property fails validation before any call. What exactly goes into the
+Linear fingerprint (and its invalidation granularity) is decided by the
+day-1 spike, not here.
+
 ## Decisions (merged 2026-11-21, Tony; quiz-resolved where tracks diverged)
 
 | # | Decision | Choice |
 |---|---|---|
 | 1 | Base architecture | `main` core + build-time pinning; Bun/SQLite spec stays a design record |
-| 2 | Usage model | Hybrid **explore → pin**: agent explores (Gas), pins into a hosted endpoint (reviewed), can export the code into its repo |
+| 2 | Usage model | Hybrid **explore → pin**: agent explores (Gas), pins into a hosted endpoint (reviewed) |
 | 3 | Source access | Live federation; **no customer data stored** (handlers, schemas, tokens, payload-free logs only) |
 | 4 | Operations | Read-only v0; writes are roadmap (SaaS writes have no rollback — needs its own design) |
-| 5 | Execution locus | All in slime-cloud |
-| 6 | Agent surface | MCP server + `slime` CLI; wire format = Dispatch Protocol v1 envelope |
-| 7 | Reuse mechanics | **Both, phase-split:** `catalog` for explore (lists reviewed handlers verbatim, incl. `contractId`); `expect`/`contractId` mandatory on pinned endpoints — a call carrying `expect` can never invoke the generator |
-| 8 | "Crystal" naming | Product-facing Crystal = **export into the client's repo**. The engine's internal git-module tier keeps working but is not called Crystal in product language |
-| 9 | Integration scope | **Core line: Linear + Postgres. Stretch: Notion** with the cross-source join as the demo finale. Fallback is explicit: Notion is cut first |
-| 10 | Personas | One devtool (see above) |
+| 5 | Reuse mechanics | **Both, phase-split:** `catalog` for explore; `expect`/`contractId` mandatory on pinned endpoints |
+| 6 | "Crystal" naming | Product-facing Crystal = **export into the client's repo** — roadmap, not v0. The engine's internal git-module tier keeps working but is not called Crystal in product language |
+| 7 | Integration scope | **Core line: Linear + Postgres. Stretch: Notion** with the cross-source join as the demo finale. Fallback is explicit: Notion is cut first |
 
 Rejected alternatives and the full federation research (rate limits, N+1
 math, the precise meaning of "no customer data") live in the
@@ -65,23 +68,13 @@ every paraphrase would be a new generation. Two mechanisms for two phases:
 * **Explore:** the agent calls `catalog` first — it lists only reviewed
   handlers (intent text, input types, output shape, sources, call cost,
   `contractId`) and the agent resends a listed intent verbatim for an exact
-  cache hit. A miss answers as Gas with `meta.hint: "pin to add to the
-  catalog"`. Known limit: depends on the agent following instructions;
+  cache hit. Known limit: depends on the agent following instructions;
   semantic matching stays a later option if the measured hit rate is low.
-* **Pinned:** a production caller sends `expect: <contractId>`. The dispatch
-  rule from Dispatch Protocol v1: such a call never reaches the generator —
-  a missing pin or a drifted schema is an explicit error
-  (`PIN_NOT_FOUND` / `SCHEMA_STALE`), not a silent regeneration.
-
-## Virtual schema (what makes a SaaS source fit the engine)
-
-Per source, a fingerprint plays the role the Postgres schema hash plays
-today — in the cache key and in `SCHEMA_STALE` detection. For Linear it is
-built from the GraphQL type system (pruned to the exposed subset — hashing
-the full introspection would invalidate every handler on any Linear API
-change) plus a snapshot of workspace structure (teams, projects, workflow
-states). A renamed property fails plan validation before any call and drops
-the handler back to Gas.
+* **Pinned:** a production caller sends `expect: <contractId>`, and such a
+  call can never reach the generator — a miss is an explicit error, never a
+  silent regeneration. The mechanics (contractId derivation, the error
+  split, the build-time pin manifest) are Dispatch Protocol v1; see the
+  research record and the 2026-11-20 protocol artifact.
 
 ## Demo vertical (hackathon scope)
 
@@ -113,10 +106,9 @@ multi-tenant.
 * **Identity (next decision per the research record):** whose token reads
   Linear/Notion in explore vs in a pinned endpoint; service identity,
   scopes, refresh.
-* The six Dispatch Protocol v1 questions from the 2026-11-20 research run
-  (value-leak false positives, `not_pinnable` strictness, `expectCode` vs
-  rewrites, pagination beyond rowCap, `SCHEMA_STALE` recovery, deferred
-  `INTENT_AMBIGUOUS`). Full record is an internal artifact; ask Tony.
+* The Dispatch Protocol v1 open questions (six, from the 2026-11-20
+  research run) live with the protocol: research record + internal
+  artifact, ask Tony.
 * Source addressing in the envelope (v0 routes by intent), quota budgeting
   per handler (429 + `Retry-After`, call cost in `meta`), semantic layer
   across sources, economics/metering, tenancy.
