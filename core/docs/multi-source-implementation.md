@@ -1010,7 +1010,58 @@ P5.
   as its own issue.
 - Everything under design §10 "Later (P7)".
 
-## 12. Changes in revision 2
+## 12. Merging main (2026-11-21)
+
+`main` moved 65 commits past the branch point (`441c84b`): the Slime Cloud
+admin (#18), the local admin (#29) and product frame v0.2 (#28). Almost all of
+it is in `platform/`; `core` changed in 10 files (+38/−9). A trial merge on a
+throwaway branch found two textual conflicts and no broken checks. Merge
+`main` into this branch with a merge commit (no rebase: force-pushes are
+forbidden).
+
+### M.1 Merge and resolve (0.5 h)
+- `git merge origin/main` on `chore/multi-source-plan`.
+- `core/src/crystallize/crystallize.ts`:
+  - keep the MS9 skip of v2 records first;
+  - then call `main`'s `readinessProblem(record, minRuns, provenance)`.
+- `core/test/package.test.ts`: keep both new exports, `SourceError` and
+  `changedProvenance`, in sorted order.
+- Everything else merges cleanly: `ci.yml` keeps both new jobs, and
+  `README.md`, `docs/README.md`, `core/PLAN.md`, `src/README.md`,
+  `slime-engine.ts`, `handler-cache.ts`, `types.ts` and `index.ts` combine both
+  sides.
+
+### M.2 Check how main's core changes meet multi-source (1 h)
+
+| Main's change | Meets | Conclusion |
+|---|---|---|
+| `crystallize({ provenance })` refuses handlers made with another provenance | MS9, MS17 | v2 records are skipped before the check. `changedProvenance` ignores `sourceHashes`. In a multi-source setup the compared `schemaHash` is the global one, so adding an API source makes saved SQL-only handlers not ready until explore mode regenerates them, which it does anyway. |
+| `Slime.provenance()` | MS3, MS17 | Returns the multi-source prompt hash and `sourceHashes` on setups with API sources. The runtime's Lifecycle compares with `changedProvenance`, so stale detection stays right. |
+| `HandlerSummary.review` | none | Independent. |
+| `platform/runtime` (`config.connector`, `LIMIT_VARIABLES`, legacy handlers) | MS1, MS5, MS3 | `connector` stays a required `Connector`. `LIMIT_VARIABLES` is a `Partial`, so `maxSteps` and `apiTimeoutMs` need no runtime variable. Legacy v1 artifacts fit `AnyArtifact`. |
+| `platform/admin`, `platform/provisioner` | none | They don't depend on `@slime-cloud/core`. |
+
+### M.3 Tests for the interactions (1 h)
+- **Files:** `core/test/engine/multi-source.test.ts`.
+- **Change:** add three cases:
+  - `crystallize` with the current `slime.provenance()` skips a v2 record and
+    crystallizes a single-SQL record stored as v1;
+  - `slime.provenance()` on a multi-source setup returns
+    `multiSourcePromptHash` and `sourceHashes`;
+  - `changedProvenance` reports nothing for two provenances that differ only
+    in `sourceHashes`.
+
+### M.4 Run every check (0.5 h)
+Run all of these, then push and watch CI:
+- `core`: typecheck, tests, build, pack check;
+- `platform/runtime`: typecheck, tests, bundle build;
+- `examples/express`: tests and `check:crystal`;
+- `examples/multi-source`: tests;
+- `pre-commit run --all-files`.
+
+The trial merge passed all of them before M.3.
+
+## 13. Changes in revision 2
 
 | Finding | Source | Change |
 |---|---|---|
