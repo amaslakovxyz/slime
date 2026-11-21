@@ -25,8 +25,8 @@ re-export them.
 - `assertWithinLimit(data: unknown, input: InputValues): void` (`limit.ts`):
   throws `SlimeError('INVALID_HANDLER', ...)` when `data` is a list longer
   than a numeric `input.limit`. Anything else passes.
-- Dependencies: `SlimeError` from `../errors.ts`, `Artifact` type from
-  `../ports.ts`.
+- Dependencies: `SlimeError` from `../../shared/errors.ts`, `Artifact` type from
+  `../../models/types.ts`.
 
 ## Invariants
 
@@ -34,7 +34,7 @@ re-export them.
   `delete`, `merge`, `drop`, `alter`, `create`, `grant`, `revoke`, `truncate`,
   `copy`, `vacuum`, `set_config`, `pg_sleep`, `pg_read_file`, `lo_import`,
   `dblink`. The `\b` boundaries mean identifiers such as `created_at` do not
-  match (covered by `test/sql.test.ts`).
+  match (covered by `test/engine/checks/sql.test.ts`).
 - The keyword match runs over the raw SQL text, so a forbidden word inside a
   string literal or comment is also refused.
 - Placeholder mapping (`lintArtifact`), where `artifact.params[i]` binds
@@ -51,7 +51,7 @@ re-export them.
 - Checks run in order (read-only, placeholder bound, per-param mapping,
   hardcoded values), and the first failure throws.
 - `WRITE_REFUSED` maps to HTTP 403 and `INVALID_HANDLER` maps to HTTP 500 (via
-  `STATUS_BY_CODE` in `../errors.ts`). Both are thrown with `retryable` false.
+  `STATUS_BY_CODE` in `../../shared/errors.ts`). Both are thrown with `retryable` false.
 
 ## Side Effects
 
@@ -61,4 +61,4 @@ re-export them.
 ## Verification
 
 - Run: `npm test -w @slime-cloud/core` (from the repository root). Tests for
-  this directory are in `test/sql.test.ts`.
+  this directory are in `test/engine/checks/sql.test.ts`.

@@ -39,7 +39,7 @@ Public package exports, from [`../index.ts`](../index.ts): `fileStore`,
 `memoryStore`, `DEFAULT_STORE_DIR` and the types `SlimeStore` and
 `StoreEntry`.
 
-Consumers: [`../config.ts`](../config.ts) types the `store` option as
+Consumers: [`../config/options.ts`](../config/options.ts) types the `store` option as
 `SlimeStore` and checks that it has `get`, `put`, `list` and `delete`.
 
 ## Invariants
@@ -64,6 +64,6 @@ Consumers: [`../config.ts`](../config.ts) types the `store` option as
 ## Verification
 
 - Run from the repository root: `npm test -w @slime-cloud/core`
-- `test/store-contract.ts` is the `SlimeStore` contract;
-  `test/stores.test.ts` runs it against both stores and adds the file
-  store's own rules. `test/config.test.ts` covers the `store` option.
+- `src/testing/store-contract.ts` is the `SlimeStore` contract;
+  `test/stores/stores.test.ts` runs it against both stores and adds the file
+  store's own rules. `test/config/config.test.ts` covers the `store` option.

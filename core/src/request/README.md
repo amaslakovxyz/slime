@@ -6,14 +6,14 @@ The request format of `@slime-cloud/core`: how a caller's `{ intent, input?, out
 is validated, how the `output` shape notation is checked against generated
 results, how per-handler parameter types are recorded, and how cache keys are
 derived. Every module here is pure (no I/O). Validation failures are thrown as
-`SlimeError('INVALID_REQUEST')` from [`../errors.ts`](../errors.ts) (HTTP status 400,
+`SlimeError('INVALID_REQUEST')` from [`../shared/errors.ts`](../shared/errors.ts) (HTTP status 400,
 not retryable). Design background lives in [`PLAN.md`](../../PLAN.md) §4.1 to §4.3
 and rules R2 to R7.
 
 Only the types `InputScalar`, `InputValue`, `SlimeRequest`, `ParamType` and
 `Shape` are part of the public package API (re-exported from
 [`../index.ts`](../index.ts)). The functions are internal to the engine; deep
-imports are not part of the API. [`../ports.ts`](../ports.ts) imports `ParamType`
+imports are not part of the API. [`../models/types.ts`](../models/types.ts) imports `ParamType`
 and `Shape`.
 
 ## Interface
@@ -126,5 +126,5 @@ and `Shape`.
 ## Verification
 
 - Run from the repository root: `npm test -w @slime-cloud/core`
-- Tests: `test/request.test.ts`, `test/shape.test.ts`, `test/params.test.ts`, `test/key.test.ts`
+- Tests: `test/request/` (`parse`, `shape`, `params`, `key`)
   (under `core/`).

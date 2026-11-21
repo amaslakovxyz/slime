@@ -3,7 +3,7 @@
 ## Overview
 
 Serving Crystal handlers (PLAN.md C10, M5). Crystal handlers are modules in
-the app's own code, written by the crystallize job (`../crystallize/`). The
+the app's own code, written by the crystallize job (`../../crystallize/`). The
 app imports the generated `index.mjs` and passes its `crystals` as `crystal`
 in `SlimeConfig`.
 
@@ -20,7 +20,7 @@ in `SlimeConfig`.
 
 ## Invariants
 
-- **Crystal is served first** (`../engine/slime-engine.ts`), keyed by request
+- **Crystal is served first** (`../slime-engine.ts`), keyed by request
   key, in explore and locked mode. Input types are checked against the
   recorded `paramTypes` (R4).
 - **No sandbox.** The shape function runs in the app's process. The
@@ -29,7 +29,7 @@ in `SlimeConfig`.
   throwing shape function becomes `INVALID_HANDLER`.
 - **Another schema is reported once.** A handler made against another schema
   is served as it is, and `createSlime()` emits one warning.
-- **Never imports the job.** This folder never imports `../crystallize/`, so a
+- **Never imports the job.** This folder never imports `../../crystallize/`, so a
   serving process never loads `acorn`.
 
 ## Side Effects
@@ -38,4 +38,4 @@ in `SlimeConfig`.
 
 ## Verification
 
-- `test/crystallize.test.ts` serves a crystallized handler in locked mode.
+- `test/crystallize/crystallize.test.ts` serves a crystallized handler in locked mode.

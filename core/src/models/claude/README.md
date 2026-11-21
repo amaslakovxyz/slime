@@ -6,10 +6,10 @@ The `@slime-cloud/core/claude` entry (PLAN.md C7, M4): a `Generator`, a
 `Reviewer` and an `Optimizer` (M5) on the Claude API. Needs the optional peer
 dependency `@anthropic-ai/sdk`.
 
-- `structured-call.ts`: one Claude request whose reply is parsed and checked
-  against a zod schema.
-- `claude-models.ts`: `claudeGenerator`, `claudeReviewer` and
-  `claudeOptimizer`.
+- `claude-client.ts`: `claudeClient`, the `ModelClient` (`../model-client.ts`)
+  for Claude, in `'native'` output mode.
+- `index.ts`: `claudeGenerator`, `claudeReviewer` and `claudeOptimizer`,
+  built by `modelRoles` (`../roles.ts`).
 
 ## Interface
 
@@ -34,7 +34,7 @@ dependency `@anthropic-ai/sdk`.
   `server-side-fallback-2026-07-01` beta with `fallbacks: "default"`.
 - **Error mapping:**
   - a refusal → `GENERATION_FAILED` (final);
-  - an incomplete reply → `GENERATION_FAILED` (retryable);
+  - an incomplete reply, or one that misses the schema → `GENERATION_FAILED` (retryable);
   - a bad key → `GENERATION_FAILED` (final);
   - a rate limit → `GENERATION_RATE_LIMITED` (retryable);
   - a timeout → `GENERATION_TIMEOUT` (retryable);
@@ -48,5 +48,6 @@ dependency `@anthropic-ai/sdk`.
 
 ## Verification
 
-- `scripts/live-run.mjs` with `ANTHROPIC_API_KEY`. There is no offline test
-  of this adapter; the engine tests use stub models.
+- `test/models/claude.test.ts` runs the ModelClient contract against a
+  stubbed `fetch`, and checks the request shape and the cached dictionary.
+- `npm run bench` with `ANTHROPIC_API_KEY` for a real run.

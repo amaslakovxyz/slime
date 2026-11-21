@@ -1,10 +1,16 @@
-# shaping
+# sandbox
 
 ## Overview
 
-Runs a handler's generated `function shape(rows, input)` in QuickJS
+The `SandboxRunner` port (`types.ts`) and its one implementation,
+`quickjs/`. It is a type only in v1: core always uses its own QuickJS runner,
+and there is no option to pass another.
+
+`quickjs/` runs a handler's generated `function shape(rows, input)` in QuickJS
 (WebAssembly) inside worker threads (PLAN.md C3). The code gets rows and
 input as JSON only: no database, network, files, timers or host functions.
+
+Files in `quickjs/`:
 
 - `quickjs-runner.ts`: `QuickJSRunner`, the `SandboxRunner` the engine uses.
   It keeps a pool of up to `MAX_WORKERS` (4) workers per Slime instance.
@@ -38,7 +44,8 @@ input as JSON only: no database, network, files, timers or host functions.
   can't resolve relative `.js` imports.
 - **Which worker file loads.** It is chosen from `import.meta.url`:
   `shape-worker.ts` when running from source, `shape-worker.js` in `dist/`.
-  `scripts/check-pack.mjs` requires the `.js` file.
+  The `.js` file is exported as `@slime-cloud/core/shape-worker`, so bundlers
+  (the runtime's Lambda build) find it without knowing this folder.
 
 ## Side Effects
 
@@ -47,5 +54,5 @@ input as JSON only: no database, network, files, timers or host functions.
 
 ## Verification
 
-- `test/shaping.test.ts`: return values, no host access, an infinite loop,
+- `test/sandbox/quickjs.test.ts`: return values, no host access, an infinite loop,
   a stuck native call, recovery after a kill, and a missing return value.

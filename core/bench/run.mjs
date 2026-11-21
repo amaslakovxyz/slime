@@ -20,7 +20,8 @@ const { label, ...models } = await chooseModels();
 const reviews = [];
 const connector = postgresConnector({ url: DATABASE_URL });
 const slime = await core.createSlime(
-  new core.SlimeConfig({ connector, ...models, store: core.memoryStore(), onEvent: (event) => event.type === 'reviewed' && reviews.push(event) }),
+  // gasToLiquidRuns: 2 so repeats trigger the review and promotion within one run.
+  new core.SlimeConfig({ connector, ...models, store: core.memoryStore(), tiers: { gasToLiquidRuns: 2 }, onEvent: (event) => event.type === 'reviewed' && reviews.push(event) }),
 );
 const referenceConnector = postgresConnector({ url: DATABASE_URL });
 const runSql = async (sql, params) => (await referenceConnector.run(sql, params, { timeoutMs: 5_000, rowCap: 10_000 })).rows;

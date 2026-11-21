@@ -6,8 +6,11 @@ The `@slime-cloud/core/groq` entry (PLAN.md C7, M4): a `Generator`, a
 `Reviewer` and an `Optimizer` (M5) on Groq's OpenAI-compatible chat API,
 called with `fetch`, so it needs no extra package.
 
-- `groq-client.ts`: one JSON-mode request, with retries and reply checks.
-- `groq-models.ts`: `groqGenerator`, `groqReviewer` and `groqOptimizer`.
+- `groq-client.ts`: `groqClient`, the `ModelClient` (`../model-client.ts`)
+  for Groq in `'prompt'` output mode: one JSON-mode request, with retries and
+  reply checks.
+- `index.ts`: `groqGenerator`, `groqReviewer` and `groqOptimizer`, built by
+  `modelRoles` (`../roles.ts`).
 
 ## Interface
 
@@ -27,6 +30,8 @@ called with `fetch`, so it needs no extra package.
   time; the engine doesn't count it against the generation budget.
 - **Transient failures get two more tries:** dropped connections, replies
   Groq rejects as invalid JSON, and 5xx.
+- **Cancellable.** The call's `signal` aborts the request and any further
+  retries, with a final `GENERATION_FAILED`.
 - **`reasoning_effort`** is sent only to models that reason before
   answering (`openai/gpt-oss-*`).
 
@@ -36,6 +41,6 @@ called with `fetch`, so it needs no extra package.
 
 ## Verification
 
-- `test/groq.test.ts` uses a stubbed `fetch`: the request shape, reply
-  checks, rate-limit waits and error mapping.
-- `scripts/live-run.mjs` with `GROQ_API_KEY` for a real run.
+- `test/models/groq.test.ts` uses a stubbed `fetch`: the ModelClient
+  contract, the request shape and rate-limit waits.
+- `npm run bench` with `GROQ_API_KEY` for a real run.

@@ -15,7 +15,7 @@ Project-wide docs. Code-local docs live next to their code and are listed at the
 
 - [../core/PLAN.md](../core/PLAN.md) (Plan, engine milestones)
 - [../core/docs/request-format.md](../core/docs/request-format.md) (Current, request format)
-- [../core/docs/protocol-cases.md](../core/docs/protocol-cases.md) (Design)
+- [../core/bench/protocol-cases.md](../core/bench/protocol-cases.md) (Design; benchmark material)
 - [../examples/express/README.md](../examples/express/README.md) (Current, example app and demo database)
 - [../platform/runtime/README.md](../platform/runtime/README.md) (Current)
 - [../platform/infra/README.md](../platform/infra/README.md) and [../platform/infra/FINOPS.md](../platform/infra/FINOPS.md) (Current)
