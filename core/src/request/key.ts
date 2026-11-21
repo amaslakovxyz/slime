@@ -14,6 +14,8 @@ export interface HandlerProvenance {
   dictionaryHash: string;
   promptHash: string;
   model: string;
+  /** One hash per source, only with API sources; not compared by changedProvenance (MS17). */
+  sourceHashes?: Readonly<Record<string, string>>;
 }
 
 const PROVENANCE_FIELDS = ['schemaHash', 'dictionaryHash', 'promptHash', 'model'] as const satisfies readonly (keyof HandlerProvenance)[];
