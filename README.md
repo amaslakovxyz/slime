@@ -3,12 +3,18 @@
 ## System Overview
 
 Slime (runtime and CLI `slime`) is a hackathon project in its design phase.
-The engine is [`@slime-cloud/core`](./oss/packages/core/README.md): it answers
-`{ intent, input, output }` requests with model-generated, cached, read-only
-SQL against Postgres. [oss/examples/express](./oss/examples/express/README.md)
-shows it behind an app's endpoints, and
-[slime-cloud/runtime](./slime-cloud/runtime/README.md) runs it on AWS Lambda. The specs in `docs/`
-describe intent, not implemented behaviour.
+The repository has two halves:
+
+- [`core/`](./core/README.md) is the engine package `@slime-cloud/core`, for
+  local development and self-hosting. It answers `{ intent, input, output }`
+  requests with model-generated, cached, read-only SQL against Postgres.
+  [examples/express](./examples/express/README.md) shows it behind an app's
+  endpoints.
+- `platform/` (see [the map below](#subdirectories--system-boundaries)) is the hosted Slime Cloud:
+  landing page, AWS infrastructure, and the Lambda runtime that runs the core.
+
+The specs in `docs/` describe intent, not implemented behaviour; see
+[docs/README.md](./docs/README.md) for the status of each.
 
 ### Developer notes (original)
 
@@ -20,57 +26,50 @@ Backend -- Slime runtime:
 
 ## Subdirectories & System Boundaries
 
-- [landing/](./landing/README.md) - Static marketing page (one `index.html`,
-  no build step). Preview with `just landing`.
-- [oss/packages/core/](./oss/packages/core/README.md) - `@slime-cloud/core`,
+- [core/](./core/README.md) - `@slime-cloud/core`,
   the engine as an installable library. It replaced the `sandbox/` prototype,
   which was deleted in M6 (it is in git history).
-  [PLAN.md](./oss/packages/core/PLAN.md) holds the decisions and milestones:
+  [PLAN.md](./core/PLAN.md) holds the decisions and milestones:
   M0–M3 and M5 done, M4 and M6 built (runs against a real model pending).
-  The only npm workspace so far.
-- [oss/examples/express/](./oss/examples/express/README.md) - an Express app
+  The only npm workspace so far. Never imports `platform/`.
+- [examples/express/](./examples/express/README.md) - an Express app
   whose endpoints are answered by `@slime-cloud/core`; its own lockfile. It
   also holds the demo database (`db/init.sql`) that core's tests and CI use.
-- `docs/` (no contract file; documentation only)
-  - [architecture-spec.md](./docs/architecture-spec.md) - Development spec for
-    the Slime runtime: request path, DB API, Gatekeeper rules, and Gas / Liquid
-    / Crystal trust levels.
-  - [architecture.excalidraw](./docs/architecture.excalidraw) - Architecture
-    diagram matching the spec.
-  - [slime_runtime_master_spec.md](./docs/slime_runtime_master_spec.md) -
-    Vision pitch and target architecture (request-time synthesis, V8/Wasm,
-    Redis, connectors). Broader than, and in places conflicting with, the
-    development spec above.
-  - `docs/brand/` - Brand and marketing material:
-    - [slime_master_brand_book_agent_design_system.md](./docs/brand/slime_master_brand_book_agent_design_system.md) - Color tokens, typography, and UI rules for agents generating Slime UI.
-    - [slime_master_brand_book_design_system.html](./docs/brand/slime_master_brand_book_design_system.html) - Interactive brand book and component kit.
-    - [slime_marketing_positioning_tone_of_voice_use_cases.md](./docs/brand/slime_marketing_positioning_tone_of_voice_use_cases.md) - Positioning, tone of voice, use cases, and messaging.
+- **`platform/` — hosted Slime Cloud**
+  - [platform/landing/](./platform/landing/README.md) - Static marketing page
+    (one `index.html`, no build step). Preview with `just landing`.
+  - [platform/infra/](./platform/infra/README.md) - Terraform stacks:
+    `bootstrap/` (human-applied roles, state bucket, budgets) and the
+    CI-applied `landing/` (CloudFront + Lambda) and `platform/` (Slime runtime
+    on Lambda + DynamoDB).
+  - [platform/runtime/](./platform/runtime/README.md) - `@slime-cloud/runtime`:
+    the Lambda entry and DynamoDB handler store around the core. Imports
+    `@slime-cloud/core` (`core/`); the core never imports it.
+  - `platform/docs/` - dated reviews.
+  - [platform/provisioner/](./platform/provisioner/README.md) -
+    `slime-provisioner` Lambda: turns `pending` endpoints in `slime-control`
+    into `slime-ep-<id>` functions on the shared Gas layer, reconfigures and
+    deletes them.
+  - [platform/admin/](./platform/admin) - slime cloud admin (Next.js, runs
+    locally): sign-up, endpoints, connector settings, tier usage and bill
+    estimate, OpenTelemetry. Design:
+    [docs/architecture/slime-cloud.html](./docs/architecture/slime-cloud.html).
+- **`docs/`** - project-wide docs, indexed with statuses in
+  [docs/README.md](./docs/README.md): `product/`, `architecture/`, `brand/`.
 - `.github/workflows/` (no contract file) - [ci.yml](./.github/workflows/ci.yml)
   runs pre-commit, the core, example and runtime tests, and the Lambda bundle
   build on every push and
   pull request; [terraform.yml](./.github/workflows/terraform.yml) plans every
-  `infra/aws/` stack on pull requests and applies them on `main` (the landing
+  `platform/infra/` stack on pull requests and applies them on `main` (the landing
   page included); [terraform-quality.yml](./.github/workflows/terraform-quality.yml)
   runs tflint and trivy.
-- [infra/aws/](./infra/aws/README.md) - Terraform: `bootstrap/` (human-applied
-  roles, state bucket, budgets) and the CI-applied stacks (`platform/`: Slime
-  runtime on Lambda + DynamoDB).
-- [slime-cloud/runtime/](./slime-cloud/runtime/README.md) - `@slime-cloud/runtime`:
-  the Lambda entry and DynamoDB handler store around the core. Imports
-  `@slime-cloud/core` (`oss/packages/core`); the core never imports it.
-- [slime-cloud/provisioner/](./slime-cloud/provisioner) - `slime-provisioner`
-  Lambda: turns `pending` endpoints in `slime-control` into `slime-ep-<id>`
-  functions on the shared Gas layer, reconfigures and deletes them.
-- [slime-cloud/admin/](./slime-cloud/admin) - slime cloud admin (Next.js, runs
-  locally): sign-up, endpoints, connector settings, tier usage and bill
-  estimate, OpenTelemetry. Design:
-  [docs/slime-cloud/architecture.html](./docs/slime-cloud/architecture.html).
+
 
 Root files: [AGENTS.md](./AGENTS.md) (repository contract for agents),
 [justfile](./justfile) (task runner),
 [.pre-commit-config.yaml](./.pre-commit-config.yaml) (hooks), and
-[package.json](./package.json) (npm workspaces for `oss/packages/*` only;
-`oss/examples/express` and `slime-cloud/runtime` keep their own lockfiles).
+[package.json](./package.json) (npm workspaces for `core` only;
+`examples/express` and `platform/runtime` keep their own lockfiles).
 
 ## Global Invariants
 
@@ -88,9 +87,9 @@ Root files: [AGENTS.md](./AGENTS.md) (repository contract for agents),
 - CI: [ci.yml](./.github/workflows/ci.yml) job `pre-commit` runs
   `pre-commit/action@v3.0.1` on `push` and `pull_request`.
 - Deploy: [terraform.yml](./.github/workflows/terraform.yml) applies every
-  `infra/aws/` stack except `bootstrap/` on each push to `main` that touches
-  `infra/aws/`, `oss/packages/core/`, `slime-cloud/` or `landing/` (AWS account `025772230981`,
-  `eu-central-1`); `landing/` is served by CloudFront + Lambda.
+  `platform/infra/` stack except `bootstrap/` on each push to `main` that
+  touches `platform/` or `core/` (AWS account `025772230981`, `eu-central-1`);
+  `platform/landing/` is served by CloudFront + Lambda.
 
 ## System Verification
 

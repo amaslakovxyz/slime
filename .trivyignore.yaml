@@ -3,14 +3,14 @@
 misconfigurations:
   - id: AWS-0132
     paths:
-      - "infra/aws/bootstrap/state.tf"
+      - "platform/infra/bootstrap/state.tf"
     statement: >-
       State bucket uses SSE-S3. A customer-managed KMS key costs $1/month plus
       requests and adds key-policy recovery risk; TLS-only policy, versioning
       and blocked public access already protect the state.
   - id: AWS-0011
     paths:
-      - "infra/aws/landing/domain.tf"
+      - "platform/infra/landing/domain.tf"
     statement: >-
       No WAF on the landing distribution. WAF starts at about $5/month plus
       per-request fees (this account already paid $7-8/month for WAF earlier
