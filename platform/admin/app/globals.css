@@ -527,33 +527,9 @@ p {
   gap: 12px;
 }
 
-.tier-tag {
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-family: var(--font-code);
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  white-space: nowrap;
-}
 
-.tier-gas .tier-tag {
-  color: var(--gas-accent);
-  background: var(--gas-bg);
-  border: 1px dashed var(--gas-border);
-}
 
-.tier-liquid .tier-tag {
-  color: #fff;
-  background: rgba(255, 20, 118, 0.22);
-  border: 1px solid rgba(255, 20, 118, 0.6);
-}
 
-.tier-crystal .tier-tag {
-  color: var(--crystal-accent);
-  background: var(--crystal-bg);
-  border: 1px solid var(--crystal-border);
-  border-radius: 3px;
-}
 
 .tier-share {
   font-size: 13px;
@@ -2033,3 +2009,4 @@ code.inline {
 .lc-route-actions { display: flex; gap: 6px; align-self: flex-start; }
 .lc-route > .lc-route-actions { flex: 0 0 auto; }
 .form-narrow { max-width: 720px; }
+.tier-head .tier-name { margin: 0; }

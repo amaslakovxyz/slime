@@ -2,10 +2,10 @@ import { formatCount, formatMs, formatShare } from '@/app/format';
 import type { Usage } from '@/lib/endpoints';
 import type { Tier } from '@/lib/pricing';
 
-const TIER_COPY: Record<Tier, { tag: string; name: string; handlersLabel: string }> = {
-  gas: { tag: 'TIER 0 · GAS', name: 'Gas', handlersLabel: 'handlers' },
-  liquid: { tag: 'TIER 1 · LIQUID', name: 'Liquid', handlersLabel: 'handlers' },
-  crystal: { tag: 'TIER 2 · CRYSTAL', name: 'Crystal', handlersLabel: 'crystals' },
+const TIER_COPY: Record<Tier, { name: string; handlersLabel: string }> = {
+  gas: { name: 'Gas', handlersLabel: 'handlers' },
+  liquid: { name: 'Liquid', handlersLabel: 'handlers' },
+  crystal: { name: 'Crystal', handlersLabel: 'crystals' },
 };
 
 function handlerCount(usage: Usage, tier: Tier): number | null {
@@ -25,10 +25,9 @@ export function TierCards({ usage }: { usage: Usage }) {
         return (
           <article className={`tier tier-${tier}`} key={tier} aria-label={`${copy.name} tier`}>
             <div className="tier-head">
-              <span className="tier-tag">{copy.tag}</span>
+              <h3 className="tier-name">{copy.name}</h3>
               <span className="tier-share mono">{formatShare(t.requests, total)}</span>
             </div>
-            <h3 className="tier-name">{copy.name}</h3>
             <div className="tier-latency">
               <span className="mono">{formatMs(t.avgMs)}</span>
               <span className="tier-latency-label">avg</span>
