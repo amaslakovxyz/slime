@@ -112,6 +112,12 @@ describe('store helpers', () => {
     assert.deepEqual(keys, ['b']);
   });
 
+  test('storeLimitedTo refuses writes: it is a read-only view', () => {
+    const view = storeLimitedTo(memoryStore(), ['b']);
+    assert.throws(() => view.put('handlers', 'a', { key: 'a' }), /read-only/);
+    assert.throws(() => view.delete('handlers', 'a'), /read-only/);
+  });
+
   test('syncLiveRuns raises saved runs to the live count and never lowers them', async () => {
     const store = memoryStore();
     await store.put('handlers', 'a', { key: 'a', runs: 3 });

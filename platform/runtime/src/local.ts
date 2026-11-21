@@ -21,13 +21,20 @@ export { syncLiveRuns };
 const HANDLERS_NS = 'handlers';
 const MAX_BODY_BYTES = 64 * 1024;
 
-/** A read-only view whose list() returns only `keys`: crystallize() has no key filter. */
+/**
+ * A read-only view whose list() returns only `keys`: crystallize() has no key
+ * filter. crystallize() only reads (store.list / store.get), so the view refuses
+ * writes rather than quietly letting a job mutate the real store through it.
+ */
 export function storeLimitedTo(store: SlimeStore, keys: readonly string[]): SlimeStore {
   const wanted = new Set(keys);
+  const readonly = () => {
+    throw new Error('storeLimitedTo is a read-only view');
+  };
   return {
     get: (ns, key) => store.get(ns, key),
-    put: (ns, key, value) => store.put(ns, key, value),
-    delete: (ns, key) => store.delete(ns, key),
+    put: readonly,
+    delete: readonly,
     list: async (ns, prefix) => (await store.list(ns, prefix)).filter(({ key }) => ns !== HANDLERS_NS || wanted.has(key)),
   };
 }
