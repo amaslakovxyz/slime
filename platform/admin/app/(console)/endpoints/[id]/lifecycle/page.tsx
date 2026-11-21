@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { LivePoller } from '@/app/ui/live-poller';
 import { crystalTokenHints } from '@/lib/crystal-tokens';
 import { readLifecycle, stagesOf, toRow } from '@/lib/lifecycle';
@@ -38,10 +39,16 @@ export default async function LifecyclePage({ params }: { params: Promise<{ id: 
         ))}
 
       {!data.ok && (
-        <div className="note" role="status">
+        // A failure reads as an error (plasma), not as the green "waiting" note.
+        <div className={ep.status === 'failed' ? 'alert alert-block' : 'note'} role="status">
           <div>
             <strong>{data.reason}</strong>
-
+            {ep.status === 'failed' && (
+              <span className="muted small">
+                {' '}
+                Fix the connection or provider in <Link href={`/endpoints/${ep.endpointId}/settings`}>Settings</Link>; saving restarts it.
+              </span>
+            )}
           </div>
         </div>
       )}
@@ -51,7 +58,7 @@ export default async function LifecyclePage({ params }: { params: Promise<{ id: 
         {ep.url ? (
           <AgentSnippet endpointId={ep.endpointId} url={ep.url} tokenHint={ep.tokenHint} />
         ) : (
-          <p className="muted small">Starting…</p>
+          <p className="muted small">{ep.status === 'failed' ? 'Not running.' : 'Starting…'}</p>
         )}
         <div className={`lc-wait ${total > 0 ? 'ok' : ''}`}>
           <i aria-hidden="true" />

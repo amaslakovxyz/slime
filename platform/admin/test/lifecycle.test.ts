@@ -1,7 +1,8 @@
 // What the Lifecycle tab shows for a handler and for the stage rail.
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { stagesOf, toRow, type RuntimeHandler } from '../lib/lifecycle';
+import type { Endpoint } from '../lib/endpoints';
+import { readLifecycle, stagesOf, toRow, type RuntimeHandler } from '../lib/lifecycle';
 
 const t = { liquidRuns: 3, crystalRuns: 10 };
 const h = (over: Partial<RuntimeHandler>): RuntimeHandler => ({ key: 'abcdef123456', intent: 'accounts per plan', tier: 'gas', runs: 1, ...over });
@@ -63,5 +64,18 @@ describe('stagesOf', () => {
     const all = stagesOf('ready', [h({ tier: 'crystal', runs: 12 })], 12);
     assert.deepEqual(states(all), ['done', 'done', 'done', 'done']);
     assert.equal(all[1]!.note, '1 handler · 12 requests');
+  });
+});
+
+describe('readLifecycle without a running endpoint', () => {
+  const base = { endpointId: 'ep-0a1b2c3d4e', owner: 'a@b.c', name: 'n', provider: 'offline', connectorType: 'postgres', tokenHint: 'abcd', createdAt: '', updatedAt: '' } as const;
+
+  test('a failed endpoint shows why it failed', async () => {
+    const data = await readLifecycle({ ...base, status: 'failed', error: 'Health check failed: connect ECONNREFUSED 127.0.0.1:1' } as Endpoint);
+    assert.deepEqual(data, { ok: false, reason: 'Endpoint failed: Health check failed: connect ECONNREFUSED 127.0.0.1:1' });
+  });
+
+  test('a failed endpoint without a recorded error still says it failed', async () => {
+    assert.deepEqual(await readLifecycle({ ...base, status: 'failed' } as Endpoint), { ok: false, reason: 'Endpoint failed.' });
   });
 });

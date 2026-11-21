@@ -16,6 +16,7 @@ import { DeleteCommand, ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb
 import { ddb } from '../lib/ddb';
 import { env } from '../lib/env';
 import { removeLocalEndpointData } from '../lib/local-teardown';
+import { startupFailure } from '../lib/runtime-output';
 import { secretStore } from '../lib/secrets';
 
 const RUNTIME_DIR = resolve(import.meta.dirname, '../../runtime');
@@ -138,7 +139,7 @@ async function start(item: Item): Promise<string> {
     await new Promise((r) => setTimeout(r, 500));
   }
   stop(item.endpointId);
-  throw new Error(`Health check failed: ${entry.stderr.slice(-3).join(' | ') || 'no output'}`);
+  throw new Error(`Health check failed: ${startupFailure(entry.stderr)}`);
 }
 
 function stop(endpointId: string): Promise<void> {

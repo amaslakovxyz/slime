@@ -28,7 +28,7 @@ export default async function EndpointLayout({ children, params }: { children: R
               <CopyButton value={ep.url} label="Copy URL" />
             </div>
           ) : (
-            <span className="muted small">Starting…</span>
+            <span className="muted small">{ep.status === 'failed' ? 'Not running' : 'Starting…'}</span>
           )}
         </div>
       </header>
