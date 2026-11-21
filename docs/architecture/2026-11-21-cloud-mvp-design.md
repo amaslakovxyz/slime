@@ -333,8 +333,9 @@ s3://slime-crystals-025772230981/endpoints/<id>/crystal/<crystal key>.mjs
 ### Admin on Lambda
 
 - **Build.**
-  - `next.config.ts` sets `output: 'standalone'`, `outputFileTracingRoot` to `platform/admin`, and `serverActions.allowedOrigins: ['admin.amaslakov.com']`.
+  - `next.config.ts` sets `output: 'standalone'`, `outputFileTracingRoot` to `platform/admin`, `serverActions.allowedOrigins: ['admin.amaslakov.com']`, and `generateBuildId` returning `ADMIN_SOURCE_HASH`. A git SHA is not used, because the merge commit differs from the branch head.
   - The allowed-origins setting is needed because CloudFront sends the Function URL host as `Host` while the browser sends `Origin: https://admin.amaslakov.com`. Next refuses a server action whose origin matches neither.
+  - **Deploy trigger.** Next writes per-build random values (preview-mode keys, the server-actions encryption key), so the admin zip is not reproducible. `ADMIN_SOURCE_HASH` is the deploy trigger instead. It is a SHA-256 over every file under `platform/admin` except `node_modules/`, `.next/`, `dist/`, `.data/`, `test-results/`, `playwright-report/` and `.env*`, plus the build-time `ADMIN_ORIGIN` and the Node major version. `aws_lambda_function.admin.source_code_hash` reads it from `platform/admin/dist/source-hash.txt`. A rebuild with unchanged inputs leaves the function untouched, and no input can be left out because the whole tree is hashed.
   - A build step assembles `platform/admin/dist/lambda/` from:
     - the standalone server;
     - `.next/static` and `public`;
@@ -853,7 +854,7 @@ Work happens in `.worktrees/cloud-mvp` on branch `feat/cloud-mvp`. Commits follo
 ##### 37. `platform/admin/next.config.ts` (Modify)
 
 *   **Type / Scope**: Build config.
-*   **Proposed Changes**: `output: 'standalone'`, `outputFileTracingRoot: <admin dir>`, server actions `allowedOrigins` from `ADMIN_ORIGIN` at build time (default `admin.amaslakov.com`).
+*   **Proposed Changes**: `output: 'standalone'`, `outputFileTracingRoot: <admin dir>`, server actions `allowedOrigins` from `ADMIN_ORIGIN` at build time (default `admin.amaslakov.com`), `generateBuildId: () => process.env.ADMIN_SOURCE_HASH` (the build fails if it is unset).
 
 ##### 38. `platform/admin/instrumentation.ts` (Modify)
 
@@ -871,9 +872,11 @@ Work happens in `.worktrees/cloud-mvp` on branch `feat/cloud-mvp`. Commits follo
 
 *   **Type / Scope**: Packaging.
 *   **Proposed Changes**:
-    - `build-lambda.mjs` copies `.next/standalone`, `.next/static` → `.next/static`, `public`, and `lambda/*` into `dist/lambda/`, deterministically (sorted copy, fixed mtimes) so the Terraform zip hash is stable.
+    - `build-lambda.mjs`:
+      - Before `next build`, it computes `ADMIN_SOURCE_HASH` over the input set defined in the Technical Plan (whole `platform/admin` tree minus the excluded folders, plus `ADMIN_ORIGIN` and the Node major). It runs `next build` with that variable set and writes the base64 hash to `dist/source-hash.txt`.
+      - It then copies `.next/standalone`, `.next/static` → `.next/static`, `public`, and `lambda/*` into `dist/lambda/` in sorted order.
     - Size guard: the script prints the unzipped size of `dist/lambda/` and fails above 200 MB. A direct-upload zip is capped at 50 MB, and the unzipped function plus layers at 250 MB. If the zip measured at the first build is above 40 MB, `admin.tf` uploads the code through `s3_bucket`/`s3_key` (in the crystals bucket under `artifacts/`) instead of `filename`, and `/_next/static/*` is served from that bucket through a second CloudFront origin.
-    - New scripts: `build:lambda` (`next build && node scripts/build-lambda.mjs`), `e2e` (`playwright test -c e2e/playwright.config.ts --project=local`), `e2e:cloud`.
+    - New scripts: `build:lambda` (`node scripts/build-lambda.mjs`, which runs `next build` itself), `e2e` (`playwright test -c e2e/playwright.config.ts --project=local`), `e2e:cloud`.
     - Add dev dependency `@playwright/test`, and `@aws-sdk/client-s3` for teardown.
 
 ##### 41. `platform/admin/e2e/playwright.config.ts`, `e2e/local.spec.ts`, `e2e/cloud-smoke.spec.ts`, `e2e/helpers.ts` (Create)
@@ -961,7 +964,7 @@ Work happens in `.worktrees/cloud-mvp` on branch `feat/cloud-mvp`. Commits follo
 
 *   **Type / Scope**: Terraform.
 *   **Proposed Changes**:
-    - `archive_file` of `platform/admin/dist/lambda`.
+    - `archive_file` of `platform/admin/dist/lambda`. The function's `source_code_hash = trimspace(file("${path.module}/../../../platform/admin/dist/source-hash.txt"))`, so only changed admin inputs redeploy it.
     - Role and policy as in the Technical Plan, and a log group.
     - `aws_lambda_function.admin` with the LWA layer `arn:aws:lambda:${var.region}:753240598075:layer:LambdaAdapterLayerArm64:${var.lwa_layer_version}` (publisher account per the LWA project; verify at implementation).
     - The Function URL (`NONE`) with the two public permissions copied from `runtime.tf`.
@@ -1087,7 +1090,8 @@ No files beyond the task record.
     - `npm ci && npm run build -w @slime-cloud/core`;
     - `(cd platform/runtime && npm ci && npm run typecheck && npm run build)`;
     - `(cd platform/admin && npm ci && npm run typecheck && npm run build:lambda)`;
-    - `bash platform/infra/platform/build.sh`.
+    - `bash platform/infra/platform/build.sh`;
+    - run `build.sh` twice and confirm `platform/admin/dist/source-hash.txt` is identical and `terraform plan` shows no change to `aws_lambda_function.admin`.
 *   **Unit Tests**:
     - `npm test -w @slime-cloud/core`;
     - `(cd platform/runtime && npm test)` with the demo Postgres up (`cd examples/express && npm run db:up`);
