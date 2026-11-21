@@ -33,7 +33,7 @@ the API:
 
 | Subpath | Source |
 |---|---|
-| `.` | `index.ts`: `createSlime`, `SlimeConfig`, `DEFAULT_TIERS`, `DEFAULT_LIMITS`, `SlimeError`, `SlimeConfigError`, `fileStore`, `memoryStore`, `DEFAULT_STORE_DIR`, `handlerKeyFor`, `changedProvenance`, and every port type. |
+| `.` | `index.ts`: `createSlime`, `SlimeConfig`, `DEFAULT_TIERS`, `DEFAULT_LIMITS`, `SlimeError`, `SlimeConfigError`, `fileStore`, `memoryStore`, `DEFAULT_STORE_DIR`, `handlerKeyFor`, `changedProvenance`, `QuickJSRunner`, and every port type. |
 | `./postgres` | `connectors/postgres/index.ts` |
 | `./models` | `models/index.ts`: `modelRoles`, `parseJsonReply`, `ModelClient` types |
 | `./claude`, `./groq`, `./offline` | `models/<name>/index.ts` |
@@ -43,10 +43,12 @@ the API:
 
 `test/package.test.ts` pins every entry's value exports.
 
-**`create-slime.ts`**: `createSlime(config)`. Startup order: the
+**`create-slime.ts`**: `createSlime(config, { runner }?)`. Startup order: the
 connector's safety check (an unsafe user throws `SlimeConfigError`),
 `store.init()`, `describe()` and the dictionary. In locked mode it emits one
-`warning` event when saved handlers were made against another schema.
+`warning` event when saved handlers were made against another schema. A
+`runner` the host passes is shared: the engine uses it and `close()` leaves it
+running. Without one, the engine builds its own `QuickJSRunner` and closes it.
 
 **`shared/errors.ts`**
 

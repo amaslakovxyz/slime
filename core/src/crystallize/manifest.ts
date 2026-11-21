@@ -43,7 +43,11 @@ export async function readManifest(dir: string): Promise<Manifest> {
     if (error.code === 'ENOENT') return undefined;
     throw error;
   });
-  if (json === undefined) return { version: MANIFEST_VERSION, entries: {} };
+  return json === undefined ? { version: MANIFEST_VERSION, entries: {} } : parseManifest(json);
+}
+
+/** The manifest from its text, wherever it is stored. */
+export function parseManifest(json: string): Manifest {
   const manifest = JSON.parse(json) as Manifest;
   if (manifest.version !== MANIFEST_VERSION) throw new Error(`${MANIFEST_FILE}: unsupported version ${String(manifest.version)}`);
   return manifest;

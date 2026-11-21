@@ -26,6 +26,8 @@ export interface EngineParts {
   config: SlimeConfig;
   store: SlimeStore;
   runner: SandboxRunner;
+  /** False when the host injected the runner and shares it: close() then leaves it running. */
+  ownsRunner: boolean;
   dictionary: Dictionary;
   provenance: HandlerProvenance;
 }
@@ -103,7 +105,7 @@ export class SlimeEngine implements Slime {
 
   async close(): Promise<void> {
     await this.flush();
-    await this.#parts.runner.close();
+    if (this.#parts.ownsRunner) await this.#parts.runner.close();
     await this.#parts.store.close?.();
     await this.#parts.config.connector.close();
   }
@@ -126,7 +128,7 @@ export class SlimeEngine implements Slime {
   async #answerFromCrystal({ key, crystal, request, startedAt }: CrystalAnswer): Promise<QueryResult> {
     checkParamTypes(crystal.paramTypes, request.input);
     const { connector, limits, mode } = this.#parts.config;
-    const execution = await runCrystal({ connector, limits }, crystal, request.input);
+    const execution = await runCrystal({ connector, runner: this.#parts.runner, limits }, crystal, request.input);
     const code = { sql: crystal.sql, shapeJs: crystal.shape ? String(crystal.shape) : null, assumptions: [] };
     const meta = queryMeta({ handlerKey: key, tier: 'crystal', cache: 'hit', review: crystal.review, execution, code, mode, intent: request.intent, totalMs: performance.now() - startedAt });
     return { data: execution.data, meta };

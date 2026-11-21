@@ -8,6 +8,7 @@ import { SlimeConfigError } from './shared/errors.js';
 import type { Connector } from './connectors/types.js';
 import type { HandlerProvenance } from './request/key.js';
 import { QuickJSRunner } from './sandbox/quickjs/quickjs-runner.js';
+import type { SandboxRunner } from './sandbox/types.js';
 import { fileStore } from './stores/file-store.js';
 import type { SlimeStore } from './stores/types.js';
 
@@ -15,8 +16,17 @@ import type { SlimeStore } from './stores/types.js';
 const LOCKED_MARKER = 'locked';
 const UNSAFE_CREDENTIALS = 'the connector refused to start: its database user can write or is too powerful';
 
+export interface CreateSlimeOptions {
+  /**
+   * A sandbox shared with other engines in the process (one pool for many tenants). The
+   * engine uses it and leaves it running on close(); the host closes it. Omit for the
+   * engine's own runner, which close() stops.
+   */
+  runner?: SandboxRunner;
+}
+
 /** Startup order (§7, M2): safety check, store init, dictionary. */
-export async function createSlime(config: SlimeConfig): Promise<Slime> {
+export async function createSlime(config: SlimeConfig, options: CreateSlimeOptions = {}): Promise<Slime> {
   await assertSafeCredentials(config.connector);
   const store = config.store ?? fileStore();
   await store.init?.();
@@ -24,7 +34,8 @@ export async function createSlime(config: SlimeConfig): Promise<Slime> {
   const provenance = currentProvenance(config, dictionary);
   if (config.mode === 'locked') await warnAboutOtherSchemas(config, store, provenance.schemaHash);
   warnAboutOtherSchemaCrystals(config, provenance.schemaHash);
-  return new SlimeEngine({ config, store, runner: new QuickJSRunner(), dictionary, provenance });
+  const runner = options.runner ?? new QuickJSRunner();
+  return new SlimeEngine({ config, store, runner, ownsRunner: !options.runner, dictionary, provenance });
 }
 
 async function assertSafeCredentials(connector: Connector): Promise<void> {

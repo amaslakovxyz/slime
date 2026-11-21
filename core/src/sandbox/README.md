@@ -3,8 +3,10 @@
 ## Overview
 
 The `SandboxRunner` port (`types.ts`) and its one implementation,
-`quickjs/`. It is a type only in v1: core always uses its own QuickJS runner,
-and there is no option to pass another.
+`quickjs/`. Core builds its own QuickJS runner unless the host passes one to
+`createSlime(config, { runner })` or `crystallize({ runner })`, so that many
+engines in one process share one worker pool. `QuickJSRunner` is exported from
+the main entry for that.
 
 `quickjs/` runs a handler's generated `function shape(rows, input)` in QuickJS
 (WebAssembly) inside worker threads (PLAN.md C3). The code gets rows and
@@ -13,7 +15,8 @@ input as JSON only: no database, network, files, timers or host functions.
 Files in `quickjs/`:
 
 - `quickjs-runner.ts`: `QuickJSRunner`, the `SandboxRunner` the engine uses.
-  It keeps a pool of up to `MAX_WORKERS` (4) workers per Slime instance.
+  It keeps a pool of up to `MAX_WORKERS` (4) workers per runner: per Slime
+  instance by default, per process when the host shares one.
 - `shape-worker-client.ts`: `ShapeWorker`, one worker thread and its
   deadline.
 - `shape-worker.ts`: the code inside the worker.

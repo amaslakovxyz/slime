@@ -1,6 +1,6 @@
 // The public entry. Deep imports are not part of the API; adapters have their own subpaths (C7).
 
-export { createSlime } from './create-slime.js';
+export { createSlime, type CreateSlimeOptions } from './create-slime.js';
 export { DEFAULT_STORE_DIR, fileStore } from './stores/file-store.js';
 export { memoryStore } from './stores/memory-store.js';
 export type {
@@ -66,6 +66,7 @@ export type {
   Reviewer,
 } from './models/types.js';
 export type { SandboxLimits, SandboxRunner, ShapeJob } from './sandbox/types.js';
+export { QuickJSRunner } from './sandbox/quickjs/quickjs-runner.js';
 export type { InputScalar, InputValue, InputValues, SlimeRequest } from './request/parse.js';
 export type { ParamType } from './request/params.js';
 export type { ObjectShape, Shape } from './request/shape.js';

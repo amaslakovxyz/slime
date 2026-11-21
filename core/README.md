@@ -29,13 +29,15 @@ input values. Handlers move up through three tiers:
 * **Liquid:** has proven itself and passed a background review (when a
   reviewer is configured); saved in a store.
 * **Crystal:** rewritten by an agent into JS modules (with `.d.ts`) in the app's own
-  code, and passed to Slime through the config.
+  code, and passed to Slime through the config. A host that keeps the modules
+  elsewhere (Slime Cloud keeps them in S3) loads them as data instead: its
+  Crystal shapes are source strings, and they run in the shaping sandbox.
 
 > **Status:** M5 is done: Crystal. `crystallize()` (`@slime-cloud/core/crystallize`)
 > turns proven Liquid handlers into `.mjs` modules in the app's code, and the
 > app passes the generated `index.mjs` as `crystal`. `slime-crystal check`
-> re-checks the folder in CI: Crystal runs without a sandbox, so **run it in
-> your CI**. M4 (Claude and Groq models, review, promotion) is built; its live
+> re-checks the folder in CI: an imported Crystal runs without a sandbox, so
+> **run it in your CI**. M4 (Claude and Groq models, review, promotion) is built; its live
 > run against a real model is still pending (`npm run bench` with an API key). Decisions and
 > milestones are in [PLAN.md](PLAN.md). The request format is in
 > [docs/request-format.md](docs/request-format.md), and an app using the
