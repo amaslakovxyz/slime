@@ -31,7 +31,7 @@ flowchart LR
 ## Platform: Slime runtime
 
 [`platform/runtime.tf`](platform/runtime.tf): Lambda `slime-runtime` (Function
-URL, arm64, Node 22) built from [`slime-cloud/runtime`](../../slime-cloud/runtime/README.md)
+URL, arm64, Node 22) built from [`platform/runtime`](../runtime/README.md)
 by `npm run build` (it bundles the built `@slime-cloud/core` from
 `oss/packages/core`), and DynamoDB table `slime-handlers` for reviewed Liquid
 handlers (partition key `tenantId`, sort key `artifactKey`, which holds
@@ -53,12 +53,12 @@ put ANTHROPIC_API_KEY '<key>'                   # GROQ_API_KEY for groq
 ```
 
 Any other variable the runtime's
-[`src/config.ts`](../../slime-cloud/runtime/src/config.ts) reads (`SLIME_MODE`,
+[`src/config.ts`](../runtime/src/config.ts) reads (`SLIME_MODE`,
 `MAX_GENERATIONS_PER_HOUR`, ...) can be set the same way. Until `DATABASE_URL` points at a reachable read-only
 Postgres, authenticated requests get `503 NOT_READY`.
 
 ```sh
-URL=$(terraform -chdir=infra/aws/platform output -raw runtime_url)
+URL=$(terraform -chdir=platform/infra/platform output -raw runtime_url)
 curl -s "${URL}healthz" -H "x-api-key: $KEY" | jq
 ```
 
@@ -76,7 +76,7 @@ The CI roles deny anything outside these names, so follow them:
 - No changes to `slime-deployer`, `slime-gha-*`, OIDC providers, the state
   bucket's configuration, or budgets: those belong to `bootstrap/`
 
-Local run: `AWS_PROFILE=slime terraform -chdir=infra/aws/platform plan`.
+Local run: `AWS_PROFILE=slime terraform -chdir=platform/infra/platform plan`.
 
 ## Known trust gap
 

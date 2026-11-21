@@ -1,17 +1,17 @@
 # Landing on AWS Lambda
 
-Serves [`landing/`](../../../landing/) at https://amaslakov.com/ through
+Serves [`platform/landing/`](../../landing/) at https://amaslakov.com/ through
 CloudFront in front of a Lambda Function URL in `eu-central-1`.
 
 | Resource | Notes |
 |---|---|
-| Layer `slime-landing-site` | `landing/` minus `README.md` and `tools/`; unpacked at `/opt` |
+| Layer `slime-landing-site` | `platform/landing/` minus `README.md` and `tools/`; unpacked at `/opt` |
 | Function `slime-landing` | Node 22, arm64, 256 MB; [`function/index.mjs`](function/index.mjs) serves only files present in the layer (allowlist = path-traversal guard) and sets `Cache-Control`; compression and security headers come from CloudFront |
 | Function URL | `AWS_IAM` auth; only the CloudFront distribution may call it (Origin Access Control signs requests). Direct hits get 403 and never run the function, so nobody can bypass the cache and exhaust the account's shared Lambda concurrency (10) |
 | Log group `/aws/lambda/slime-landing` | 14-day retention |
 
 State: `s3://slime-tfstate-025772230981/landing/terraform.tfstate` (bucket from
-`infra/aws/bootstrap`, S3 lockfile).
+`platform/infra/bootstrap`, S3 lockfile).
 
 ## Deploy
 
@@ -20,16 +20,16 @@ pull requests and applies it on merge to `main` (then invalidates CloudFront).
 Apply by hand only for recovery:
 
 ```sh
-cd infra/aws/landing
+cd platform/infra/landing
 AWS_PROFILE=slime terraform init
-AWS_PROFILE=slime terraform apply      # any change in landing/ publishes a new layer version
+AWS_PROFILE=slime terraform apply      # any change in platform/landing/ publishes a new layer version
 terraform output -raw site_url
 ```
 
 ## Test
 
 ```sh
-node --test infra/aws/landing/function/index.test.mjs
+node --test platform/infra/landing/function/index.test.mjs
 ```
 
 ## Custom domain
@@ -49,7 +49,7 @@ SPF, DKIM, DMARC). The apex `A` record previously pointed at `142.93.162.168`
 (unreachable); `allow_overwrite` replaced it. Rollback: `terraform destroy`
 removes the aliases; recreate that `A` record by hand if it is needed again.
 
-After a `landing/` change, HTML refreshes within 5 min and assets within a
+After a `platform/landing/` change, HTML refreshes within 5 min and assets within a
 day; to force it:
 `aws cloudfront create-invalidation --distribution-id $(terraform output -raw cloudfront_distribution_id) --paths '/*'`.
 

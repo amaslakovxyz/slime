@@ -1,4 +1,4 @@
-# TFLint for every stack under infra/aws/ (run: tflint --recursive --config "$PWD/.tflint.hcl").
+# TFLint for every stack under platform/infra/ (run: tflint --recursive --config "$PWD/.tflint.hcl").
 # The AWS ruleset catches invalid instance/runtime types, deprecated
 # arguments and similar mistakes that `terraform validate` accepts.
 

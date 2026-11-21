@@ -1,4 +1,4 @@
-// Lambda entry for the Slime runtime (Function URL; see infra/aws/platform/runtime.tf).
+// Lambda entry for the Slime runtime (Function URL; see platform/infra/platform/runtime.tf).
 //
 // Cold start:
 //   1. Every SSM parameter under SLIME_SSM_PREFIX becomes an env var named after

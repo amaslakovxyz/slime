@@ -1,16 +1,18 @@
-# Landing page (landing/) served by a Lambda Function URL.
+# Landing page (platform/landing/) served by a Lambda Function URL.
 #
-#   layer    slime-landing-site  <- landing/ minus tools/ and README (unpacked at /opt)
+#   layer    slime-landing-site  <- platform/landing/ minus tools/ and README (unpacked at /opt)
 #   function slime-landing       <- function/index.mjs (static file server)
 #   URL      AWS_IAM; only CloudFront (OAC, domain.tf) may invoke it
 #
-# Site files are a layer so Terraform packages them straight from landing/
-# with no build step; editing landing/ yields a new layer version on apply.
+# Site files are a layer so Terraform packages them straight from platform/landing/
+# with no build step; editing platform/landing/ yields a new layer version on apply.
+# The layer description below keeps "landing/": it is ForceNew, so editing it
+# would publish a new layer version.
 # Names follow the slime-* convention that the CI roles enforce.
 
 locals {
   name     = "${var.project}-landing"
-  site_dir = "${path.module}/../../../landing"
+  site_dir = "${path.module}/../../../platform/landing"
 }
 
 data "archive_file" "site" {

@@ -1,10 +1,10 @@
-// Run: node --test infra/aws/landing/function/index.test.mjs
-// Serves the real landing/ directory, the same files the layer ships.
+// Run: node --test platform/infra/landing/function/index.test.mjs
+// Serves the real platform/landing/ directory, the same files the layer ships.
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
-process.env.SITE_ROOT = fileURLToPath(new URL("../../../../landing", import.meta.url));
+process.env.SITE_ROOT = fileURLToPath(new URL("../../../../platform/landing", import.meta.url));
 const { handler } = await import("./index.mjs");
 
 const get = (rawPath, headers = {}, method = "GET") =>

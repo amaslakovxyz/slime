@@ -1,6 +1,6 @@
 name: Terraform quality
 
-# Static checks for every stack under infra/aws/. No AWS credentials.
+# Static checks for every stack under platform/infra/. No AWS credentials.
 #   tflint  .tflint.hcl         terraform "recommended" preset + AWS ruleset
 #   trivy   .trivyignore.yaml   HIGH/CRITICAL misconfigurations; accepted
 #                               findings carry a written cost rationale
@@ -10,14 +10,14 @@ name: Terraform quality
 on:
   pull_request:
     paths:
-      - infra/aws/**
+      - platform/infra/**
       - .tflint.hcl
       - .trivyignore.yaml
       - .github/workflows/terraform-quality.yml
   push:
     branches: [main]
     paths:
-      - infra/aws/**
+      - platform/infra/**
       - .tflint.hcl
       - .trivyignore.yaml
       - .github/workflows/terraform-quality.yml
@@ -55,7 +55,7 @@ jobs:
       - name: Lint stacks
         run: |
           status=0
-          for dir in infra/aws/*/; do
+          for dir in platform/infra/*/; do
             echo "::group::$dir"
             (cd "$dir" && tflint --config "$GITHUB_WORKSPACE/.tflint.hcl" --format compact) || status=1
             echo "::endgroup::"
@@ -73,7 +73,7 @@ jobs:
           curl -fsSL -o /tmp/trivy.tgz "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
           echo "${TRIVY_SHA256}  /tmp/trivy.tgz" | sha256sum -c -
           sudo tar -xzf /tmp/trivy.tgz -C /usr/local/bin trivy
-      - name: Scan infra/aws
+      - name: Scan platform/infra
         run: >-
           trivy config --quiet --severity HIGH,CRITICAL --exit-code 1
           --ignorefile .trivyignore.yaml .

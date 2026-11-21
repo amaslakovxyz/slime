@@ -34,7 +34,7 @@ credits); 12-month offers no longer apply, only Always Free.
   group currently have none.
 - **Cost Explorer API**: $0.01 per request (scripts that poll it cost money).
 
-## Guard rails (infra/aws/bootstrap)
+## Guard rails (platform/infra/bootstrap)
 
 | Control | Setting | Effect |
 |---|---|---|
@@ -60,7 +60,7 @@ after it appears in billing data (about 24 hours).
 
 ```sh
 aws ce list-cost-allocation-tags --tag-keys Project   # wait until it is listed
-cd infra/aws/bootstrap && terraform apply -var project_cost_tag_active=true
+cd platform/infra/bootstrap && terraform apply -var project_cost_tag_active=true
 ```
 
 Then set `project_cost_tag_active = true` as the default in `variables.tf`.
@@ -77,9 +77,9 @@ Local runs from the repo root:
 
 ```sh
 tflint --init --config "$PWD/.tflint.hcl"
-for d in infra/aws/*/; do (cd "$d" && tflint --config "$OLDPWD/.tflint.hcl"); done
+for d in platform/infra/*/; do (cd "$d" && tflint --config "$OLDPWD/.tflint.hcl"); done
 trivy config --severity HIGH,CRITICAL --ignorefile .trivyignore.yaml .
-infracost auth login && infracost scan infra/aws   # once logged in
+infracost auth login && infracost scan platform/infra   # once logged in
 ```
 
 Infracost prices mostly usage-based services (Lambda, CloudFront, DynamoDB

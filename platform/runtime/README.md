@@ -2,7 +2,7 @@
 
 Slime Cloud's hosted runtime: `@slime-cloud/core` running on AWS Lambda, with
 reviewed Liquid handlers in DynamoDB. Deployed by
-[`infra/aws/platform`](../../infra/aws/README.md#platform-slime-runtime) as the
+[`platform/infra/platform`](../infra/README.md#platform-slime-runtime) as the
 `slime-runtime` function.
 
 **Boundary:** this package imports the core; the core never imports this
@@ -37,7 +37,7 @@ npm run build         # dist/lambda/, zipped by Terraform
 ## Settings
 
 SSM parameters under `/slime/runtime/` become env vars at cold start
-([infra README](../../infra/aws/README.md#platform-slime-runtime)). The names
+([infra README](../infra/README.md#platform-slime-runtime)). The names
 are the sandbox runtime's, so existing parameters keep working:
 
 | Variable | Meaning |
@@ -71,7 +71,7 @@ No longer read: `META_DATABASE_URL`, `SLIME_META_TABLE`, `SLIME_THINKING`,
 
    Keys collide when the sandbox had several versions of one request (other
    input types or scopes); the version with most runs is kept.
-2. **Deploy.** `infra/aws/platform` now lets the function Query, GetItem,
+2. **Deploy.** `platform/infra/platform` now lets the function Query, GetItem,
    PutItem and DeleteItem (`UpdateItem` is no longer used).
 3. **Roll back** by redeploying the previous bundle: it reads the untouched
    sandbox items.

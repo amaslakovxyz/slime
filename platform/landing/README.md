@@ -8,13 +8,13 @@ Slime's own.
 
 - `assets/state-*.webp`: the Gas / Liquid / Crystal card images, rendered
   with three.js by [`tools/render-states/`](tools/render-states/). To
-  regenerate: `node landing/tools/render-states/capture.mjs landing/assets`
+  regenerate: `node platform/landing/tools/render-states/capture.mjs platform/landing/assets`
   (needs Google Chrome; macOS path in the script).
 
 ## Preview locally
 
 ```bash
-just landing          # serves landing/ at http://localhost:8000
+just landing          # serves platform/landing/ at http://localhost:8000
 ```
 
 Or open `index.html` directly in a browser.
@@ -22,18 +22,18 @@ Or open `index.html` directly in a browser.
 ## Deploy
 
 Served at https://amaslakov.com/ by CloudFront in front of AWS Lambda; see
-[`infra/aws/landing/`](../infra/aws/landing/README.md). (GitHub Pages was
+[`platform/infra/landing/`](../infra/landing/README.md). (GitHub Pages was
 dropped: it is unavailable for private repositories on GitHub Free.)
-[`.github/workflows/terraform.yml`](../.github/workflows/terraform.yml) applies
-it on every push to `main` that touches `landing/` or `infra/aws/`.
+[`.github/workflows/terraform.yml`](../../.github/workflows/terraform.yml) applies
+it on every push to `main` that touches `platform/`.
 
 ## Where things come from
 
 - Colors, fonts and component styles:
-  [docs/brand/slime_master_brand_book_agent_design_system.md](../docs/brand/slime_master_brand_book_agent_design_system.md)
+  [docs/brand/slime_master_brand_book_agent_design_system.md](../../docs/brand/slime_master_brand_book_agent_design_system.md)
   (tokens are copied into `:root` at the top of `index.html`).
 - Use cases and punchlines:
-  [docs/brand/slime_marketing_positioning_tone_of_voice_use_cases.md](../docs/brand/slime_marketing_positioning_tone_of_voice_use_cases.md).
+  [docs/brand/slime_marketing_positioning_tone_of_voice_use_cases.md](../../docs/brand/slime_marketing_positioning_tone_of_voice_use_cases.md).
 
 ## Notes
 

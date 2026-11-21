@@ -1,7 +1,7 @@
 # AWS bootstrap (slime)
 
 One-time layer that carves out the `slime` project inside the existing AWS
-account (no AWS Organizations). Everything else in `infra/aws/` should run
+account (no AWS Organizations). Everything else in `platform/infra/` should run
 through the role it creates.
 
 | Resource | Purpose |
@@ -36,7 +36,7 @@ Runs with the admin profile (`default`), since it manages the roles everything
 else uses.
 
 ```sh
-cd infra/aws/bootstrap
+cd platform/infra/bootstrap
 cp terraform.tfvars.example terraform.tfvars   # fill in ARN + alert email
 terraform init
 terraform apply

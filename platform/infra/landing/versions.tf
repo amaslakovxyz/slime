@@ -12,7 +12,7 @@ terraform {
     }
   }
 
-  # Bucket is created by infra/aws/bootstrap (PR #8 / #10).
+  # Bucket is created by platform/infra/bootstrap (PR #8 / #10).
   backend "s3" {
     bucket       = "slime-tfstate-025772230981"
     key          = "landing/terraform.tfstate"

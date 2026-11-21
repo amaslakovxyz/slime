@@ -1,8 +1,8 @@
 name: Terraform AWS
 
-# CD for every Terraform stack under infra/aws/ except bootstrap.
+# CD for every Terraform stack under platform/infra/ except bootstrap.
 #
-# Trust model (roles defined in infra/aws/bootstrap/github_oidc.tf):
+# Trust model (roles defined in platform/infra/bootstrap/github_oidc.tf):
 #   validate  no AWS credentials                    every PR / push
 #   plan      OIDC -> slime-gha-plan (read-only)    pull requests from this repo
 #   apply     OIDC -> slime-gha-apply               push / manual run on main
@@ -11,9 +11,9 @@ name: Terraform AWS
 # never assume it. Do NOT add `environment:` to the apply job: it changes the
 # OIDC subject and AWS would reject the token.
 # NOTE: GitHub Free private repos have no branch protection, so anyone with
-# write access who pushes to main triggers apply. See infra/aws/README.md.
+# write access who pushes to main triggers apply. See platform/infra/README.md.
 #
-# Stacks: every infra/aws/<name>/ except bootstrap (which owns the CI roles and
+# Stacks: every platform/infra/<name>/ except bootstrap (which owns the CI roles and
 # is applied by a human). A stack with a build.sh gets it run first, from the
 # repo root, so Terraform can zip its artifact (platform builds the runtime).
 # Every stack is planned/applied on every run; unchanged stacks are no-ops.
@@ -21,18 +21,14 @@ name: Terraform AWS
 on:
   pull_request:
     paths:
-      - infra/aws/**
+      - platform/**
       - oss/packages/core/**
-      - slime-cloud/**
-      - landing/**
       - .github/workflows/terraform.yml
   push:
     branches: [main]
     paths:
-      - infra/aws/**
+      - platform/**
       - oss/packages/core/**
-      - slime-cloud/**
-      - landing/**
       - .github/workflows/terraform.yml
   workflow_dispatch:
     inputs:
@@ -66,10 +62,10 @@ jobs:
           terraform_version: ${{ env.TF_VERSION }}
           terraform_wrapper: false
       - name: Format check
-        run: terraform fmt -check -recursive infra/aws
+        run: terraform fmt -check -recursive platform/infra
       - name: Validate stacks (no backend, no credentials)
         run: |
-          for dir in infra/aws/*/; do
+          for dir in platform/infra/*/; do
             echo "::group::$dir"
             terraform -chdir="$dir" init -backend=false
             terraform -chdir="$dir" validate
@@ -78,7 +74,7 @@ jobs:
       - name: List deployable stacks
         id: stacks
         run: |
-          stacks=$(find infra/aws -mindepth 1 -maxdepth 1 -type d ! -name bootstrap -exec basename {} \; | sort | jq -R . | jq -sc .)
+          stacks=$(find platform/infra -mindepth 1 -maxdepth 1 -type d ! -name bootstrap -exec basename {} \; | sort | jq -R . | jq -sc .)
           echo "stacks=$stacks" >> "$GITHUB_OUTPUT"
           echo "Stacks: $stacks"
 
@@ -101,16 +97,16 @@ jobs:
       group: terraform-plan-${{ github.event.pull_request.number }}-${{ matrix.stack }}
       cancel-in-progress: false
     env:
-      STACK_DIR: infra/aws/${{ matrix.stack }}
+      STACK_DIR: platform/infra/${{ matrix.stack }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        if: hashFiles(format('infra/aws/{0}/build.sh', matrix.stack)) != ''
+        if: hashFiles(format('platform/infra/{0}/build.sh', matrix.stack)) != ''
         with:
           node-version: 22
       # Before credentials on purpose: npm install scripts never see AWS tokens.
       - name: Build artifacts
-        if: hashFiles(format('infra/aws/{0}/build.sh', matrix.stack)) != ''
+        if: hashFiles(format('platform/infra/{0}/build.sh', matrix.stack)) != ''
         run: bash "$STACK_DIR/build.sh"
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
@@ -158,16 +154,16 @@ jobs:
       group: terraform-apply-${{ matrix.stack }}
       cancel-in-progress: false
     env:
-      STACK_DIR: infra/aws/${{ matrix.stack }}
+      STACK_DIR: platform/infra/${{ matrix.stack }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        if: hashFiles(format('infra/aws/{0}/build.sh', matrix.stack)) != ''
+        if: hashFiles(format('platform/infra/{0}/build.sh', matrix.stack)) != ''
         with:
           node-version: 22
       # Before credentials on purpose: npm install scripts never see AWS tokens.
       - name: Build artifacts
-        if: hashFiles(format('infra/aws/{0}/build.sh', matrix.stack)) != ''
+        if: hashFiles(format('platform/infra/{0}/build.sh', matrix.stack)) != ''
         run: bash "$STACK_DIR/build.sh"
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:

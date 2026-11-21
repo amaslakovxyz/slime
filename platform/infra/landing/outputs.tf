@@ -9,7 +9,7 @@ output "site_url" {
 }
 
 output "cloudfront_distribution_id" {
-  description = "For cache invalidations after landing/ changes."
+  description = "For cache invalidations after platform/landing/ changes."
   value       = aws_cloudfront_distribution.site.id
 }
 

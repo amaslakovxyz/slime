@@ -1,7 +1,7 @@
 {
   "name": "slime",
   "private": true,
-  "description": "Slime monorepo root. Workspaces cover the open-source packages only; the example app and slime-cloud/runtime keep their own lockfiles.",
+  "description": "Slime monorepo root. Workspaces cover the open-source packages only; the example app and platform/runtime keep their own lockfiles.",
   "workspaces": [
     "oss/packages/*"
   ],

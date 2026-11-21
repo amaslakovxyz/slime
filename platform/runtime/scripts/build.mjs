@@ -1,5 +1,5 @@
 // Bundles the runtime for AWS Lambda into dist/lambda/ (zipped by Terraform,
-// infra/aws/platform/runtime.tf). @slime-cloud/core comes from its built dist/
+// platform/infra/platform/runtime.tf). @slime-cloud/core comes from its built dist/
 // (build it first: npm run build -w @slime-cloud/core). Output must be
 // deterministic: the same source gives the same zip hash, so Terraform plans
 // show no change for no change.
