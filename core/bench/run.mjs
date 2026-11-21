@@ -7,13 +7,13 @@
 import { readFileSync } from 'node:fs';
 import { cases } from './cases.mjs';
 
-const ROOT = new URL('..', import.meta.url).pathname;
 const OFFLINE_HANDLERS = new URL('../../examples/express/offline-handlers.json', import.meta.url).pathname;
 const DATABASE_URL = process.env.DATABASE_URL ?? 'postgres://slime_reader:slime_reader@localhost:54329/slime';
 const DECIMALS = 100;
 
-const core = await import(`${ROOT}dist/index.js`);
-const { postgresConnector } = await import(`${ROOT}dist/postgres/index.js`);
+// Imported by the package's own name, through exports, as an app would (needs `npm run build`).
+const core = await import('@slime-cloud/core');
+const { postgresConnector } = await import('@slime-cloud/core/postgres');
 const only = process.argv.slice(2);
 const selected = only.length > 0 ? cases.filter(({ name }) => only.includes(name)) : cases;
 const { label, ...models } = await chooseModels();
@@ -83,15 +83,15 @@ function round(ms) {
 
 async function chooseModels() {
   if (process.env.GROQ_API_KEY) {
-    const { groq } = await import(`${ROOT}dist/groq/index.js`);
+    const { groq } = await import('@slime-cloud/core/groq');
     const options = { apiKey: process.env.GROQ_API_KEY, model: 'openai/gpt-oss-120b' };
     return { label: 'groq openai/gpt-oss-120b', generator: groq.generator({ ...options, reasoningEffort: 'low' }), reviewer: groq.reviewer({ ...options, reasoningEffort: 'high' }) };
   }
   if (process.env.ANTHROPIC_API_KEY) {
-    const { claude } = await import(`${ROOT}dist/claude/index.js`);
+    const { claude } = await import('@slime-cloud/core/claude');
     const apiKey = process.env.ANTHROPIC_API_KEY;
     return { label: 'claude-haiku-5-5, reviewed by claude-opus-5-5', generator: claude.generator({ apiKey, model: 'claude-haiku-5-5' }), reviewer: claude.reviewer({ apiKey, model: 'claude-opus-5-5' }) };
   }
-  const { offlineGenerator } = await import(`${ROOT}dist/offline/index.js`);
+  const { offlineGenerator } = await import('@slime-cloud/core/offline');
   return { label: 'offline handlers (no model)', generator: offlineGenerator(JSON.parse(readFileSync(OFFLINE_HANDLERS, 'utf8'))) };
 }

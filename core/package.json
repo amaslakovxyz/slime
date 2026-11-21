@@ -15,20 +15,20 @@
       "default": "./dist/index.js"
     },
     "./offline": {
-      "types": "./dist/offline/index.d.ts",
-      "default": "./dist/offline/index.js"
+      "types": "./dist/models/offline/index.d.ts",
+      "default": "./dist/models/offline/index.js"
     },
     "./postgres": {
-      "types": "./dist/postgres/index.d.ts",
-      "default": "./dist/postgres/index.js"
+      "types": "./dist/connectors/postgres/index.d.ts",
+      "default": "./dist/connectors/postgres/index.js"
     },
     "./claude": {
-      "types": "./dist/claude/index.d.ts",
-      "default": "./dist/claude/index.js"
+      "types": "./dist/models/claude/index.d.ts",
+      "default": "./dist/models/claude/index.js"
     },
     "./groq": {
-      "types": "./dist/groq/index.d.ts",
-      "default": "./dist/groq/index.js"
+      "types": "./dist/models/groq/index.d.ts",
+      "default": "./dist/models/groq/index.js"
     },
     "./crystallize": {
       "types": "./dist/crystallize/index.d.ts",
@@ -48,7 +48,7 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "node --import tsx --test 'test/**/*.test.ts'",
     "check:pack": "node scripts/check-pack.mjs",

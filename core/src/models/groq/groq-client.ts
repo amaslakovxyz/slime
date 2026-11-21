@@ -1,7 +1,7 @@
 // Groq's OpenAI-compatible chat API in JSON mode, through fetch: no SDK to install.
 import type { z } from 'zod';
-import { SlimeError } from '../errors.js';
-import type { ModelUsage } from '../ports.js';
+import { SlimeError } from '../../shared/errors.js';
+import type { ModelUsage } from '../../ports.js';
 
 export type ReasoningEffort = 'low' | 'medium' | 'high';
 

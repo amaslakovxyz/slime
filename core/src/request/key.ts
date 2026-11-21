@@ -1,7 +1,7 @@
 // Cache keys (§4.3, R2–R4). The request key alone is a handler's store key.
 // Provenance is stored inside the handler, not hashed into the key, so locked
 // mode, which has no generator, finds what explore mode saved (§4.7).
-import { createHash } from 'node:crypto';
+import { canonicalJSON, sha256 } from '../shared/hash.js';
 import { parseRequest, type ParsedRequest, type SlimeRequest } from './parse.js';
 
 // Bumping it invalidates every saved handler.
@@ -17,23 +17,6 @@ export interface HandlerProvenance {
 }
 
 const PROVENANCE_FIELDS = ['schemaHash', 'dictionaryHash', 'promptHash', 'model'] as const satisfies readonly (keyof HandlerProvenance)[];
-
-export function sha256(text: string): string {
-  return createHash('sha256').update(text).digest('hex');
-}
-
-/** Object keys are sorted at every level, so key order never changes a hash. */
-export function canonicalJSON(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJSON).join(',')}]`;
-  if (value && typeof value === 'object') {
-    const record = value as Record<string, unknown>;
-    const fields = Object.keys(record)
-      .sort()
-      .map((key) => `${JSON.stringify(key)}:${canonicalJSON(record[key])}`);
-    return `{${fields.join(',')}}`;
-  }
-  return JSON.stringify(value);
-}
 
 // R3: no synonyms and no model, so the key stays deterministic.
 export function normalizeIntent(intent: string): string {

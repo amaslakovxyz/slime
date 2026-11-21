@@ -1,15 +1,15 @@
 // The M2 engine against a scripted connector and a stub generator: no database, no model (PLAN.md §7).
 import assert from 'node:assert/strict';
 import { after, describe, test } from 'node:test';
-import { SlimeConfig, type SlimeOptions } from '../src/config.js';
+import { SlimeConfig, type SlimeOptions } from '../src/config/slime-config.js';
 import type { SlimeEvent } from '../src/config/options.js';
 import { createSlime } from '../src/create-slime.js';
 import { buildDictionary } from '../src/dictionary/dictionary.js';
 import type { HandlerRecord, Slime } from '../src/engine/types.js';
-import { SlimeConfigError, SlimeError, type ErrorCode } from '../src/errors.js';
+import { SlimeConfigError, SlimeError, type ErrorCode } from '../src/shared/errors.js';
 import { requestKey } from '../src/request/key.js';
 import { parseRequest, type InputValues, type SlimeRequest } from '../src/request/parse.js';
-import { memoryStore } from '../src/store/memory-store.js';
+import { memoryStore } from '../src/stores/memory-store.js';
 import { artifact, fakeConnector, stubGenerator } from './helpers.js';
 
 const ROWS = [{ name: 'Acme' }, { name: 'Globex' }];

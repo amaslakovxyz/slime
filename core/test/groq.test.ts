@@ -1,8 +1,8 @@
 // The Groq adapter against a stubbed fetch: request shape, validation, rate-limit waits, errors.
 import assert from 'node:assert/strict';
 import { afterEach, describe, test } from 'node:test';
-import { SlimeError } from '../src/errors.js';
-import { groq } from '../src/groq/index.js';
+import { SlimeError } from '../src/shared/errors.js';
+import { groq } from '../src/models/groq/index.js';
 import type { GenerationRequest } from '../src/ports.js';
 
 const OPTIONS = { apiKey: 'test-key', model: 'openai/gpt-oss-120b', reasoningEffort: 'low' as const };

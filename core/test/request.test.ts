@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { SlimeError } from '../src/errors.js';
+import { SlimeError } from '../src/shared/errors.js';
 import { literalsInIntent, parseRequest } from '../src/request/parse.js';
 
 const output = [{ name: 'string' }];

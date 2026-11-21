@@ -1,5 +1,5 @@
-import { SlimeError } from '../errors.js';
-import type { InputValues } from '../request/parse.js';
+import { SlimeError } from '../../shared/errors.js';
+import type { InputValues } from '../../request/parse.js';
 
 /** R6: a top-level list may not have more rows than input.limit; checked without a model. */
 export function assertWithinLimit(data: unknown, input: InputValues): void {

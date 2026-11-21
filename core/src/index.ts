@@ -1,8 +1,8 @@
 // The public entry. Deep imports are not part of the API; adapters have their own subpaths (C7).
 
 export { createSlime } from './create-slime.js';
-export { DEFAULT_STORE_DIR, fileStore } from './store/file-store.js';
-export { memoryStore } from './store/memory-store.js';
+export { DEFAULT_STORE_DIR, fileStore } from './stores/file-store.js';
+export { memoryStore } from './stores/memory-store.js';
 export type {
   CacheOutcome,
   HandlerRecord,
@@ -16,7 +16,7 @@ export type {
   StoredTier,
   Tier,
 } from './engine/types.js';
-export type { CrystalHandler, ShapeFunction } from './crystal/types.js';
+export type { CrystalHandler, ShapeFunction } from './engine/crystal/types.js';
 export { handlerKeyFor, type HandlerProvenance } from './request/key.js';
 export type { ParamTypes } from './request/params.js';
 
@@ -36,8 +36,8 @@ export {
   type SlimeOptions,
   type TierOptions,
   type WarningEvent,
-} from './config.js';
-export { SlimeConfigError, SlimeError, type ErrorCode, type SlimeErrorBody, type SlimeErrorOptions } from './errors.js';
+} from './config/slime-config.js';
+export { SlimeConfigError, SlimeError, type ErrorCode, type SlimeErrorBody, type SlimeErrorOptions } from './shared/errors.js';
 export type {
   Artifact,
   ColumnInfo,
@@ -69,4 +69,4 @@ export type {
 export type { InputScalar, InputValue, InputValues, SlimeRequest } from './request/parse.js';
 export type { ParamType } from './request/params.js';
 export type { ObjectShape, Shape } from './request/shape.js';
-export type { SlimeStore, StoreEntry } from './store/types.js';
+export type { SlimeStore, StoreEntry } from './stores/types.js';

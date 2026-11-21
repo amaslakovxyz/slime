@@ -1,5 +1,5 @@
 import type pg from 'pg';
-import type { SchemaInfo, TableInfo } from '../ports.js';
+import type { SchemaInfo, TableInfo } from '../../ports.js';
 import { readEnumValues, type EnumValues } from './enum-values.js';
 
 interface ColumnRow {

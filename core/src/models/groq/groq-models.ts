@@ -9,9 +9,9 @@ import {
   optimizeMessage,
   promptHash,
   reviewMessage,
-} from '../models/prompts.js';
-import { ArtifactSchema, OptimizedCodeSchema, ReviewVerdictSchema } from '../models/schemas.js';
-import type { Generator, Optimizer, Reviewer } from '../ports.js';
+} from '../prompts.js';
+import { ArtifactSchema, OptimizedCodeSchema, ReviewVerdictSchema } from '../schemas.js';
+import type { Generator, Optimizer, Reviewer } from '../../ports.js';
 import { callGroqJson, type GroqOptions } from './groq-client.js';
 
 const PROVIDER = 'groq';

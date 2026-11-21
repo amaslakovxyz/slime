@@ -1,7 +1,8 @@
 // Serves hand-written handlers instead of calling a model, so tests, CI and
 // benchmarks run without an API key.
-import type { Artifact, GenerationResult, Generator } from '../ports.js';
-import { canonicalJSON, normalizeIntent, sha256 } from '../request/key.js';
+import type { Artifact, GenerationResult, Generator } from '../../ports.js';
+import { normalizeIntent } from '../../request/key.js';
+import { canonicalJSON, sha256 } from '../../shared/hash.js';
 
 /** Hand-written handlers, keyed by intent; intents match after the cache key's normalization (R3). */
 export type OfflineHandlers = Readonly<Record<string, Artifact>>;

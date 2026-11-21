@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { SlimeError } from '../src/errors.js';
+import { SlimeError } from '../src/shared/errors.js';
 import { checkParamTypes, coarseType } from '../src/request/params.js';
 
 describe('parameter types (R4, R5)', () => {

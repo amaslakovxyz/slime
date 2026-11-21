@@ -1,12 +1,12 @@
 // The app passes everything core needs; core never reads process.env or .env (C4).
-import { DEFAULT_LIMITS, DEFAULT_TIERS } from './config/defaults.js';
-import type { CrystalRegistry, LimitOptions, SlimeEvent, SlimeMode, SlimeOptions, TierOptions } from './config/options.js';
-import { configProblems } from './config/validate.js';
-import { SlimeConfigError } from './errors.js';
-import type { Connector, Generator, Reviewer } from './ports.js';
-import type { SlimeStore } from './store/types.js';
+import { DEFAULT_LIMITS, DEFAULT_TIERS } from './defaults.js';
+import type { CrystalRegistry, LimitOptions, SlimeEvent, SlimeMode, SlimeOptions, TierOptions } from './options.js';
+import { configProblems } from './validate.js';
+import { SlimeConfigError } from '../shared/errors.js';
+import type { Connector, Generator, Reviewer } from '../ports.js';
+import type { SlimeStore } from '../stores/types.js';
 
-export { DEFAULT_LIMITS, DEFAULT_TIERS } from './config/defaults.js';
+export { DEFAULT_LIMITS, DEFAULT_TIERS } from './defaults.js';
 export type {
   CrystalRegistry,
   ErrorEvent,
@@ -19,7 +19,7 @@ export type {
   SlimeOptions,
   TierOptions,
   WarningEvent,
-} from './config/options.js';
+} from './options.js';
 
 /** Setting an option to undefined removes it. */
 export type SlimeOptionOverrides = { [Key in keyof SlimeOptions]?: SlimeOptions[Key] | undefined };

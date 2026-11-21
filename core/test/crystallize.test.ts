@@ -7,17 +7,18 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { after, describe, test } from 'node:test';
-import { SlimeConfig } from '../src/config.js';
+import { SlimeConfig } from '../src/config/slime-config.js';
 import { createSlime } from '../src/create-slime.js';
-import type { CrystalRegistry } from '../src/crystal/types.js';
+import type { CrystalRegistry } from '../src/engine/crystal/types.js';
 import { checkCrystalFolder, crystallize, type CrystallizeOptions } from '../src/crystallize/index.js';
-import { moduleFileFor, renderManifest, readManifest, sha256Hex } from '../src/crystallize/manifest.js';
+import { moduleFileFor, renderManifest, readManifest } from '../src/crystallize/manifest.js';
+import { sha256 } from '../src/shared/hash.js';
 import type { HandlerRecord } from '../src/engine/types.js';
 import type { OptimizedCode, Optimizer } from '../src/ports.js';
 import { requestKey } from '../src/request/key.js';
 import { parseRequest } from '../src/request/parse.js';
-import { memoryStore } from '../src/store/memory-store.js';
-import type { SlimeStore } from '../src/store/types.js';
+import { memoryStore } from '../src/stores/memory-store.js';
+import type { SlimeStore } from '../src/stores/types.js';
 import { artifact, fakeConnector } from './helpers.js';
 
 const ROWS = [
@@ -141,7 +142,7 @@ describe('slime-crystal check (M5)', () => {
     assert.match((await checkCrystalFolder(dir)).join(' '), /does not match the hash pinned/);
 
     const manifest = await readManifest(dir);
-    manifest.entries[KEY]!.sha256 = sha256Hex(edited);
+    manifest.entries[KEY]!.sha256 = sha256(edited);
     await writeFile(join(dir, 'manifest.json'), renderManifest(manifest));
     assert.match((await checkCrystalFolder(dir)).join(' '), /globalThis/);
   });

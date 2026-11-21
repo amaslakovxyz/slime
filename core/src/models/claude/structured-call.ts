@@ -1,8 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
 import type { z } from 'zod';
-import { SlimeError } from '../errors.js';
-import type { ModelUsage } from '../ports.js';
+import { SlimeError } from '../../shared/errors.js';
+import type { ModelUsage } from '../../ports.js';
 
 export type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 

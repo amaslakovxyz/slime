@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { after, describe, test } from 'node:test';
-import { SlimeError } from '../src/errors.js';
+import { SlimeError } from '../src/shared/errors.js';
 import { QuickJSRunner } from '../src/shaping/quickjs-runner.js';
 
 const LIMITS = { timeoutMs: 200, memoryBytes: 32 * 1024 * 1024 };

@@ -1,6 +1,6 @@
-import { SlimeError } from '../errors.js';
-import { assertValidOutput, bindParams, queryLimits, type Execution, type ExecutionDeps } from '../engine/execute.js';
-import type { InputValues } from '../request/parse.js';
+import { SlimeError } from '../../shared/errors.js';
+import { assertValidOutput, bindParams, queryLimits, type Execution, type ExecutionDeps } from '../execute.js';
+import type { InputValues } from '../../request/parse.js';
 import type { CrystalHandler } from './types.js';
 
 export type CrystalDeps = Omit<ExecutionDeps, 'runner'>;

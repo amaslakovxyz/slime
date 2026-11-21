@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { lintArtifact } from '../src/checks/sql.js';
-import { SlimeError } from '../src/errors.js';
+import { lintArtifact } from '../src/engine/checks/sql.js';
+import { SlimeError } from '../src/shared/errors.js';
 import { artifact } from './helpers.js';
 
 function code(fn: () => void): string {

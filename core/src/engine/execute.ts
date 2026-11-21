@@ -1,6 +1,6 @@
-import { assertWithinLimit } from '../checks/limit.js';
+import { assertWithinLimit } from './checks/limit.js';
 import type { LimitOptions } from '../config/options.js';
-import { SlimeError } from '../errors.js';
+import { SlimeError } from '../shared/errors.js';
 import type { Artifact, Connector, QueryLimits, SandboxRunner } from '../ports.js';
 import type { InputValues } from '../request/parse.js';
 import { validateData, type Shape } from '../request/shape.js';

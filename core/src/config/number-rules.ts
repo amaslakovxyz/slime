@@ -1,4 +1,4 @@
-import { isPlainObject } from '../guards.js';
+import { isPlainObject } from '../shared/guards.js';
 import { MEBIBYTE } from './defaults.js';
 import type { LimitOptions, TierOptions } from './options.js';
 

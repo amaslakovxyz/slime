@@ -1,15 +1,15 @@
-import type { SlimeConfig } from './config.js';
+import type { SlimeConfig } from './config/slime-config.js';
 import { buildDictionary, type Dictionary } from './dictionary/dictionary.js';
 import { emitSafely } from './engine/events.js';
 import { HANDLERS_NS } from './engine/handler-cache.js';
 import { SlimeEngine } from './engine/slime-engine.js';
 import type { HandlerRecord, Slime } from './engine/types.js';
-import { SlimeConfigError } from './errors.js';
+import { SlimeConfigError } from './shared/errors.js';
 import type { Connector } from './ports.js';
 import type { HandlerProvenance } from './request/key.js';
 import { QuickJSRunner } from './shaping/quickjs-runner.js';
-import { fileStore } from './store/file-store.js';
-import type { SlimeStore } from './store/types.js';
+import { fileStore } from './stores/file-store.js';
+import type { SlimeStore } from './stores/types.js';
 
 // Locked mode has no generator and never compares these two fields (§4.7).
 const LOCKED_MARKER = 'locked';

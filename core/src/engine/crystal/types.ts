@@ -1,8 +1,8 @@
 // A Crystal handler as the generated index exports it (C10).
-import type { ReviewStatus } from '../engine/types.js';
-import type { InputValues } from '../request/parse.js';
-import type { ParamTypes } from '../request/params.js';
-import type { Shape } from '../request/shape.js';
+import type { ReviewStatus } from '../types.js';
+import type { InputValues } from '../../request/parse.js';
+import type { ParamTypes } from '../../request/params.js';
+import type { Shape } from '../../request/shape.js';
 
 export type ShapeFunction = (rows: Record<string, unknown>[], input: InputValues) => unknown;
 
