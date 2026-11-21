@@ -1,0 +1,3 @@
+# Saved handlers from explore mode; commit them only if you want locked mode to serve them.
+.slime/
+*.tgz

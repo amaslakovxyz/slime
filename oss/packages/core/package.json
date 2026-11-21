@@ -49,7 +49,8 @@
     "test": "node --import tsx --test 'test/**/*.test.ts'",
     "check:pack": "node scripts/check-pack.mjs",
     "prepack": "npm run build",
-    "live": "npm run build && node scripts/live-run.mjs"
+    "live": "npm run build && node scripts/live-run.mjs",
+    "bench": "npm run build && node bench/run.mjs"
   },
   "dependencies": {
     "acorn": "^8.19.0",

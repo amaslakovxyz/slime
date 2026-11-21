@@ -24,10 +24,13 @@ Backend -- Slime runtime:
   Hono, Postgres, Claude, QuickJS) and its speed/correctness benchmark.
   Frozen: new engine work goes into `oss/packages/core/`.
 - [oss/packages/core/](./oss/packages/core/README.md) - `@slime-cloud/core`,
-  the engine rebuilt from `sandbox/` as an installable library. Design phase:
-  [PLAN.md](./oss/packages/core/PLAN.md) holds the decisions and milestones.
-  M0–M1 done: package skeleton, request format and key, contracts,
-  `SlimeConfig`. No engine yet. The only npm workspace so far.
+  the engine rebuilt from `sandbox/` as an installable library.
+  [PLAN.md](./oss/packages/core/PLAN.md) holds the decisions and milestones:
+  M0–M3 and M5 done, M4 and M6 built (runs against a real model pending).
+  The only npm workspace so far.
+- [oss/examples/express/](./oss/examples/express/README.md) - an Express app
+  whose endpoints are answered by `@slime-cloud/core`; its own lockfile. It
+  also holds the demo database (`db/init.sql`) that core's tests and CI use.
 - `docs/` (no contract file; documentation only)
   - [architecture-spec.md](./docs/architecture-spec.md) - Development spec for
     the Slime runtime: request path, DB API, Gatekeeper rules, and Gas / Liquid

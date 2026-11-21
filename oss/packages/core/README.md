@@ -37,7 +37,9 @@ input values. Handlers move up through three tiers:
 > re-checks the folder in CI: Crystal runs without a sandbox, so **run it in
 > your CI**. M4 (Claude and Groq models, review, promotion) is built; its live
 > run against a real model is still pending (`npm run live`). Decisions and
-> milestones are in [PLAN.md](PLAN.md).
+> milestones are in [PLAN.md](PLAN.md). The request format is in
+> [docs/request-format.md](docs/request-format.md), and an app using the
+> package is in [oss/examples/express](../../examples/express/README.md).
 
 ### Scope
 
@@ -100,12 +102,17 @@ input values. Handlers move up through three tiers:
   - [src/checks/](./src/checks/README.md): SQL lint;
   - [src/store/](./src/store/README.md): the key-value store contract.
 - [scripts/](./scripts/README.md): `check-pack.mjs`, which guards what
-  `npm pack` ships.
+  `npm pack` ships, and `live-run.mjs` (M4's live run).
+- `bench/`: the bench ported from the sandbox (`npm run bench`). `cases.mjs`
+  holds 8 cases with reference queries; `run.mjs` runs them through the
+  built package against the demo database, with Groq, Claude, or the
+  example's offline handlers.
 - `test/`: `node:test` suites run through `tsx` (no contract file; tests
   only).
-- `docs/`: design material, no code.
-  [protocol-cases.md](./docs/protocol-cases.md) records the dropped
-  structured protocol and 35 request cases kept for benchmarks.
+- `docs/`: [request-format.md](./docs/request-format.md) is the request
+  format for app developers: fields, output notation, parameters, `meta`,
+  errors and modes. [protocol-cases.md](./docs/protocol-cases.md) records the
+  dropped structured protocol and 35 request cases kept for benchmarks.
 
 ## Global Invariants
 

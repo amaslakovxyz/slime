@@ -62,7 +62,7 @@ jobs:
     name: Core tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # The demo database from sandbox/db/init.sql, for the Postgres connector tests.
+    # The demo database from oss/examples/express/db/init.sql, for the Postgres connector tests.
     services:
       postgres:
         image: postgres:16
@@ -86,7 +86,7 @@ jobs:
       - name: Core does not import Slime Cloud
         run: "! grep -rnE \"@slime-cloud/(runtime|server|control-plane)|slime-cloud/runtime\" oss/packages/core/src"
       - run: npm ci
-      - run: psql "postgres://slime_admin:slime_admin@localhost:54329/slime" -v ON_ERROR_STOP=1 -f sandbox/db/init.sql
+      - run: psql "postgres://slime_admin:slime_admin@localhost:54329/slime" -v ON_ERROR_STOP=1 -f oss/examples/express/db/init.sql
       - run: npm run typecheck -w @slime-cloud/core
       # REQUIRE_DB makes database tests fail instead of skipping if Postgres is missing.
       - run: npm test -w @slime-cloud/core
@@ -95,6 +95,46 @@ jobs:
       # What would be published: compiled dist/ with types, no sources or tests.
       - run: npm run build -w @slime-cloud/core
       - run: npm run check:pack -w @slime-cloud/core
+
+  example:
+    name: Example app
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: slime_admin
+          POSTGRES_PASSWORD: slime_admin
+          POSTGRES_DB: slime
+        ports:
+          - 54329:5432
+        options: >-
+          --health-cmd "pg_isready -U slime_admin -d slime"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            oss/examples/express/package-lock.json
+      - run: psql "postgres://slime_admin:slime_admin@localhost:54329/slime" -v ON_ERROR_STOP=1 -f oss/examples/express/db/init.sql
+      # The example runs on the packed tarball, as an app installing the package would (M6).
+      - run: npm ci
+      - run: npm pack -w @slime-cloud/core --pack-destination "$RUNNER_TEMP"
+      - run: npm ci
+        working-directory: oss/examples/express
+      - run: npm install --no-save "$RUNNER_TEMP"/slime-cloud-core-*.tgz
+        working-directory: oss/examples/express
+      - run: npm test
+        working-directory: oss/examples/express
+        env:
+          REQUIRE_DB: "1"
+      - run: npm run check:crystal
+        working-directory: oss/examples/express
 
   runtime:
     name: Slime Cloud runtime

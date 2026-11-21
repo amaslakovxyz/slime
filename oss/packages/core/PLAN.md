@@ -1,6 +1,6 @@
 # @slime-cloud/core: library plan
 
-* **Status:** draft. M0 to M3 and M5 are done; M4 is built and waits for its live run.
+* **Status:** draft. M0 to M3 and M5 are done. M4 and M6 are built; they wait for runs against a real model, and M6's deletion of `sandbox/` waits for M7.
 * **Date:** 2026-11-20 (review fixes and follow-ups 2026-11-21)
 * **Owner:** Konstantin (core only; server and Slime Cloud are owned by others)
 
@@ -398,7 +398,7 @@ goal. Before a milestone starts, its row gets the files it creates or changes
 | M3 | **Postgres connector.** Connector with the startup safety check and enum values from the catalog, which the M2 dictionary renders (§4.4). CI gets a Postgres service using `sandbox/db/init.sql` (roles and seed data). | `postgres.test.ts` cases pass against Postgres in CI (database tests require `REQUIRE_DB=1` in CI rather than skipping); the file and memory stores pass the shared contract test; changing `rules` changes the dictionary and regenerates handlers in explore mode. | done |
 | M4 | **Models and Liquid.** Claude and Groq generators and reviewers with prompts updated for §4 (nullable parameters, the dictionary); the review loop; promotion to Liquid (rule below); `reviewed` and `promoted` events. | Review and promotion tests pass; one live run against Groq or Claude (`npm run live`). | built; live run pending |
 | M5 | **Crystal.** Serving from an imported registry; the crystallize job writing `.mjs` modules with a generated index; the `check` command. | `crystal*.test.ts` ported; a hand-edited Crystal file fails `check`; the output passes the equivalence test. | done |
-| M6 | **Use it as a package, and retire `sandbox/`.** An example app that installs the packed tarball and calls `slime.query()` from an endpoint; docs for the request format; the bench ported to run on core. The example takes over what `sandbox/` still provides: the demo server, the demo database (`db/init.sql` and its Docker Compose file, used by core's tests and CI) and the offline handlers. Then `sandbox/` is deleted, with its CI job. Publishing to npm is not part of v1. | The example (`oss/examples/express`, its own lockfile, run in CI from the packed tarball) answers a query. The bench, ported to `oss/packages/core/bench/`, gets the 5 cases recorded as correct in `concepts_brief.md` right, and refuses the 2 unsafe ones. Core's tests and CI use the moved demo database. `sandbox/` and its CI job are gone. | planned |
+| M6 | **Use it as a package, and retire `sandbox/`.** An example app that installs the packed tarball and calls `slime.query()` from an endpoint; docs for the request format; the bench ported to run on core. The example takes over what `sandbox/` still provides: the demo server, the demo database (`db/init.sql` and its Docker Compose file, used by core's tests and CI) and the offline handlers. Then `sandbox/` is deleted, with its CI job. Publishing to npm is not part of v1. | The example (`oss/examples/express`, its own lockfile, run in CI from the packed tarball) answers a query. The bench, ported to `oss/packages/core/bench/`, gets the 5 cases recorded as correct in `concepts_brief.md` right, and refuses the 2 unsafe ones. Core's tests and CI use the moved demo database. `sandbox/` and its CI job are gone. | built; bench with a model and `sandbox/` deletion pending |
 | M7 | **Switch `slime-cloud/runtime` to the package** (with its owner). Drop the path mapping to `sandbox/src`; build the engine with `createSlime(new SlimeConfig(…))`; replace `DynamoHandlerStore` with a `SlimeStore` over the existing table that serves the items already there; keep `slime.flush()` before each response (C15). After the switch nothing compiles `sandbox/src`, so M6 can delete `sandbox/`. | The runtime's tests pass on the package; a deployed function answers from handlers stored by the new store. Handlers saved before the switch are still served. The previous deploy can be restored. | planned |
 
 **M2 engine rules.** `createSlime()` awaits `connector.safetyCheck()` (unsafe
@@ -495,6 +495,18 @@ a real model as generator and reviewer); tests `promotion`, `groq` and
 (`meta.ts`; the engine serves Crystal first); `package.json` (`./crystallize`
 export, `slime-crystal` bin, `acorn` and `acorn-walk`); tests
 `crystal-allowlist`, `crystallize` and `package`.
+
+**M6 files.** `oss/examples/express/` (`src/app.mjs` with named routes and
+a dev-only `POST /dev/query`, `src/config.mjs`, `src/server.mjs`,
+`scripts/crystallize.mjs`, `test/app.test.mjs`, `offline-handlers.json`,
+`db/init.sql` and `docker-compose.yml` copied from `sandbox/`, its own
+lockfile); `oss/packages/core/docs/request-format.md`;
+`oss/packages/core/bench/` (`cases.mjs`, `run.mjs`, `npm run bench`; it runs
+offline too, which checks the bench but not a model); core's tests and CI
+use the example's `db/init.sql`; `.github/workflows/ci.yml` (an "Example
+app" job that installs the packed tarball, runs the example's tests and
+`check:crystal`). `sandbox/` keeps its own copy of the demo database until it
+is deleted.
 
 **M7 checklist (with the runtime owner):**
 
