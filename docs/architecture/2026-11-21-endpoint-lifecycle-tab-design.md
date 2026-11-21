@@ -113,7 +113,7 @@ endpoint (`/mcp`), multi-user concurrency, persistence of the feed.
 ### 4.3 Admin (`platform/admin`)
 
 * `tabs.tsx`: add **Lifecycle** at `/endpoints/[id]/lifecycle`.
-* `lib/lifecycle.ts` (pure, unit-tested): from `/v0/handlers` + `/v0/events`
+* `lib/lifecycle.ts` (pure, unit-tested): from `/v0/lifecycle` + `/v0/events`
   derive
   * per handler: stage, progress label (`n/3 to Liquid`, `n/10 to Crystal`,
     `ready to crystallize`), review label;
@@ -142,7 +142,7 @@ sequenceDiagram
   R->>E: spawn + /healthz
   R->>C: ready + url
   A->>E: POST /v0/query (x3 → Liquid, x10 → ready)
-  UI->>E: every 2 s: /v0/handlers, /v0/events
+  UI->>E: every 2 s: /v0/lifecycle, /v0/events
   UI->>E: POST /v0/crystallize {keys}
   E-->>UI: reports
   UI->>C: status=updating
