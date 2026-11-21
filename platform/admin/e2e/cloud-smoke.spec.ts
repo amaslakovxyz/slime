@@ -1,16 +1,18 @@
-// Goal 10: the hosted admin and the shared runtime without a database. Asserts only
-// sign-in, create -> failed with the database reason, the endpoint URL refusing a
-// request without a key, an unknown id answering 404, and delete. Gas -> Liquid ->
-// Crystal on AWS is not covered here (there is no cloud database).
+// The hosted admin and the shared runtime.
+// - Goal 10, always: sign-in, create -> failed with the database reason, the endpoint
+//   URL refusing a request without a key, an unknown id answering 404, and delete.
+// - With SMOKE_DB_URL (a read-only URL to a database with the demo schema, e.g. the
+//   temporary test RDS): the whole lifecycle on AWS, Gas -> Liquid -> Crystal.
 // SMOKE_EMAIL must be in /slime/admin/ADMIN_ALLOWED_EMAILS; the account is created on
 // the first run. With AWS credentials in the environment the SSM path is checked too.
 import { randomBytes } from 'node:crypto';
 import { GetParametersByPathCommand, SSMClient } from '@aws-sdk/client-ssm';
 import { expect, test } from '@playwright/test';
-import { createEndpoint, deleteEndpoint, endpointUrl, expectStatus, signIn } from './helpers';
+import { createEndpoint, deleteEndpoint, endpointUrl, expectStatus, lifecycleJourney, signIn } from './helpers';
 
 const EMAIL = process.env.SMOKE_EMAIL;
 const SMOKE_PASSWORD = process.env.SMOKE_PASSWORD;
+const SMOKE_DB_URL = process.env.SMOKE_DB_URL;
 /** `.invalid` never resolves, so the runtime fails fast with a DNS error instead of a connect timeout. */
 const UNREACHABLE_DB = 'postgres://smoke:smoke@unreachable.invalid:5432/smoke';
 
@@ -61,5 +63,13 @@ test.describe('cloud smoke (Goal 10)', () => {
     const names = await ssmNames(id);
     if (names === undefined) test.info().annotations.push({ type: 'skipped', description: 'no AWS credentials: SSM path not checked' });
     else expect(names).toEqual([]);
+  });
+
+  test('the whole lifecycle on the test database: create -> ready, Liquid, Crystallize, the Crystal route, delete', async ({ page, request }) => {
+    test.skip(!SMOKE_DB_URL, 'SMOKE_DB_URL is not set (no cloud test database)');
+    // Twelve queries, a Crystallize and a settings TTL for the new Crystal token.
+    test.setTimeout(240_000);
+    await signIn(page, EMAIL!, SMOKE_PASSWORD!);
+    await lifecycleJourney(page, request, { name: `smoke-db-${randomBytes(3).toString('hex')}`, databaseUrl: SMOKE_DB_URL! });
   });
 });
