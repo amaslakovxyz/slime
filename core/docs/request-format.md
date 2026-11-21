@@ -116,13 +116,12 @@ try {
 }
 ```
 
-## Multi-source handlers (planned)
+## Multi-source handlers
 
-**Not implemented yet.** This section fixes the format the implementation
-will follow ([multi-source.md](./multi-source.md), decisions MS1–MS17 in
-[PLAN.md §3.1](../PLAN.md)). Nothing here changes while no API source is
-configured: requests, handlers, `meta` and errors stay exactly as described
-above.
+When the config has API sources ([multi-source.md](./multi-source.md),
+decisions MS1–MS17 in [PLAN.md §3.1](../PLAN.md)), handlers can read from
+several sources. Nothing here applies while no API source is configured:
+requests, handlers, `meta` and errors stay exactly as described above.
 
 The request itself is unchanged: `{ intent, input, output }`. What changes is
 the handler the model writes when the instance has at least one API source.

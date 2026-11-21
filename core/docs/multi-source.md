@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | **Design** (draft for review; not on main) |
+| Status | **Built** on `chore/multi-source-plan` (PR #26): P0–P6 done, except recording real Notion fixtures (P5.5) and the live Notion run (P6.5), which need a Notion workspace |
 | Owner | Konstantin |
 | Date | 2026-11-21 (revised after the review in PR #26) |
 | Scope | `core/` (`@slime-cloud/core`), one new adapter subpath, one example app |

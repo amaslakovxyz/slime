@@ -40,9 +40,14 @@ The other two demo intents are in `offline-handlers.json`.
 4. Copy `.env.example` to `.env` and set `NOTION_TOKEN` (reader),
    `NOTION_SEED_TOKEN` (seeder) and `NOTION_PARENT_PAGE_ID`.
 5. Seed the data and put the printed ids into `.env`
-   (`NOTION_FEEDBACK_ID`, `NOTION_MOVIE_NIGHTS_ID`).
+   (`NOTION_FEEDBACK_ID`, `NOTION_MOVIE_NIGHTS_ID`). The seed script,
+   `scripts/seed-notion.mjs`, comes with the recorded fixtures (P5.5); until
+   then create the two databases by hand with the properties in
+   `test/fixtures/notion/retrieve-*.json`.
 6. `npm start`. Set `GROQ_API_KEY` or `ANTHROPIC_API_KEY` to let a model write
    handlers; without one, the offline handlers answer the three demo intents.
+7. `node --env-file=.env scripts/live-run.mjs` runs the three intents against
+   real Notion, the films API and a model until each is promoted (P6.5).
 
 ## Development only
 
