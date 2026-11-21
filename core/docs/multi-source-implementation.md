@@ -136,6 +136,30 @@ multi-source". If P0 changes one, update the steps that cite it.
   least 2 of the 3 intents return a plausible two-step artifact on at least one
   provider. Paste the replies into the pull request. If either check fails,
   stop and revise the artifact format before P1.
+- **Result (2026-11-21): passed, with one finding and one open check.**
+  - **Groq** (`openai/gpt-oss-120b`, prompt-mode JSON validated with the
+    schema), three runs:
+
+    | Run | Intent 1 (db + notion) | Intent 2 (notion + films) | Intent 3 (films) |
+    |---|---|---|---|
+    | 1 | wrong source name (`postgresql`) | pass | pass |
+    | 2 | pass | pass | pass |
+    | 3 | pass | pass | Groq rate limit |
+
+    "Pass" means the reply matched the schema, passed the step lint, used the
+    expected sources, and ran end to end: SQL against the demo database,
+    canned API rows, `shape` in QuickJS, and output validation. Intent 1's
+    handler pushed the `negative` and `Open` filters to Notion as constants,
+    joined on the `matches db.accounts.name` hint, and sorted correctly.
+  - **Finding.** Run 1 failed because today's dictionary heading
+    (`Database: postgresql 16`) doesn't name the SQL source. With API sources
+    configured, the heading becomes `Database db: postgresql 16` (P1.5,
+    design §3.4). Runs 2 and 3 used that heading.
+  - **Claude.** No API key was available, so there was no live call. The
+    schema converts with `betaZodOutputFormat` with every object closed
+    (`additionalProperties: false`). One live Claude call is still to do; P3.2's
+    tests and the P3.4 live run cover it.
+  - The spike is `core/bench/spikes/multi-source-prompt.mjs`.
 
 ## 3. Phase P1: sources and dictionary (2.5 d)
 
@@ -245,7 +269,10 @@ multi-source". If P0 changes one, update the steps that cite it.
   - With API schemas:
     - one section per source after the tables (design §3.4);
     - columns reuse `renderColumn`;
-    - param lines are `name type [one of: …] [-- comment]`.
+    - param lines are `name type [one of: …] [-- comment]`;
+    - the database heading names the SQL source:
+      `Database <sqlSourceName>: <dialect>` (P0.3 finding: without it the
+      model named the step's source `postgresql`).
   - `schemaHash` without API schemas is today's. With them it is
     `sha256(canonicalJSON({ sql: schema, api: apiSchemas }))`.
   - `buildDictionary` also returns
