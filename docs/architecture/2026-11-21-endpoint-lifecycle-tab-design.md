@@ -8,10 +8,11 @@
 ## 1. Goal
 
 **One endpoint is a dispatch buffer.** Every request goes to one URL
-(`POST /v0/query`); each distinct request becomes a handler keyed by its hash.
-Gas → Liquid happens by itself as a hash repeats; Liquid → Crystal is the
-operator's choice: a picked request becomes **its own endpoint**
-(`POST /v0/e/<hash>` with only `input` in the body). The Lifecycle tab is where
+(`POST /v0/query`); each distinct request becomes a handler keyed by its
+handler key. Gas → Liquid happens by itself: 3 successful runs, then the
+review approves (or review is off). Liquid → Crystal is the operator's choice:
+a picked request becomes **its own endpoint** (`POST /v0/e/<crystal key>` with
+only `input` in the body). The Lifecycle tab is where
 the operator sees what matters and promotes it.
 
 One minimal flow inside an endpoint, runnable on a laptop:
@@ -59,6 +60,9 @@ endpoint (`/mcp`), multi-user concurrency, persistence of the feed.
 | L14 | A busy own port fails the endpoint with a reason instead of moving it; the runner kills its runtimes on exit or crash; one endpoint's error never stops the runner; the file secret store writes atomically and queues changes. | Five parallel deletes raced on the secrets file, crashed the runner, left orphan runtimes on their ports, and the next runner silently moved two endpoints to new URLs. |
 | L15 | Endpoint tabs are Lifecycle · Usage · Settings (Overview and Connector redirect: Overview folded into Lifecycle and Usage, the connection moved to Settings). Crystallize is a button in the ready row; a Crystal's URL, token and curl open under its row. The endpoint list shows name, status, URL and requests; the whole row is a link. | Fewer screens repeating the same numbers; the whole flow fits one list. |
 | L16 | The local runtime writes the same usage counters as Lambda (`USAGE#<id>` in the control table, `SLIME_USAGE_TABLE` set by the runner). | Locally, Usage, Billing and the list showed zeros next to a Lifecycle tab full of traffic. |
+| L17 | The Crystal route refuses missing **and unknown** input names. | The key hashes the input names; an unknown name would miss the Crystal and generate. |
+| L18 | Saved handlers with another provenance are marked stale, rank below live Gas, and `crystallize()` refuses them. | Stale code must not be frozen. |
+| L19 | Engine `warning` events are logged by both runtimes and shown in the Lifecycle tab. | The Crystal schema warning was dropped. |
 
 ## 4. Components
 
@@ -72,7 +76,7 @@ endpoint (`/mcp`), multi-user concurrency, persistence of the feed.
   (`{at, handlerKey, tier, cache, ms}`), fed by the existing `onQuery` hook.
   `GET /v0/events` returns it. Memory only.
 * **`POST /v0/crystallize`** `{ keys?: string[] }` (only when `SLIME_LOCAL=1`):
-  runs `crystallize({ connector, store, dir: SLIME_CRYSTAL_DIR, minRuns })`
+  runs `crystallize({ connector, store, dir: SLIME_CRYSTAL_DIR, minRuns, provenance })`
   without an optimizer (the unchanged Liquid code is the candidate). `keys`
   limits the job through a read-only store view whose `list()` returns only
   those handlers (`crystallize()` has no key filter; no core change). The
@@ -84,9 +88,11 @@ endpoint (`/mcp`), multi-user concurrency, persistence of the feed.
   in memory, while `crystallize()` reads runs from the store. Without the copy
   no handler ever reaches `minRuns` from live traffic (`syncLiveRuns`).
 * **`GET /v0/lifecycle`** merges saved, live and Crystal handlers (one row per
-  key, most mature tier wins) and returns the thresholds
-  (`gasToLiquidRuns`, `CRYSTAL_MIN_RUNS`).
-* **`POST /v0/e/<key>`**: a Crystal's own route (L8).
+  key, most mature tier wins; a stale saved row ranks below live Gas, L18) and
+  returns the thresholds (`gasToLiquidRuns`, `CRYSTAL_MIN_RUNS`) and the
+  engine's startup warnings (L19).
+* **`POST /v0/e/<crystal key>`**: a Crystal's own route (L8); refuses missing
+  and unknown input names (L17).
 
 ### 4.2 Local runner (`platform/admin/scripts/local-runner.ts`, `npm run local`)
 
@@ -119,12 +125,11 @@ endpoint (`/mcp`), multi-user concurrency, persistence of the feed.
     `ready to crystallize`), review label;
   * the rail: Connected (endpoint `ready`), Agent linked (any handler),
     Liquid (any Liquid or Crystal), Crystal (any Crystal).
-  * Review label: a saved handler carries a `ReviewStatus`
-    (`approved` / `rejected` / `pending` → `reviewing…`). A live handler has no
-    review field on `HandlerSummary`, so it is inferred: non-Gas → `approved`
-    (or `no reviewer` when its stored review is `none`), Gas with runs ≥ 3 →
-    `reviewing…`, else `—`. Good enough for v1; a real review field on
-    `HandlerSummary` is deferred (§9).
+  * Review label comes from the engine (`HandlerSummary.review`, saved records,
+    Crystal manifest); no inference from runs. `pending` → `reviewing…`; a
+    non-Gas handler with `none` → `no reviewer`; Gas with `none` → `—`.
+  * A stale saved handler shows `stale · regenerates on next request` and has
+    no Crystallize checkbox (L18).
 * `lifecycle/page.tsx`: the three cards from the mockup; snippets filled with
   the endpoint URL and the token hint (full token via the existing Reveal).
 * Server action `crystallize(endpointId, keys)`: calls the runtime, shows
@@ -187,6 +192,14 @@ sequenceDiagram
 * Crystal tokens cannot be rotated or revoked one by one yet; deleting the
   endpoint removes them.
 * Single machine, single operator.
+* An approved revision turns Liquid after 1 run: a rejection resets runs to 1,
+  and the revised code is reviewed at once.
+* Crystals are served as is after a migration: a breaking migration gives a
+  database error at call time, a semantic one a silently wrong answer.
+  Re-crystallize after migrations; the Lifecycle tab shows the startup warning.
+* Crystal code runs without the QuickJS sandbox (allowlist and equivalence
+  test only), and Crystallize is local-only (`SLIME_LOCAL=1`).
+* With `SLIME_REVIEW=off` a Crystal can ship unreviewed.
 * DynamoDB Local runs `-inMemory`: restarting its container drops Liquid
   handlers and endpoints.
 
@@ -199,7 +212,25 @@ sequenceDiagram
   filtered store view does it without touching the core.
 * **Answered:** *crystallize may see stale `runs`.* The local entry flushes
   before each response, like Lambda.
+* **Answered:** *review state in `HandlerSummary`.* A one-field core change;
+  the admin no longer derives the label.
 * **Survived (limit):** the first real test needs a model key in the runner's
   environment.
-* **Deferred:** MCP endpoint, GitHub PR for Crystal, review state in
-  `HandlerSummary` (derived label for now).
+* **Deferred:** MCP endpoint, GitHub PR for Crystal.
+
+## 10. Relation to product frame v0.2
+
+Frame: [product_frame_v0_2.md](../product/product_frame_v0_2.md).
+
+The Lifecycle tab implements the v0 main flow and vocabulary of the frame
+(calibrated 2026-11-21).
+
+| Frame term | Here |
+|---|---|
+| Gas | A new request on `POST /v0/query` generates a handler; shown as a Gas row with `n/3 to Liquid`. |
+| Liquid | Automatic promotion after 3 runs and the review; the saved row survives restarts. |
+| Crystallize | The Crystallize button → `POST /v0/crystallize` (local only), then a restart. |
+| Crystal | Its own route `POST /v0/e/<crystal key>` with an `slc_` token. |
+
+Not here yet: `catalog`, slime-client, `/mcp`, `slime uncrystallize`, origin
+allowlist, CORS.

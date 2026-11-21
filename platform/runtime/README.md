@@ -19,8 +19,8 @@ replace the `file:` path with a version; nothing else changes.
 |---|---|
 | [src/lambda.ts](src/lambda.ts) | Lambda entry: SSM settings at cold start (comma-separated `SLIME_SSM_PREFIX` paths, later overrides earlier), `x-api-key` auth, lazy `createSlime()` (503 `NOT_READY` and retry), a capped `flush()` (store, reviews, usage) before each response |
 | [src/config.ts](src/config.ts) | `SlimeConfig` from env, with the same variable names the sandbox runtime read |
-| [src/app.ts](src/app.ts) | HTTP routes on the core's `Slime` API (`/v0/query`, `/healthz`, `/v0/handlers`, a Crystal's own route `/v0/e/<key>`; local-only `/v0/events`, `/v0/lifecycle`, `/v0/crystallize` when their parts are given) |
-| [src/local.ts](src/local.ts) | Local entry: the same runtime as a Node HTTP server on `PORT`, started by the admin's local runner; flushes before each response, crystallizes into `SLIME_CRYSTAL_DIR` |
+| [src/app.ts](src/app.ts) | HTTP routes on the core's `Slime` API (`/v0/query`, `/healthz`, `/v0/handlers`, a Crystal's own route `/v0/e/<key>`; local-only `/v0/events`, `/v0/lifecycle`, `/v0/crystallize` when their parts are given); the Crystal route refuses missing and unknown input names |
+| [src/local.ts](src/local.ts) | Local entry: the same runtime as a Node HTTP server on `PORT`, started by the admin's local runner; flushes before each response, crystallizes into `SLIME_CRYSTAL_DIR`; marks stale saved handlers; collects `warning` events for `/v0/lifecycle` |
 | [src/events.ts](src/events.ts) | The last 50 answered requests (handler, tier, cache, ms), memory only |
 | [src/auth.ts](src/auth.ts) | `keyMatches` and `isAuthorized`, shared by both entries: the endpoint key opens every route; a Crystal's own token (`CRYSTAL_TOKENS`, JSON `{key: token}`) opens only `POST /v0/e/<its key>` |
 | [src/live-runs.ts](src/live-runs.ts) | Copies live Liquid run counts to the store (the core saves a handler only when it turns Liquid): before Crystallize locally, at most every `SLIME_RUNS_SYNC_MS` (default 60 s) on Lambda flush |
