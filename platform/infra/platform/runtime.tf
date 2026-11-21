@@ -206,6 +206,9 @@ resource "aws_lambda_function" "runtime" {
       SLIME_TENANT_CACHE_MAX   = "8"
       SLIME_TENANT_TTL_MS      = "30000"
       SLIME_MAX_DB_CONNECTIONS = "2"
+      # Liquid run counts reach the store after every request: Crystallize can land on
+      # another warm instance, which only sees the store (platform/runtime/src/live-runs.ts).
+      SLIME_RUNS_SYNC_MS = "0"
     }
   }
 

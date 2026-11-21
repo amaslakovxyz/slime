@@ -7,7 +7,7 @@ import { memoryStore, type CrystalRegistry, type QueryMeta, type Slime } from '@
 import { createApp, mergeHandlers } from '../src/app.js';
 import { RecentRequests } from '../src/events.js';
 import { storeLimitedTo, toSavedHandler } from '../src/endpoint-runtime.js';
-import { syncLiveRuns } from '../src/live-runs.js';
+import { LiveRunsSync, syncLiveRuns } from '../src/live-runs.js';
 
 const meta = (handlerKey: string, tier: QueryMeta['tier']): QueryMeta =>
   ({ handlerKey, tier, cache: 'hit', timingsMs: { total: 3, run: 2, shape: 0 } }) as unknown as QueryMeta;
@@ -207,5 +207,26 @@ describe('LiveRunsSync', () => {
     now = 120_000;
     assert.equal(await sync.maybeSync(), true);
     assert.equal(((await store.get('handlers', 'liq')) as { runs: number }).runs, 20);
+  });
+
+  test('with interval 0 every grown Liquid count is written at once; unchanged counts cost no store call', async () => {
+    const store = memoryStore();
+    await store.put('handlers', 'liq', { key: 'liq', runs: 3 });
+    const savedRuns = async (): Promise<unknown> => {
+      const saved = await store.get('handlers', 'liq');
+      return saved && typeof saved === 'object' && 'runs' in saved ? saved.runs : undefined;
+    };
+    let gets = 0;
+    const counting: typeof store = { ...store, get: async (ns, key) => (gets++, store.get(ns, key)) };
+    let live = [{ key: 'liq', tier: 'liquid', runs: 4 }];
+    const sync = new LiveRunsSync(counting, () => live, 0);
+    assert.equal(await sync.maybeSync(), true);
+    assert.equal(await savedRuns(), 4);
+    const before = gets;
+    assert.equal(await sync.maybeSync(), false, 'same count: nothing to write');
+    assert.equal(gets, before);
+    live = [{ key: 'liq', tier: 'liquid', runs: 12 }];
+    assert.equal(await sync.maybeSync(), true);
+    assert.equal(await savedRuns(), 12);
   });
 });
