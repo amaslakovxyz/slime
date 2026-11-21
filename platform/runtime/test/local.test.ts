@@ -72,6 +72,17 @@ describe('local routes', () => {
     assert.match(error.message, /takes input: limit \(number\)\. Missing: limit\./);
   });
 
+  test('a Crystal call with an unknown input name is a 400 and never reaches the engine', async () => {
+    const queries: unknown[] = [];
+    const app = createApp({ slime: fakeSlime(queries), connector, crystal });
+    const res = await app.request('/v0/e/k1', { method: 'POST', body: JSON.stringify({ input: { limit: 5, extra: 1 } }) });
+    assert.equal(res.status, 400);
+    const { error } = (await res.json()) as { error: { code: string; message: string } };
+    assert.equal(error.code, 'INVALID_REQUEST');
+    assert.match(error.message, /Unknown: extra\./);
+    assert.deepEqual(queries, []);
+  });
+
   test('an unknown Crystal key is 404', async () => {
     const app = createApp({ slime: fakeSlime(), connector, crystal });
     assert.equal((await app.request('/v0/e/nope', { method: 'POST', body: '{}' })).status, 404);
