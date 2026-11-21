@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { SlimeError } from '../src/shared/errors.js';
-import { checkParamTypes, coarseType } from '../src/request/params.js';
+import { SlimeError } from '../../src/shared/errors.js';
+import { checkParamTypes, coarseType } from '../../src/request/params.js';
 
 describe('parameter types (R4, R5)', () => {
   test('coarse types: whole and decimal numbers are one type; null has none', () => {

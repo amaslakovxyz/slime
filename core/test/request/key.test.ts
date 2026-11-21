@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { changedProvenance, handlerKeyFor, normalizeIntent, requestKey } from '../src/request/key.js';
-import { canonicalJSON } from '../src/shared/hash.js';
-import { parseRequest } from '../src/request/parse.js';
+import { changedProvenance, handlerKeyFor, normalizeIntent, requestKey } from '../../src/request/key.js';
+import { canonicalJSON } from '../../src/shared/hash.js';
+import { parseRequest } from '../../src/request/parse.js';
 
 const output = [{ name: 'string', totalPaid: 'integer' }];
 const key = (intent: string, input: Record<string, unknown> = {}, out: unknown = output) =>

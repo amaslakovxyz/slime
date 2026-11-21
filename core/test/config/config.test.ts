@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { DEFAULT_LIMITS, DEFAULT_TIERS, SlimeConfig, type SlimeOptions } from '../src/config/slime-config.js';
-import { SlimeConfigError } from '../src/shared/errors.js';
-import type { SlimeStore } from '../src/stores/types.js';
-import { fakeConnector, fakeGenerator, fakeReviewer } from './helpers.js';
+import { DEFAULT_LIMITS, DEFAULT_TIERS, SlimeConfig, type SlimeOptions } from '../../src/config/slime-config.js';
+import { SlimeConfigError } from '../../src/shared/errors.js';
+import type { SlimeStore } from '../../src/stores/types.js';
+import { fakeConnector, fakeGenerator, fakeReviewer } from '../../src/testing/fakes.js';
 
 function problems(options: unknown): readonly string[] {
   try {

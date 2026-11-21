@@ -48,7 +48,15 @@ test('adapters have their own subpaths, so the main entry never loads them (C7)'
   assert.deepEqual(Object.keys(await import('../src/models/groq/index.js')).sort(), ['groq', 'groqGenerator', 'groqOptimizer', 'groqReviewer']);
   assert.deepEqual(pkg.exports['./crystallize'], { types: './dist/crystallize/index.d.ts', default: './dist/crystallize/index.js' });
   assert.deepEqual(pkg.exports['./testing'], { types: './dist/testing/index.d.ts', default: './dist/testing/index.js' });
-  assert.deepEqual(Object.keys(await import('../src/testing/index.js')), ['describeStoreContract']);
+  assert.deepEqual(Object.keys(await import('../src/testing/index.js')).sort(), [
+    'artifact',
+    'describeStoreContract',
+    'fakeConnector',
+    'fakeGenerator',
+    'fakeReviewer',
+    'stubGenerator',
+    'stubReviewer',
+  ]);
   // Bundlers copy the shaping worker by this name; it is never imported, only loaded as a worker.
   assert.equal(pkg.exports['./shape-worker'], './dist/sandbox/quickjs/shape-worker.js');
 });

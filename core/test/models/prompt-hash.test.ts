@@ -3,8 +3,8 @@
 // to prompt text, or to how a provider assembles it, a deliberate one.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { claude } from '../src/models/claude/index.js';
-import { groq } from '../src/models/groq/index.js';
+import { claude } from '../../src/models/claude/index.js';
+import { groq } from '../../src/models/groq/index.js';
 
 const OPTIONS = { apiKey: 'unused', model: 'any-model' };
 

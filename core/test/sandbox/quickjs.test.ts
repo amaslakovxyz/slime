@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, describe, test } from 'node:test';
-import { SlimeError } from '../src/shared/errors.js';
-import { QuickJSRunner } from '../src/sandbox/quickjs/quickjs-runner.js';
+import { SlimeError } from '../../src/shared/errors.js';
+import { QuickJSRunner } from '../../src/sandbox/quickjs/quickjs-runner.js';
 
 const LIMITS = { timeoutMs: 200, memoryBytes: 32 * 1024 * 1024 };
 const STUCK_IN_NATIVE_CALL = 'function shape() { const a = []; while (true) a.push("x".repeat(1e6)) }';

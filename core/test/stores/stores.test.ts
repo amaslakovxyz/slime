@@ -3,9 +3,9 @@ import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, describe, test } from 'node:test';
-import { fileStore } from '../src/stores/file-store.js';
-import { memoryStore } from '../src/stores/memory-store.js';
-import { describeStoreContract } from '../src/testing/index.js';
+import { fileStore } from '../../src/stores/file-store.js';
+import { memoryStore } from '../../src/stores/memory-store.js';
+import { describeStoreContract } from '../../src/testing/index.js';
 
 const temporaryDirs: string[] = [];
 after(() => Promise.all(temporaryDirs.map((dir) => rm(dir, { recursive: true, force: true }))));

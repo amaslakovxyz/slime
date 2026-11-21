@@ -1,14 +1,14 @@
 // Gas → Liquid and the review loop (PLAN.md §7, M4 promotion rule), with stub models.
 import assert from 'node:assert/strict';
 import { after, describe, test } from 'node:test';
-import { SlimeConfig, type SlimeOptions } from '../src/config/slime-config.js';
-import type { SlimeEvent } from '../src/config/options.js';
-import { createSlime } from '../src/create-slime.js';
-import type { HandlerRecord, QueryMeta, Slime } from '../src/engine/types.js';
-import type { GenerationRequest } from '../src/models/types.js';
-import type { SlimeStore } from '../src/stores/types.js';
-import { memoryStore } from '../src/stores/memory-store.js';
-import { artifact, fakeConnector, stubGenerator, stubReviewer } from './helpers.js';
+import { SlimeConfig, type SlimeOptions } from '../../src/config/slime-config.js';
+import type { SlimeEvent } from '../../src/config/options.js';
+import { createSlime } from '../../src/create-slime.js';
+import type { HandlerRecord, QueryMeta, Slime } from '../../src/engine/types.js';
+import type { GenerationRequest } from '../../src/models/types.js';
+import type { SlimeStore } from '../../src/stores/types.js';
+import { memoryStore } from '../../src/stores/memory-store.js';
+import { artifact, fakeConnector, stubGenerator, stubReviewer } from '../../src/testing/fakes.js';
 
 const ROWS = [{ name: 'Acme' }];
 const REQUEST = { intent: 'accounts in a country', input: { country: 'DE' }, output: [{ name: 'string' }] };

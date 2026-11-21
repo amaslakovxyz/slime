@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { assertValidShape, validateAgainstShape, validateData } from '../src/request/shape.js';
+import { assertValidShape, validateAgainstShape, validateData } from '../../src/request/shape.js';
 
 describe('output notation', () => {
   test('accepts type names, one-element lists and objects', () => {

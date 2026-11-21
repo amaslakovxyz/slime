@@ -1,6 +1,6 @@
-// Test doubles shared by the unit tests. No database, no model.
-import type { Connector } from '../src/connectors/types.js';
-import type { Artifact, GenerationRequest, Generator, Reviewer } from '../src/models/types.js';
+// Test doubles for apps' and adapters' own tests, and core's: no database, no model.
+import type { Connector } from '../connectors/types.js';
+import type { Artifact, GenerationRequest, Generator, Reviewer } from '../models/types.js';
 
 export function artifact(sql: string, params: string[] = [], shapeJs: string | null = null): Artifact {
   return { unsatisfiable: null, sql, params, shapeJs, assumptions: [] };

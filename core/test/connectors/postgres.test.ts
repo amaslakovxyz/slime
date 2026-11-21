@@ -1,16 +1,16 @@
 // The Postgres connector against the demo database, as the read-only slime_reader (M3).
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { SlimeConfig } from '../src/config/slime-config.js';
-import { createSlime } from '../src/create-slime.js';
-import { SlimeError } from '../src/shared/errors.js';
-import { offlineGenerator } from '../src/models/offline/index.js';
-import type { Connector, QueryLimits } from '../src/connectors/types.js';
-import { valuesInCheck } from '../src/connectors/postgres/enum-values.js';
-import { postgresConnector } from '../src/connectors/postgres/index.js';
-import { memoryStore } from '../src/stores/memory-store.js';
-import { READER_URL, WRITER_URL, asWriter, isDatabaseAvailable } from './database.js';
-import { artifact } from './helpers.js';
+import { SlimeConfig } from '../../src/config/slime-config.js';
+import { createSlime } from '../../src/create-slime.js';
+import { SlimeError } from '../../src/shared/errors.js';
+import { offlineGenerator } from '../../src/models/offline/index.js';
+import type { Connector, QueryLimits } from '../../src/connectors/types.js';
+import { valuesInCheck } from '../../src/connectors/postgres/enum-values.js';
+import { postgresConnector } from '../../src/connectors/postgres/index.js';
+import { memoryStore } from '../../src/stores/memory-store.js';
+import { READER_URL, WRITER_URL, asWriter, isDatabaseAvailable } from '../support/database.js';
+import { artifact } from '../../src/testing/fakes.js';
 
 const hasDatabase = await isDatabaseAvailable();
 const LIMITS: QueryLimits = { timeoutMs: 2_000, rowCap: 1_000 };
