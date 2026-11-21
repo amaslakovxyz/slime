@@ -39,7 +39,9 @@ x-api-key: slc_…
 
 * Known key, exact input names → the frozen handler runs: deterministic code,
   zero model tokens.
-* Unknown Crystal key → `HANDLER_NOT_FOUND`.
+* Unknown Crystal key or wrong token → 401 `UNAUTHORIZED` (the token is
+  checked first); a token whose Crystal is not loaded yet (before the
+  endpoint restarts) → `HANDLER_NOT_FOUND`.
 * Missing or unknown input names → `INVALID_REQUEST`.
 * Never a generation.
 
@@ -54,7 +56,9 @@ Crystallize (admin today; `slime crystallize "<intent>"` later):
    frozen; the Crystal endpoint goes live after the endpoint restarts, and an
    `slc_` token is issued.
 
-Re-crystallizing after a migration keeps the same Crystal key. `query` = "ask"
+Re-crystallizing in place is not built (core answers `already` for a key in the
+manifest); after a migration the Crystal must be removed first, and the same
+Crystal key comes back. `query` = "ask"
 (may generate); `crystallize` = "freeze and give me a permanent address".
 
 ## slime CLI / MCP
@@ -128,10 +132,10 @@ User flow — **two steps**:
     body: JSON.stringify({ input: {} }),
   })
     .then(r => r.json())
-    .then(rows => {
+    .then(({ data }) => {                  // the route answers { data, meta }
       const list = document.getElementById("list");
       list.textContent = "";
-      for (const i of rows) {
+      for (const i of data) {
         const li = document.createElement("li");
         li.textContent = `${i.id} — ${i.title}`;   // textContent, never innerHTML
         list.appendChild(li);
@@ -147,8 +151,11 @@ Crystal design itself:
 
 1. **No source tokens in the page.** Linear/Postgres OAuth tokens are
    encrypted, live only in slime-cloud, and never reach the browser.
-2. **Own `slc_` token per Crystal, opens only its own route.** Leaking it
-   only lets someone replay the same shaped response the page already shows.
+2. **Own `slc_` token per Crystal, opens only its own route.** A leaked token
+   runs that Crystal with any input values, not only the page's: for a Crystal
+   with no inputs that is the same response the page shows; for one with
+   inputs it is every row those inputs can select. Never make an identity
+   (org, user) a Crystal input on a public page.
 3. **Only the handler's shape leaves the platform.** No arbitrary queries, no
    raw source rows; the route rejects unknown input names and serves only the
    Crystal, so a public page can never reach the generator.
