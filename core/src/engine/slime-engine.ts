@@ -11,6 +11,7 @@ import { requestKey, type HandlerProvenance } from '../request/key.js';
 import { parseRequest, type InputValues, type ParsedRequest, type SlimeRequest } from '../request/parse.js';
 import { checkParamTypes } from '../request/params.js';
 import type { SlimeStore } from '../stores/types.js';
+import type { ApiSchema } from '../sources/types.js';
 import { BackgroundTasks } from './background.js';
 import { Coalescer } from './coalescer.js';
 import { emitSafely, errorEvent, generatedEvent } from './events.js';
@@ -29,6 +30,8 @@ export interface EngineParts {
   runner: SandboxRunner;
   dictionary: Dictionary;
   provenance: HandlerProvenance;
+  /** API sources' schemas by name; empty without API sources. */
+  apiSchemas: Readonly<Record<string, ApiSchema>>;
 }
 
 interface CrystalAnswer {
@@ -157,14 +160,20 @@ export class SlimeEngine implements Slime {
   async #runSaved(record: HandlerRecord, input: InputValues): Promise<Execution> {
     record.paramTypes = checkParamTypes(record.paramTypes, input);
     const { config, runner } = this.#parts;
-    const execution = await executeArtifact({ connector: config.connector, runner, limits: config.limits }, { artifact: record.artifact, output: record.output, input });
+    const execution = await executeArtifact({ ...this.#sourceDeps(), runner, limits: config.limits }, { artifact: record.artifact, output: record.output, input });
     this.#lifecycle.recordRun(record, input);
     return execution;
   }
 
   #generationDeps(generator: Generator): GenerationDeps {
     const { config, runner, dictionary, provenance } = this.#parts;
-    return { generator, connector: config.connector, runner, limits: config.limits, dictionaryText: dictionary.text, provenance };
+    const multiSource = config.hasApiSources ? { format: 'v2' as const, sqlSourceName: config.sqlSourceName } : {};
+    return { generator, ...this.#sourceDeps(), runner, limits: config.limits, dictionaryText: dictionary.text, provenance, ...multiSource };
+  }
+
+  #sourceDeps() {
+    const { config, apiSchemas } = this.#parts;
+    return { connector: config.connector, sources: config.sources, apiSchemas };
   }
 
   #reviewFunction(): ((record: HandlerRecord) => Promise<ReviewOutcome>) | undefined {

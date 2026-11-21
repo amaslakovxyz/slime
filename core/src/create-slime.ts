@@ -29,7 +29,7 @@ export async function createSlime(config: SlimeConfig): Promise<Slime> {
   if (config.mode === 'locked') await warnAboutOtherSchemas(config, store, provenance.schemaHash);
   // Crystal is SQL only, so an API source's change must not flag it (MS17).
   warnAboutOtherSchemaCrystals(config, dictionary.sourceHashes?.[config.sqlSourceName] ?? dictionary.schemaHash);
-  return new SlimeEngine({ config, store, runner: new QuickJSRunner(), dictionary, provenance });
+  return new SlimeEngine({ config, store, runner: new QuickJSRunner(), dictionary, provenance, apiSchemas });
 }
 
 async function assertSafeCredentials(connector: Connector): Promise<void> {
