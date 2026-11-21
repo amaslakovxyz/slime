@@ -54,6 +54,10 @@ export function createApp(slime, { exposeDevQuery = false } = {}) {
 
   app.use((error, _request, response, _next) => {
     if (error instanceof SlimeError) return response.status(error.status).json({ error: error.toJSON() });
+    // body-parser's own 4xx (malformed JSON, body over the limit): the client must fix it, so not retryable.
+    if (error.expose && error.status >= 400 && error.status < 500) {
+      return response.status(error.status).json({ error: { code: 'INVALID_REQUEST', message: `The request body is not valid: ${error.message}`, retryable: false } });
+    }
     console.error(error);
     return response.status(500).json({ error: INTERNAL_ERROR });
   });
