@@ -59,9 +59,8 @@ npm run local                 # admin on :3100 (PORT=…) + local runner
 
 Open http://localhost:3100, create an account, and create an endpoint with
 the demo database's read-only role:
-`postgres://slime_reader:slime_reader@localhost:54329/slime`. Pick **Offline**
-to run without a model key; Claude or Groq need `ANTHROPIC_API_KEY` or
-`GROQ_API_KEY` in the environment of `npm run local` (the runner passes it to
+`postgres://slime_reader:slime_reader@localhost:54329/slime`. Claude or Groq
+need `ANTHROPIC_API_KEY` or `GROQ_API_KEY` in the environment of `npm run local` (the runner passes it to
 the endpoints, nothing else reads it). The endpoint turns `ready` within a few
 seconds, and its URL (`http://localhost:87xx/`) is in the Lifecycle tab.
 
@@ -96,8 +95,9 @@ npm run e2e                       # starts `npm run local` itself (or reuses one
 The `local` project ([e2e/local.spec.ts](e2e/local.spec.ts)) needs DynamoDB
 Local with the tables and the demo Postgres. It starts the stack with
 `ADMIN_ALLOWED_EMAILS=e2e@example.com` and walks the user journeys: a
-non-invited sign-up is refused, the invited one gets in, an Offline endpoint on
-the demo database turns `ready`, twelve queries make its handler Liquid,
+non-invited sign-up is refused, the invited one gets in, an endpoint on the
+demo database turns `ready` (locally its model is replaced by canned handlers:
+`SLIME_CANNED_HANDLERS`, read only by the local runtime entry), twelve queries make its handler Liquid,
 Crystallize, the Crystal route answers with its `slc_` token (which `/v0/query`
 refuses), and delete removes the endpoint.
 

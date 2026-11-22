@@ -45,7 +45,7 @@ test.describe('cloud smoke (Goal 10)', () => {
   test('sign in, create fails with the database reason, the endpoint is guarded, delete removes it', async ({ page, request }) => {
     await signIn(page, EMAIL!, SMOKE_PASSWORD!);
 
-    const id = await createEndpoint(page, { name: `smoke-${randomBytes(3).toString('hex')}`, provider: 'offline', databaseUrl: UNREACHABLE_DB });
+    const id = await createEndpoint(page, { name: `smoke-${randomBytes(3).toString('hex')}`, provider: 'groq', databaseUrl: UNREACHABLE_DB });
     leftover = id;
     await expectStatus(page, 'failed', 5_000);
     await expect(page.getByText(/^Endpoint failed: /)).toContainText(/ENOTFOUND|getaddrinfo|unreachable\.invalid/i);

@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { SlimeConfigError, type CrystalRegistry } from '@slime-cloud/core';
 import { keyMatches } from '../src/auth.js';
+import { cannedGenerator } from '@slime-cloud/core/testing';
 import { slimeConfigFromEnv } from '../src/config.js';
 import { app } from '../src/lambda.js';
 
@@ -12,7 +13,8 @@ const BASE_ENV = {
   DATABASE_URL: 'postgres://reader:reader@localhost:1/none',
   SLIME_HANDLERS_TABLE: 'slime-handlers',
   SLIME_TENANT_ID: 'ep-0123456789',
-  SLIME_PROVIDER: 'offline',
+  SLIME_PROVIDER: 'groq',
+  GROQ_API_KEY: 'test',
 };
 
 describe('Lambda entry', () => {
@@ -44,15 +46,16 @@ describe('config from env (the sandbox variable names)', () => {
     }
   });
 
-  test('SLIME_MODE=locked means no generator', async () => {
-    const config = await slimeConfigFromEnv({ ...BASE_ENV, SLIME_MODE: 'locked' });
-    assert.equal(config.mode, 'locked');
+  test('SLIME_PROVIDER=groq generates and reviews with Groq', async () => {
+    const config = await slimeConfigFromEnv(BASE_ENV);
+    assert.deepEqual([config.generator.model, config.reviewer?.model], ['openai/gpt-oss-120b', 'openai/gpt-oss-120b']);
     await config.connector.close();
   });
 
-  test('the offline provider explores with the bundled handlers, without a reviewer', async () => {
-    const config = await slimeConfigFromEnv(BASE_ENV);
-    assert.deepEqual([config.mode, config.generator?.model, config.reviewer], ['explore', 'offline', undefined]);
+  test('a generator passed in (tests) replaces the provider, with no reviewer', async () => {
+    const generator = cannedGenerator({});
+    const config = await slimeConfigFromEnv(BASE_ENV, { generator });
+    assert.deepEqual([config.generator, config.reviewer], [generator, undefined]);
     await config.connector.close();
   });
 

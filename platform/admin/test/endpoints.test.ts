@@ -80,13 +80,13 @@ describe('users and endpoints (DynamoDB Local)', { skip }, () => {
 
   test('createEndpoint (local mode) stores a pending item without a URL and its secrets', async () => {
     const owner = email('a');
-    const id = await createEndpoint(owner, { name: 'shop', provider: 'offline', databaseUrl: DB_URL });
+    const id = await createEndpoint(owner, { name: 'shop', provider: 'groq', databaseUrl: DB_URL });
     assert.match(id, /^ep-[0-9a-f]{10}$/);
 
     const ep = await getEndpoint(owner, id);
     assert.equal(ep?.status, 'pending');
     assert.equal(ep?.name, 'shop');
-    assert.equal(ep?.provider, 'offline');
+    assert.equal(ep?.provider, 'groq');
     assert.equal(ep?.owner, owner);
 
     const token = await revealToken(owner, id);
@@ -94,7 +94,7 @@ describe('users and endpoints (DynamoDB Local)', { skip }, () => {
     assert.equal(ep?.tokenHint, token!.slice(-4));
     assert.equal(await secretStore().get(id, 'DATABASE_URL'), DB_URL);
     // The runtime reads the provider from the secrets; the item keeps it for display.
-    assert.equal(await secretStore().get(id, 'SLIME_PROVIDER'), 'offline');
+    assert.equal(await secretStore().get(id, 'SLIME_PROVIDER'), 'groq');
     assert.equal(ep?.url, undefined);
 
     const file = process.env.SLIME_SECRETS_FILE!;
@@ -131,7 +131,7 @@ describe('users and endpoints (DynamoDB Local)', { skip }, () => {
 
   test('endpointStats sums a month of day items into tier totals, a daily series and an estimate', async () => {
     const owner = email('stats');
-    const id = await createEndpoint(owner, { name: 'billed', provider: 'offline', databaseUrl: DB_URL });
+    const id = await createEndpoint(owner, { name: 'billed', provider: 'groq', databaseUrl: DB_URL });
     const day = (sk: string, item: Record<string, unknown>) =>
       ddb().send(new PutCommand({ TableName: tables.control, Item: { pk: `USAGE#${id}`, sk, ...item } }));
     await day('2025-03-02', {
@@ -184,8 +184,8 @@ describe('users and endpoints (DynamoDB Local)', { skip }, () => {
   test('overview adds up endpoints for the current month, day by day', async () => {
     const owner = email('overview');
     const today = new Date().toISOString().slice(0, 10);
-    const a = await createEndpoint(owner, { name: 'a', provider: 'offline', databaseUrl: DB_URL });
-    const b = await createEndpoint(owner, { name: 'b', provider: 'offline', databaseUrl: DB_URL });
+    const a = await createEndpoint(owner, { name: 'a', provider: 'groq', databaseUrl: DB_URL });
+    const b = await createEndpoint(owner, { name: 'b', provider: 'groq', databaseUrl: DB_URL });
     await setStatus(owner, b, 'updating');
     const usage = { requests: 1000, generations: 2, gasRequests: 100, liquidRequests: 400, crystalRequests: 500, gasMs: 20000, tokens: 600 };
     // Only a reports a Liquid snapshot; b's missing one adds nothing.
@@ -211,7 +211,7 @@ describe('users and endpoints (DynamoDB Local)', { skip }, () => {
 
   test('updateConnector overwrites the secret, and redeploys only a ready or failed endpoint', async () => {
     const owner = email('connector');
-    const id = await createEndpoint(owner, { name: 'conn', provider: 'offline', databaseUrl: DB_URL });
+    const id = await createEndpoint(owner, { name: 'conn', provider: 'groq', databaseUrl: DB_URL });
     const url = (n: number) => `postgres://reader:pw${n}@db.example.com:5432/app`;
     const stored = () => secretStore().get(id, 'DATABASE_URL');
 
@@ -250,17 +250,17 @@ describe('users and endpoints (DynamoDB Local)', { skip }, () => {
 
   test('updateSettings renames in place; a provider change needs ready or failed, moves the provider secret and redeploys', async () => {
     const owner = email('settings');
-    const id = await createEndpoint(owner, { name: 'before', provider: 'offline', databaseUrl: DB_URL });
+    const id = await createEndpoint(owner, { name: 'before', provider: 'claude', databaseUrl: DB_URL });
 
-    await updateSettings(owner, id, { name: 'renamed', provider: 'offline' });
+    await updateSettings(owner, id, { name: 'renamed', provider: 'claude' });
     let ep = await getEndpoint(owner, id);
     assert.deepEqual([ep?.name, ep?.status], ['renamed', 'pending']);
 
-    await assert.rejects(updateSettings(owner, id, { name: 'renamed', provider: 'claude' }), (err) =>
+    await assert.rejects(updateSettings(owner, id, { name: 'renamed', provider: 'groq' }), (err) =>
       hasCode(err, 'NOT_UPDATABLE'),
     );
-    assert.equal((await getEndpoint(owner, id))?.provider, 'offline');
-    assert.equal(await secretStore().get(id, 'SLIME_PROVIDER'), 'offline');
+    assert.equal((await getEndpoint(owner, id))?.provider, 'claude');
+    assert.equal(await secretStore().get(id, 'SLIME_PROVIDER'), 'claude');
 
     await setStatus(owner, id, 'ready');
     assert.equal(await updateSettings(owner, id, { name: 'switched', provider: 'groq' }), true);
@@ -281,11 +281,12 @@ describe('users and endpoints (DynamoDB Local)', { skip }, () => {
     const readSecrets = () => readFile(process.env.SLIME_SECRETS_FILE!, 'utf8').catch(() => '');
     const before = await readSecrets();
     const cases = [
-      { name: 'x', provider: 'offline', databaseUrl: 'mysql://localhost/db' },
-      { name: '   ', provider: 'offline', databaseUrl: DB_URL },
-      { name: 'y'.repeat(41), provider: 'offline', databaseUrl: DB_URL },
+      { name: 'x', provider: 'groq', databaseUrl: 'mysql://localhost/db' },
+      { name: '   ', provider: 'groq', databaseUrl: DB_URL },
+      { name: 'y'.repeat(41), provider: 'groq', databaseUrl: DB_URL },
       { name: 'x', provider: 'openai', databaseUrl: DB_URL },
-      { name: 'x', provider: 'offline', databaseUrl: DB_URL, connectorType: 'clickhouse' },
+      { name: 'x', provider: 'offline', databaseUrl: DB_URL },
+      { name: 'x', provider: 'groq', databaseUrl: DB_URL, connectorType: 'clickhouse' },
     ];
     for (const input of cases) {
       await assert.rejects(createEndpoint(owner, input), (err) => hasCode(err, 'INVALID'));

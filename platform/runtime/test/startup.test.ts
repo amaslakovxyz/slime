@@ -14,11 +14,9 @@ describe('missingProviderKey', () => {
     assert.match(missingProviderKey({}) ?? '', /ANTHROPIC_API_KEY/, 'claude is the default provider');
   });
 
-  test('is silent when the key is set, offline, or locked (no generation)', () => {
+  test('is silent when the key is set', () => {
     assert.equal(missingProviderKey({ SLIME_PROVIDER: 'groq', GROQ_API_KEY: 'gsk_x' }), undefined);
     assert.equal(missingProviderKey({ SLIME_PROVIDER: 'claude', ANTHROPIC_API_KEY: 'sk-x' }), undefined);
-    assert.equal(missingProviderKey({ SLIME_PROVIDER: 'offline' }), undefined);
-    assert.equal(missingProviderKey({ SLIME_PROVIDER: 'claude', SLIME_MODE: 'locked' }), undefined);
   });
 });
 

@@ -8,7 +8,6 @@
 //   shape-worker.js        the core's shaping worker; the core resolves it as ./shape-worker.js
 //   emscripten-module.wasm QuickJS release-sync build, found by URL next to the worker
 //   package.json           { "type": "module" }, so both .js files load as ES modules
-//   offline/handlers.json  canned handlers for SLIME_PROVIDER=offline (read from cwd)
 //
 // Crystals are not bundled: each endpoint's live in S3 (src/crystal-store.ts).
 import { build } from 'esbuild';
@@ -47,7 +46,6 @@ await build({
 writeFileSync(join(out, 'package.json'), '{ "type": "module" }\n');
 const wasm = join(dirname(coreRequire.resolve('@jitl/quickjs-wasmfile-release-sync')), 'emscripten-module.wasm');
 cpSync(wasm, join(out, 'emscripten-module.wasm'));
-cpSync(join(root, 'offline'), join(out, 'offline'), { recursive: true });
 
 console.log(`built ${out}`);
 

@@ -16,7 +16,7 @@ import { CodedError } from './errors';
 import { crystallizationSavings, estimateBill, TIERS, type Tier } from './pricing';
 import { secretStore } from './secrets';
 
-export const PROVIDERS = ['claude', 'groq', 'offline'] as const;
+export const PROVIDERS = ['claude', 'groq'] as const;
 export type Provider = (typeof PROVIDERS)[number];
 export const STATUSES = ['pending', 'provisioning', 'ready', 'failed', 'updating', 'deleting'] as const;
 export type Status = (typeof STATUSES)[number];

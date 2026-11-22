@@ -3,7 +3,7 @@
 // once per process with process.env, the Lambda tenant cache once per cached endpoint
 // with that endpoint's own env object. It reads only the env it is given, never
 // process.env, so one endpoint's settings cannot reach another's.
-import { changedProvenance, createSlime, type HandlerProvenance, type SandboxRunner, type Slime, type SlimeStore } from '@slime-cloud/core';
+import { changedProvenance, createSlime, type Generator, type HandlerProvenance, type SandboxRunner, type Slime, type SlimeStore } from '@slime-cloud/core';
 import { crystallize, DEFAULT_MIN_RUNS } from '@slime-cloud/core/crystallize';
 import type { Hono } from 'hono';
 import { createApp, type CrystallizeOutcome, type SavedHandler } from './app.js';
@@ -32,6 +32,8 @@ export interface EndpointDeps {
   isPerInstance?: boolean;
   /** Tests pass a fake DynamoDB for the handler store. */
   storeClient?: DocClient;
+  /** Tests pass a fake generator (cannedGenerator) instead of the endpoint's provider. */
+  generator?: Generator;
   /** One JSON line per call; defaults to stdout. Every line carries `endpointId`. */
   log?: (line: LogLine) => void;
 }
@@ -77,7 +79,7 @@ type RecordLike = {
   provenance: HandlerProvenance;
 };
 
-/** `current` is the provenance new handlers are made with; pass none when drifted records are still served (locked mode). */
+/** `current` is the provenance new handlers are made with: a saved record made with another one is stale. */
 export function toSavedHandler(value: unknown, current?: HandlerProvenance): SavedHandler {
   const r = value as RecordLike;
   const isStale = current !== undefined && changedProvenance(r.provenance, current).length > 0;
@@ -104,7 +106,7 @@ export async function endpointRuntime(env: Env, deps: EndpointDeps = {}): Promis
     warnings.push(message);
     log({ warning: message });
   };
-  const keyWarning = missingProviderKey(env);
+  const keyWarning = deps.generator ? undefined : missingProviderKey(env);
   if (keyWarning) warn(keyWarning);
 
   const { crystalStore } = deps;
@@ -121,6 +123,7 @@ export async function endpointRuntime(env: Env, deps: EndpointDeps = {}): Promis
     },
     ...(crystals ? { crystal: crystals.registry } : {}),
     ...(deps.storeClient ? { storeClient: deps.storeClient } : {}),
+    ...(deps.generator ? { generator: deps.generator } : {}),
   });
   let slime: Slime;
   try {
@@ -140,7 +143,6 @@ export async function endpointRuntime(env: Env, deps: EndpointDeps = {}): Promis
   // Keeps Liquid run counts in the store current, so Crystallize can see them (see live-runs.ts).
   const runs = store ? new LiveRunsSync(store, () => slime.handlers(), Number(env.SLIME_RUNS_SYNC_MS || DEFAULT_RUNS_SYNC_MS)) : undefined;
   const crystalRuns = Number(env.CRYSTAL_MIN_RUNS || DEFAULT_MIN_RUNS);
-  const isExplore = config.mode === 'explore';
 
   const crystallizeKeys = async (keys?: string[]): Promise<CrystallizeOutcome[]> => {
     if (!store || !crystalStore) return [];
@@ -155,8 +157,7 @@ export async function endpointRuntime(env: Env, deps: EndpointDeps = {}): Promis
         store: keys ? storeLimitedTo(store, keys) : store,
         dir: work.dir,
         minRuns: crystalRuns,
-        // Locked mode has no generator, so its provenance never matches a saved record.
-        ...(isExplore ? { provenance: slime.provenance() } : {}),
+        provenance: slime.provenance(),
         ...(deps.runner ? { runner: deps.runner } : {}),
       });
       if (!reports.some(({ outcome }) => outcome === 'crystallized')) return reports;
@@ -192,9 +193,9 @@ export async function endpointRuntime(env: Env, deps: EndpointDeps = {}): Promis
     thresholds: { liquidRuns: config.tiers.gasToLiquidRuns, crystalRuns },
     warnings: () => [...warnings],
     ...(deps.isPerInstance ? { isPerInstance: true } : {}),
-    // Explore mode regenerates drifted records, so they show as stale; locked mode serves them as is.
+    // Drifted records are generated again on their next request, so they show as stale.
     savedHandlers: async () => {
-      const current = isExplore ? slime.provenance() : undefined;
+      const current = slime.provenance();
       return store ? (await store.list(HANDLERS_NS)).map(({ value }) => toSavedHandler(value, current)) : [];
     },
     ...(store && crystalStore ? { crystallize: crystallizeKeys } : {}),
