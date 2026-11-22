@@ -34,11 +34,13 @@ const ROUTES = [
 ];
 
 /**
+ * `crystallizer` adds POST /dev/crystallize: `{ keys? }` → the crystallize reports.
+ * It writes into the app's source folder, so it is for a developer's machine only.
  * `exposeDevQuery` adds POST /dev/query, which passes any request to Slime.
  * Only for local development: in production it would let any
  * client generate queries against everything the database user can read (R8, R11).
  */
-export function createApp(slime, { exposeDevQuery = false } = {}) {
+export function createApp(slime, { exposeDevQuery = false, crystallizer } = {}) {
   const app = express();
   app.use(express.json({ limit: '16kb' }));
 
@@ -46,6 +48,12 @@ export function createApp(slime, { exposeDevQuery = false } = {}) {
   for (const route of ROUTES) {
     app.get(route.path, async (request, response) => {
       response.json(await slime.query({ intent: route.intent, input: route.input(request.query), output: route.output }));
+    });
+  }
+  if (crystallizer) {
+    app.post('/dev/crystallize', async (request, response) => {
+      const keys = Array.isArray(request.body?.keys) ? request.body.keys : undefined;
+      response.json({ reports: await crystallizer.run(keys ? { keys } : {}) });
     });
   }
   if (exposeDevQuery) {

@@ -2,10 +2,14 @@
 // handlers instead of a model. CI runs it from the packed core tarball.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import pg from 'pg';
 import { createSlime, memoryStore } from '@slime-cloud/core';
 import { cannedGenerator } from '@slime-cloud/core/testing';
+import { Crystallizer } from '@slime-cloud/crystal';
 import { createApp } from '../src/app.mjs';
 import { slimeConfigFromEnv } from '../src/config.mjs';
 
@@ -27,9 +31,10 @@ async function isDatabaseAvailable() {
   }
 }
 
+/** `options` may be a function of the instance, for routes that need it (the crystallizer). */
 async function startServer(env, options) {
   const slime = await createSlime(await slimeConfigFromEnv(env, { store: memoryStore(), generator: cannedGenerator(CANNED_HANDLERS) }));
-  const server = createApp(slime, options).listen(0);
+  const server = createApp(slime, typeof options === 'function' ? options(slime) : options).listen(0);
   await new Promise((resolve) => server.once('listening', resolve));
   const baseUrl = `http://localhost:${server.address().port}`;
   const stop = async () => {
@@ -88,5 +93,29 @@ describe('example app without /dev/query', { skip: !hasDatabase }, () => {
   test('named endpoints still answer, and /dev/query does not exist', async () => {
     assert.equal((await fetch(`${app.baseUrl}/api/plans/accounts`)).status, 200);
     assert.equal((await fetch(`${app.baseUrl}/dev/query`, { method: 'POST' })).status, 404);
+  });
+});
+
+describe('example app with POST /dev/crystallize', { skip: !hasDatabase }, () => {
+  let app;
+  let dir;
+  before(async () => {
+    dir = await mkdtemp(join(tmpdir(), 'slime-example-crystal-'));
+    app = await startServer(ENV, (slime) => ({ crystallizer: new Crystallizer(slime, { dir }) }));
+  });
+  after(async () => {
+    await app.stop();
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test('turns a handler used ten times into Crystal with a typed service method', async () => {
+    for (let limit = 1; limit <= 10; limit++) assert.equal((await fetch(`${app.baseUrl}/api/accounts/top?limit=${limit}`)).status, 200);
+    const response = await fetch(`${app.baseUrl}/dev/crystallize`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+    const { reports } = await response.json();
+    assert.deepEqual(reports.map(({ outcome }) => outcome), ['crystallized']);
+    const manifest = JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8'));
+    const [entry] = Object.values(manifest.entries);
+    assert.equal(entry.service, 'topNAccountsByTotalPaid');
+    assert.match(await readFile(join(dir, 'services.mjs'), 'utf8'), /export const topNAccountsByTotalPaid = /);
   });
 });
