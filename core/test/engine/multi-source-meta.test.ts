@@ -2,10 +2,10 @@
 import assert from 'node:assert/strict';
 import { after, describe, test } from 'node:test';
 import { SlimeConfig, type SlimeOptions } from '../../src/config/slime-config.js';
-import type { SlimeEvent } from '../../src/config/options.js';
+import type { SlimeEvent } from '../../src/config/events.js';
 import { createSlime } from '../../src/create-slime.js';
 import type { Slime } from '../../src/engine/types.js';
-import type { Artifact } from '../../src/models/artifact.js';
+import type { Artifact } from '../../src/artifact/artifact.js';
 import type { GenerationRequest } from '../../src/models/types.js';
 import { memoryStore } from '../../src/stores/memory-store.js';
 import type { SlimeStore } from '../../src/stores/types.js';

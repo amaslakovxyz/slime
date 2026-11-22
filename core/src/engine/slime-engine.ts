@@ -1,30 +1,31 @@
 import type { SlimeConfig } from '../config/slime-config.js';
-import { sqlOf } from '../models/artifact.js';
-import type { SlimeEvent } from '../config/options.js';
+import { sqlOf } from '../artifact/artifact.js';
+import type { SlimeEvent } from '../config/events.js';
 import type { Dictionary } from '../dictionary/dictionary.js';
 import { SlimeError } from '../shared/errors.js';
-import { answerFromCrystal } from './crystal-answer.js';
-import { executionDeps, generationDeps } from './engine-deps.js';
+import { answerFromCrystal } from './crystal/answer.js';
+import { executionDeps, generationDeps, sourceSetup } from './engine-deps.js';
 import type { Generator } from '../models/types.js';
 import type { SandboxRunner } from '../sandbox/types.js';
 import { requestKey, type HandlerProvenance } from '../request/key.js';
 import { parseRequest, type InputValues, type ParsedRequest, type SlimeRequest } from '../request/parse.js';
 import { checkParamTypes } from '../request/params.js';
 import type { SlimeStore } from '../stores/types.js';
-import type { ApiSchema } from '../sources/types.js';
-import { closeApiSources } from '../sources/close-sources.js';
+import type { ApiSchema } from '../sources/api/types.js';
+import { closeSources } from '../sources/lifecycle.js';
 import { BackgroundTasks } from './background.js';
 import { Coalescer } from './coalescer.js';
 import { emitSafely, errorEvent, generatedEvent } from './events.js';
-import { executeArtifact, type Execution } from './execute.js';
-import { generateHandler, type GenerationOutcome } from './generate.js';
-import { GenerationLimits } from './generation-limits.js';
+import { executeArtifact, type Execution } from './execution/execute.js';
+import { generateHandler, type GenerationOutcome } from './generation/generate.js';
+import { GenerationLimits } from './generation/limits.js';
 import { HandlerCache } from './handler-cache.js';
-import { savedHandlerProblem } from './saved-handler-check.js';
-import { HandlerLifecycle } from './lifecycle.js';
+import { savedHandlerProblem } from '../handler/fits-sources.js';
+import { HandlerPromotion } from './promotion.js';
 import { queryMeta } from './meta.js';
-import { reviewUntilSettled, type ReviewOutcome } from './review-loop.js';
-import type { CacheOutcome, HandlerRecord, HandlerSummary, QueryResult, Slime, SlimeStats } from './types.js';
+import { reviewUntilSettled, type ReviewOutcome } from './generation/review-loop.js';
+import type { CacheOutcome, HandlerSummary, QueryResult, Slime, SlimeStats } from './types.js';
+import type { HandlerRecord } from '../handler/record.js';
 
 export interface EngineParts {
   config: SlimeConfig;
@@ -53,7 +54,7 @@ export class SlimeEngine implements Slime {
   readonly #cache: HandlerCache;
   readonly #limits: GenerationLimits;
   readonly #background: BackgroundTasks;
-  readonly #lifecycle: HandlerLifecycle;
+  readonly #promotion: HandlerPromotion;
   readonly #generations = new Coalescer<GenerationOutcome>();
 
   constructor(parts: EngineParts) {
@@ -63,7 +64,7 @@ export class SlimeEngine implements Slime {
     this.#cache = new HandlerCache({ store, mode: config.mode, provenance, sqlSourceName: config.sqlSourceName, gasWindowMs: config.tiers.gasWindowMs, savedHandlerProblem: (record) => savedHandlerProblem(record, savedContext) });
     this.#limits = new GenerationLimits({ maxPerHour: config.limits.maxGenerationsPerHour, maxConcurrent: config.limits.maxConcurrentGenerations });
     this.#background = new BackgroundTasks((error) => this.#emit(errorEvent(error)));
-    this.#lifecycle = new HandlerLifecycle({
+    this.#promotion = new HandlerPromotion({
       store,
       cache: this.#cache,
       background: this.#background,
@@ -103,12 +104,13 @@ export class SlimeEngine implements Slime {
     return this.#background.settled();
   }
 
+  /** Closes everything it owns, even when one close fails; then rejects with the first failure. */
   async close(): Promise<void> {
     await this.flush();
-    if (this.#parts.ownsRunner) await this.#parts.runner.close();
-    await this.#parts.store.close?.();
-    await this.#parts.config.connector.close();
-    await closeApiSources(this.#parts.config);
+    const { runner, ownsRunner, store, config } = this.#parts;
+    const closed = await Promise.allSettled([ownsRunner ? runner.close() : undefined, store.close?.(), closeSources(sourceSetup(config))]);
+    const failed = closed.find((result): result is PromiseRejectedResult => result.status === 'rejected');
+    if (failed) throw failed.reason;
   }
 
   async #answer(raw: unknown): Promise<QueryResult> {
@@ -145,7 +147,7 @@ export class SlimeEngine implements Slime {
       const outcome = await generateHandler(generationDeps(this.#parts, generator), { key, request });
       this.#cache.addGas(outcome.record);
       this.#emit(generatedEvent(outcome.record, outcome.usage));
-      this.#lifecycle.afterRun(outcome.record);
+      this.#promotion.afterRun(outcome.record);
       return outcome;
     } finally {
       releaseSlot();
@@ -155,7 +157,7 @@ export class SlimeEngine implements Slime {
   async #runSaved(record: HandlerRecord, input: InputValues): Promise<Execution> {
     record.paramTypes = checkParamTypes(record.paramTypes, input);
     const execution = await executeArtifact(executionDeps(this.#parts), { artifact: record.artifact, output: record.output, input });
-    this.#lifecycle.recordRun(record, input);
+    this.#promotion.recordRun(record, input);
     return execution;
   }
 

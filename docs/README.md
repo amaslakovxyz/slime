@@ -20,6 +20,7 @@ Project-wide docs. Code-local docs live next to their code and are listed at the
 
 - [../core/PLAN.md](../core/PLAN.md) (Plan, engine milestones)
 - [../core/docs/request-format.md](../core/docs/request-format.md) (Current, request format)
+- [../core/docs/extending.md](../core/docs/extending.md) (Current, extension points and their contract tests)
 - [../core/docs/multi-source.md](../core/docs/multi-source.md) (Current, multi-source handlers: Postgres + Notion + REST APIs; built, live Notion run pending)
 - [../core/docs/multi-source-implementation.md](../core/docs/multi-source-implementation.md) (Plan, step-by-step implementation of multi-source handlers; P0–P6 done except P5.5 and P6.5)
 - [../examples/multi-source/README.md](../examples/multi-source/README.md) (Current, multi-source example)

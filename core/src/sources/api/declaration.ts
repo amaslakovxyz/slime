@@ -1,9 +1,9 @@
 // The declaration an app writes to wrap a REST API, and its checks (MS2).
-import type { ColumnInfo } from '../../connectors/types.js';
+import type { ColumnInfo } from '../types.js';
 import { isLeafType } from '../../request/shape.js';
-import type { OperationInfo, ParamInfo } from '../types.js';
-import type { HttpClient } from './http-client.js';
-import type { FetchFunction } from './retry.js';
+import type { OperationInfo, ParamInfo } from './types.js';
+import type { HttpClient } from './http/http-client.js';
+import type { FetchFunction } from './http/retry.js';
 
 export interface ApiParamDeclaration {
   type: string;

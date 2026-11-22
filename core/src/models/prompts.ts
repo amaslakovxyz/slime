@@ -1,7 +1,7 @@
 // The prompts every model adapter shares, so a bench compares models, not prompts.
 // They are the cached prompt prefix, and their hash is each handler's promptHash:
 // editing them regenerates handlers in explore mode (§4.7).
-import { isApiStep, type Step } from './artifact.js';
+import { isApiStep, type Step } from '../artifact/artifact.js';
 import type { GenerationRequest, OptimizeRequest, ReviewRequest } from './types.js';
 import { sha256 } from '../shared/hash.js';
 

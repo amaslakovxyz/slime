@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { after, describe, test } from 'node:test';
 import { SlimeConfig } from '../../src/config/slime-config.js';
 import { createSlime } from '../../src/create-slime.js';
-import type { CrystalHandler, CrystalRegistry } from '../../src/engine/crystal/types.js';
+import type { CrystalHandler, CrystalRegistry } from '../../src/handler/crystal.js';
 import { crystallize } from '../../src/crystallize/index.js';
 import { readManifest } from '../../src/crystallize/manifest.js';
 import { requestKey } from '../../src/request/key.js';

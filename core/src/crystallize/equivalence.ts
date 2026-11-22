@@ -1,9 +1,9 @@
 import type { LimitOptions } from '../config/options.js';
 import { runCrystal } from '../engine/crystal/run-crystal.js';
-import type { CrystalHandler } from '../engine/crystal/types.js';
-import { executeArtifact } from '../engine/execute.js';
-import type { HandlerRecord } from '../engine/types.js';
-import type { Connector } from '../connectors/types.js';
+import type { CrystalHandler } from '../handler/crystal.js';
+import { executeArtifact } from '../engine/execution/execute.js';
+import type { HandlerRecord } from '../handler/record.js';
+import type { Connector } from '../sources/sql/types.js';
 import type { SandboxRunner } from '../sandbox/types.js';
 import { canonicalJSON } from '../shared/hash.js';
 import type { InputValues } from '../request/parse.js';

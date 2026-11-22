@@ -1,10 +1,10 @@
 // Turns a declaration into an ApiSource: any REST API in a few dozen lines of
 // app code, reached only through the constrained client (MS2, MS10).
 import { SlimeConfigError } from '../../shared/errors.js';
-import { SourceError } from '../source-error.js';
-import type { ApiSchema, ApiSource, CallOptions } from '../types.js';
+import { SourceError } from './source-error.js';
+import type { ApiSchema, ApiSource, CallOptions } from './types.js';
 import { declarationProblems, operationInfo, type ApiRunContext, type ApiSourceDeclaration } from './declaration.js';
-import { createHttpClient } from './http-client.js';
+import { createHttpClient } from './http/http-client.js';
 
 const BAD_REQUEST = 400;
 

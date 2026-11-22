@@ -1,5 +1,5 @@
 // Column and comment lines shared by the database and API sections (D2).
-import type { ColumnInfo } from '../connectors/types.js';
+import type { ColumnInfo } from '../sources/types.js';
 
 export const INDENT = '  ';
 

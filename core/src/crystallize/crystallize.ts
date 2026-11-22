@@ -1,16 +1,16 @@
 // The crystallize job: turns proven Liquid handlers into Crystal modules in the
 // app's own code (C10). The app runs it from its own script with its own config.
-import { asSingleQuery, type SingleQuery } from '../models/artifact.js';
+import { asSingleQuery, type SingleQuery } from '../artifact/artifact.js';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { DEFAULT_LIMITS } from '../config/defaults.js';
 import type { LimitOptions } from '../config/options.js';
 import { SQL_SOURCE_DEFAULT_NAME } from '../config/source-rules.js';
-import { HANDLERS_NS, recordFromStore } from '../engine/handler-cache.js';
-import { forModel } from '../engine/generate.js';
-import type { HandlerRecord } from '../engine/types.js';
+import { HANDLERS_NS, recordFromStore } from '../handler/record.js';
+import type { HandlerRecord } from '../handler/record.js';
 import { changedProvenance, type HandlerProvenance } from '../request/key.js';
-import type { Connector } from '../connectors/types.js';
+import { paramTypesForModel } from '../request/params.js';
+import type { Connector } from '../sources/sql/types.js';
 import type { Optimizer } from '../models/types.js';
 import { QuickJSRunner } from '../sandbox/quickjs/quickjs-runner.js';
 import type { SandboxRunner } from '../sandbox/types.js';
@@ -132,7 +132,7 @@ async function candidatesFor({ options }: JobContext, record: HandlerRecord, { s
   const unchanged: Candidate = { code: { sql, params, shape: shapeJs }, isOptimized: false, notes: [] };
   if (!options.optimizer) return [unchanged];
   try {
-    const request = { sql, params, shapeJs, output: record.output, paramTypes: forModel(record.paramTypes) };
+    const request = { sql, params, shapeJs, output: record.output, paramTypes: paramTypesForModel(record.paramTypes) };
     const { code } = await options.optimizer.optimize(request, { timeoutMs: options.optimizeTimeoutMs ?? DEFAULT_OPTIMIZE_TIMEOUT_MS });
     return [{ code: { sql: code.sql, params: code.params, shape: code.shape }, isOptimized: true, notes: code.notes }, unchanged];
   } catch (error) {

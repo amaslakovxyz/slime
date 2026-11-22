@@ -1,11 +1,12 @@
 // Gas → Liquid and the review loop (PLAN.md §7, M4 promotion rule), with stub models.
-import { sqlOf } from '../../src/models/artifact.js';
+import { sqlOf } from '../../src/artifact/artifact.js';
 import assert from 'node:assert/strict';
 import { after, describe, test } from 'node:test';
 import { SlimeConfig, type SlimeOptions } from '../../src/config/slime-config.js';
-import type { SlimeEvent } from '../../src/config/options.js';
+import type { SlimeEvent } from '../../src/config/events.js';
 import { createSlime } from '../../src/create-slime.js';
-import type { HandlerRecord, QueryMeta, Slime } from '../../src/engine/types.js';
+import type { QueryMeta, Slime } from '../../src/engine/types.js';
+import type { HandlerRecord } from '../../src/handler/record.js';
 import type { GenerationRequest } from '../../src/models/types.js';
 import type { SlimeStore } from '../../src/stores/types.js';
 import { memoryStore } from '../../src/stores/memory-store.js';

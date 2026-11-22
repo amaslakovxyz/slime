@@ -1,6 +1,6 @@
 // Serves hand-written handlers instead of calling a model, so tests, CI and
 // benchmarks run without an API key.
-import { ARTIFACT_VERSION, fromStoredArtifact, type Artifact, type LegacyArtifact } from '../artifact.js';
+import { ARTIFACT_VERSION, fromStoredArtifact, type Artifact, type LegacyArtifact } from '../../artifact/artifact.js';
 import type { GenerationResult, Generator } from '../types.js';
 import { normalizeIntent } from '../../request/key.js';
 import { canonicalJSON, sha256 } from '../../shared/hash.js';

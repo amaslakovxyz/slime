@@ -1,11 +1,9 @@
 // The model ports: Generator, Reviewer and Optimizer. Providers live in sibling
 // folders (claude/, groq/, offline/).
-import type { ParamType } from '../request/params.js';
+import type { ParamTypesForModel } from '../request/params.js';
 import type { Shape } from '../request/shape.js';
-import type { Artifact } from './artifact.js';
+import type { Artifact } from '../artifact/artifact.js';
 
-/** 'unknown' while only null has been seen. Never values. */
-export type ParamTypesForModel = Record<string, ParamType | 'unknown'>;
 
 export interface GenerationRequest {
   /** The rendered dictionary (§4.4). */

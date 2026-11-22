@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { matchesLeaf } from '../request/shape.js';
-import type { ApiSource, OperationInfo } from '../sources/types.js';
+import type { ApiSource, OperationInfo } from '../sources/api/types.js';
 
 export type ApiSourceFactory = () => ApiSource | Promise<ApiSource>;
 

@@ -1,7 +1,7 @@
 import { SlimeError } from '../../shared/errors.js';
-import { assertValidOutput, bindParams, queryLimits, type Execution, type ExecutionDeps } from '../execute.js';
+import { assertValidOutput, bindParams, queryLimits, type Execution, type ExecutionDeps } from '../execution/execute.js';
 import type { InputValues } from '../../request/parse.js';
-import type { CrystalHandler, ShapeFunction } from './types.js';
+import type { CrystalHandler, ShapeFunction } from '../../handler/crystal.js';
 
 /** The runner is needed only for string shapes; function shapes never touch it. */
 export type CrystalDeps = Pick<ExecutionDeps, 'connector' | 'limits'> & Partial<Pick<ExecutionDeps, 'runner'>>;

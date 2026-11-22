@@ -95,7 +95,7 @@ MVP design (L20–L23).
   (`fixtures`, up to `fixturesPerHandler`). Returns the core's
   `CrystalReport[]`.
 * **Live runs are copied to the store first.** The core saves a handler once,
-  when it turns Liquid (`core/src/engine/lifecycle.ts`); later runs count only
+  when it turns Liquid (`core/src/engine/promotion.ts`); later runs count only
   in memory, while `crystallize()` reads runs from the store. Without the copy
   no handler ever reaches `minRuns` from live traffic (`syncLiveRuns`).
 * **`GET /v0/lifecycle`** merges saved, live and Crystal handlers (one row per

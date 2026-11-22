@@ -2,13 +2,14 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import { SlimeConfig, type SlimeOptions } from '../../src/config/slime-config.js';
-import type { SlimeEvent } from '../../src/config/options.js';
+import type { SlimeEvent } from '../../src/config/events.js';
 import { createSlime } from '../../src/create-slime.js';
 import type { Slime } from '../../src/engine/types.js';
-import type { Artifact } from '../../src/models/artifact.js';
+import type { Artifact } from '../../src/artifact/artifact.js';
 import { memoryStore } from '../../src/stores/memory-store.js';
 import type { SlimeStore } from '../../src/stores/types.js';
-import type { ParamInfo, Source } from '../../src/sources/types.js';
+import type { ParamInfo } from '../../src/sources/api/types.js';
+import type { Source } from '../../src/sources/types.js';
 import { fakeApiSource } from '../../src/testing/fake-api-source.js';
 import { artifact, fakeConnector, stubGenerator } from '../../src/testing/fakes.js';
 

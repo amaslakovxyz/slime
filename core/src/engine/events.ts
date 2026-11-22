@@ -1,8 +1,8 @@
-import type { ErrorEvent, GeneratedEvent, SlimeEvent } from '../config/options.js';
-import { sqlOf } from '../models/artifact.js';
+import type { ErrorEvent, GeneratedEvent, SlimeEvent } from '../config/events.js';
+import { sqlOf } from '../artifact/artifact.js';
 import { SlimeError } from '../shared/errors.js';
 import type { ModelUsage } from '../models/types.js';
-import type { HandlerRecord } from './types.js';
+import type { HandlerRecord } from '../handler/record.js';
 
 const BACKGROUND_FAILED = 'BACKGROUND_FAILED';
 

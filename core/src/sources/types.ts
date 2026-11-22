@@ -1,54 +1,28 @@
-// The ApiSource port: a read-only data provider reached over an API (MS2).
-// Implementations: defineApiSource (sources/api/) and notion (sources/notion/).
-import type { ColumnInfo, Connector, RunResult, SafetyReport } from '../connectors/types.js';
-import type { LeafType } from '../request/shape.js';
+// Where data comes from: exactly one SQL source (sql/) and any number of API
+// sources (api/) (MS1). The types both kinds share live here.
+import type { ApiSource } from './api/types.js';
+import type { Connector } from './sql/types.js';
 
-export interface SourceCallOptions {
-  timeoutMs: number;
-  signal: AbortSignal;
-}
-
-export interface CallOptions extends SourceCallOptions {
-  rowCap: number;
-}
-
-export interface ParamInfo {
+export interface ColumnInfo {
   name: string;
-  type: LeafType;
+  type: string;
+  nullable: boolean;
   comment?: string;
-  /** Allowed values, like a Postgres enum (D1). */
+  /** Read from the catalog (enum types, CHECK … IN), never from rows (D1). */
   values?: string[];
 }
 
-export interface OperationInfo {
-  /** For example "feedback.query" or "films.list". */
-  name: string;
-  description?: string;
-  /** Every param is nullable: null means "not given" (R5). */
-  params: ParamInfo[];
-  /** The flat row each call returns; `type` is an output-notation leaf. */
-  columns: ColumnInfo[];
-  primaryKey?: string[];
-  /** The order rows come back in, for example "created desc". */
-  order?: string;
+export interface RunResult {
+  rows: Record<string, unknown>[];
+  /** More rows existed than rowCap. */
+  truncated: boolean;
+  ms: number;
 }
 
-export interface ApiSchema {
-  /** Shown to the model like a database dialect, for example "Notion API 2025-09-03". */
-  service: string;
-  operations: OperationInfo[];
-}
-
-export interface ApiSource {
-  readonly kind: 'api';
-  readonly name: string;
-  /** Values core redacts from every message and event (MS16). */
-  readonly secrets: readonly string[];
-  /** Metadata only, never rows (D1). */
-  describe(options: SourceCallOptions): Promise<ApiSchema>;
-  call(operation: string, args: Readonly<Record<string, unknown>>, options: CallOptions): Promise<RunResult>;
-  safetyCheck(options: SourceCallOptions): Promise<SafetyReport>;
-  close(): Promise<void>;
+export interface SafetyReport {
+  ok: boolean;
+  user: string;
+  problems: string[];
 }
 
 export type Source = Connector | ApiSource;

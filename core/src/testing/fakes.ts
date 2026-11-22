@@ -1,6 +1,6 @@
 // Test doubles for apps' and adapters' own tests, and core's: no database, no model.
-import type { Connector } from '../connectors/types.js';
-import { fromStoredArtifact, type Artifact } from '../models/artifact.js';
+import type { Connector } from '../sources/sql/types.js';
+import { fromStoredArtifact, type Artifact } from '../artifact/artifact.js';
 import type { GenerationRequest, Generator, Reviewer } from '../models/types.js';
 
 const FAKE_SQL_SOURCE_NAME = 'db';
