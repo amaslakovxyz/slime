@@ -1,9 +1,9 @@
 # Customer demo: three use cases from the customer's agent
 
-* **Status:** Current. Built and run live on 2026-11-22 (see [Measured](#measured-2026-11-22)).
+* **Status:** Current. Cases 1 and 2 run live on Slime Cloud on 2026-11-22; case 3 run through the same site with canned handlers, not a live model (see [Measured](#measured-2026-11-22)).
 * **Code:** [examples/customer-site](../../examples/customer-site/README.md) (the customer's site), [examples/multi-source](../../examples/multi-source/README.md) (the self-hosted case).
 * **Vocabulary:** Gas → Liquid → Crystal and Crystallize as in [product_frame_v0_2.md](product_frame_v0_2.md).
-* **Positioning:** a concrete run of Use Case 1, "the self-building backend for AI-generated apps", in [the marketing playbook](../brand/slime_marketing_positioning_tone_of_voice_use_cases.md).
+* **Positioning:** concrete runs of the "Now" use cases in [the marketing playbook](../brand/slime_marketing_positioning_tone_of_voice_use_cases.md) §3: case 1 is Use Case 1 (a backend for AI-built UIs), case 2 is Use Case 2 (a database-guarded API for agents), case 3 is Use Case 3 (one API over existing systems instead of glue middleware). Its "Claims We Don't Make" apply: only measured numbers, no tenancy claims.
 
 ## The setup
 
@@ -48,7 +48,10 @@ flowchart LR
   - A working dashboard panel with zero backend code.
   - Model tokens are spent once, at generation and review. Repeats cost none.
   - The Crystal endpoint can never reach the generator: a wrong or extra input name is
-    refused, and its token opens only that route.
+    refused, and its own `slc_` token opens only that route.
+  - No speed claim. Warm, the Crystal and the Liquid handler both spend 3-8 ms in the
+    engine, almost all of it the Postgres query; the network round trip dominates. The
+    value is the fixed route, its own token and zero model tokens.
 * **Talking point:** "The prototype is the production endpoint. Nobody rewrites it."
 
 ## Use case 2: Churn risk by country (Cloud endpoint, Liquid with a parameter)
@@ -110,6 +113,9 @@ Prerequisites:
 - The 1Password vault `Slime Hackathon` holds `Slime — Atlas demo endpoint` (URL, `slm_`
   key) and `Slime — Atlas demo Crystal (plan revenue)` (Crystal key, `slc_` token).
 - For live generation in case 3, a Groq or Anthropic key.
+- Cases 1 and 2 are already warm on `atlas-demo` (Crystal and Liquid; Liquid is saved and
+  survives restarts). The Gas beat is case 3: before the demo, delete
+  `examples/multi-source/.slime` (its file store) so its handler is generated live.
 
 1. **Admin:** show the `atlas-demo` endpoint and its Lifecycle tab. Say: one database,
    one key, a read-only role.
@@ -118,16 +124,17 @@ Prerequisites:
    key. Add `FETCH_FIXTURES=1` to replay the recorded Notion and FX responses.
 3. **Customer site:** in `examples/customer-site`, run
    `op run --env-file=<refs> -- npm start` and open <http://localhost:4000>.
-4. **Case 2 first:** pick a country and press Run. The answer is Gas with "generated in …
-   ms". Press "Run ×5": the badge turns Liquid and the engine time drops to single-digit
-   milliseconds. Change the country: it stays Liquid. Open "The code that answered" to
-   show the SQL the model wrote.
-5. **Case 1:** press Run. The badge reads "Crystal endpoint". Explain the operator's
-   Crystallize step in the admin, then show the `slc_` token on the Crystal card.
-6. **Case 3:** pick a plan and a currency. The badge shows three sources,
-   `db + notion + rates`. Switch the currency: the amounts change and no new code is
-   generated.
-7. **Close:** go back to the Lifecycle tab. Gas, Liquid and Crystal rows match what the
+4. **Case 3, the Gas beat:** pick a plan and a currency and press Run. The badge reads
+   Gas with "generated in … ms" and three sources, `db + notion + rates`. Open "The code
+   that answered" to show the SQL, the Notion and FX steps and the join the model wrote.
+   Press "Run ×5": repeats run the cached code at no model tokens, and after the review
+   the badge turns Liquid. Switch the currency: no new generation.
+5. **Case 2, Liquid:** press Run. It answers from the saved Liquid handler. Change the
+   country: still Liquid, same handler, no tokens. DE and IT are empty, which is correct.
+6. **Case 1, Crystal:** press Run. The badge reads "Crystal endpoint". Explain the
+   operator's Crystallize step in the admin, then show the `slc_` token on the Crystal
+   card: it opens this route only.
+7. **Close:** go back to the Lifecycle tab. Its Liquid and Crystal rows match what the
    audience just saw.
 
 ## Measured (2026-11-22)
@@ -137,7 +144,7 @@ against `slime-test-db`, through the customer site:
 
 | Case | Observed |
 |---|---|
-| 1 | 13 calls on `/v0/query`: Liquid with review `approved` at about 6 ms engine time. Crystallize in the admin, then `route: crystal`, `tier: crystal`, 4 rows that match the database |
+| 1 | 13 calls on `/v0/query`: Liquid with review `approved` at about 6 ms engine time. Crystallize in the admin, then `route: crystal`, `tier: crystal`, 4 rows that match the database. Eight direct Crystal calls: 51 ms engine time on the first (a cold database pool, all in `timingsMs.run`), then 3.5-4 ms |
 | 2 | First call Gas, generation 5.6 s. Calls 2-3 Gas at about 7 ms (cached code, review pending). From call 4 Liquid, `approved`, 6-8 ms. FR returns 6 rows. DE returns none, which is correct: the data has no past-due accounts in DE |
 | 3 | Through the proxy with canned handlers (no model key was available): 48 Enterprise rows from `db + notion + rates`. Tests check the converted amounts against the recorded USD rate |
 
