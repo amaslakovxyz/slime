@@ -12,7 +12,7 @@ import { postgresConnector } from '../../../src/sources/sql/postgres/index.js';
 import { memoryStore } from '../../../src/stores/memory-store.js';
 import { READER_URL, WRITER_URL, asWriter, isDatabaseAvailable } from '../../support/database.js';
 import { describeConnectorContract } from '../../../src/testing/connector-contract.js';
-import { artifact } from '../../../src/testing/fakes.js';
+import { artifact, fakeGenerator } from '../../../src/testing/fakes.js';
 
 const hasDatabase = await isDatabaseAvailable();
 const LIMITS: QueryLimits = { timeoutMs: 2_000, rowCap: 1_000 };
@@ -144,7 +144,7 @@ describe('engine on Postgres (M3)', { skip: !hasDatabase }, () => {
   });
 
   test('createSlime refuses a user that can write', async () => {
-    const config = new SlimeConfig({ connector: postgresConnector({ url: WRITER_URL }), store: memoryStore() });
+    const config = new SlimeConfig({ connector: postgresConnector({ url: WRITER_URL }), store: memoryStore(), generator: fakeGenerator() });
     await assert.rejects(createSlime(config), /can write to/);
   });
 });

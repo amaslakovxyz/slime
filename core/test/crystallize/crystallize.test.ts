@@ -19,7 +19,7 @@ import { requestKey } from '../../src/request/key.js';
 import { parseRequest } from '../../src/request/parse.js';
 import { memoryStore } from '../../src/stores/memory-store.js';
 import type { SlimeStore } from '../../src/stores/types.js';
-import { artifact, fakeConnector } from '../../src/testing/fakes.js';
+import { artifact, fakeConnector, fakeGenerator } from '../../src/testing/fakes.js';
 
 const ROWS = [
   { name: 'Acme', cents: 1250 },
@@ -83,17 +83,17 @@ async function importRegistry(dir: string): Promise<CrystalRegistry> {
 }
 
 describe('crystallize (M5)', () => {
-  test('crystallizes a ready Liquid handler; the folder passes the check; locked mode serves it as Crystal', async () => {
+  test('crystallizes a ready Liquid handler; the folder passes the check; Slime serves it as Crystal', async () => {
     const { dir, report } = await runJob(liquidRecord());
     assert.deepEqual([report.outcome, report.isOptimized], ['crystallized', false]);
     assert.deepEqual(await checkCrystalFolder(dir), []);
 
     const connector = fakeConnector({ rows: ROWS });
-    const slime = await createSlime(new SlimeConfig({ connector, store: memoryStore(), crystal: await importRegistry(dir) }));
+    const slime = await createSlime(new SlimeConfig({ connector, store: memoryStore(), generator: fakeGenerator(), crystal: await importRegistry(dir) }));
     try {
       const { data, meta } = await slime.query(REQUEST);
       assert.deepEqual(data, EUROS);
-      assert.deepEqual([meta.tier, meta.cache, meta.review, meta.sql], ['crystal', 'hit', 'approved', undefined]);
+      assert.deepEqual([meta.tier, meta.cache, meta.review], ['crystal', 'hit', 'approved']);
     } finally {
       await slime.close();
     }

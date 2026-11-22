@@ -49,8 +49,8 @@ the API:
 **`create-slime.ts`**: `createSlime(config, { runner }?)`. Startup order
 (`sources/lifecycle.ts`): every source's safety check (an unsafe database
 user throws `SlimeConfigError`), every source's `describe()`, then
-`store.init()` and the dictionary. In locked mode it emits one
-`warning` event when saved handlers were made against another schema. A
+`store.init()` and the dictionary. It emits one `warning` event when Crystal
+handlers were made against another schema. A
 `runner` the host passes is shared: the engine uses it and `close()` leaves it
 running. Without one, the engine builds its own `QuickJSRunner` and closes it.
 

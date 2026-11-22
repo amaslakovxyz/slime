@@ -59,9 +59,9 @@ classes and functions here are internal.
   by that Crystal handler (`./crystal/`), before the cache or generation.
 - **Keys.** A handler's key is the request key (`request/key.ts`); its
   provenance is stored inside it (§4.7).
-- **Saved handlers.** Explore mode treats a saved handler whose provenance
-  changed as a miss. Locked mode serves it as it is.
-- **Locked mode never generates.** A miss throws `HANDLER_NOT_FOUND`.
+- **Saved handlers.** A saved handler whose provenance changed, or that no
+  longer fits the sources (MS14), is a miss and is generated again.
+- **Every miss is generated.** A generator is required.
 - **Generation.** At most `1 + maxRepairs` attempts, while at least 1 s of
   budget is left; provider rate-limit waits extend the budget.
   `WRITE_REFUSED` and `ACCESS_DENIED` are final. An `unsatisfiable` reason
@@ -74,8 +74,8 @@ classes and functions here are internal.
 - **Rate limits.** Over the hourly cap, a generation fails with
   `GENERATION_RATE_LIMITED` (`retryable: true`). Over the concurrency cap, it
   waits for a slot.
-- **`meta`.** `meta.sql`, `shapeJs` and `assumptions` appear only in explore
-  mode (R9, R11). Literals in the intent become `meta.warnings` (R7).
+- **`meta`.** `meta.sql`, `shapeJs`, `assumptions` and `steps` show the code
+  that answered (R9). Literals in the intent become `meta.warnings` (R7).
 - **Events.** `onEvent` gets `generated` for each generation and revision,
   `reviewed` for each review, `promoted` for each promotion, and `error` for
   each failed query or background task.

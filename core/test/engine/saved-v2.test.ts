@@ -1,8 +1,7 @@
-// Saved v2 handlers are checked against today's sources on load and at locked startup (MS14).
+// A saved handler with API steps is checked against today's sources when it is loaded (MS14).
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import { SlimeConfig, type SlimeOptions } from '../../src/config/slime-config.js';
-import type { SlimeEvent } from '../../src/config/events.js';
 import { createSlime } from '../../src/create-slime.js';
 import type { Slime } from '../../src/engine/types.js';
 import type { Artifact } from '../../src/artifact/artifact.js';
@@ -38,45 +37,34 @@ async function start(sources: Record<string, Source>, store: SlimeStore, options
   return slime;
 }
 
-describe('saved v2 handlers against changed sources (MS14)', () => {
+describe('saved handlers against changed sources (MS14)', () => {
   const store = memoryStore();
   before(async () => {
-    const explore = await start({ db: fakeConnector({ rows: [{ name: 'Acme' }] }), notion: notion() }, store, { generator: stubGenerator(() => V2) });
-    await explore.query(REQUEST);
-    await explore.flush();
+    const first = await start({ db: fakeConnector({ rows: [{ name: 'Acme' }] }), notion: notion() }, store, { generator: stubGenerator(() => V2) });
+    await first.query(REQUEST);
+    await first.flush();
   });
 
-  test('locked mode still serves it while the sources match', async () => {
-    const locked = await start({ db: fakeConnector({ rows: [{ name: 'Acme' }] }), notion: notion() }, store);
-    assert.deepEqual((await locked.query(REQUEST)).data, [{ name: 'Acme' }]);
+  test('it is served while the sources match', async () => {
+    const generator = stubGenerator(() => V2);
+    const slime = await start({ db: fakeConnector({ rows: [{ name: 'Acme' }] }), notion: notion() }, store, { generator });
+    assert.deepEqual((await slime.query(REQUEST)).data, [{ name: 'Acme' }]);
+    assert.equal(generator.calls, 0);
   });
 
-  test('locked mode refuses it with the reason when its source is gone', async () => {
-    const locked = await start({ db: fakeConnector() }, store);
-    await assert.rejects(locked.query(REQUEST), { code: 'HANDLER_NOT_FOUND', message: /no longer fits the configured sources: .*unknown source "notion"/ });
-  });
-
-  test('locked mode refuses it when the param it binds was renamed', async () => {
-    const locked = await start({ db: fakeConnector(), notion: notion([{ ...SENTIMENT, name: 'mood' }]) }, store);
-    await assert.rejects(locked.query(REQUEST), { code: 'HANDLER_NOT_FOUND', message: /has no such param/ });
-  });
-
-  test('explore mode regenerates it instead', async () => {
+  test('it is generated again when its source is gone', async () => {
     const generator = stubGenerator(() => artifact('SELECT name FROM accounts'));
-    const explore = await start({ db: fakeConnector({ rows: [{ name: 'Globex' }] }) }, store, { generator });
-    const { data, meta } = await explore.query(REQUEST);
+    const slime = await start({ db: fakeConnector({ rows: [{ name: 'Globex' }] }) }, store, { generator });
+    const { data, meta } = await slime.query(REQUEST);
     assert.deepEqual(data, [{ name: 'Globex' }]);
     assert.equal(meta.cache, 'miss');
     assert.equal(generator.calls, 1);
   });
 
-  test('locked startup lists the handlers that no longer fit', async () => {
-    const otherStore = memoryStore();
-    const explore = await start({ db: fakeConnector({ rows: [{ name: 'Acme' }] }), notion: notion() }, otherStore, { generator: stubGenerator(() => V2) });
-    await explore.query(REQUEST);
-    await explore.flush();
-    const warnings: string[] = [];
-    await start({ db: fakeConnector() }, otherStore, { onEvent: (event: SlimeEvent) => event.type === 'warning' && warnings.push(event.message) });
-    assert.ok(warnings.some((message) => /^1 saved handler\(s\) no longer fit the configured sources and are not served: [0-9a-f]{12}: .*unknown source "notion"/.test(message)), warnings.join('\n'));
+  test('it is generated again when the param it binds was renamed', async () => {
+    const generator = stubGenerator(() => artifact('SELECT name FROM accounts'));
+    const slime = await start({ db: fakeConnector({ rows: [{ name: 'Acme' }] }), notion: notion([{ ...SENTIMENT, name: 'mood' }]) }, store, { generator });
+    assert.equal((await slime.query(REQUEST)).meta.cache, 'miss');
+    assert.equal(generator.calls, 1);
   });
 });

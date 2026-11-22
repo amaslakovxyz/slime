@@ -17,10 +17,10 @@ function problems(options: unknown): readonly string[] {
 }
 
 describe('SlimeConfig (C4)', () => {
-  test('a connector alone is enough: defaults fill the rest, and it is locked (C6)', () => {
-    const config = new SlimeConfig({ connector: fakeConnector() });
-    assert.equal(config.mode, 'locked');
-    assert.equal(config.generator, undefined);
+  test('a connector and a generator are enough: defaults fill the rest', () => {
+    const generator = fakeGenerator();
+    const config = new SlimeConfig({ generator, connector: fakeConnector() });
+    assert.equal(config.generator, generator);
     assert.equal(config.store, undefined, 'createSlime() builds the default file store');
     assert.deepEqual(config.tiers, DEFAULT_TIERS);
     assert.deepEqual(config.limits, DEFAULT_LIMITS);
@@ -29,12 +29,12 @@ describe('SlimeConfig (C4)', () => {
     assert.deepEqual(config.rules, []);
   });
 
-  test('a generator makes it explore mode', () => {
-    assert.equal(new SlimeConfig({ connector: fakeConnector(), generator: fakeGenerator() }).mode, 'explore');
+  test('a generator is required', () => {
+    assert.deepEqual(problems({ connector: fakeConnector() }), ['generator is required: it writes a handler for each new request']);
   });
 
   test('partial tiers and limits are merged over the defaults', () => {
-    const config = new SlimeConfig({ connector: fakeConnector(), tiers: { gasToLiquidRuns: 5 }, limits: { rowCap: 50 } });
+    const config = new SlimeConfig({ generator: fakeGenerator(), connector: fakeConnector(), tiers: { gasToLiquidRuns: 5 }, limits: { rowCap: 50 } });
     assert.equal(config.tiers.gasToLiquidRuns, 5);
     assert.equal(config.tiers.gasWindowMs, DEFAULT_TIERS.gasWindowMs);
     assert.equal(config.limits.rowCap, 50);
@@ -74,16 +74,17 @@ describe('SlimeConfig (C4)', () => {
 
   test('a connector without the required methods is refused', () => {
     const { run: _run, close: _close, ...partial } = fakeConnector();
-    assert.deepEqual(problems({ connector: partial }), ['connector is missing methods run, close']);
+    assert.deepEqual(problems({ generator: fakeGenerator(), connector: partial }), ['connector is missing methods run, close']);
   });
 
-  test('a reviewer without a generator is refused: nothing would ever be reviewed', () => {
-    assert.match(problems({ connector: fakeConnector(), reviewer: fakeReviewer() }).join(), /reviewer is set but generator is not/);
+  test('a reviewer must have a review method and a model', () => {
+    assert.match(problems({ connector: fakeConnector(), generator: fakeGenerator(), reviewer: { model: '' } }).join(), /reviewer is missing method review/);
+    assert.doesNotThrow(() => new SlimeConfig({ connector: fakeConnector(), generator: fakeGenerator(), reviewer: fakeReviewer() }));
   });
 
   test('is immutable', () => {
-    const config = new SlimeConfig({ connector: fakeConnector(), glossary: { revenue: 'paid invoices' }, rules: ['a'] });
-    assert.throws(() => Object.assign(config, { mode: 'explore' }), TypeError);
+    const config = new SlimeConfig({ generator: fakeGenerator(), connector: fakeConnector(), glossary: { revenue: 'paid invoices' }, rules: ['a'] });
+    assert.throws(() => Object.assign(config, { rules: [] }), TypeError);
     assert.throws(() => Object.assign(config.tiers, { gasToLiquidRuns: 9 }), TypeError);
     assert.throws(() => Object.assign(config.glossary, { x: 'y' }), TypeError);
     assert.throws(() => (config.rules as string[]).push('b'), TypeError);
@@ -91,7 +92,7 @@ describe('SlimeConfig (C4)', () => {
 
   test('does not keep references to the caller\'s objects', () => {
     const glossary = { revenue: 'paid invoices' };
-    const config = new SlimeConfig({ connector: fakeConnector(), glossary });
+    const config = new SlimeConfig({ generator: fakeGenerator(), connector: fakeConnector(), glossary });
     glossary.revenue = 'changed later';
     assert.equal(config.glossary.revenue, 'paid invoices');
   });
@@ -102,11 +103,11 @@ describe('SlimeConfig (C4)', () => {
     assert.equal(changed.tiers.gasToLiquidRuns, 7);
     assert.equal(changed.tiers.maxReviews, 3);
     assert.equal(base.tiers.gasToLiquidRuns, DEFAULT_TIERS.gasToLiquidRuns);
-    assert.equal(base.with({ generator: undefined }).mode, 'locked');
+    assert.throws(() => base.with({ generator: undefined }), /generator is required/);
   });
 
   test('with() validates like the constructor', () => {
-    const base = new SlimeConfig({ connector: fakeConnector() });
+    const base = new SlimeConfig({ generator: fakeGenerator(), connector: fakeConnector() });
     assert.throws(() => base.with({ limits: { rowCap: 0 } }), SlimeConfigError);
   });
 });
@@ -116,15 +117,15 @@ describe('store option (C14, §4.7)', () => {
 
   test('accepts any SlimeStore and uses that same object', () => {
     const custom: SlimeStore = { get: async () => undefined, put: async () => {}, list: async () => [], delete: async () => {} };
-    assert.equal(new SlimeConfig({ connector, store: custom }).store, custom);
+    assert.equal(new SlimeConfig({ generator: fakeGenerator(), connector, store: custom }).store, custom);
   });
 
   test('a store must implement get, put, list and delete', () => {
-    assert.deepEqual(problems({ connector, store: { get: async () => undefined } }), ['store is missing methods put, list, delete']);
+    assert.deepEqual(problems({ generator: fakeGenerator(), connector, store: { get: async () => undefined } }), ['store is missing methods put, list, delete']);
   });
 
   test('a { type } option is not a store: stores are passed as objects', () => {
-    assert.deepEqual(problems({ connector, store: { type: 'file', dir: '.slime' } }), ['store is missing methods get, put, list, delete']);
+    assert.deepEqual(problems({ generator: fakeGenerator(), connector, store: { type: 'file', dir: '.slime' } }), ['store is missing methods get, put, list, delete']);
   });
 });
 
@@ -143,7 +144,7 @@ describe('sources (MS1)', () => {
 
   test('connector is shorthand for sources: { db: connector }', () => {
     const connector = fakeConnector();
-    const config = new SlimeConfig({ connector });
+    const config = new SlimeConfig({ generator: fakeGenerator(), connector });
     assert.equal(config.connector, connector);
     assert.deepEqual(Object.keys(config.sources), ['db']);
     assert.equal(config.sqlSourceName, 'db');
@@ -151,41 +152,41 @@ describe('sources (MS1)', () => {
 
   test('sources may name the SQL source anything', () => {
     const connector = fakeConnector();
-    const config = new SlimeConfig({ sources: { warehouse: connector } });
+    const config = new SlimeConfig({ generator: fakeGenerator(), sources: { warehouse: connector } });
     assert.equal(config.connector, connector);
     assert.equal(config.sqlSourceName, 'warehouse');
   });
 
   test('API sources are listed beside the SQL source', () => {
-    const config = new SlimeConfig({ sources: { db: fakeConnector(), notion: apiSource(), films: apiSource() } });
+    const config = new SlimeConfig({ generator: fakeGenerator(), sources: { db: fakeConnector(), notion: apiSource(), films: apiSource() } });
     assert.deepEqual(config.apiSourceNames, ['notion', 'films']);
     assert.deepEqual(config.with({ rules: ['x'] }).apiSourceNames, ['notion', 'films']);
   });
 
 
   test('each source problem is reported', () => {
-    const found = problems({ connector: fakeConnector(), sources: { db: fakeConnector() } });
+    const found = problems({ generator: fakeGenerator(), connector: fakeConnector(), sources: { db: fakeConnector() } });
     assert.deepEqual(found, ['connector and sources are both set: pass the database connector as one of sources, or use connector alone']);
-    const many = problems({ sources: { Bad: fakeConnector(), other: fakeConnector(), notion: apiSource({ call: undefined, secrets: 'x' }) } });
+    const many = problems({ generator: fakeGenerator(), sources: { Bad: fakeConnector(), other: fakeConnector(), notion: apiSource({ call: undefined, secrets: 'x' }) } });
     assert.ok(many.some((p) => /sources\.Bad: a source name starts with a lowercase letter/.test(p)), many.join('\n'));
     assert.ok(many.some((p) => /sources\.notion is missing method call/.test(p)), many.join('\n'));
     assert.ok(many.some((p) => /sources\.notion\.secrets must be a list of strings/.test(p)), many.join('\n'));
     assert.ok(many.some((p) => /exactly one SQL source/.test(p)), many.join('\n'));
-    assert.ok(problems({ sources: { notion: apiSource() } }).some((p) => /exactly one SQL source/.test(p)));
+    assert.ok(problems({ generator: fakeGenerator(), sources: { notion: apiSource() } }).some((p) => /exactly one SQL source/.test(p)));
   });
 
   test('with({ connector }) replaces the SQL source', () => {
     const replacement = fakeConnector();
-    const config = new SlimeConfig({ sources: { warehouse: fakeConnector() } }).with({ connector: replacement });
+    const config = new SlimeConfig({ generator: fakeGenerator(), sources: { warehouse: fakeConnector() } }).with({ connector: replacement });
     assert.equal(config.connector, replacement);
     assert.deepEqual(Object.keys(config.sources), ['warehouse']);
   });
 
   test('maxSteps and apiTimeoutMs have defaults and minimums', () => {
-    const config = new SlimeConfig({ connector: fakeConnector() });
+    const config = new SlimeConfig({ generator: fakeGenerator(), connector: fakeConnector() });
     assert.equal(config.limits.maxSteps, 4);
     assert.equal(config.limits.apiTimeoutMs, 10_000);
-    const found = problems({ connector: fakeConnector(), limits: { maxSteps: 0, apiTimeoutMs: 10 } });
+    const found = problems({ generator: fakeGenerator(), connector: fakeConnector(), limits: { maxSteps: 0, apiTimeoutMs: 10 } });
     assert.ok(found.some((p) => /limits\.maxSteps must be an integer of at least 1/.test(p)), found.join('\n'));
     assert.ok(found.some((p) => /limits\.apiTimeoutMs must be an integer of at least 100/.test(p)), found.join('\n'));
   });

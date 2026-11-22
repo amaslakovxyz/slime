@@ -72,16 +72,16 @@ describe('multi-source generation and meta', () => {
     assert.deepEqual(Object.keys(saved.provenance.sourceHashes ?? {}), ['db', 'notion']);
   });
 
-  test('locked mode serves the saved v2 handler without step details in meta', async () => {
+  test('a saved handler is served after a restart, with its steps in meta', async () => {
     const store = memoryStore();
-    const explore = await start({ generator: stubGenerator(() => ARTIFACT) }, store);
-    await explore.query(REQUEST);
-    await explore.flush();
-    const locked = await start({}, store);
-    const { data, meta } = await locked.query(REQUEST);
+    const first = await start({ generator: stubGenerator(() => ARTIFACT) }, store);
+    await first.query(REQUEST);
+    await first.flush();
+    const generator = stubGenerator(() => ARTIFACT);
+    const { data, meta } = await (await start({ generator }, store)).query(REQUEST);
     assert.deepEqual(data, [{ name: 'Acme', open: 1 }, { name: 'Globex', open: 0 }]);
-    assert.equal(meta.tier, 'liquid');
-    assert.equal(meta.steps, undefined);
-    assert.equal(meta.sql, undefined);
+    assert.deepEqual([meta.tier, meta.cache, generator.calls], ['liquid', 'hit', 0]);
+    assert.deepEqual(meta.steps?.map(({ name }) => name), ['accounts', 'feedback']);
+    assert.equal(meta.sql, 'SELECT name FROM accounts');
   });
 });

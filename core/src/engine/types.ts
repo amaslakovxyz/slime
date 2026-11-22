@@ -1,5 +1,4 @@
 // The Slime instance API (PLAN.md §5).
-import type { SlimeMode } from '../config/options.js';
 import type { StepTiming } from './execution/steps.js';
 import type { HandlerProvenance } from '../request/key.js';
 import type { SlimeRequest } from '../request/parse.js';
@@ -24,9 +23,9 @@ export interface QueryMeta {
   timingsMs: QueryTimings;
   warnings: string[];
   review: ReviewStatus;
-  /** Explore mode only: what each step read (R9). */
+  /** What each step read (R9). */
   steps?: StepTiming[];
-  /** sql, shapeJs and assumptions: explore mode only (R9). */
+  /** The code that answered (R9). */
   sql?: string;
   shapeJs?: string;
   assumptions?: string[];
@@ -47,7 +46,6 @@ export interface HandlerSummary {
 }
 
 export interface SlimeStats {
-  mode: SlimeMode;
   handlers: Record<StoredTier, number>;
   generationsThisHour: number;
   generationsInFlight: number;
@@ -57,7 +55,7 @@ export interface Slime {
   query(request: SlimeRequest): Promise<QueryResult>;
   handlers(): HandlerSummary[];
   stats(): SlimeStats;
-  /** The provenance new handlers are made with; saved ones that differ are regenerated in explore mode. */
+  /** The provenance new handlers are made with; saved ones that differ are generated again. */
   provenance(): HandlerProvenance;
   /** Removes the handler from memory and the store; false if it was unknown. */
   evict(handlerKey: string): Promise<boolean>;

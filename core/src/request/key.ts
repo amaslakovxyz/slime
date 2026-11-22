@@ -1,6 +1,6 @@
 // Cache keys (§4.3, R2–R4). The request key alone is a handler's store key.
-// Provenance is stored inside the handler, not hashed into the key, so locked
-// mode, which has no generator, finds what explore mode saved (§4.7).
+// Provenance is stored inside the handler, not hashed into the key, so a
+// changed prompt or model replaces the saved handler under the same key (§4.7).
 import { canonicalJSON, sha256 } from '../shared/hash.js';
 import { parseRequest, type ParsedRequest, type SlimeRequest } from './parse.js';
 
@@ -36,7 +36,7 @@ export function requestKey(request: ParsedRequest): string {
   );
 }
 
-/** Explore mode regenerates on any change; locked mode serves the handler and warns on schemaHash (§4.7). */
+/** Any change means the saved handler is generated again (§4.7). */
 export function changedProvenance(saved: HandlerProvenance, current: HandlerProvenance): (keyof HandlerProvenance)[] {
   return PROVENANCE_FIELDS.filter((field) => saved[field] !== current[field]);
 }

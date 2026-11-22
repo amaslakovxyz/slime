@@ -10,7 +10,7 @@ const REVIEWER_STRINGS = ['model'];
 const STORE_METHODS = ['get', 'put', 'list', 'delete'];
 
 const NOT_AN_OBJECT = 'the config must be an object, for example new SlimeConfig({ connector })';
-const REVIEWER_WITHOUT_GENERATOR = 'reviewer is set but generator is not: without a generator (locked mode) nothing is ever reviewed';
+const GENERATOR_REQUIRED = 'generator is required: it writes a handler for each new request';
 
 /** Every problem at once, so the app fixes its config in one pass (C4). */
 export function configProblems(options: unknown): string[] {
@@ -19,7 +19,7 @@ export function configProblems(options: unknown): string[] {
     ...unknownOptionProblems(options),
     ...sourceProblems(options as SourceOptions),
     ...generatorProblems(options.generator),
-    ...reviewerProblems(options.reviewer, options.generator !== undefined),
+    ...reviewerProblems(options.reviewer),
     ...storeProblems(options.store),
     ...crystalProblems(options.crystal),
     ...glossaryProblems(options.glossary),
@@ -38,15 +38,13 @@ function unknownOptionProblems(options: Record<string, unknown>): string[] {
 }
 
 function generatorProblems(generator: unknown): string[] {
-  if (generator === undefined) return [];
+  if (generator === undefined) return [GENERATOR_REQUIRED];
   return [...missingMethods('generator', generator, GENERATOR_METHODS), ...missingStrings('generator', generator, GENERATOR_STRINGS)];
 }
 
-function reviewerProblems(reviewer: unknown, hasGenerator: boolean): string[] {
+function reviewerProblems(reviewer: unknown): string[] {
   if (reviewer === undefined) return [];
-  const problems = [...missingMethods('reviewer', reviewer, REVIEWER_METHODS), ...missingStrings('reviewer', reviewer, REVIEWER_STRINGS)];
-  if (!hasGenerator) problems.push(REVIEWER_WITHOUT_GENERATOR);
-  return problems;
+  return [...missingMethods('reviewer', reviewer, REVIEWER_METHODS), ...missingStrings('reviewer', reviewer, REVIEWER_STRINGS)];
 }
 
 function storeProblems(store: unknown): string[] {

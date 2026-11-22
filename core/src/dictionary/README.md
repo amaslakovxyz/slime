@@ -20,7 +20,7 @@ not stored (D3): `createSlime()` builds it at every start.
 
 - **Deterministic.** The same inputs give the same text and hashes.
 - **Rules don't change `schemaHash`.** Glossary and rules change the text
-  and `hash`, never `schemaHash`, so locked mode's startup warning only
+  and `hash`, never `schemaHash`, so the Crystal startup warning only
   reacts to schema changes.
 - **Empty sections are left out.**
 

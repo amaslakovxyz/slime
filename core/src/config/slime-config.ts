@@ -1,6 +1,6 @@
 // The app passes everything core needs; core never reads process.env or .env (C4).
 import { DEFAULT_LIMITS, DEFAULT_TIERS } from './defaults.js';
-import type { CrystalRegistry, LimitOptions, SlimeMode, SlimeOptions, TierOptions } from './options.js';
+import type { CrystalRegistry, LimitOptions, SlimeOptions, TierOptions } from './options.js';
 import type { SlimeEvent } from './events.js';
 import { SQL_SOURCE_DEFAULT_NAME } from './source-rules.js';
 import { configProblems } from './validate.js';
@@ -11,7 +11,7 @@ import type { SlimeStore } from '../stores/types.js';
 import { isApiSource, type Source } from '../sources/types.js';
 
 export { DEFAULT_LIMITS, DEFAULT_TIERS } from './defaults.js';
-export type { CrystalRegistry, LimitOptions, SlimeMode, SlimeOptions, TierOptions } from './options.js';
+export type { CrystalRegistry, LimitOptions, SlimeOptions, TierOptions } from './options.js';
 export type { ErrorEvent, GeneratedEvent, PromotedEvent, ReviewedEvent, SlimeEvent, WarningEvent } from './events.js';
 
 /** Setting an option to undefined removes it. */
@@ -25,7 +25,7 @@ export class SlimeConfig {
   readonly sources: Readonly<Record<string, Source>>;
   readonly sqlSourceName: string;
   readonly apiSourceNames: readonly string[];
-  readonly generator: Generator | undefined;
+  readonly generator: Generator;
   readonly reviewer: Reviewer | undefined;
   /** undefined: createSlime() builds the default file store. */
   readonly store: SlimeStore | undefined;
@@ -35,7 +35,6 @@ export class SlimeConfig {
   readonly tiers: Readonly<TierOptions>;
   readonly limits: Readonly<LimitOptions>;
   readonly onEvent: (event: SlimeEvent) => void;
-  readonly mode: SlimeMode;
 
   readonly #options: SlimeOptions;
 
@@ -61,7 +60,6 @@ export class SlimeConfig {
     this.tiers = Object.freeze({ ...DEFAULT_TIERS, ...options.tiers });
     this.limits = Object.freeze({ ...DEFAULT_LIMITS, ...options.limits });
     this.onEvent = options.onEvent ?? ignoreEvent;
-    this.mode = options.generator ? 'explore' : 'locked';
     Object.freeze(this);
   }
 
