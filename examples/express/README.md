@@ -59,6 +59,11 @@ From a new request to Crystal:
    `npm run crystallize` reads only the store, whose counts stop at promotion).
    With a model key, an optimizer tries to simplify the code first.
 3. Commit `slime-crystal/`. CI runs `npm run check:crystal`.
+
+`node scripts/grow-crystals.mjs` does steps 1–2 without a model (canned
+handlers, the demo database): it is how `.github/workflows/crystal-agents.yml`
+feeds the Crystal agent loop (`crystal/README.md`, "Agent loop"). The tests
+set `crystal: false`, so whatever `slime-crystal/` holds, they grow their own.
 4. The server loads `slime-crystal/index.mjs` at startup and serves those
    handlers in-process; app code can also call `slime-crystal/services.mjs`
    directly, typed, without Slime.

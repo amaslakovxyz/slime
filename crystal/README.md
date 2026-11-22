@@ -47,6 +47,34 @@ the store as the fallback core uses when the Crystal stops fitting the data
 (a migration). `prune({ olderThanDays = 14, isDryRun })` deletes it once the
 Crystal has been in place that long, through `slime.evict`.
 
+## Agent loop
+
+Agents may rewrite a Crystal, never the gate that judges it (`agents/`,
+`scripts/`; not shipped in the package):
+
+1. **Writer** (`agents/writer.md`): optimizes the freshly crystallized modules
+   (`isOptimized` not set), aiming at the same results with no `shape` and a
+   cheaper plan. It may only read, edit, and run `slime-crystal pin` / `verify`.
+2. **Gate** (`scripts/agent-loop.mjs`): restores every file but those modules,
+   then pins and verifies; if anything fails, the folder goes back to what
+   crystallize wrote.
+3. **Reviewers** (`agents/reviewer-correctness.md`, `-security.md`,
+   `-performance.md`): get the reference, the module and the request in the
+   prompt, have no tools, and answer with a schema-checked verdict. Their notes
+   go back to the writer for the next round (2 rounds by default).
+4. **Merge gate** (`scripts/merge-gate.mjs`): a PR merges without a person only
+   when the branch changes nothing outside the Crystal folder, `verify` passes
+   on the committed folder, and every reviewer approved.
+
+```sh
+node crystal/scripts/agent-loop.mjs --dir <crystal folder> --database-url <read-only url> --report report.json
+```
+
+It runs the `claude` CLI (Opus writes, Sonnet reviews): `--bare` with
+`ANTHROPIC_API_KEY`, else the local login without MCP servers or skills.
+`.github/workflows/crystal-agents.yml` runs the whole loop on the express
+example (grown with canned handlers, no model) and opens the PR.
+
 Source layout (`src/`):
 
 - `crystallize.ts`: the job.

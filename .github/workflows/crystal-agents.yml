@@ -1,0 +1,125 @@
+name: Crystal agents
+
+# Grows the express example's handlers to Crystal (canned handlers, no model), lets a
+# writer agent optimize the new modules behind the pin/verify gate, has three reviewer
+# agents check them, and opens a PR. It merges only when crystal/scripts/merge-gate.mjs
+# allows it: the branch changes nothing outside the Crystal folder, verify passes on the
+# committed folder, and every reviewer approved. Otherwise the PR waits for a person.
+#
+# Off until the repository has the ANTHROPIC_API_KEY secret. Opening the PR needs
+# Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests".
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: crystal-agents
+  cancel-in-progress: false
+
+jobs:
+  agents:
+    name: Crystallize and optimize
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: slime_admin
+          POSTGRES_PASSWORD: slime_admin
+          POSTGRES_DB: slime
+        ports:
+          - 54329:5432
+        options: >-
+          --health-cmd "pg_isready -U slime_admin -d slime"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      DATABASE_URL: postgres://slime_reader:slime_reader@localhost:54329/slime
+      CRYSTAL_DIR: examples/express/slime-crystal
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Needs ANTHROPIC_API_KEY
+        id: key
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::notice::ANTHROPIC_API_KEY is not set: the Crystal agents are off."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.key.outputs.skip != 'true'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - if: steps.key.outputs.skip != 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            examples/express/package-lock.json
+      - if: steps.key.outputs.skip != 'true'
+        run: psql "postgres://slime_admin:slime_admin@localhost:54329/slime" -v ON_ERROR_STOP=1 -f examples/express/db/init.sql
+      - if: steps.key.outputs.skip != 'true'
+        run: |
+          npm ci
+          npm run build -w @slime-cloud/core -w @slime-cloud/crystal
+          npm ci --prefix examples/express
+          npm install -g @anthropic-ai/claude-code@2.1.330
+      - name: Grow the example's handlers to Crystal
+        if: steps.key.outputs.skip != 'true'
+        working-directory: examples/express
+        run: node scripts/grow-crystals.mjs
+      - name: Commit what crystallize wrote
+        id: crystallize
+        if: steps.key.outputs.skip != 'true'
+        run: |
+          if [ -z "$(git status --porcelain -- "$CRYSTAL_DIR")" ]; then
+            echo "::notice::No handler is newly ready for Crystal."
+            echo "nothing=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "crystal/agents-${GITHUB_RUN_ID}"
+          git add -- "$CRYSTAL_DIR"
+          git commit -m "crystallize: new Crystal in $CRYSTAL_DIR"
+      - name: Writer and reviewer agents
+        if: steps.key.outputs.skip != 'true' && steps.crystallize.outputs.nothing != 'true'
+        run: |
+          node crystal/scripts/agent-loop.mjs --dir "$CRYSTAL_DIR" --database-url "$DATABASE_URL" --report "$RUNNER_TEMP/report.json"
+          if [ -n "$(git status --porcelain -- "$CRYSTAL_DIR")" ]; then
+            git add -- "$CRYSTAL_DIR"
+            git commit -m "crystal: optimized by the writer agent, reviewed by three agents"
+          fi
+          git push -u origin "crystal/agents-${GITHUB_RUN_ID}"
+      - name: Open the PR, and merge it if the gate allows
+        if: steps.key.outputs.skip != 'true' && steps.crystallize.outputs.nothing != 'true'
+        run: |
+          node -e '
+            const r = require(process.argv[1]);
+            const last = r.rounds.at(-1) ?? { reviews: [], gate: { verified: true, problems: [] } };
+            const lines = [
+              "Crystal for the express example, written by `crystal/scripts/agent-loop.mjs`.",
+              "",
+              `- Modules: ${r.keys.length}; optimized by the writer: ${r.optimized.length}`,
+              `- Verify on the last round: ${last.gate.verified ? "passed" : "failed: " + last.gate.problems.join("; ")}`,
+              `- Reviewers: ${last.reviews.map((x) => `${x.reviewer} ${x.verdict}`).join(", ") || "none"}`,
+              `- Rounds: ${r.rounds.length}; agent cost: $${r.costUsd}`,
+              "",
+              ...last.reviews.flatMap((x) => x.problems.map((p) => `- ${x.reviewer}: ${p}`)),
+            ];
+            process.stdout.write(lines.join("\n") + "\n");
+          ' "$RUNNER_TEMP/report.json" > "$RUNNER_TEMP/body.md"
+          gh pr create --base main --title "Crystal: agent-optimized handlers for the express example" --body-file "$RUNNER_TEMP/body.md"
+          if node crystal/scripts/merge-gate.mjs --report "$RUNNER_TEMP/report.json" --dir "$CRYSTAL_DIR" --base origin/main --database-url "$DATABASE_URL"; then
+            gh pr merge --squash --delete-branch
+          else
+            echo "::notice::The merge gate left this PR for a person."
+          fi

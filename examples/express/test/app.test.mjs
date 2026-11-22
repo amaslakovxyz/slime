@@ -33,7 +33,8 @@ async function isDatabaseAvailable() {
 
 /** `options` may be a function of the instance, for routes that need it (the crystallizer). */
 async function startServer(env, options) {
-  const slime = await createSlime(await slimeConfigFromEnv(env, { store: memoryStore(), generator: cannedGenerator(CANNED_HANDLERS) }));
+  // crystal: false — the tests grow their own handlers, whatever slime-crystal/ holds.
+  const slime = await createSlime(await slimeConfigFromEnv(env, { store: memoryStore(), generator: cannedGenerator(CANNED_HANDLERS), crystal: false }));
   const server = createApp(slime, typeof options === 'function' ? options(slime) : options).listen(0);
   await new Promise((resolve) => server.once('listening', resolve));
   const baseUrl = `http://localhost:${server.address().port}`;
