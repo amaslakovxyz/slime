@@ -1,5 +1,5 @@
 // Builds the SlimeConfig from this app's environment. Core never reads env; the app does.
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { SlimeConfig, fileStore } from '@slime-cloud/core';
 import { postgresConnector } from '@slime-cloud/core/postgres';
 
@@ -13,16 +13,11 @@ const CLAUDE_REVIEW_MODEL = 'claude-opus-5-5';
 const GLOSSARY = { revenue: 'sum of paid invoices, in cents' };
 const RULES = ['Revenue counts only invoices with status paid.'];
 
-/**
- * Explore mode generates new handlers (development); locked mode serves only
- * saved and Crystal handlers (production, R8). SLIME_LOCKED=1 locks it.
- */
+/** A request no saved or Crystal handler answers is generated, so a model is required; tests pass their own `generator`. */
 export async function slimeConfigFromEnv(env = process.env, overrides = {}) {
-  const models = env.SLIME_LOCKED === '1' ? {} : await chooseModels(env);
+  const models = overrides.generator ? {} : await chooseModels(env);
   return new SlimeConfig({
-    // `||`, not `??`: an empty value copied from .env.example means unset.
-    connector: postgresConnector({ url: env.DATABASE_URL || DEMO_DATABASE_URL }),
-    store: fileStore(env.SLIME_STORE_DIR || `${APP_DIR}.slime`),
+    ...databaseFromEnv(env),
     glossary: GLOSSARY,
     rules: RULES,
     ...models,
@@ -31,7 +26,16 @@ export async function slimeConfigFromEnv(env = process.env, overrides = {}) {
   });
 }
 
-/** A model key picks a provider; without one, the offline handlers stand in for a model. */
+/** The demo database and the handler store, without a model: enough for the crystallize job. */
+export function databaseFromEnv(env = process.env) {
+  return {
+    // `||`, not `??`: an empty value copied from .env.example means unset.
+    connector: postgresConnector({ url: env.DATABASE_URL || DEMO_DATABASE_URL }),
+    store: fileStore(env.SLIME_STORE_DIR || `${APP_DIR}.slime`),
+  };
+}
+
+/** A model key picks the provider. */
 async function chooseModels(env) {
   if (env.GROQ_API_KEY) {
     const { groq } = await import('@slime-cloud/core/groq');
@@ -43,8 +47,7 @@ async function chooseModels(env) {
     const apiKey = env.ANTHROPIC_API_KEY;
     return { generator: claude.generator({ apiKey, model: CLAUDE_GENERATOR_MODEL }), reviewer: claude.reviewer({ apiKey, model: CLAUDE_REVIEW_MODEL }) };
   }
-  const { offlineGenerator } = await import('@slime-cloud/core/offline');
-  return { generator: offlineGenerator(JSON.parse(readFileSync(`${APP_DIR}offline-handlers.json`, 'utf8'))) };
+  throw new Error('Set GROQ_API_KEY or ANTHROPIC_API_KEY: Slime generates a handler for each new request with that model.');
 }
 
 /** Crystal handlers live in this app's code once `npm run crystallize` has written them (C10). */

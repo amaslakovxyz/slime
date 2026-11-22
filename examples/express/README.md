@@ -7,11 +7,9 @@ the demo database. It shows the setup PLAN.md recommends (R8, R11):
 
 - Each endpoint picks its intent and output and builds the input on the
   server. Clients never send an intent or an identity value.
-- **Explore mode in development** generates handlers for new requests:
-  - with a Groq or Claude key, a model writes them;
-  - without a key, the offline handlers in `offline-handlers.json` stand in.
-- **Locked mode in production** (`SLIME_LOCKED=1`) serves only handlers
-  saved in `.slime/` and Crystal handlers in `slime-crystal/`.
+- A Groq or Claude key is required: a request no saved handler (`.slime/`)
+  or Crystal handler (`slime-crystal/`) answers is written by that model.
+- Crystallize the handlers you rely on, so production serves reviewed code.
 
 It also holds the demo database (`db/init.sql` and `docker-compose.yml`) that
 core's tests and CI use.
@@ -36,7 +34,7 @@ Endpoints:
 | `GET /api/revenue/monthly?since=2026-06-01` | paid revenue per month since a date |
 | `GET /api/accounts/failed-invoices?since=2026-01-01` | accounts with failed invoices since a date |
 | `GET /health` | `slime.stats()` |
-| `POST /dev/query` | any `{ intent, input, output }`, **explore mode only** |
+| `POST /dev/query` | any `{ intent, input, output }`, **only with `SLIME_DEV_QUERY=1`** |
 
 Environment (put it in `.env`: `npm start` and `npm run crystallize` load it,
 and git ignores it; `.env.example` lists the variables):
@@ -44,14 +42,14 @@ and git ignores it; `.env.example` lists the variables):
 | Variable | Default | Meaning |
 |---|---|---|
 | `DATABASE_URL` | the demo `slime_reader` | a read-only database user |
-| `GROQ_API_KEY` / `ANTHROPIC_API_KEY` | unset | a model writes handlers; without a key, the offline handlers do |
-| `SLIME_LOCKED` | unset | `1`: locked mode, no generation |
+| `GROQ_API_KEY` / `ANTHROPIC_API_KEY` | unset | **required for `npm start`**: the model that writes handlers |
+| `SLIME_DEV_QUERY` | unset | `1`: add `POST /dev/query` (local development only) |
 | `SLIME_STORE_DIR` | `./.slime` | where saved (Liquid) handlers are kept |
 | `PORT` | `3000` | |
 
-From explore to Crystal:
+From a new request to Crystal:
 
-1. Call the endpoints in explore mode. After 3 successful runs a handler is
+1. Call the endpoints. After 3 successful runs a handler is
    reviewed (with a model key) and saved to `.slime/`.
 2. `npm run crystallize` writes proven handlers to `slime-crystal/`. With a
    model key, an optimizer tries to simplify them first.
@@ -61,8 +59,8 @@ From explore to Crystal:
 
 ## Invariants
 
-- **`/dev/query` is never on in locked mode.** It lets a caller generate
-  queries against everything the database user can read.
+- **`/dev/query` is off unless `SLIME_DEV_QUERY=1`.** It lets a caller
+  generate queries against everything the database user can read.
 - **Values from the query string are passed as values,** never written into
   an intent.
 - **Run `check:crystal` in CI.** Crystal code runs without a sandbox, and the
@@ -71,11 +69,12 @@ From explore to Crystal:
 ## Side Effects
 
 - Reads and writes `.slime/` (handlers) and `slime-crystal/` (Crystal).
-- Calls the model provider when a key is set.
+- Calls the model provider for every new request.
 
 ## Verification
 
-- `npm test` runs the endpoints against the demo database with the offline
-  handlers. It is skipped when Postgres is down, unless `REQUIRE_DB=1`.
+- `npm test` runs the endpoints against the demo database with canned
+  handlers (`test/canned-handlers.json`, through `cannedGenerator` from
+  `@slime-cloud/core/testing`), so it needs no model key. It is skipped when Postgres is down, unless `REQUIRE_DB=1`.
 - CI's "Example app" job packs core, installs the tarball here instead of the
   local link, and runs the tests and `check:crystal`.

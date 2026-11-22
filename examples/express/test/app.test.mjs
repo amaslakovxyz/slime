@@ -1,14 +1,17 @@
-// The example end to end: its endpoints against the demo database, with the
-// offline handlers instead of a model. CI runs it from the packed core tarball.
+// The example end to end: its endpoints against the demo database, with canned
+// handlers instead of a model. CI runs it from the packed core tarball.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
+import { readFileSync } from 'node:fs';
 import pg from 'pg';
 import { createSlime, memoryStore } from '@slime-cloud/core';
+import { cannedGenerator } from '@slime-cloud/core/testing';
 import { createApp } from '../src/app.mjs';
 import { slimeConfigFromEnv } from '../src/config.mjs';
 
 const DATABASE_URL = process.env.DATABASE_URL ?? 'postgres://slime_reader:slime_reader@localhost:54329/slime';
-const OFFLINE_ENV = { DATABASE_URL };
+const ENV = { DATABASE_URL };
+const CANNED_HANDLERS = JSON.parse(readFileSync(new URL('./canned-handlers.json', import.meta.url), 'utf8'));
 const hasDatabase = await isDatabaseAvailable();
 
 async function isDatabaseAvailable() {
@@ -25,7 +28,7 @@ async function isDatabaseAvailable() {
 }
 
 async function startServer(env, options) {
-  const slime = await createSlime(await slimeConfigFromEnv(env, { store: memoryStore() }));
+  const slime = await createSlime(await slimeConfigFromEnv(env, { store: memoryStore(), generator: cannedGenerator(CANNED_HANDLERS) }));
   const server = createApp(slime, options).listen(0);
   await new Promise((resolve) => server.once('listening', resolve));
   const baseUrl = `http://localhost:${server.address().port}`;
@@ -36,10 +39,10 @@ async function startServer(env, options) {
   return { baseUrl, stop };
 }
 
-describe('example app in explore mode (offline handlers)', { skip: !hasDatabase }, () => {
+describe('example app (canned handlers)', { skip: !hasDatabase }, () => {
   let app;
   before(async () => {
-    app = await startServer(OFFLINE_ENV, { exposeDevQuery: true });
+    app = await startServer(ENV, { exposeDevQuery: true });
   });
   after(() => app.stop());
 
@@ -64,7 +67,7 @@ describe('example app in explore mode (offline handlers)', { skip: !hasDatabase 
     assert.deepEqual([error.code, error.retryable], ['INVALID_REQUEST', false]);
   });
 
-  test('POST /dev/query answers any request in explore mode', async () => {
+  test('POST /dev/query answers any request when it is enabled', async () => {
     const response = await fetch(`${app.baseUrl}/dev/query`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -75,17 +78,15 @@ describe('example app in explore mode (offline handlers)', { skip: !hasDatabase 
   });
 });
 
-describe('example app in locked mode', { skip: !hasDatabase }, () => {
+describe('example app without /dev/query', { skip: !hasDatabase }, () => {
   let app;
   before(async () => {
-    app = await startServer({ ...OFFLINE_ENV, SLIME_LOCKED: '1' });
+    app = await startServer(ENV);
   });
   after(() => app.stop());
 
-  test('serves only saved handlers: an empty store answers 404, and /dev/query does not exist', async () => {
-    const response = await fetch(`${app.baseUrl}/api/plans/accounts`);
-    assert.equal(response.status, 404);
-    assert.equal((await response.json()).error.code, 'HANDLER_NOT_FOUND');
+  test('named endpoints still answer, and /dev/query does not exist', async () => {
+    assert.equal((await fetch(`${app.baseUrl}/api/plans/accounts`)).status, 200);
     assert.equal((await fetch(`${app.baseUrl}/dev/query`, { method: 'POST' })).status, 404);
   });
 });
