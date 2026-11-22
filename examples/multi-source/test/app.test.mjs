@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import pg from 'pg';
 import { createSlime, memoryStore } from '@slime-cloud/core';
 import { cannedGenerator } from '@slime-cloud/core/testing';
@@ -99,14 +100,25 @@ describe('the multi-source example', { skip: !isDatabaseUp && 'Postgres is not r
     assert.deepEqual([error.code, error.retryable], ['INVALID_REQUEST', false]);
   });
 
-  test('POST /crystallize skips the handlers that read Notion or the films API, and says why', async () => {
-    // Liquid first: crystallize looks only at saved handlers (3 runs; each intent ran once above).
-    for (const body of [POSTGRES_AND_NOTION, NOTION_AND_FILMS, FILMS_ALONE]) for (let run = 0; run < 2; run++) assert.equal((await ask(body)).status, 200);
+  test('POST /crystallize turns the three intents into Crystal, which a new instance serves', async () => {
+    // Ready first: 10 successful runs each (each intent ran once above).
+    for (const body of [POSTGRES_AND_NOTION, NOTION_AND_FILMS, FILMS_ALONE]) for (let run = 0; run < 9; run++) assert.equal((await ask(body)).status, 200);
     const response = await app.request('/crystallize', { method: 'POST' });
     assert.equal(response.status, 200);
     const { reports } = await response.json();
-    assert.equal(reports.length, 3, 'the three intents above');
-    assert.ok(reports.every(({ outcome, reasons }) => outcome === 'skipped' && /one SQL query/.test(reasons.join())), JSON.stringify(reports));
+    assert.deepEqual(reports.map(({ outcome }) => outcome), ['crystallized', 'crystallized', 'crystallized'], JSON.stringify(reports));
+
+    const { crystals } = await import(pathToFileURL(join(dir, 'index.mjs')).href);
+    const served = await createSlime(await slimeConfigFromEnv(ENV, { store: memoryStore(), generator: cannedGenerator({}), crystal: crystals }));
+    try {
+      for (const body of [POSTGRES_AND_NOTION, NOTION_AND_FILMS, FILMS_ALONE]) {
+        const [fromLiquid, fromCrystal] = [await slime.query(body), await served.query(body)];
+        assert.equal(fromCrystal.meta.tier, 'crystal');
+        assert.deepEqual(fromCrystal.data, fromLiquid.data);
+      }
+    } finally {
+      await served.close();
+    }
   });
 
   test('POST /crystallize refuses keys that are not a list of strings', async () => {

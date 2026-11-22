@@ -1,7 +1,7 @@
 // Three endpoints, as in examples/express and examples/hono. POST /slime passes the
 // frontend's { intent, input, output } to Slime: development only (S7, R8).
-// POST /crystallize turns ready handlers into Crystal; for now Crystal takes only
-// handlers that are one SQL query, so ones that read Notion or the films API are skipped.
+// POST /crystallize turns ready handlers into Crystal, the ones that read Notion or the
+// films API included: their steps run through the app's sources.
 import { SlimeError } from '@slime-cloud/core';
 import { Hono } from 'hono';
 

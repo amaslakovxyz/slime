@@ -315,11 +315,11 @@ Still open:
   JSON or Linear GraphQL. That form has no `or` filters, relations or nested
   filters. The spike checks whether a Linear source fits the `ApiSource`
   port as is; until then, no new operations are added to the Notion adapter.
-* **Crystal for handlers that read API sources:** core's MS9 excludes them,
-  so a Linear or Notion handler stops at Liquid. **Proposed (pending team
-  confirmation):** in v0, Crystal covers SQL-only handlers; the demo's
-  Crystal step uses a Postgres handler, and Crystal for API handlers (record
-  and replay of source responses) is roadmap.
+* **Crystal for handlers that read API sources:** decided on 2026-11-22: they
+  become Crystal as steps modules (their declared API calls and SQL, plus a
+  checked `shape`), crystallized on the app's instance, where the sources are
+  (core/docs/multi-source.md §3.6). Record and replay of source responses, for
+  verifying an edited module without the live sources, is roadmap.
 * **Blocking — Identity (next decision per the research record):** whose
   token reads Linear/Notion in Gas vs behind a Crystal endpoint; service
   identity, scopes, refresh.

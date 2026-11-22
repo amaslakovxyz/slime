@@ -53,10 +53,13 @@ The other two demo intents are in `test/canned-handlers.json`.
 ## Crystal
 
 `POST /crystallize` (`{ keys? }`) runs a `Crystallizer` from
-`@slime-cloud/crystal` on the instance, as in the other examples. Crystal takes
-only a handler that is one SQL query for now, so the three demo intents, which
-read Notion or the films API, come back `skipped` with that reason; a
-Postgres-only request crystallizes into `slime-crystal/` after 10 runs.
+`@slime-cloud/crystal` on the instance, as in the other examples. A handler that
+is ready (10 successful runs) becomes a module in `slime-crystal/`: its steps
+(Postgres, Notion, films) unchanged, and its `shape(data, input)` checked by the
+allowlist, then run in the app's process. The equivalence test calls the real
+sources (or the recorded ones with `FETCH_FIXTURES=1`), so it runs on the
+instance. Its service in `slime-crystal/services.mjs` takes the app's sources
+map, not only the connector.
 
 ## Development only
 

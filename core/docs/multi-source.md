@@ -6,7 +6,7 @@
 | Owner | Konstantin |
 | Date | 2026-11-21 (revised after the review in PR #26) |
 | Scope | `core/` (`@slime-cloud/core`), one new adapter subpath, one example app |
-| Next step | Confirm handler shape and Crystal for API steps against [product frame v0.2](../../docs/product/product_frame_v0_2.md) (open questions); run P6.5; wire sources into `platform/runtime` |
+| Next step | Confirm handler shape against [product frame v0.2](../../docs/product/product_frame_v0_2.md) (open questions); run P6.5; wire sources into `platform/runtime` |
 
 
 > **Update 2026-11-22:** the v1/v2 split described here is gone. Every handler now uses the
@@ -48,8 +48,8 @@ These parts keep their current behaviour; the code that runs them changes in
 - locked mode.
 
 With no API source configured, Slime behaves exactly as today (§3.3,
-compatibility rule). Crystal for handlers that call APIs is deferred to a later
-phase.
+compatibility rule). Crystal for handlers that call APIs came later: steps
+modules (§3.6).
 
 The first build targets three sources:
 - **Postgres**: the demo billing database from `examples/express`.
@@ -107,7 +107,6 @@ other.
 - Model-written JavaScript that performs I/O (path B, §3.7).
 - Steps that depend on each other's results (for example, read keys from
   Postgres, then ask the API only for those keys). Listed under P7 (later).
-- Crystal for handlers with API steps. Listed under P7.
 - More than one SQL source, and cross-database SQL.
 - Non-HTTP sources (CSV, Excel, DuckDB). A separate track.
 - Importing an OpenAPI spec automatically. Listed under P7.
@@ -140,7 +139,7 @@ Decisions this touches:
 | C3 (ports) | Consistent: an API source is a new port beside `Connector`. |
 | C4 (core never reads env) | Holds: the app passes tokens to adapters. |
 | C7 (subpath adapters) | Consistent: Notion ships as `@slime-cloud/core/notion`. |
-| C10 (Crystal) | Limited: handlers with API steps are not crystallized in v1. |
+| C10 (Crystal) | Handlers with API steps (or several SQL steps) become steps modules (§3.6). |
 | C12 (no connectors other than Postgres in v1) | **Amended** by this document. |
 | `docs/product/concepts_brief.md` non-goal "Connectors other than Postgres" | **Amended** together with C12. |
 | D1 (metadata only) | Holds: Notion property schemas and select options are metadata. |
@@ -470,7 +469,7 @@ sandbox.
 | Review | Unchanged loop. The review prompt shows the steps. |
 | Liquid | Unchanged rule (`lifecycle.ts`): enough successful runs, plus approval when a reviewer is set. |
 | Locked | Serves saved v2 handlers that pass the step lint against today's sources (§3.3). Adapters still run, so sources must be reachable. |
-| Crystal | v1: handlers with an API step are skipped and reported. Single-SQL-step handlers were stored as v1 (§3.3) and crystallize as today. P7 adds a module format for API steps with record-and-replay equivalence. |
+| Crystal | A single-SQL-step handler becomes a query module, as before. Any other handler becomes a steps module (2026-11-22, replacing MS9): `export const steps` (a plain literal of its Liquid steps) and `export function shape(data, input)`, checked by the same allowlist. The equivalence test calls the live sources on the app's instance (`Crystallizer`); a source that changes between the Liquid and the Crystal run makes it fail, never pass wrongly. `slime-crystal verify` without the app's sources accepts such a module only while it is exactly its Liquid code. |
 
 ### 3.7 Alternatives considered
 
@@ -692,7 +691,7 @@ around them. That is what the rules below are for.
 |---|---|---|---|
 | S1 | **The model steers a request to another host** (SSRF). If an argument can shape the URL, the adapter sends its `Authorization` header to an attacker's server. | Base URL fixed per source. Arguments only as encoded query or body values. Paths start with one `/` and contain no `//` or `..`; the built URL's origin must equal the base URL's. Cross-origin redirects refused. No URL, host or path parameters. | Query values with `../`, `?`, `#` and full URLs are encoded and keep the host. Paths `//evil.example/x` and `/a/../b` are refused. A redirect to another origin fails. |
 | S2 | **Secrets in error text.** HTTP client errors often carry request headers or URLs. Error text reaches the HTTP response (`SlimeError` JSON), startup errors (which `platform/runtime` returns in its 503 body), `onEvent` logs, and the repair prompt sent to the model provider. | Adapters throw `SourceError(status, safeMessage)` with no headers and no raw body. The engine calls every source method (`describe`, `safetyCheck`, `call`, `close`) through one wrapper that redacts the source's `secrets` and wraps the error. The constrained client adds every header value it sends to `secrets`. | The token never appears in a `QueryResult`, `SlimeError.toJSON()`, a startup `SlimeConfigError`, an `onEvent` payload, a store file, or a prompt captured by a spy generator. |
-| S3 | **Crystal runs `shape` in-process.** The allowlist is the only wall between model code and `process.env`. | v1: no Crystal for handlers with API steps. Keep the allowlist tests. | Crystallize skips handlers with API steps and reports them. |
+| S3 | **Crystal runs `shape` in-process.** The allowlist is the only wall between model code and `process.env`. | Steps modules keep it: API steps are declared operations in a plain literal, not code, and `shape` passes the same allowlist. Keep the allowlist tests. | `crystal/src/module-format.ts` refuses anything in `steps` that runs. |
 | S4 | **Non-JSON objects reach the sandbox** (adapter objects, functions, response objects with headers). | API rows are checked before they cross: a bigint, function, symbol or undefined is refused. SQL rows keep today's handling. | An API row with a function or bigint is refused; a SQL row with a `Date` still works. |
 | S5 | **Secrets in the environment** widen the damage of any future bug that reads it. On Lambda, `platform/runtime/src/lambda.ts:30-42` (the Lambda wrapper for Slime Cloud) loads every SSM parameter into `process.env`. | Pass each secret straight to its adapter. Separate follow-up in `platform/runtime`, outside this plan: load only what the runtime needs. | Runtime review item. |
 | S6 | **Too much data visible** (a data leak, not a secret leak). | Least privilege per source acts as the GRANT. Postgres: read-only user, as today. Notion: "Read content" only, integration shared only with the listed data sources; Slime exposes only `dataSources` minus `exclude`. `people` properties excluded. | Safety check fails if a listed data source is unreadable. Dictionary snapshot test shows no excluded properties. |
@@ -771,7 +770,7 @@ known so far.
 | Execution | Parallel steps, deadline, abort on any failure, input type check per run, truncation rule, `meta.steps`, `shape(data, input)` | `core/src/engine/execution/execute.ts`, `generate.ts`, `slime-engine.ts` (split), `meta.ts`, `events.ts` |
 | Sandbox | The first `shape` argument may be an object of step rows; API rows checked for plain JSON | `core/src/sandbox/types.ts`, `core/src/sandbox/quickjs/quickjs-runner.ts` |
 | Models | Generation and review prompts for steps (in a new file); JSON reply format and schema; offline generator accepts v2 | `core/src/models/prompts-multi-source.ts`, `roles.ts`, `schemas.ts`, `offline/` |
-| Crystal | Skip handlers with API steps, with a `skipped` outcome | `crystal/src/crystallize.ts` |
+| Crystal | Skip handlers with API steps, with a `skipped` outcome (replaced on 2026-11-22 by steps modules) | `crystal/src/crystallize.ts` |
 | HTTP | New deadline retry helper; constrained client. `groq-client.ts` is not touched. | `core/src/sources/api/*` |
 | Adapters | `defineApiSource`; `notion/` subpath and its export | `core/src/sources/api/*`, `core/src/sources/api/notion/*`, `core/package.json` |
 | Testing | `fakeApiSource`, `apiSourceContract`, fixture stub, fixtures | `core/src/testing/*`, `core/test/**`, `core/test/package.test.ts` (new export) |
@@ -835,7 +834,7 @@ Every question carries a recommendation. P0 recorded each one as a decision in [
 | Q4 | List-valued columns (multi_select, relation)? | No list columns in v1: multi_select is a joined string, relation is excluded. | Recorded: MS2 |
 | Q5 | Notion filters: generated equality and range params, or a model-written filter language? | Generated params in v1. Small, typed, lintable. Anything finer is done in `shape` over at most `rowCap` rows; more data fails the run (§3.5). | Recorded: MS12 |
 | Q6 | A source is down at startup? | Fail fast in explore and locked mode, matching today's behaviour when the database is unreachable. | Recorded: MS8 |
-| Q7 | Crystal for handlers with API steps? | Not in v1 (S3, and equivalence on live data is not deterministic). | Recorded: MS9 |
+| Q7 | Crystal for handlers with API steps? | Not in v1 (S3, and equivalence on live data is not deterministic). Since 2026-11-22: yes, as steps modules (§3.6). | Recorded: MS9, replaced |
 | Q8 | Can a `defineApiSource` operation use raw `fetch`? | No. Only the constrained client, which takes headers, method and body options. | Recorded: MS10 |
 | Q9 | Naming and folders: "source" vs "connector"; `connectors/` vs `sources/`? | "Source" is the umbrella term, and the Postgres connector is a SQL source. New code goes in `core/src/sources/`. | Recorded: MS11 |
 | Q10 | Merge before or after the demo? | Phase by phase as each is ready: the compatibility rule and the P1–P3 config guard keep a Postgres-only demo unchanged. | Recorded: Plan §0 |
