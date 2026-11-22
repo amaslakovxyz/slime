@@ -4,7 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, describe, test } from 'node:test';
-import { SlimeConfig, createSlime, handlerKeyFor, memoryStore, type Slime } from '@slime-cloud/core';
+import { SlimeConfig, createSlime, handlerKeyFor, memoryStore, type Slime, type SlimeError } from '@slime-cloud/core';
 import { artifact, fakeConnector, stubGenerator } from '@slime-cloud/core/testing';
 import { Crystallizer } from '../src/crystallizer.js';
 import { crystallize } from '../src/crystallize.js';
@@ -70,6 +70,14 @@ describe('Crystallizer', () => {
     const key = handlerKeyFor({ ...EUROS, input: { country: 'DE' } });
     const reports = await new Crystallizer(slime, { dir }).run({ keys: [key] });
     assert.deepEqual(reports.map((report) => [report.key, report.outcome]), [[key, 'crystallized']]);
+  });
+
+  test('refuses keys that are not a list of strings, as an endpoint passes them on', async () => {
+    const { slime } = await grownSlime();
+    const crystallizer = new Crystallizer(slime, { dir: await crystalDir() });
+    for (const keys of ['all', [1], { 0: 'a' }]) {
+      await assert.rejects(crystallizer.run({ keys } as never), (error: SlimeError) => error.code === 'INVALID_REQUEST');
+    }
   });
 
   test('minRuns counts the live runs', async () => {

@@ -1,7 +1,7 @@
 // Crystallize from a running instance: its connector, store, sandbox, limits and
 // provenance, and its live run counts, so nothing is configured twice.
 import { HANDLERS_NS, slimeInternals, type SlimeInternals } from '@slime-cloud/core/tooling';
-import type { HandlerRecord, Optimizer, Slime, SlimeStore, StoreEntry } from '@slime-cloud/core';
+import { SlimeError, type HandlerRecord, type Optimizer, type Slime, type SlimeStore, type StoreEntry } from '@slime-cloud/core';
 import { checkCrystalFolder } from './check.js';
 import { crystallize, type CrystalReport } from './crystallize.js';
 import { readManifest } from './manifest.js';
@@ -18,8 +18,8 @@ export interface CrystallizerOptions {
 }
 
 export interface CrystallizeRun {
-  /** Only these request keys; omit for every ready handler. */
-  keys?: readonly string[];
+  /** Only these request keys; omit for every ready handler. Checked, so an endpoint can pass a request body's `keys` as it is. */
+  keys?: readonly string[] | undefined;
   /** Check everything, write nothing. */
   isDryRun?: boolean;
 }
@@ -48,6 +48,9 @@ export class Crystallizer {
 
   /** Crystallizes the ready Liquid handlers; each one passes the equivalence test before it is written. */
   async run({ keys, isDryRun }: CrystallizeRun = {}): Promise<CrystalReport[]> {
+    if (keys !== undefined && !(Array.isArray(keys) && keys.every((key) => typeof key === 'string'))) {
+      throw new SlimeError('INVALID_REQUEST', '`keys` must be an array of handler keys.');
+    }
     await this.#slime.flush();
     const internals = slimeInternals(this.#slime);
     const { connector, runner, limits } = internals;
