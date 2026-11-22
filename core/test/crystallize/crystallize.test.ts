@@ -10,7 +10,8 @@ import { after, describe, test } from 'node:test';
 import { SlimeConfig } from '../../src/config/slime-config.js';
 import { createSlime } from '../../src/create-slime.js';
 import type { CrystalRegistry } from '../../src/handler/crystal.js';
-import { checkCrystalFolder, crystallize, type CrystallizeOptions } from '../../src/crystallize/index.js';
+import { SERVICES_FILE, checkCrystalFolder, crystallize, type CrystallizeOptions } from '../../src/crystallize/index.js';
+import { crystalService } from '../../src/engine/crystal/service.js';
 import { moduleFileFor, renderManifest, readManifest } from '../../src/crystallize/manifest.js';
 import { sha256 } from '../../src/shared/hash.js';
 import type { HandlerRecord } from '../../src/handler/record.js';
@@ -97,6 +98,27 @@ describe('crystallize (M5)', () => {
     } finally {
       await slime.close();
     }
+  });
+
+  test('writes a typed service method per Crystal; the app calls it natively, without the engine', async () => {
+    const { dir } = await runJob(liquidRecord());
+    const manifest = await readManifest(dir);
+    assert.equal(manifest.entries[KEY]?.service, 'accountsInACountryWithTheir');
+    const services = await readFile(join(dir, SERVICES_FILE), 'utf8');
+    assert.match(services, /export const accountsInACountryWithTheir = \$service\(\$crystals\[/);
+    const types = await readFile(join(dir, 'services.d.mts'), 'utf8');
+    assert.match(types, /accountsInACountryWithTheir\(connector: Connector, input: \{ "country"\?: string \| null \}, options\?: CrystalServiceOptions\): Promise<Array<\{ "name": string; "euros": number \}>>/);
+
+    const service = crystalService((await importRegistry(dir))[KEY]!);
+    assert.deepEqual(await service(fakeConnector({ rows: ROWS }), { country: 'DE' }), EUROS);
+    await assert.rejects(service(fakeConnector({ rows: ROWS }), { country: 49 }), { code: 'INVALID_REQUEST' });
+    await assert.rejects(service(fakeConnector({ rows: ROWS }), { contry: 'DE' }), { code: 'INVALID_REQUEST', message: /Unknown input contry/ });
+  });
+
+  test('a hand-edited services.mjs fails the check', async () => {
+    const { dir } = await runJob(liquidRecord());
+    await writeFile(join(dir, SERVICES_FILE), 'export const hacked = () => process.env;\n');
+    assert.match((await checkCrystalFolder(dir)).join('\n'), /services\.mjs does not match manifest\.json/);
   });
 
   test('skips handlers that are not ready, and ones already crystallized', async () => {

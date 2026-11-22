@@ -5,6 +5,7 @@ import type { ReviewStatus } from '../handler/record.js';
 import type { HandlerProvenance } from '../request/key.js';
 import type { ParamTypes } from '../request/params.js';
 import type { Shape } from '../request/shape.js';
+import { SERVICES_FILE, SERVICES_TYPES_FILE, renderServiceTypes, renderServices } from './services.js';
 
 export interface ManifestEntry {
   file: string;
@@ -19,6 +20,8 @@ export interface ManifestEntry {
   /** The Liquid handler it came from. */
   provenance: HandlerProvenance;
   createdAt: string;
+  /** Its function name in services.mjs; set once, so a rename never breaks the app. */
+  service?: string;
 }
 
 export interface Manifest {
@@ -59,6 +62,8 @@ export async function writeManifestAndIndex(dir: string, manifest: Manifest): Pr
   await writeFile(join(dir, MANIFEST_FILE), renderManifest(manifest));
   await writeFile(join(dir, INDEX_FILE), renderIndex(manifest));
   await writeFile(join(dir, INDEX_TYPES_FILE), renderIndexTypes());
+  await writeFile(join(dir, SERVICES_FILE), renderServices(manifest));
+  await writeFile(join(dir, SERVICES_TYPES_FILE), renderServiceTypes(manifest));
 }
 
 export function renderManifest({ entries }: Manifest): string {

@@ -19,6 +19,7 @@ import { verifyCandidate, type EquivalenceDeps } from './equivalence.js';
 import { sha256 } from '../shared/hash.js';
 import { moduleFileFor, readManifest, writeManifestAndIndex, type Manifest } from './manifest.js';
 import type { CrystalCode } from './module-format.js';
+import { serviceNameFor, serviceNames } from './services.js';
 
 export interface CrystallizeOptions {
   /** A read-only connector: the equivalence test runs both versions against the database. */
@@ -158,5 +159,6 @@ async function saveCrystal({ options, manifest }: JobContext, record: HandlerRec
     notes: candidate.notes,
     provenance,
     createdAt: new Date().toISOString(),
+    service: serviceNameFor(intent, record.key, new Set(serviceNames(manifest).values())),
   };
 }

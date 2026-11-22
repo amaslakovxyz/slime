@@ -6,6 +6,7 @@ import { assertReadOnlySql } from '../artifact/checks/sql.js';
 import { INDEX_FILE, INDEX_TYPES_FILE, MODULE_EXTENSION, readManifest, renderIndex, renderIndexTypes, type Manifest } from './manifest.js';
 import { sha256 } from '../shared/hash.js';
 import { parseModule } from './module-format.js';
+import { SERVICES_FILE, SERVICES_TYPES_FILE, renderServiceTypes, renderServices } from './services.js';
 
 const REGENERATE = 'run crystallize again instead of editing it';
 
@@ -43,6 +44,8 @@ async function generatedFileProblems(dir: string, manifest: Manifest): Promise<s
   const expected = [
     { file: INDEX_FILE, text: renderIndex(manifest) },
     { file: INDEX_TYPES_FILE, text: renderIndexTypes() },
+    { file: SERVICES_FILE, text: renderServices(manifest) },
+    { file: SERVICES_TYPES_FILE, text: renderServiceTypes(manifest) },
   ];
   // A folder nothing was crystallized into yet has no generated files, and that's fine.
   const isEmpty = Object.keys(manifest.entries).length === 0;
@@ -56,7 +59,7 @@ async function generatedFileProblems(dir: string, manifest: Manifest): Promise<s
 }
 
 async function unlistedModules(dir: string, manifest: Manifest): Promise<string[]> {
-  const listed = new Set([INDEX_FILE, ...Object.values(manifest.entries).map(({ file }) => file)]);
+  const listed = new Set([INDEX_FILE, SERVICES_FILE, ...Object.values(manifest.entries).map(({ file }) => file)]);
   const files = await readdir(dir).catch(() => []);
   return files.filter((file) => file.endsWith(MODULE_EXTENSION) && !listed.has(file)).map((file) => `${file} is not in manifest.json`);
 }

@@ -33,6 +33,7 @@ test('the public entry exports createSlime, the config, the stores, the sandbox 
     'SourceError',
     'changedProvenance',
     'createSlime',
+    'crystalService',
     'defineApiSource',
     'fileStore',
     'handlerKeyFor',

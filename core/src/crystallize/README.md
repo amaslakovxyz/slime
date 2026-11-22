@@ -16,6 +16,8 @@ imports its generated `index.mjs` never loads this folder.
 - `import-module.ts`: check a module's text, then import exactly those bytes.
 - `manifest.ts`: `manifest.json` and the generated `index.mjs` /
   `index.d.mts`.
+- `services.ts`: the generated `services.mjs` / `services.d.mts`, one typed
+  service method per Crystal (`crystalService` from the main entry).
 - `check.ts` and `bin.ts`: `slime-crystal check <dir>`.
 
 ## Interface
@@ -27,6 +29,15 @@ imports its generated `index.mjs` never loads this folder.
   reasons. A `runner` the host passes is used and left running; without one
   the job builds its own and closes it.
 - `checkCrystalFolder(dir): Promise<string[]>`: every problem, or none.
+- **Service methods.** The folder also gets `services.mjs` and
+  `services.d.mts`: for each Crystal, a function named from its intent
+  (`topNAccountsByTotalPaid`, kept in `manifest.json` as `service`, so it
+  never changes), typed from `paramTypes` and `output`. The app calls it
+  directly, `await topNAccountsByTotalPaid(connector, { limit: 5 })`, with
+  no Slime instance: the SQL runs through the connector (read-only, row cap,
+  timeouts), the shape runs natively, and the output and R6 checks still
+  apply. Inputs are optional and nullable (R5); an unknown input name is
+  `INVALID_REQUEST`.
 - `slime-crystal check <dir>`: exit 0 when clean, 1 with problems, 2 on bad
   usage.
 - Loading modules as data: `parseModule(source)` parses a module, checks its
@@ -70,8 +81,8 @@ imports its generated `index.mjs` never loads this folder.
 - **`check`:**
   - re-runs the allowlist and the lint on every module, so a hand edit with a
     re-pinned hash still fails;
-  - compares `index.mjs` and `index.d.mts` with ones rendered from the
-    manifest;
+  - compares `index.mjs`, `index.d.mts`, `services.mjs` and
+    `services.d.mts` with ones rendered from the manifest;
   - refuses `.mjs` files missing from the manifest;
   - accepts an empty folder (nothing crystallized yet).
 

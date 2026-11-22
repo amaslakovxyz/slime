@@ -7,3 +7,4 @@ export { CrystalCodeError, checkShapeSource } from './allowlist.js';
 export { DEFAULT_MIN_RUNS, crystallize, type CrystalOutcome, type CrystalReport, type CrystallizeOptions } from './crystallize.js';
 export { MANIFEST_FILE, moduleFileFor, parseManifest, readManifest, type Manifest, type ManifestEntry } from './manifest.js';
 export { parseModule, type CrystalCode } from './module-format.js';
+export { SERVICES_FILE, renderServiceTypes, renderServices } from './services.js';
