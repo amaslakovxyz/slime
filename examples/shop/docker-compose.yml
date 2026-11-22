@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: shop_admin
+      POSTGRES_PASSWORD: shop_admin
+      POSTGRES_DB: shop
+    ports:
+      # Non-default host port so it doesn't clash with a local Postgres or the express demo (54329).
+      - "54330:5432"
+    volumes:
+      - ./db/shop.sql:/docker-entrypoint-initdb.d/01-shop.sql:ro
+      - ./db/local-reader-password.sql:/docker-entrypoint-initdb.d/02-local-reader-password.sql:ro
+    healthcheck:
+      # -h 127.0.0.1: the temporary server that runs the init scripts listens only on the
+      # unix socket, so this passes only once init is done and the real server is up.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U shop_admin -d shop"]
+      interval: 2s
+      timeout: 3s
+      # Generating the data takes longer than the express demo's init.
+      retries: 90
