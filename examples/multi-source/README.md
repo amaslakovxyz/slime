@@ -1,17 +1,18 @@
 # Multi-source example
 
-One Slime instance over three sources: the demo Postgres database (`db`),
-Notion (`notion`) and the public Studio Ghibli films API (`films`). A handler
-can read from several of them and combine the rows in `shape(data, input)`.
+One Slime instance over four sources: the demo Postgres database (`db`),
+Notion (`notion`), the public Studio Ghibli films API (`films`) and the public
+Frankfurter euro exchange rates (`rates`). A handler can read from several of
+them and combine the rows in `shape(data, input)`.
 The design is in [core/docs/multi-source.md](../../core/docs/multi-source.md).
 
 | File | What |
 |---|---|
 | `src/app.mjs` | Hono: `GET /health` and `POST /slime` |
-| `src/config.mjs` | The three sources, the model choice, fixture replay |
-| `src/films.mjs` | The films API as an app-defined source (`defineApiSource`) |
-| `test/canned-handlers.json` | Hand-written handlers for the three demo intents, used by the tests instead of a model |
-| `test/fixtures/` | Recorded Notion and films responses |
+| `src/config.mjs` | The four sources, the model choice, fixture replay |
+| `src/films.mjs`, `src/rates.mjs` | The two public APIs as app-defined sources (`defineApiSource`) |
+| `test/canned-handlers.json` | Hand-written handlers for the four demo intents, used by the tests instead of a model |
+| `test/fixtures/` | Recorded Notion, films and rates responses |
 
 ## Run it with recorded APIs (no Notion account needed)
 
@@ -26,7 +27,9 @@ curl localhost:3000/slime -H 'content-type: application/json' -d '{
 }'
 ```
 
-The other two demo intents are in `test/canned-handlers.json`.
+The other demo intents are in `test/canned-handlers.json`. The fourth one
+(Postgres + Notion + rates) is the Customer 360 panel of
+[examples/customer-site](../customer-site/README.md).
 
 ## Run it against your own Notion
 

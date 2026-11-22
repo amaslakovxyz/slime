@@ -76,5 +76,54 @@
     ],
     "shapeJs": "function shape(data) { return data.films.map((f) => ({ title: f.title, rtScore: f.rtScore })).sort((x, y) => y.rtScore - x.rtScore); }",
     "assumptions": []
+  },
+  "accounts on a given plan with their total paid revenue converted into a given currency and their number of open negative feedback items, most open items first": {
+    "version": 2,
+    "unsatisfiable": null,
+    "steps": [
+      {
+        "name": "accounts",
+        "source": "db",
+        "sql": "SELECT a.name, COALESCE(SUM(i.amount_cents), 0)::int AS \"paidCents\" FROM accounts a JOIN plans p ON p.id = a.plan_id LEFT JOIN invoices i ON i.account_id = a.id AND i.status = 'paid' WHERE ($1::text IS NULL OR p.name = $1::text) GROUP BY a.id, a.name",
+        "params": [
+          "plan"
+        ]
+      },
+      {
+        "name": "feedback",
+        "source": "notion",
+        "operation": "feedback.query",
+        "args": [
+          {
+            "param": "sentiment",
+            "input": null,
+            "value": "negative"
+          },
+          {
+            "param": "status",
+            "input": null,
+            "value": "Open"
+          }
+        ]
+      },
+      {
+        "name": "rates",
+        "source": "rates",
+        "operation": "rates.latest",
+        "args": [
+          {
+            "param": "currency",
+            "input": "currency",
+            "value": null
+          }
+        ]
+      }
+    ],
+    "shapeJs": "function shape(data, input) { const rate = data.rates.find((r) => r.currency === input.currency)?.perEur; if (!rate) throw new Error(`no euro rate for ${input.currency}`); const open = new Map(); for (const f of data.feedback) if (f.account) open.set(f.account, (open.get(f.account) ?? 0) + 1); const rows = data.accounts.map((a) => ({ name: a.name, paidRevenue: Math.round(a.paidCents * rate) / 100, openNegative: open.get(a.name) ?? 0 })); rows.sort((x, y) => y.openNegative - x.openNegative || y.paidRevenue - x.paidRevenue); return rows; }",
+    "assumptions": [
+      "Invoice amounts are EUR cents; revenue is converted at the latest ECB rate.",
+      "Feedback is matched to accounts by exact account name.",
+      "Revenue counts only paid invoices."
+    ]
   }
 }

@@ -4,6 +4,7 @@ import { notionSource } from '@slime-cloud/core/notion';
 import { postgresConnector } from '@slime-cloud/core/postgres';
 import { fixtureFetch } from '@slime-cloud/core/testing';
 import { ghibliFilms } from './films.mjs';
+import { euroRates } from './rates.mjs';
 
 const APP_DIR = new URL('..', import.meta.url);
 const DEMO_DATABASE_URL = 'postgres://slime_reader:slime_reader@localhost:54329/slime';
@@ -12,6 +13,7 @@ const FIXTURE_FEEDBACK_ID = '0f0e0d0c-0b0a-4908-8706-050403020100';
 const FIXTURE_MOVIE_NIGHTS_ID = '1a1b1c1d-1e1f-4a2b-8c3d-4e5f60718293';
 const FIXTURE_TOKEN = 'fixture-token';
 const NOTION_HOST = 'api.notion.com';
+const RATES_HOST = 'api.frankfurter.dev';
 const GROQ_MODEL = 'openai/gpt-oss-120b';
 const CLAUDE_GENERATOR_MODEL = 'claude-haiku-5-5';
 const CLAUDE_REVIEW_MODEL = 'claude-opus-5-5';
@@ -35,8 +37,13 @@ export async function slimeConfigFromEnv(env = process.env, overrides = {}) {
     ...(fetchImpl ? { fetchImpl } : {}),
   });
   return new SlimeConfig({
-    sources: { db: postgresConnector({ url: env.DATABASE_URL || DEMO_DATABASE_URL }), notion, films: ghibliFilms(fetchImpl ? { fetchImpl } : {}) },
-    glossary: { revenue: 'sum of paid invoices, in cents' },
+    sources: {
+      db: postgresConnector({ url: env.DATABASE_URL || DEMO_DATABASE_URL }),
+      notion,
+      films: ghibliFilms(fetchImpl ? { fetchImpl } : {}),
+      rates: euroRates(fetchImpl ? { fetchImpl } : {}),
+    },
+    glossary: { revenue: 'sum of paid invoices, in cents', currency: 'invoice amounts are EUR cents; rates.latest converts euros into another currency' },
     rules: ['Revenue counts only invoices with status paid.'],
     ...(overrides.generator ? {} : await chooseModels(env)),
     ...overrides,
@@ -58,11 +65,14 @@ async function chooseModels(env) {
   throw new Error('Set GROQ_API_KEY or ANTHROPIC_API_KEY: Slime generates a handler for each new request with that model.');
 }
 
-// Replays test/fixtures: Notion's from one folder, the films API's from another.
+// Replays test/fixtures: one folder per API host.
 function recordedFetch() {
-  const notionFetch = fixtureFetch(new URL('test/fixtures/notion/', APP_DIR));
+  const byHost = {
+    [NOTION_HOST]: fixtureFetch(new URL('test/fixtures/notion/', APP_DIR)),
+    [RATES_HOST]: fixtureFetch(new URL('test/fixtures/frankfurter/', APP_DIR)),
+  };
   const filmsFetch = fixtureFetch(new URL('test/fixtures/ghibli/', APP_DIR));
-  return (input, init) => (new URL(String(input)).host === NOTION_HOST ? notionFetch : filmsFetch)(input, init);
+  return (input, init) => (byHost[new URL(String(input)).host] ?? filmsFetch)(input, init);
 }
 
 function required(env, name) {
