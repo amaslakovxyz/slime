@@ -147,15 +147,16 @@ export function createApp({ slime, connector, crystal, onQuery, log, events, sav
     const body = (await c.req.json().catch(() => ({}))) as { input?: Record<string, unknown> };
     const input = body.input && typeof body.input === 'object' ? body.input : {};
     const wanted = Object.entries(handler.paramTypes).map(([name, type]) => `${name}${type ? ` (${type})` : ''}`);
+    const takes = wanted.length ? `This endpoint takes input: ${wanted.join(', ')}.` : 'This endpoint takes no input.';
     // null means "not given", but the name must still be sent. Own properties only: an
     // inherited name such as `toString` would otherwise pass and change the key.
     const missing = Object.keys(handler.paramTypes).filter((name) => !Object.hasOwn(input, name));
     if (missing.length) {
-      throw new SlimeError('INVALID_REQUEST', `This endpoint takes input: ${wanted.join(', ')}. Missing: ${missing.join(', ')}.`);
+      throw new SlimeError('INVALID_REQUEST', `${takes} Missing: ${missing.join(', ')}.`);
     }
     const unknown = Object.keys(input).filter((name) => !Object.hasOwn(handler.paramTypes, name));
     if (unknown.length) {
-      throw new SlimeError('INVALID_REQUEST', `This endpoint takes input: ${wanted.join(', ')}. Unknown: ${unknown.join(', ')}.`);
+      throw new SlimeError('INVALID_REQUEST', `${takes} Unknown: ${unknown.join(', ')}.`);
     }
     const { data, meta } = await slime.query({ intent: handler.intent, input, output: handler.output } as never);
     onQuery?.(meta);

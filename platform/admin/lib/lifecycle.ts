@@ -145,21 +145,29 @@ export function stagesOf(status: Endpoint['status'], handlers: RuntimeHandler[],
   ];
 }
 
-export type LifecycleData =
-  | {
-      ok: true;
-      handlers: RuntimeHandler[];
-      events: RuntimeEvent[];
-      total: number;
-      thresholds: Thresholds;
-      warnings: string[];
-      /** The feed and Gas rows come from the one instance that answered (the shared Lambda), not every instance. */
-      instance: boolean;
-    }
-  | { ok: false; reason: string };
+type LiveLifecycle = {
+  ok: true;
+  handlers: RuntimeHandler[];
+  events: RuntimeEvent[];
+  total: number;
+  thresholds: Thresholds;
+  warnings: string[];
+  /** The feed and Gas rows come from the one instance that answered (the shared Lambda), not every instance. */
+  instance: boolean;
+};
+export type LifecycleData = LiveLifecycle | { ok: false; reason: string };
+
+/**
+ * Local only: the last answer per endpoint, shown while the runner restarts the runtime process (after
+ * a Crystallize or a settings change) and it refuses connections for a moment. Without it a poll that
+ * lands in that gap swaps the board for a notice and back, and the board loses its Crystallize report.
+ * Per admin process; a fresh one shows the notice.
+ */
+const lastRead = new Map<string, LiveLifecycle>();
 
 /** Server only: reads the endpoint's runtime with its own token. */
 export async function readLifecycle(ep: Endpoint): Promise<LifecycleData> {
+  if (ep.status !== 'ready' && ep.status !== 'updating') lastRead.delete(ep.endpointId);
   if (ep.status === 'failed') return { ok: false, reason: ep.error ? `Endpoint failed: ${ep.error}` : 'Endpoint failed.' };
   if (!ep.url || (ep.status !== 'ready' && ep.status !== 'updating')) return { ok: false, reason: `Endpoint is ${ep.status}.` };
   const token = await secretStore().get(ep.endpointId, 'SLIME_API_KEY');
@@ -174,7 +182,7 @@ export async function readLifecycle(ep: Endpoint): Promise<LifecycleData> {
     if (!life.ok || !feed.ok) return { ok: false, reason: `Runtime answered ${life.status}/${feed.status}.` };
     const l = (await life.json()) as { handlers: RuntimeHandler[]; thresholds?: Thresholds; warnings?: string[]; instance?: boolean };
     const f = (await feed.json()) as { total: number; events: RuntimeEvent[] };
-    return {
+    const data: LiveLifecycle = {
       ok: true,
       handlers: l.handlers,
       events: f.events,
@@ -183,9 +191,12 @@ export async function readLifecycle(ep: Endpoint): Promise<LifecycleData> {
       warnings: l.warnings ?? [],
       instance: l.instance === true,
     };
+    if (!cloud) lastRead.set(ep.endpointId, data);
+    return data;
   } catch {
     if (cloud) return { ok: false, reason: 'Endpoint runtime did not answer.' };
-    if (ep.status === 'updating') return { ok: false, reason: 'Restarting the endpoint…' };
+    if (ep.status === 'updating') return lastRead.get(ep.endpointId) ?? { ok: false, reason: 'Restarting the endpoint…' };
+    lastRead.delete(ep.endpointId);
     return { ok: false, reason: 'Endpoint is not running. Is `npm run local` up?' };
   }
 }
