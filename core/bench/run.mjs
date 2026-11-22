@@ -2,8 +2,15 @@
 // each case, cache hits for repeats and other values, and timings.
 //   GROQ_API_KEY=... npm run bench -w @slime-cloud/core          (openai/gpt-oss-120b)
 //   ANTHROPIC_API_KEY=... npm run bench -w @slime-cloud/core     (claude-haiku-5-5 + claude-opus-5-5 review)
-// Optional: DATABASE_URL, and case names to run only those.
-import { cases } from './cases.mjs';
+// Optional: DATABASE_URL, BENCH_CASES (another case file, e.g. examples/shop/bench-cases.mjs), and case names to run only those.
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+// BENCH_CASES picks another case file (e.g. examples/shop/bench-cases.mjs), relative to where npm was run.
+const casesUrl = process.env.BENCH_CASES
+  ? pathToFileURL(resolve(process.env.INIT_CWD ?? process.cwd(), process.env.BENCH_CASES)).href
+  : new URL('./cases.mjs', import.meta.url).href;
+const { cases } = await import(casesUrl);
 
 const DATABASE_URL = process.env.DATABASE_URL ?? 'postgres://slime_reader:slime_reader@localhost:54329/slime';
 const DECIMALS = 100;

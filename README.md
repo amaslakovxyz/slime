@@ -46,6 +46,9 @@ Backend -- Slime runtime:
 - [examples/multi-source/](./examples/multi-source/README.md) - one instance
   over Postgres, Notion and a public films API; replays recorded API
   responses, so its tests run in CI without accounts.
+- [examples/shop/](./examples/shop/README.md) - a demo online-shop database
+  (12 tables, deterministic) loaded into the cloud test RDS as database `shop`,
+  with 10 demo use cases that run through the bench (`BENCH_CASES`).
 - **`platform/` — hosted Slime Cloud**
   - [platform/landing/](./platform/landing/README.md) - Static marketing page
     (one `index.html`, no build step). Preview with `just landing`.
