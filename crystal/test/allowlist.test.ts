@@ -47,6 +47,18 @@ describe('Crystal allowlist: refused', () => {
     refuses('return ({})["constructor"]', /variable key/);
   });
 
+  test('destructuring reads a property too', () => {
+    refuses('const { constructor: A } = rows; const { constructor: F } = A; return F("return process")()', /constructor/);
+    refuses('const { constructor } = rows; return constructor', /constructor/);
+    refuses('const { "constructor": c } = rows; return c', /constructor/);
+    refuses('const { __proto__: p } = rows; return p', /__proto__/);
+    refuses('const f = ({ constructor: c }) => c; return f(rows)("return process")()', /constructor/);
+    refuses('try { return rows.x.y } catch ({ constructor: c }) { return c }', /constructor/);
+    refuses('const k = "constructor"; const { [k]: c } = rows; return c', /variable key/);
+    refuses('const { ["constructor"]: c } = rows; return c', /variable key/);
+    accepts('const { id, name: label, ...rest } = rows[0]; return { id, label, rest }');
+  });
+
   test('a shorthand property still counts as reading the variable', () => {
     refuses('return { process }', /process/);
   });
