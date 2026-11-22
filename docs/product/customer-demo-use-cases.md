@@ -108,8 +108,8 @@ flowchart LR
 ## Demo script (about 7 minutes)
 
 Prerequisites:
-- `slime-test-db` is running. It stops by itself on **Mon 2026-11-23 20:00 Berlin**; after
-  that, run `aws rds start-db-instance --db-instance-identifier slime-test-db`.
+- `slime-test-db` is running. It runs permanently since 2026-11-22 (database `slime`, see
+  [platform/infra/README.md](../../platform/infra/README.md)).
 - The 1Password vault `Slime Hackathon` holds `Slime — Atlas demo endpoint` (URL, `slm_`
   key) and `Slime — Atlas demo Crystal (plan revenue)` (Crystal key, `slc_` token).
 - For case 3, the model key: `Slime — Anthropic API key (shared runtime)` in the same
@@ -166,5 +166,5 @@ against `slime-test-db`, through the customer site:
   guard.
 - **The page shows SQL and shape code.** That is fine for a demo; a public page would drop
   `meta`.
-- **The test RDS is public**, with SSL enforced and a random password. It is temporary
-  and stops on Monday (see prerequisites).
+- **The test RDS is public**, with SSL enforced and a random password, and read through
+  the read-only `slime_reader` role.
