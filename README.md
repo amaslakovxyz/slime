@@ -6,7 +6,8 @@ Slime (runtime and CLI `slime`) is a hackathon project in its design phase.
 The repository has two halves:
 
 - [`core/`](./core/README.md) is the engine package `@slime-cloud/core`, for
-  local development and self-hosting. It answers `{ intent, input, output }`
+  local development and self-hosting; [`crystal/`](./crystal/README.md)
+  (`@slime-cloud/crystal`) turns its proven handlers into code in your repo. It answers `{ intent, input, output }`
   requests with model-generated, cached, read-only SQL against Postgres.
   [examples/express](./examples/express/README.md) shows it behind an app's
   endpoints.
@@ -32,7 +33,11 @@ Backend -- Slime runtime:
   which was deleted in M6 (it is in git history).
   [PLAN.md](./core/PLAN.md) holds the decisions and milestones:
   M0–M3 and M5 done, M4 and M6 built (runs against a real model pending).
-  The only npm workspace so far. Never imports `platform/`.
+  An npm workspace. Never imports `platform/`.
+- [crystal/](./crystal/README.md) - `@slime-cloud/crystal`, the build-time
+  side of Crystal: the crystallize job, typed service methods and the
+  `slime-crystal` CLI (check, pin, verify). The second npm workspace; uses
+  core's internals through `@slime-cloud/core/tooling`.
 - [examples/express/](./examples/express/README.md) - an Express app
   whose endpoints are answered by `@slime-cloud/core`; its own lockfile. It
   also holds the demo database (`db/init.sql`) that core's tests and CI use.

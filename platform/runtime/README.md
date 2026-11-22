@@ -59,7 +59,7 @@ endpoint's engine cannot start, for example an unreachable database or no
 ## Commands
 
 ```sh
-(cd ../.. && npm ci && npm run build -w @slime-cloud/core) && npm ci
+(cd ../.. && npm ci && npm run build -w @slime-cloud/core -w @slime-cloud/crystal) && npm ci
 npm run typecheck
 npm test              # no AWS; the tenant and Crystallize tests use the demo Postgres
 npm run build         # dist/lambda/, zipped by Terraform

@@ -19,7 +19,7 @@ core's tests and CI use.
 Run from this folder:
 
 ```bash
-npm run build -w @slime-cloud/core --prefix ../..      # once: the example imports core's dist/
+npm run build -w @slime-cloud/core -w @slime-cloud/crystal --prefix ../..   # once: the example imports their dist/
 npm install
 npm run db:up                                          # the demo Postgres on localhost:54329
 npm start                                              # http://localhost:3000

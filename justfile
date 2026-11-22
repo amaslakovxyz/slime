@@ -13,13 +13,17 @@ hooks:
 landing port="8090":
     python3 -m http.server {{port}} --bind 127.0.0.1 --directory platform/landing
 
-# Type-check, test, build and pack-check @slime-cloud/core, as CI does.
+# Type-check, test, build and pack-check @slime-cloud/core and @slime-cloud/crystal, as CI does.
 core:
     npm ci
     npm run typecheck -w @slime-cloud/core
     npm test -w @slime-cloud/core
     npm run build -w @slime-cloud/core
     npm run check:pack -w @slime-cloud/core
+    npm run typecheck -w @slime-cloud/crystal
+    npm test -w @slime-cloud/crystal
+    npm run build -w @slime-cloud/crystal
+    npm run check:pack -w @slime-cloud/crystal
 
 # Build the Slime Cloud runtime Lambda bundle (platform/runtime/dist/lambda).
 runtime-build:

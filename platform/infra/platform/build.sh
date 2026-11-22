@@ -4,9 +4,9 @@
 # platform/admin/dist/lambda/ and platform/admin/dist/source-hash.txt.
 set -euo pipefail
 repo="$(cd "$(dirname "$0")/../../.." && pwd)"
-# The runtime links @slime-cloud/core (core/) and bundles its built dist/.
+# The runtime links @slime-cloud/core (core/) and @slime-cloud/crystal (crystal/) and bundles their built dist/.
 npm ci --no-audit --no-fund --prefix "$repo"
-npm run build --prefix "$repo" -w @slime-cloud/core
+npm run build --prefix "$repo" -w @slime-cloud/core -w @slime-cloud/crystal
 npm ci --no-audit --no-fund --prefix "$repo/platform/runtime"
 npm run build --prefix "$repo/platform/runtime"
 # The admin: Next standalone build plus the Lambda start scripts.

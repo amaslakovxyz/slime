@@ -42,7 +42,7 @@ open (local default).
 Needs Node ≥ 22 and Docker. Run from the repository root once:
 
 ```sh
-npm ci && npm run build -w @slime-cloud/core      # the runtime imports core's dist/
+npm ci && npm run build -w @slime-cloud/core -w @slime-cloud/crystal   # the runtime imports their dist/
 (cd platform/runtime && npm ci)                   # the runner starts endpoints from here
 (cd examples/express && npm run db:up)            # demo Postgres on localhost:54329
 ```

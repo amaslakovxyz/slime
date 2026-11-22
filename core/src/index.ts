@@ -6,6 +6,7 @@ export { memoryStore } from './stores/memory-store.js';
 export type { CacheOutcome, HandlerSummary, QueryMeta, QueryResult, QueryTimings, Slime, SlimeStats } from './engine/types.js';
 export type { HandlerRecord, ReviewStatus, StoredTier, Tier } from './handler/record.js';
 export type { CrystalHandler, ShapeFunction } from './handler/crystal.js';
+export { crystalService, type CrystalService, type CrystalServiceOptions } from './engine/crystal/service.js';
 export { changedProvenance, handlerKeyFor, type HandlerProvenance } from './request/key.js';
 export type { ParamTypes } from './request/params.js';
 
