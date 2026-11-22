@@ -7,8 +7,8 @@ The design is in [core/docs/multi-source.md](../../core/docs/multi-source.md).
 
 | File | What |
 |---|---|
-| `src/app.mjs` | Hono: `GET /health` and `POST /slime` |
-| `src/config.mjs` | The three sources, the model choice, fixture replay |
+| `src/app.mjs` | Hono: `POST /slime`, `POST /crystallize` and `GET /health` |
+| `src/config.mjs` | The three sources, the model choice, fixture replay, the Crystal folder |
 | `src/films.mjs` | The films API as an app-defined source (`defineApiSource`) |
 | `test/canned-handlers.json` | Hand-written handlers for the three demo intents, used by the tests instead of a model |
 | `test/fixtures/` | Recorded Notion and films responses |
@@ -17,6 +17,7 @@ The design is in [core/docs/multi-source.md](../../core/docs/multi-source.md).
 
 ```sh
 (cd ../express && npm run db:up)   # the demo database
+npm run build -w @slime-cloud/core -w @slime-cloud/crystal --prefix ../..   # once
 npm install
 GROQ_API_KEY=... npm run start:fixtures   # or ANTHROPIC_API_KEY: a model writes the handlers
 curl localhost:3000/slime -H 'content-type: application/json' -d '{
@@ -49,11 +50,20 @@ The other two demo intents are in `test/canned-handlers.json`.
 6. `npm run live` runs the three intents against real Notion, the films API
    and a model until each is promoted (P6.5).
 
+## Crystal
+
+`POST /crystallize` (`{ keys? }`) runs a `Crystallizer` from
+`@slime-cloud/crystal` on the instance, as in the other examples. Crystal takes
+only a handler that is one SQL query for now, so the three demo intents, which
+read Notion or the films API, come back `skipped` with that reason; a
+Postgres-only request crystallizes into `slime-crystal/` after 10 runs.
+
 ## Development only
 
 `POST /slime` passes the request body straight to Slime, so anyone who can
 reach it can make Slime generate queries over everything the
 database user and the Notion integration can read, and spend your Notion and
-model quota (core/docs/multi-source.md, S7). In production, let each endpoint
+model quota (core/docs/multi-source.md, S7); `POST /crystallize` writes into
+this folder. In production, let each endpoint
 choose its intent and set identity values on the server (R11), and
 crystallize the handlers you rely on.

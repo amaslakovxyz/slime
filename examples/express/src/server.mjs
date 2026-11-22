@@ -8,13 +8,15 @@ const DEFAULT_PORT = 3000;
 // Print what Slime generates and promotes, so a wrong answer can be fixed by rewording the intent (R9).
 const config = await slimeConfigFromEnv(process.env, { onEvent: logEvent });
 const slime = await createSlime(config);
+
+
 // Crystallize writes Crystal modules into this app's source folder (slime-crystal/); commit them.
 const optimizer = await optimizerFromEnv();
 const crystallizer = new Crystallizer(slime, { dir: CRYSTAL_DIR, ...(optimizer ? { optimizer } : {}) });
 const port = Number(process.env.PORT || DEFAULT_PORT);
 
 const server = createApp(slime, crystallizer).listen(port, () => {
-  console.log(`Slime example on http://localhost:${port} (POST /query, POST /crystallize, GET /health)`);
+  console.log(`Slime example on http://localhost:${port} (POST /slime, POST /crystallize, GET /health)`);
 });
 
 for (const signal of ['SIGINT', 'SIGTERM']) {

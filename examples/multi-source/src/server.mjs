@@ -1,12 +1,16 @@
 import { serve } from '@hono/node-server';
 import { createSlime } from '@slime-cloud/core';
+import { Crystallizer } from '@slime-cloud/crystal';
 import { createApp } from './app.mjs';
-import { slimeConfigFromEnv } from './config.mjs';
+import { CRYSTAL_DIR, slimeConfigFromEnv } from './config.mjs';
 
 const DEFAULT_PORT = 3000;
 const slime = await createSlime(await slimeConfigFromEnv(process.env, { onEvent: logEvent }));
+const crystallizer = new Crystallizer(slime, { dir: CRYSTAL_DIR });
 const port = Number(process.env.PORT || DEFAULT_PORT);
-const server = serve({ fetch: createApp(slime).fetch, port }, () => console.log(`Slime multi-source example on http://localhost:${port}`));
+const server = serve({ fetch: createApp(slime, crystallizer).fetch, port }, () =>
+  console.log(`Slime multi-source example on http://localhost:${port} (POST /slime, POST /crystallize, GET /health)`),
+);
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.once(signal, () => {

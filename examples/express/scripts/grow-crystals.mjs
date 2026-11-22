@@ -1,7 +1,7 @@
 // Grows this example's handlers to Crystal without a model, through the app's own
 // endpoints, for the Crystal agent loop (.github/workflows/crystal-agents.yml) and for
 // trying it locally: the canned handlers stand in for the generator, each request goes
-// through POST /query until it is ready (tiers.crystalReadyRuns), then
+// through POST /slime until it is ready (tiers.crystalReadyRuns), then
 // POST /crystallize writes slime-crystal/, as it does on a running server.
 //   node scripts/grow-crystals.mjs        (needs the demo database: npm run db:up)
 import { readFileSync } from 'node:fs';
@@ -30,7 +30,7 @@ const server = createApp(slime, new Crystallizer(slime, { dir: CRYSTAL_DIR })).l
 try {
   await new Promise((resolve) => server.once('listening', resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
-  for (const request of REQUESTS) await post(`${base}/query`, request);
+  for (const request of REQUESTS) await post(`${base}/slime`, request);
   const { reports } = await post(`${base}/crystallize`, {});
   for (const { key, intent, outcome, reasons } of reports) {
     console.log(`${outcome}: ${key.slice(0, 12)} ${intent}${reasons.length > 0 ? `\n  ${reasons.join('\n  ')}` : ''}`);

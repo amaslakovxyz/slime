@@ -57,22 +57,22 @@ describe('example app (canned handlers)', { skip: !hasDatabase }, () => {
   });
   after(() => app.stop());
 
-  test('POST /query answers, and a repeat with other values reuses the handler', async () => {
-    const first = await (await app.post('/query', { ...TOP_ACCOUNTS, input: { limit: 3 } })).json();
-    const second = await (await app.post('/query', { ...TOP_ACCOUNTS, input: { limit: 5 } })).json();
+  test('POST /slime answers, and a repeat with other values reuses the handler', async () => {
+    const first = await (await app.post('/slime', { ...TOP_ACCOUNTS, input: { limit: 3 } })).json();
+    const second = await (await app.post('/slime', { ...TOP_ACCOUNTS, input: { limit: 5 } })).json();
     assert.equal(first.data.length, 3);
     assert.deepEqual(Object.keys(first.data[0]).sort(), ['name', 'totalPaidCents']);
     assert.deepEqual([first.meta.cache, second.meta.cache, second.data.length], ['miss', 'hit', 5]);
   });
 
   test('a bad input value is a 400 with a SlimeError body', async () => {
-    const response = await app.post('/query', { ...TOP_ACCOUNTS, input: { limit: 'many' } });
+    const response = await app.post('/slime', { ...TOP_ACCOUNTS, input: { limit: 'many' } });
     assert.equal(response.status, 400);
     assert.equal((await response.json()).error.code, 'INVALID_REQUEST');
   });
 
   test('a malformed JSON body is a 400 that is not retryable', async () => {
-    const response = await app.post('/query', '{intent:');
+    const response = await app.post('/slime', '{intent:');
     assert.equal(response.status, 400);
     const { error } = await response.json();
     assert.deepEqual([error.code, error.retryable], ['INVALID_REQUEST', false]);
@@ -99,7 +99,7 @@ describe('example app: POST /crystallize', { skip: !hasDatabase }, () => {
   after(() => app.stop());
 
   test('turns a handler used ten times into Crystal with a typed service method', async () => {
-    for (let limit = 1; limit <= 10; limit++) assert.equal((await app.post('/query', { ...TOP_ACCOUNTS, input: { limit } })).status, 200);
+    for (let limit = 1; limit <= 10; limit++) assert.equal((await app.post('/slime', { ...TOP_ACCOUNTS, input: { limit } })).status, 200);
     const { reports } = await (await app.post('/crystallize', {})).json();
     assert.deepEqual(reports.map(({ outcome }) => outcome), ['crystallized']);
     const manifest = JSON.parse(await readFile(join(app.dir, 'manifest.json'), 'utf8'));

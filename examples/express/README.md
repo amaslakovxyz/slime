@@ -2,7 +2,7 @@
 
 ## Overview
 
-An Express app with three endpoints: Slime (`POST /query`), crystallize
+An Express app with three endpoints: Slime (`POST /slime`), crystallize
 (`POST /crystallize`) and health (`GET /health`), against the demo database.
 
 - A client sends the whole request: `{ intent, input, output }`.
@@ -28,12 +28,12 @@ Endpoints:
 
 | Route | Body | Answer |
 |---|---|---|
-| `POST /query` | `{ intent, input?, output }` | Slime's `{ data, meta }` |
+| `POST /slime` | `{ intent, input?, output }` | Slime's `{ data, meta }` |
 | `POST /crystallize` | `{ keys? }` | `{ reports }`: ready handlers → Crystal in `slime-crystal/` |
 | `GET /health` | | `slime.stats()` |
 
 ```bash
-curl -X POST localhost:3000/query -H 'content-type: application/json' \
+curl -X POST localhost:3000/slime -H 'content-type: application/json' \
   -d '{"intent":"top N accounts by total paid invoice amount in cents, highest first","input":{"limit":5},"output":[{"name":"string","totalPaidCents":"integer"}]}'
 ```
 
@@ -67,7 +67,7 @@ set `crystal: false`, so whatever `slime-crystal/` holds, they grow their own.
 ## Invariants
 
 - **Three endpoints.** Each request carries its own intent; there are no named routes.
-- **`/query` answers anything the database user can read,** and `/crystallize`
+- **`/slime` answers anything the database user can read,** and `/crystallize`
   writes into this app's source folder: outside a demo, put both behind your
   own auth and use a read-only database user that sees only what callers may.
 - **Input values are passed as values,** never written into an intent.
