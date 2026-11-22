@@ -1,0 +1,531 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup — Requests log · request trace drawer</title>
+<!--
+  Brainstorm mockup (2026-11-22), not an implementation. Static data only.
+  Limits and error codes are the real ones: core/src/config/defaults.ts, core/src/shared/errors.ts.
+  Three drawer variants to choose from: Layers · Route map · Waterfall.
+  "Data sources" marks what the runtime already records (today) vs what needs new instrumentation (new).
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Titan+One&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg-canvas:#0B070C;--bg-surface:#161019;--bg-surface-hover:#211825;--border-color:#2D1F33;--border-bright:#442D4D;
+  --plasma-primary:#FF1476;--plasma-highlight:#FF85C0;
+  --gas-accent:#38F8B8;--gas-bg:rgba(56,248,184,.1);--gas-border:rgba(56,248,184,.35);
+  --crystal-accent:#F2EAFF;--crystal-bg:rgba(196,181,253,.12);--crystal-border:rgba(196,181,253,.35);
+  --wireframe-grey:#6E5C77;--text-pure:#F8F6FC;--text-muted:#A396AC;
+  --stop:#FF5A6E;--stop-bg:rgba(255,90,110,.12);--stop-border:rgba(255,90,110,.45);
+  --pending:#F5C451;
+  --sans:'Plus Jakarta Sans',system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,monospace;--title:'Titan One',var(--sans);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;color:var(--text-pure);font:15px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+body{min-height:100vh;background:radial-gradient(1100px 520px at 88% -8%,rgba(255,20,118,.09),transparent 62%),radial-gradient(900px 480px at -6% 108%,rgba(56,248,184,.05),transparent 60%),var(--bg-canvas);background-attachment:fixed}
+.mono,code,pre{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--text-muted)}.small{font-size:13px}
+button{font:inherit;color:inherit}
+
+/* shell */
+.shell{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
+.side{border-right:1px solid var(--border-color);padding:22px 18px}
+.brand{font-family:var(--title);font-size:22px;background:linear-gradient(135deg,#FF85C0,#FF1476 55%,#8F0043);-webkit-background-clip:text;color:transparent}
+.side nav{margin-top:26px;display:grid;gap:4px}
+.side nav a{color:var(--text-muted);padding:8px 10px;border-radius:10px;text-decoration:none;font-size:14px}
+.side nav a.on{background:var(--bg-surface-hover);color:var(--text-pure)}
+main{padding:28px 36px;max-width:1180px}
+.crumbs{color:var(--text-muted);font-size:13px}
+h1{font-family:var(--title);font-weight:400;font-size:28px;margin:4px 0 16px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border-color);margin-bottom:20px}
+.tabs a{padding:10px 14px;color:var(--text-muted);text-decoration:none;font-size:14px;border-bottom:2px solid transparent}
+.tabs a.on{color:var(--text-pure);border-color:var(--plasma-primary)}
+.card{background:linear-gradient(180deg,rgba(255,255,255,.025),transparent 120px),var(--bg-surface);border:1px solid var(--border-color);border-radius:20px;padding:24px}
+.section-head{display:flex;justify-content:space-between;align-items:baseline;gap:16px;margin-bottom:16px;flex-wrap:wrap}
+.section-title{font-family:var(--title);font-weight:400;font-size:21px;margin:0}
+
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;font-weight:500;color:var(--text-muted);font-size:12px;letter-spacing:.06em;text-transform:uppercase;padding:8px 10px;border-bottom:1px solid var(--border-color)}
+td{padding:10px;border-bottom:1px solid var(--border-color);vertical-align:middle}
+tbody tr{cursor:pointer;transition:background .12s}
+tbody tr:hover{background:var(--bg-surface-hover)}
+tbody tr.sel{background:rgba(255,20,118,.08);box-shadow:inset 3px 0 0 var(--plasma-primary)}
+.num{text-align:right}
+.intent{max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.tier-pill{display:inline-block;padding:2px 10px;border-radius:999px;font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+.tier-pill-gas{color:var(--gas-accent);background:var(--gas-bg);border:1px dashed var(--gas-border)}
+.tier-pill-liquid{color:#fff;background:rgba(255,20,118,.2);border:1px solid rgba(255,20,118,.6);box-shadow:0 0 14px rgba(255,20,118,.25)}
+.tier-pill-crystal{color:var(--crystal-accent);background:var(--crystal-bg);border:1px solid var(--crystal-border);border-radius:3px}
+.tier-pill-none{color:var(--wireframe-grey);border:1px dashed var(--border-bright)}
+.res-ok{color:var(--gas-accent)}
+.res-stop{color:var(--stop)}
+.res-stop small{color:var(--text-muted)}
+
+/* data-source badges */
+.src{display:none;margin-left:6px;font:500 10px/1 var(--mono);padding:3px 5px;border-radius:5px;vertical-align:middle;letter-spacing:.04em}
+.show-src .src{display:inline-block}
+.src-today{color:var(--gas-accent);border:1px solid var(--gas-border)}
+.src-partial{color:var(--pending);border:1px solid rgba(245,196,81,.45)}
+.src-new{color:var(--plasma-highlight);border:1px solid rgba(255,133,192,.5)}
+
+.toolbar{display:flex;gap:14px;align-items:center;font-size:13px;color:var(--text-muted)}
+.switch{display:inline-flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
+.switch input{accent-color:var(--plasma-primary)}
+
+/* drawer */
+/* Non-modal: the log stays clickable while the drawer is open, so rows can be compared one after another. */
+.scrim{display:none}
+main{transition:margin .22s ease}
+body.drawer-open main{margin-right:min(600px,100vw);padding:28px 20px}
+/* With the drawer open the drawer header repeats handler and cache, so the log keeps only what you scan by. */
+body.drawer-open .col-handler,body.drawer-open .col-cache{display:none}
+body.drawer-open .intent{max-width:170px}
+.res-short{display:none}
+body.drawer-open .res-long{display:none}body.drawer-open .res-short{display:inline}
+body.drawer-open .toolbar .switch{display:none}
+.res-stop,.res-ok,td.num{white-space:nowrap}
+body.drawer-open td,body.drawer-open th{padding-left:6px;padding-right:6px}
+body.drawer-open .card{padding:20px 16px}
+body.drawer-open .res-stop small{display:none}
+.card{overflow-x:auto}
+.drawer{position:fixed;top:0;right:0;height:100vh;width:min(600px,100vw);background:var(--bg-surface);border-left:1px solid var(--border-bright);box-shadow:-30px 0 80px rgba(0,0,0,.5);transform:translateX(102%);transition:transform .22s ease;display:flex;flex-direction:column;z-index:10}
+.drawer.open{transform:none}
+.d-head{padding:20px 24px 0;border-bottom:1px solid var(--border-color)}
+.d-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.d-intent{font-size:17px;font-weight:600;margin:6px 0 4px}
+.d-meta{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--text-muted);margin-bottom:14px}
+.icon-btn{background:none;border:1px solid var(--border-color);border-radius:10px;padding:4px 10px;cursor:pointer;color:var(--text-muted)}
+.icon-btn:hover{border-color:var(--border-bright);color:var(--text-pure)}
+.verdict{display:flex;gap:10px;align-items:center;padding:10px 14px;border-radius:12px;font-size:14px;margin-bottom:14px}
+.verdict.ok{background:var(--gas-bg);border:1px solid var(--gas-border)}
+.verdict.stop{background:var(--stop-bg);border:1px solid var(--stop-border)}
+.verdict b{font-family:var(--mono);font-weight:500}
+.vtabs{display:flex;gap:2px}
+.vtabs button{background:none;border:0;border-bottom:2px solid transparent;padding:8px 12px;cursor:pointer;color:var(--text-muted);font-size:14px}
+.vtabs button.on{color:var(--text-pure);border-color:var(--plasma-primary)}
+.vtabs .tag{font:10px var(--mono);color:var(--wireframe-grey);margin-left:4px}
+.d-body{flex:1;overflow:auto;padding:18px 24px 30px}
+.d-foot{border-top:1px solid var(--border-color);padding:10px 24px;font-size:12px;color:var(--wireframe-grey);display:flex;justify-content:space-between}
+
+/* variant A: layers */
+.layers{list-style:none;margin:0;padding:0;position:relative}
+.layers:before{content:'';position:absolute;left:13px;top:14px;bottom:14px;width:2px;background:var(--border-color)}
+.layer{position:relative;display:grid;grid-template-columns:28px 1fr auto;gap:0 12px;padding:8px 0}
+.dot{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font:600 13px var(--mono);background:var(--bg-surface);border:2px solid var(--border-bright);z-index:1}
+.layer.pass .dot{border-color:var(--gas-accent);color:var(--gas-accent)}
+.layer.stop .dot{border-color:var(--stop);color:var(--stop);background:#2a0f16;box-shadow:0 0 0 5px rgba(255,90,110,.12)}
+.layer.pending .dot{border-color:var(--pending);color:var(--pending);border-style:dashed}
+.layer.skip .dot,.layer.unreached .dot{color:var(--wireframe-grey)}
+.layer.skip .l-name,.layer.unreached .l-name{color:var(--text-muted)}
+.layer.unreached{opacity:.45}
+.l-name{font-weight:600;font-size:14px}
+.l-guard{font:12px var(--mono);color:var(--wireframe-grey)}
+.l-detail{font-size:13px;color:var(--text-muted);margin-top:2px}
+.layer.stop .l-detail{color:#FFC2CA}
+.l-ms{font:12px var(--mono);color:var(--text-muted);white-space:nowrap;padding-top:4px}
+.l-more{grid-column:2/4;margin-top:8px}
+details summary{cursor:pointer;font-size:12px;color:var(--plasma-highlight);list-style:none}
+details summary::before{content:'▸ '}details[open] summary::before{content:'▾ '}
+pre.code{background:#0E0911;border:1px solid var(--border-color);border-radius:10px;padding:10px 12px;font-size:12px;line-height:1.55;overflow:auto;margin:8px 0 0;color:#E9DDF2;white-space:pre-wrap}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;font-size:12px;margin-top:8px}
+.kv dt{color:var(--wireframe-grey);font-family:var(--mono)}.kv dd{margin:0;font-family:var(--mono)}
+
+/* variant B: route map */
+.map{position:relative;display:grid;grid-template-columns:1fr 1fr 1fr;grid-auto-rows:62px;gap:14px 22px;padding:6px 4px}
+.map svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.node{position:relative;z-index:1;border:1px solid var(--border-color);border-radius:12px;background:#120C15;padding:7px 10px;font-size:13px;display:flex;flex-direction:column;justify-content:center;opacity:.38;transition:all .2s}
+.node small{font:11px var(--mono);color:var(--wireframe-grey)}
+.node.lit{opacity:1;border-color:var(--gas-border);box-shadow:0 0 18px rgba(56,248,184,.12)}
+.node.lit.t-liquid{border-color:rgba(255,20,118,.6);box-shadow:0 0 18px rgba(255,20,118,.18)}
+.node.lit.t-crystal{border-color:var(--crystal-border)}
+.node.stop{opacity:1;border-color:var(--stop);background:#2a0f16;box-shadow:0 0 0 4px rgba(255,90,110,.12)}
+.node.bg{opacity:1;border-style:dashed;border-color:rgba(245,196,81,.5)}
+.node .ms{position:absolute;right:8px;top:6px;font:11px var(--mono);color:var(--text-muted)}
+.map-legend{display:flex;gap:14px;font-size:12px;color:var(--text-muted);margin:14px 0 4px;flex-wrap:wrap}
+.map-legend i{display:inline-block;width:18px;height:0;border-top:2px solid;vertical-align:middle;margin-right:5px}
+.map-note{font-size:13px;color:var(--text-muted);margin-top:10px}
+
+/* variant C: waterfall */
+.wf{display:grid;grid-template-columns:150px 1fr 70px;gap:6px 10px;align-items:center;font-size:13px}
+.wf .axis{grid-column:2;display:flex;justify-content:space-between;font:11px var(--mono);color:var(--wireframe-grey);border-bottom:1px solid var(--border-color);padding-bottom:4px}
+.wf .lbl{color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wf .lbl.child{padding-left:14px;font-size:12px}
+.wf .track{position:relative;height:18px;background:rgba(255,255,255,.02);border-radius:4px}
+.wf .bar{position:absolute;top:2px;height:14px;border-radius:3px;min-width:3px;background:var(--gas-accent)}
+.wf .bar.liquid{background:var(--plasma-primary)}.wf .bar.crystal{background:var(--crystal-accent)}
+.wf .bar.stop{background:var(--stop)}.wf .bar.bg{background:repeating-linear-gradient(45deg,rgba(245,196,81,.5) 0 4px,transparent 4px 8px);border:1px dashed var(--pending)}
+.wf .bar.skip{background:none;border:1px dashed var(--border-bright)}
+.wf .ms{font:12px var(--mono);color:var(--text-muted);text-align:right}
+.wf-scale{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--text-muted);margin-bottom:12px}
+.wf-scale button{background:none;border:1px solid var(--border-color);border-radius:8px;padding:2px 8px;cursor:pointer;color:var(--text-muted);font-size:12px}
+.wf-scale button.on{border-color:var(--plasma-primary);color:var(--text-pure)}
+
+.hint{margin-top:18px;font-size:12px;color:var(--wireframe-grey)}
+kbd{font:11px var(--mono);border:1px solid var(--border-bright);border-radius:4px;padding:1px 5px}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="brand">slime cloud</div>
+    <nav><a href="#">Overview</a><a class="on" href="#">Endpoints</a><a href="#">Billing</a></nav>
+  </aside>
+  <main id="main">
+    <div class="crumbs">Endpoints / atlas-shop</div>
+    <h1>atlas-shop</h1>
+    <nav class="tabs"><a href="#">Lifecycle</a><a href="#">Usage</a><a href="#">Settings</a><a class="on" href="#">Requests log</a></nav>
+
+    <section class="card">
+      <div class="section-head">
+        <h2 class="section-title">Requests log</h2>
+        <div class="toolbar">
+          <label class="switch"><input type="checkbox" id="srcToggle"> Data sources <span class="src src-today" style="display:inline-block">today</span><span class="src src-partial" style="display:inline-block">partial</span><span class="src src-new" style="display:inline-block">new</span></label>
+          <span>7 total</span>
+        </div>
+      </div>
+      <table>
+        <thead><tr>
+          <th>Time</th><th class="col-handler">Handler</th><th>Intent<span class="src src-new">new</span></th><th>Stage</th><th class="col-cache">Cache</th><th>Result<span class="src src-new">new</span></th><th class="num">Latency</th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <p class="hint">Click a row to open its trace. <kbd>↑</kbd> <kbd>↓</kbd> move between requests while the drawer is open, <kbd>Esc</kbd> closes it. Mockup data.</p>
+    </section>
+  </main>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-label="Request trace">
+  <div class="d-head">
+    <div class="d-top">
+      <div>
+        <div class="muted small mono" id="dTitle"></div>
+        <div class="d-intent" id="dIntent"></div>
+      </div>
+      <button class="icon-btn" id="close" aria-label="Close">Esc ✕</button>
+    </div>
+    <div class="d-meta" id="dMeta"></div>
+    <div id="dVerdict"></div>
+    <div class="vtabs" id="vtabs">
+      <button data-v="layers" class="on">Layers <span class="tag">A</span></button>
+      <button data-v="map">Route map <span class="tag">B</span></button>
+      <button data-v="wf">Waterfall <span class="tag">C</span></button>
+    </div>
+  </div>
+  <div class="d-body" id="dBody"></div>
+  <div class="d-foot"><span id="dFootL"></span><span>endpoint atlas-shop · /v0/query</span></div>
+</aside>
+
+<script>
+// ---- Harness layers: the real gates a request can pass, in order (guards = real defaults) ----
+const LAYERS = [
+  { id:'edge',     name:'Edge',              guard:'API key · body ≤ 16 KB',                          src:'new' },
+  { id:'key',      name:'Parse & key',       guard:'intent · input types · output shape → key',        src:'today' },
+  { id:'route',    name:'Route',             guard:'Crystal → cache → in-flight → generate',           src:'today' },
+  { id:'limits',   name:'Generation limits', guard:'≤ 200 / hour · ≤ 2 concurrent',                    src:'new' },
+  { id:'generate', name:'Generate',          guard:'model writes steps + shape · ≤ 1 repair · 25 s',   src:'partial' },
+  { id:'lint',     name:'Lint',              guard:'read-only SQL · $n → input · no literals · ≤ 4 steps', src:'new' },
+  { id:'cost',     name:'Cost check',        guard:'EXPLAIN cost ≤ 1,000,000',                         src:'new' },
+  { id:'execute',  name:'Execute',           guard:'read-only DB user · 2 s statement · row cap 1,000', src:'today' },
+  { id:'sandbox',  name:'Shape in QuickJS',  guard:'32 MiB · 200 ms',                                  src:'today' },
+  { id:'output',   name:'Output check',      guard:'matches output shape · ≤ input.limit',             src:'partial' },
+  { id:'cache',    name:'Cache',             guard:'kept as Gas 1 h · 3 runs → Liquid',                src:'today' },
+  { id:'review',   name:'Review',            guard:'background · ≤ 2 reviews',                         src:'today' },
+];
+
+const SQL_TOP = `SELECT c.id, c.name, SUM(oi.qty * oi.unit_price) AS revenue
+FROM orders o
+JOIN customers c   ON c.id = o.customer_id
+JOIN order_items oi ON oi.order_id = o.id
+WHERE o.placed_at >= now() - ($1 || ' days')::interval
+GROUP BY c.id, c.name
+ORDER BY revenue DESC
+LIMIT $2`;
+const SHAPE_TOP = `(rows, input) => rows.map(r => ({ id: r.id, name: r.name, revenue: Number(r.revenue) }))`;
+
+// Each request: per-layer status + detail, the lit route on the map, and timeline spans (start, ms).
+const REQUESTS = [
+ { id:'r1', at:'14:32:08.412', key:'a3f9c1e07d', intent:'Top customers by revenue in the last N days', tier:'gas', cache:'miss', ms:2214.6, status:200,
+   meta:['input { days: 30, limit: 5 }','5 rows','sonnet · 1,834 tokens'],
+   layers:{
+     edge:['pass',0.2,'API key slk_…9f2 · body 418 B'],
+     key:['pass',0.4,'key #a3f9c1 · params days:int, limit:int'],
+     route:['pass',0.3,'no Crystal · cache miss · nothing in flight → generate'],
+     limits:['pass',0.0,'slot 1 of 2 · 37 of 200 this hour'],
+     generate:['pass',2061.0,'2 attempts · 1 repair: column "o.total" does not exist',{sql:SQL_TOP,shape:SHAPE_TOP,assumptions:['revenue = qty × unit_price (no refunds table)','"last N days" counts from now(), not from midnight']}],
+     lint:['pass',1.1,'read-only ✓ · $1→days, $2→limit ✓ · no copied input values ✓ · 1 step'],
+     cost:['pass',6.8,'EXPLAIN cost 4,120 of 1,000,000'],
+     execute:['pass',121.4,'postgres · 1 step · 5 rows',{steps:[['main','postgres','5 rows','118.9 ms']]}],
+     sandbox:['pass',3.1,'shape ran in 3.1 ms · 1.2 MiB of 32 MiB'],
+     output:['pass',0.3,'matches output shape · 5 ≤ limit 5 · not truncated'],
+     cache:['pass',0.2,'kept as Gas · 1 / 3 runs to Liquid'],
+     review:['pending',null,'reviewer queued in background — does not delay the answer'],
+   },
+   map:{ lit:['app','edge','router','gen','guard','exec','db','shape','out','answer'], bg:['cache','review'], stop:null },
+   wf:[['edge',0,0.2],['key',0.2,0.4],['route',0.6,0.3],['limits',0.9,0.05],['generate',1.0,2061],['  attempt 1 → repair',1.0,1012,'child'],['  attempt 2',1013,1049,'child'],['lint',2062,1.1],['cost',2063,6.8],['execute',2070,121.4],['sandbox',2191.5,3.1],['output',2194.6,0.3],['review (background)',2195,900,'bg']] },
+
+ { id:'r2', at:'14:32:08.530', key:'a3f9c1e07d', intent:'Top customers by revenue in the last N days', tier:'gas', cache:'coalesced', ms:2097.9, status:200,
+   meta:['input { days: 30, limit: 5 }','5 rows','joined r1’s generation'],
+   layers:{
+     edge:['pass',0.2,'API key slk_…9f2 · body 418 B'],
+     key:['pass',0.3,'key #a3f9c1 — same as a request already generating'],
+     route:['pass',0.2,'cache miss · same key in flight → waited for it (no second model call)'],
+     limits:['skip',null,'no generation slot used'],
+     generate:['skip',1960.0,'shared: waited for the generation started 118 ms earlier'],
+     lint:['skip',null,'passed inside the shared generation'],
+     cost:['skip',null,'passed inside the shared generation'],
+     execute:['pass',130.2,'postgres · 1 step · 5 rows',{steps:[['main','postgres','5 rows','127.0 ms']]}],
+     sandbox:['pass',2.9,'shape ran in 2.9 ms'],
+     output:['pass',0.3,'matches output shape · not truncated'],
+     cache:['pass',0.1,'counted · 2 / 3 runs to Liquid'],
+     review:['pending',null,'same review as r1'],
+   },
+   map:{ lit:['app','edge','router','gen','exec','db','shape','out','answer'], bg:[], stop:null, dashedGen:true },
+   wf:[['edge',0,0.2],['key',0.2,0.3],['route',0.5,0.2],['wait for in-flight',0.7,1960,'skip'],['execute',1961,130.2],['sandbox',2091,2.9],['output',2094,0.3]] },
+
+ { id:'r3', at:'14:31:52.077', key:'7be2104a9c', intent:'Delete users inactive for a year', tier:'none', cache:'miss', ms:1318.4, status:403, code:'WRITE_REFUSED', stopAt:'lint',
+   meta:['input { days: 365 }','no rows','sonnet · 912 tokens'],
+   layers:{
+     edge:['pass',0.2,'API key slk_…9f2 · body 233 B'],
+     key:['pass',0.3,'key #7be210'],
+     route:['pass',0.2,'no Crystal · cache miss → generate'],
+     limits:['pass',0.0,'slot 1 of 2 · 38 of 200 this hour'],
+     generate:['pass',1309.0,'model marked it unsatisfiable: "the intent asks to remove rows"'],
+     lint:['stop',0.4,'WRITE_REFUSED — the intent reads as a write; Slime only reads. Final, no repair.',{kv:[['code','WRITE_REFUSED (403)'],['enforcedBy','lint'],['retryable','false'],['backstop','the endpoint’s DB user is read-only, so the database would refuse it too']]}],
+     cost:['unreached',null,'not reached'], execute:['unreached',null,'not reached — nothing touched the database'], sandbox:['unreached',null,'not reached'],
+     output:['unreached',null,'not reached'], cache:['unreached',null,'not cached — refused handlers are never kept'], review:['unreached',null,'not reached'],
+   },
+   map:{ lit:['app','edge','router','gen'], bg:[], stop:'guard' },
+   wf:[['edge',0,0.2],['key',0.2,0.3],['route',0.5,0.2],['limits',0.7,0.05],['generate',0.8,1309],['lint ✕',1310,0.4,'stop']] },
+
+ { id:'r4', at:'14:31:40.903', key:'c0d4e8b211', intent:'Orders for a customer, newest first', tier:'liquid', cache:'hit', ms:44.2, status:200,
+   meta:['input { customerId: 1042, limit: 20 }','20 rows','run 9 of 10 to Crystal-ready'],
+   layers:{
+     edge:['pass',0.2,'API key slk_…9f2 · body 301 B'],
+     key:['pass',0.3,'key #c0d4e8'],
+     route:['pass',1.8,'no Crystal · cache hit: Liquid handler from the store'],
+     limits:['skip',null,'no model call'], generate:['skip',null,'no model call — code written 2 days ago'],
+     lint:['skip',null,'checked when generated · approved by review'], cost:['skip',null,'checked when generated'],
+     execute:['pass',38.6,'postgres · 1 step · 20 rows',{sql:`SELECT id, placed_at, status, total_cents
+FROM orders WHERE customer_id = $1
+ORDER BY placed_at DESC LIMIT $2`,steps:[['main','postgres','20 rows','36.1 ms']]}],
+     sandbox:['pass',2.4,'shape ran in 2.4 ms'],
+     output:['pass',0.4,'matches output shape · 20 ≤ limit 20'],
+     cache:['pass',0.1,'9 / 10 runs to Crystal-ready'],
+     review:['pass',null,'approved 2 days ago · "parameterised, indexed on customer_id"'],
+   },
+   map:{ lit:['app','edge','router','cache','exec','db','shape','out','answer'], bg:[], stop:null, tier:'liquid' },
+   wf:[['edge',0,0.2],['key',0.2,0.3],['route',0.5,1.8],['execute',2.3,38.6],['sandbox',41,2.4],['output',43.4,0.4]] },
+
+ { id:'r5', at:'14:31:12.318', key:'19fa07c3d5', intent:'Product stock by warehouse', tier:'crystal', cache:'hit', ms:9.8, status:200, route:'crystal',
+   meta:['POST /v0/e/19fa07c3d5','input { sku: "TS-0042" }','4 rows'],
+   layers:{
+     edge:['pass',0.2,'Crystal token slc_…e1 — opens only this route · body 61 B'],
+     key:['pass',0.2,'input names checked: only "sku" — unknown names refused'],
+     route:['pass',0.6,'own route → Crystal 19fa07 · SHA-256 matches the manifest'],
+     limits:['skip',null,'no model'], generate:['skip',null,'frozen code — never regenerated'],
+     lint:['skip',null,'checked before freezing'], cost:['skip',null,'checked before freezing'],
+     execute:['pass',6.9,'postgres · 1 step · 4 rows',{steps:[['main','postgres','4 rows','6.1 ms']]}],
+     sandbox:['pass',1.7,'Crystal runs as data in QuickJS · Liquid’s limits'],
+     output:['pass',0.2,'matches output shape'],
+     cache:['skip',null,'Crystal: nothing to promote'], review:['skip',null,'reviewed before freezing'],
+   },
+   map:{ lit:['app','edge','router','crystal','exec','db','shape','out','answer'], bg:[], stop:null, tier:'crystal' },
+   wf:[['edge',0,0.2],['key',0.2,0.2],['route',0.4,0.6],['execute',1.0,6.9],['sandbox',7.9,1.7],['output',9.6,0.2]] },
+
+ { id:'r6', at:'14:30:55.640', key:'e51b3a7f02', intent:'Every order line with its product and customer', tier:'none', cache:'miss', ms:4880.2, status:500, code:'QUERY_TOO_EXPENSIVE', stopAt:'cost',
+   meta:['input { }','no rows','sonnet · 2,410 tokens'],
+   layers:{
+     edge:['pass',0.2,'API key slk_…9f2 · body 190 B'],
+     key:['pass',0.3,'key #e51b3a'],
+     route:['pass',0.2,'cache miss → generate'],
+     limits:['pass',0.0,'slot 2 of 2 · 36 of 200 this hour'],
+     generate:['pass',4851.0,'2 attempts · repair asked for a cheaper plan'],
+     lint:['pass',1.3,'read-only ✓ · no params · 1 step'],
+     cost:['stop',27.5,'QUERY_TOO_EXPENSIVE — EXPLAIN cost 18,400,000 > 1,000,000 on both attempts',{kv:[['code','QUERY_TOO_EXPENSIVE (500)'],['attempt 1','cost 21,950,000'],['attempt 2','cost 18,400,000'],['hint','add a limit or a filter to the intent / input']]}],
+     execute:['unreached',null,'not reached — the query never ran'], sandbox:['unreached',null,'not reached'],
+     output:['unreached',null,'not reached'], cache:['unreached',null,'not cached'], review:['unreached',null,'not reached'],
+   },
+   map:{ lit:['app','edge','router','gen'], bg:[], stop:'guard' },
+   wf:[['edge',0,0.2],['key',0.2,0.3],['route',0.5,0.2],['generate',0.8,4851],['lint',4852,1.3],['cost ✕',4853,27.5,'stop']] },
+
+ { id:'r7', at:'14:30:41.002', key:'4d77e0aa19', intent:'Average basket size per weekday', tier:'none', cache:'miss', ms:0.9, status:429, code:'GENERATION_RATE_LIMITED', stopAt:'limits',
+   meta:['input { weeks: 8 }','no rows','no model call'],
+   layers:{
+     edge:['pass',0.2,'API key slk_…9f2 · body 205 B'],
+     key:['pass',0.3,'key #4d77e0'],
+     route:['pass',0.2,'cache miss → would generate'],
+     limits:['stop',0.1,'GENERATION_RATE_LIMITED — 200 of 200 generations this hour',{kv:[['code','GENERATION_RATE_LIMITED (429)'],['retryable','true'],['resets','in 29 min (fixed hour)'],['note','cached and Crystal requests keep working']]}],
+     generate:['unreached',null,'not reached — no model call, no tokens billed'], lint:['unreached',null,'not reached'], cost:['unreached',null,'not reached'],
+     execute:['unreached',null,'not reached'], sandbox:['unreached',null,'not reached'], output:['unreached',null,'not reached'],
+     cache:['unreached',null,'not reached'], review:['unreached',null,'not reached'],
+   },
+   map:{ lit:['app','edge','router'], bg:[], stop:'gen' },
+   wf:[['edge',0,0.2],['key',0.2,0.3],['route',0.5,0.2],['limits ✕',0.7,0.1,'stop']] },
+];
+
+// ---- table ----
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmtMs = (ms) => ms >= 1000 ? `${(ms/1000).toFixed(2)} s` : `${ms.toFixed(1)} ms`;
+const pill = (t) => t === 'none' ? '<span class="tier-pill tier-pill-none">—</span>' : `<span class="tier-pill tier-pill-${t}">${t}</span>`;
+const layerName = (id) => LAYERS.find((l) => l.id === id).name;
+const result = (r) => r.code
+  ? `<span class="res-stop" title="${r.code}"><span class="res-long">✕ ${r.code}</span><span class="res-short">✕ ${r.status}</span> <small>· ${layerName(r.stopAt)}</small></span>`
+  : `<span class="res-ok">✓ ${r.status}</span>`;
+
+$('#rows').innerHTML = REQUESTS.map((r) => `
+  <tr data-id="${r.id}">
+    <td class="mono">${r.at.slice(0,8)}</td>
+    <td class="mono col-handler">#${r.key.slice(0,6)}</td>
+    <td class="intent" title="${esc(r.intent)}">${esc(r.intent)}</td>
+    <td>${pill(r.tier)}</td>
+    <td class="col-cache">${r.route === 'crystal' ? 'own route' : r.cache}</td>
+    <td>${result(r)}</td>
+    <td class="num mono">${fmtMs(r.ms)}</td>
+  </tr>`).join('');
+
+// ---- drawer ----
+let current = null, variant = 'layers', wfScale = 'linear';
+const srcBadge = (s) => `<span class="src src-${s}">${s}</span>`;
+const GLYPH = { pass:'✓', stop:'✕', pending:'◌', skip:'–', unreached:'·' };
+
+function open(id) {
+  current = REQUESTS.find((r) => r.id === id);
+  document.querySelectorAll('#rows tr').forEach((tr) => tr.classList.toggle('sel', tr.dataset.id === id));
+  const r = current;
+  $('#dTitle').textContent = `${r.at} · handler #${r.key.slice(0,6)} · ${r.route === 'crystal' ? 'own route' : 'cache ' + r.cache}`;
+  $('#dIntent').innerHTML = `${esc(r.intent)} ${srcBadge('new')}`;
+  $('#dMeta').innerHTML = [pill(r.tier), `<span class="mono">${fmtMs(r.ms)} total</span>`, ...r.meta.map(esc)].join('<span>·</span>');
+  const passed = LAYERS.filter((l) => r.layers[l.id][0] === 'pass').length;
+  $('#dVerdict').innerHTML = r.code
+    ? `<div class="verdict stop">✕ Stopped at <strong>${layerName(r.stopAt)}</strong> — <b>${r.code}</b> · ${passed} layers passed before it</div>`
+    : `<div class="verdict ok">✓ Answered · passed <strong>${passed}</strong> layers, ${LAYERS.filter((l)=>r.layers[l.id][0]==='skip').length} not needed on this route</div>`;
+  $('#dFootL').textContent = `request ${r.id}`;
+  render();
+  $('#drawer').classList.add('open'); document.body.classList.add('drawer-open');
+}
+function close() { $('#drawer').classList.remove('open'); document.body.classList.remove('drawer-open'); document.querySelectorAll('#rows tr').forEach((tr) => tr.classList.remove('sel')); current = null; }
+
+function render() {
+  if (!current) return;
+  document.querySelectorAll('#vtabs button').forEach((b) => b.classList.toggle('on', b.dataset.v === variant));
+  $('#dBody').innerHTML = variant === 'layers' ? renderLayers(current) : variant === 'map' ? renderMap(current) : renderWf(current);
+  if (variant === 'map') requestAnimationFrame(() => drawEdges(current));
+  if (variant === 'wf') document.querySelectorAll('.wf-scale button').forEach((b) => b.onclick = () => { wfScale = b.dataset.s; render(); });
+}
+
+// Variant A — the harness as a checklist the request walked down.
+function renderLayers(r) {
+  return `<ol class="layers">${LAYERS.map((l) => {
+    const [st, ms, detail, more] = r.layers[l.id];
+    let extra = '';
+    if (more) {
+      const parts = [];
+      if (more.kv) parts.push(`<dl class="kv">${more.kv.map(([k,v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>`);
+      if (more.steps) parts.push(`<dl class="kv">${more.steps.map(([n,s,rows,t]) => `<dt>${n}</dt><dd>${s} · ${rows} · ${t}</dd>`).join('')}</dl>`);
+      if (more.sql) parts.push(`<pre class="code">${esc(more.sql)}</pre>`);
+      if (more.shape) parts.push(`<pre class="code">${esc(more.shape)}</pre>`);
+      if (more.assumptions) parts.push(`<dl class="kv">${more.assumptions.map((a) => `<dt>assumes</dt><dd>${esc(a)}</dd>`).join('')}</dl>`);
+      const label = more.sql ? 'Show generated code' : more.kv ? 'Why' : 'Steps';
+      extra = `<div class="l-more"><details ${st === 'stop' ? 'open' : ''}><summary>${label}</summary>${parts.join('')}</details></div>`;
+    }
+    return `<li class="layer ${st}">
+      <div class="dot">${GLYPH[st]}</div>
+      <div><div class="l-name">${l.name}${srcBadge(l.src)}</div><div class="l-guard">${l.guard}</div><div class="l-detail">${esc(detail)}</div></div>
+      <div class="l-ms">${ms == null ? '' : fmtMs(ms)}</div>${extra}</li>`;
+  }).join('')}</ol>`;
+}
+
+// Variant B — the endpoint's architecture with this request's path lit.
+const NODES = [
+  ['app','1/2','Your app / agent','POST /v0/query'],
+  ['edge','2/2','Edge','key · 16 KB'],
+  ['router','3/2','Router','by handler key'],
+  ['crystal','4/1','Crystal','frozen · own route'],
+  ['cache','4/2','Handler cache','Gas · Liquid'],
+  ['gen','4/3','Generator','limits · LLM · repair'],
+  ['guard','5/3','Lint + cost','read-only · EXPLAIN'],
+  ['db','6/1','Postgres','read-only user'],
+  ['exec','6/2','Executor','steps · 2 s · 1k rows'],
+  ['review','6/3','Reviewer','background'],
+  ['shape','7/2','QuickJS shape','32 MiB · 200 ms'],
+  ['out','8/2','Output check','shape · limit'],
+  ['answer','8/3','Answer','200 + meta'],
+];
+const EDGES = [['app','edge'],['edge','router'],['router','crystal'],['router','cache'],['router','gen'],['gen','guard'],['guard','exec'],['cache','exec'],['crystal','exec'],['exec','db'],['exec','shape'],['shape','out'],['out','answer'],['cache','review']];
+const NODE_MS = { edge:'edge', router:'route', gen:'generate', guard:'cost', exec:'execute', shape:'sandbox', out:'output' };
+
+function renderMap(r) {
+  const m = r.map, tierCls = m.tier ? `t-${m.tier}` : '';
+  const nodes = NODES.map(([id, area, name, sub]) => {
+    const [row, col] = area.split('/');
+    const cls = [m.lit.includes(id) ? `lit ${tierCls}` : '', m.stop === id ? 'stop' : '', m.bg.includes(id) ? 'bg' : ''].join(' ');
+    const lid = NODE_MS[id]; const ms = lid && r.layers[lid] && r.layers[lid][1] != null && m.lit.includes(id) ? fmtMs(r.layers[lid][1]) : '';
+    const label = id === 'gen' && m.dashedGen ? 'waited for in-flight' : sub;
+    return `<div class="node ${cls}" id="n-${id}" style="grid-row:${row};grid-column:${col}"><span class="ms">${ms}</span>${name}<small>${label}</small></div>`;
+  }).join('');
+  const stopNote = r.code ? `<p class="map-note">Red node: the request stopped here with <code>${r.code}</code>. Dim nodes were never reached.</p>`
+    : `<p class="map-note">Lit path: what answered this request. Dim nodes were not needed on this route${m.bg.length ? '; dashed: still running in the background' : ''}.</p>`;
+  return `<div class="map" id="map"><svg id="edges"></svg>${nodes}</div>
+    <div class="map-legend"><span><i style="border-color:var(--gas-accent)"></i>path taken</span><span><i style="border-color:var(--stop)"></i>stopped</span><span><i style="border-color:var(--pending);border-top-style:dashed"></i>background</span><span><i style="border-color:var(--border-bright)"></i>not taken</span></div>${stopNote}`;
+}
+function drawEdges(r) {
+  const map = $('#map'); if (!map) return; const box = map.getBoundingClientRect(); const m = r.map;
+  const c = (id) => { const b = $(`#n-${id}`).getBoundingClientRect(); return { x:b.left-box.left+b.width/2, y:b.top-box.top+b.height/2, w:b.width, h:b.height }; };
+  const on = (id) => m.lit.includes(id) || m.stop === id;
+  const color = m.tier === 'liquid' ? 'var(--plasma-primary)' : m.tier === 'crystal' ? 'var(--crystal-accent)' : 'var(--gas-accent)';
+  $('#edges').innerHTML = EDGES.map(([a, b]) => {
+    const A = c(a), B = c(b); let stroke = 'var(--border-bright)', dash = '', w = 1.2, op = .6;
+    if (on(a) && on(b)) { stroke = m.stop === b ? 'var(--stop)' : color; w = 2.4; op = 1; }
+    if (m.bg.includes(b) && on(a)) { stroke = 'var(--pending)'; dash = '5 4'; w = 1.6; op = 1; }
+    if (a === 'out' && b === 'answer' && r.code) { op = .3; }
+    // leave/enter each node from the side facing the other node
+    const dx = B.x - A.x, dy = B.y - A.y; let x1, y1, x2, y2;
+    if (Math.abs(dy) > Math.abs(dx) * 0.4) { x1 = A.x; y1 = A.y + Math.sign(dy) * A.h/2; x2 = B.x; y2 = B.y - Math.sign(dy) * B.h/2; }
+    else { x1 = A.x + Math.sign(dx) * A.w/2; y1 = A.y; x2 = B.x - Math.sign(dx) * B.w/2; y2 = B.y; }
+    const my = (y1 + y2) / 2;
+    const d = Math.abs(dy) > Math.abs(dx) * 0.4 ? `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}` : `M${x1},${y1} L${x2},${y2}`;
+    return `<path d="${d}" fill="none" stroke="${stroke}" stroke-width="${w}" stroke-dasharray="${dash}" opacity="${op}"/>`;
+  }).join('');
+}
+
+// Variant C — a trace waterfall; linear shows where time really goes, log makes the fast layers readable.
+function renderWf(r) {
+  const end = Math.max(...r.wf.map(([, s, d]) => s + d));
+  const pos = (v) => wfScale === 'log' ? Math.log10(1 + v) / Math.log10(1 + end) * 100 : v / end * 100;
+  const tierCls = r.tier === 'liquid' ? 'liquid' : r.tier === 'crystal' ? 'crystal' : '';
+  const rows = r.wf.map(([name, s, d, kind]) => {
+    const cls = kind === 'stop' ? 'stop' : kind === 'bg' ? 'bg' : kind === 'skip' ? 'skip' : tierCls;
+    const left = pos(s), width = Math.max(pos(s + d) - left, .6);
+    return `<div class="lbl ${kind === 'child' ? 'child' : ''}">${esc(name.trim())}</div><div class="track"><div class="bar ${cls}" style="left:${left}%;width:${width}%"></div></div><div class="ms">${fmtMs(d)}</div>`;
+  }).join('');
+  const ticks = [0, end / 2, end].map((t) => `<span>${fmtMs(t)}</span>`).join('');
+  return `<div class="wf-scale">Time scale <button data-s="linear" class="${wfScale==='linear'?'on':''}">linear</button><button data-s="log" class="${wfScale==='log'?'on':''}">log</button></div>
+    <div class="wf"><div></div><div class="axis">${wfScale === 'log' ? '<span>0</span><span>log</span><span>' + fmtMs(end) + '</span>' : ticks}</div><div></div>${rows}</div>
+    <p class="map-note">Spans per layer ${srcBadge('partial')}: generate / run / shape are recorded today; edge, lint, cost and per-attempt spans are new.</p>`;
+}
+
+// ---- wiring ----
+$('#rows').addEventListener('click', (e) => { const tr = e.target.closest('tr'); if (tr) open(tr.dataset.id); });
+$('#close').onclick = close;
+$('#vtabs').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { variant = b.dataset.v; render(); } });
+$('#srcToggle').onchange = (e) => document.body.classList.toggle('show-src', e.target.checked);
+document.addEventListener('keydown', (e) => {
+  if (!current) return;
+  if (e.key === 'Escape') close();
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault(); const i = REQUESTS.indexOf(current) + (e.key === 'ArrowDown' ? 1 : -1);
+    if (REQUESTS[i]) open(REQUESTS[i].id);
+  }
+});
+window.addEventListener('resize', () => { if (current && variant === 'map') drawEdges(current); });
+open('r1');
+</script>
+</body>
+</html>
