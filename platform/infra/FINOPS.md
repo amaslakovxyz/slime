@@ -12,8 +12,10 @@ Free Tier API.
 | Tax | ~20% on top | never |
 | S3 (state, other buckets) | cents | partly |
 | **slime** (Lambda, CloudFront, logs, S3 state) | **$0.001 this month** | Always Free |
+| RDS `slime-test-db` (db.t4g.micro, 20 GB gp3, public IPv4), test + demo shop DB | ≈ $20/month (since 2026-11-22) | never |
 
-Baseline is ~$2/month; renewal months reach ~$21-23. WAF cost $7-8/month in
+Baseline was ~$2/month; the always-on RDS raises it to ≈ $22/month (renewal
+months ≈ $40-43). WAF cost $7-8/month in
 May-June 2026 and is gone now.
 
 The cloud MVP (2026-11-21) adds only resources that are free when idle: the
@@ -52,7 +54,7 @@ credits); 12-month offers no longer apply, only Always Free.
 | Control | Setting | Effect |
 |---|---|---|
 | Budget `slime-account-monthly` | $50, alerts 50/80% actual, 100% forecast | Whole account |
-| Budget `slime-monthly` | $15, alerts $10.50 + $15 actual, $15 forecast | Region `eu-central-1` until the `Project` tag is active, then tag `Project=slime` |
+| Budget `slime-monthly` | $30, alerts $21 + $30 actual, $30 forecast | Region `eu-central-1` until the `Project` tag is active, then tag `Project=slime` |
 | Budget action `freeze` | 100% actual of `slime-monthly`, automatic | Attaches `slime-budget-freeze` to `slime-deployer` and `slime-gha-apply`: no new paid resources or capacity increases (ECS/RDS/DynamoDB updates are blocked too); reads, code updates and deletes still work |
 | Cost Anomaly Detection | SERVICE monitor, daily email at >= $5 impact | Whole account, free |
 

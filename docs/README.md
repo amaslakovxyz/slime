@@ -25,6 +25,7 @@ Project-wide docs. Code-local docs live next to their code and are listed at the
 - [../core/docs/multi-source-implementation.md](../core/docs/multi-source-implementation.md) (Plan, step-by-step implementation of multi-source handlers; P0–P6 done except P5.5 and P6.5)
 - [../examples/multi-source/README.md](../examples/multi-source/README.md) (Current, multi-source example)
 - [../examples/express/README.md](../examples/express/README.md) (Current, example app and demo database)
+- [../examples/shop/README.md](../examples/shop/README.md) (Current, demo shop database and 10 use cases)
 - [../platform/runtime/README.md](../platform/runtime/README.md) (Current)
 - [../platform/infra/README.md](../platform/infra/README.md) and [../platform/infra/FINOPS.md](../platform/infra/FINOPS.md) (Current)
 - [../platform/docs/reviews/2026-11-20-infra-review.md](../platform/docs/reviews/2026-11-20-infra-review.md) (Record)

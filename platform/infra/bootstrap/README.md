@@ -8,7 +8,7 @@ through the role it creates.
 |---|---|
 | IAM role `slime-deployer` | `AdministratorAccess` + `region-guard` deny: regional services only in `eu-central-1` |
 | Resource group `slime` | Console view of all resources tagged `Project=slime` |
-| Budget `slime-monthly` | Project budget: $15/month on `eu-central-1` spend (tag `Project=slime` once `project_cost_tag_active`); alerts at $10.50 actual, $15 actual, $15 forecasted |
+| Budget `slime-monthly` | Project budget: $30/month on `eu-central-1` spend (tag `Project=slime` once `project_cost_tag_active`); alerts at $21 actual, $30 actual, $30 forecasted |
 | Budget action `freeze` + policy `slime-budget-freeze` + role `slime-budgets-action` | At 100% actual, AWS Budgets attaches the freeze policy to `slime-deployer` and `slime-gha-apply` (no new paid resources) |
 | Cost anomaly monitor `account-services` | Daily email for anomalies with >= $5 impact, all services |
 | Budget `slime-account-monthly` | Account-wide backstop ($50): alerts at 50% / 80% actual, 100% forecasted |
