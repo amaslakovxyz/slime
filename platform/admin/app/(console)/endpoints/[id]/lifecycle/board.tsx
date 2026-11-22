@@ -77,7 +77,8 @@ export function LifecycleBoard({
             <tbody>
               {rows.map((r) => (
                 <Fragment key={r.key}>
-                  <tr className={r.tier === 'crystal' ? 'lc-row-crystal' : undefined}>
+                  {/* The id is the lifecycle panel's link target. */}
+                  <tr id={`h-${r.key}`} className={r.tier === 'crystal' ? 'lc-row-crystal' : undefined}>
                     <td className="mono lc-hash" title={r.key}>#{r.shortKey}</td>
                     <td className="lc-intent">{r.intent}</td>
                     <td><span className={`tier-pill tier-pill-${r.tier}`}>{r.tier}</span></td>
