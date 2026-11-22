@@ -295,6 +295,10 @@ reason listed the readable columns, including "creation date", which matches
 
 ## Demo in Slime Cloud
 
+For a customer-agent run (three console panels on one endpoint, with the
+exact requests, the inputs to try, the expected answers and the Crystal step),
+hand the agent [customer-brief.md](customer-brief.md).
+
 1. In the admin, create an Endpoint and paste the `SHOP_READER_URL` value as
    its database URL.
 2. Call it with a use case, e.g. case 2:
