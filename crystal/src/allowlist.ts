@@ -1,4 +1,4 @@
-import { parse, type AnyNode, type FunctionDeclaration, type Identifier, type MemberExpression, type Node, type Pattern, type Program } from 'acorn';
+import { parse, type AnyNode, type FunctionDeclaration, type Identifier, type MemberExpression, type Node, type ObjectPattern, type Pattern, type Program } from 'acorn';
 import { fullAncestor } from 'acorn-walk';
 import { ALLOWED_GLOBALS, ANY_MEMBER, BANNED_NODE_TYPES, BANNED_PROPERTIES, VALUE_GLOBALS } from './allowlist-rules.js';
 
@@ -46,14 +46,12 @@ function checkSyntax(node: AnyNode): void {
 
 function checkAccess(node: AnyNode, parent: AnyNode | undefined, declaredNames: ReadonlySet<string>): void {
   if (node.type === 'MemberExpression') checkMemberAccess(node, parent, declaredNames);
+  else if (node.type === 'ObjectPattern') checkPatternKeys(node);
   else if (node.type === 'Identifier' && isReference(node, parent)) checkIdentifier(node, parent, declaredNames);
 }
 
 function checkMemberAccess(node: MemberExpression, parent: AnyNode | undefined, declaredNames: ReadonlySet<string>): void {
-  const propertyName = memberName(node);
-  // obj[key] with a variable key can reach `constructor` at run time, so only literal keys are allowed.
-  if (propertyName === undefined) refuse(node, 'computed property access with a variable key (use a Map)');
-  if (BANNED_PROPERTIES.has(propertyName)) refuse(node, node.computed ? 'computed property access with a variable key (use a Map)' : `\`.${propertyName}\``);
+  const propertyName = allowedPropertyName(node, node.computed, node.property);
 
   const globalName = node.object.type === 'Identifier' && !declaredNames.has(node.object.name) ? node.object.name : undefined;
   const allowedMembers = globalName ? ALLOWED_GLOBALS[globalName] : undefined;
@@ -73,11 +71,21 @@ function checkIdentifier(node: Identifier, parent: AnyNode | undefined, declared
   if (!isCalled && !isMemberRead) refuse(node, `using \`${name}\` as a value`);
 }
 
-/** The property name, or undefined for a computed key that isn't a number or string literal. */
-function memberName({ computed, property }: MemberExpression): string | undefined {
-  if (!computed) return property.type === 'Identifier' ? property.name : undefined;
-  if (property.type === 'Literal' && (typeof property.value === 'number' || typeof property.value === 'string')) return String(property.value);
-  return undefined;
+// Destructuring reads properties as well: `const { constructor: F } = rows` is `rows.constructor`.
+function checkPatternKeys(pattern: ObjectPattern): void {
+  for (const property of pattern.properties) {
+    if (property.type === 'Property') allowedPropertyName(property, property.computed, property.key);
+  }
+}
+
+/** The name of a property read, refusing banned names and computed keys that aren't number or string literals. */
+function allowedPropertyName(node: Node, computed: boolean, key: AnyNode): string {
+  const isLiteralKey = key.type === 'Literal' && (typeof key.value === 'number' || typeof key.value === 'string');
+  const name = !computed && key.type === 'Identifier' ? key.name : isLiteralKey ? String(key.value) : undefined;
+  // obj[key] with a variable key can reach `constructor` at run time, so only literal keys are allowed.
+  if (name === undefined) refuse(node, 'computed property access with a variable key (use a Map)');
+  if (BANNED_PROPERTIES.has(name)) refuse(node, computed ? 'computed property access with a variable key (use a Map)' : `\`.${name}\``);
+  return name;
 }
 
 function isWriteTarget(node: Node, parent: AnyNode | undefined): boolean {

@@ -16,9 +16,10 @@ interface ExplainRow {
   'QUERY PLAN': { Plan: { 'Total Cost': number } }[];
 }
 
-// pg's typings lack query_timeout, which pg reads per query (lib/client.js).
+// pg's typings lack query_timeout and queryMode, which pg reads per query (lib/client.js, lib/query.js).
 interface TimedQuery extends pg.QueryConfig {
   query_timeout: number;
+  queryMode: 'extended';
 }
 
 const DEFAULT_SCHEMA = 'public';
@@ -95,14 +96,17 @@ class PostgresConnector implements Connector {
   }
 }
 
-// As a subquery, anything but one SELECT or WITH (e.g. "...; DROP TABLE x") is a
-// syntax error, and the outer LIMIT caps the rows. An inner ORDER BY is kept.
+// As a subquery, a second statement ("...; DROP TABLE x") is a syntax error, and the outer LIMIT caps
+// the rows. SQL that closes the parenthesis itself ("SELECT 1) a; COMMIT; ...") is stopped by timed():
+// the extended protocol takes one statement per query, even with no parameters. An inner ORDER BY is kept.
 function wrap(sql: string, { rowCap }: QueryLimits): string {
   return `SELECT * FROM (\n${sql.trim().replace(TRAILING_SEMICOLONS, '')}\n) AS slime_query LIMIT ${rowCap + 1}`;
 }
 
+// queryMode 'extended': without parameters pg would use the simple protocol, which runs every statement
+// in the text, so generated SQL could COMMIT the READ ONLY transaction and run more statements after it.
 function timed(text: string, values: unknown[], { timeoutMs }: QueryLimits): TimedQuery {
-  return { text, values, query_timeout: timeoutMs + CLIENT_TIMEOUT_MARGIN_MS };
+  return { text, values, query_timeout: timeoutMs + CLIENT_TIMEOUT_MARGIN_MS, queryMode: 'extended' };
 }
 
 /** Returns true when the rollback failed and the connection must not be reused. */

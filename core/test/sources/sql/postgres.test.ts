@@ -119,6 +119,19 @@ describe('Postgres connector with other credentials (M3)', { skip: !hasDatabase 
     }
   });
 
+  // The connector, not the user's grants, is under test: the writer may write, so only READ ONLY stops it.
+  test('SQL that closes the wrapping subquery cannot run more statements past READ ONLY', async () => {
+    const writer = postgresConnector({ url: WRITER_URL });
+    const escape = (id: number) => `SELECT 1 AS x) AS a; COMMIT; INSERT INTO slime_meta.probe VALUES (${id}, 'gas'); SELECT * FROM (SELECT 1 AS x`;
+    try {
+      assert.equal(await errorCode(writer.run(escape(1), [], LIMITS)), 'QUERY_ERROR');
+      assert.equal(await errorCode(writer.check(escape(2), [], LIMITS)), 'QUERY_ERROR');
+      assert.deepEqual((await writer.run('SELECT count(*) AS n FROM slime_meta.probe', [], LIMITS)).rows, [{ n: 0 }]);
+    } finally {
+      await writer.close();
+    }
+  });
+
   test('describe reads the labels of Postgres enum types (D1)', async () => {
     const writer = postgresConnector({ url: WRITER_URL, schema: 'slime_meta' });
     try {
