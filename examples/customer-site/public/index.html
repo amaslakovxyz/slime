@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Atlas · Customer console</title>
+  <style>
+    :root { --ink: #16181d; --muted: #6b7280; --line: #e5e7eb; --bg: #f7f7f8; --gas: #b45309; --liquid: #1d4ed8; --crystal: #7c3aed; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 15px/1.45 system-ui, -apple-system, sans-serif; color: var(--ink); background: var(--bg); }
+    header { display: flex; align-items: baseline; gap: 12px; padding: 18px 28px; background: #fff; border-bottom: 1px solid var(--line); }
+    header h1 { margin: 0; font-size: 20px; }
+    header .by { margin-left: auto; color: var(--muted); font-size: 13px; }
+    main { display: grid; gap: 20px; padding: 24px 28px; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); }
+    .panel { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+    .panel h2 { margin: 0; font-size: 17px; }
+    .story { margin: 0; color: var(--muted); }
+    .intent { font: 12px/1.4 ui-monospace, monospace; color: var(--muted); background: var(--bg); border-radius: 6px; padding: 6px 8px; }
+    .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    select, button { font: inherit; padding: 5px 10px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+    button { cursor: pointer; }
+    button.primary { background: var(--ink); color: #fff; border-color: var(--ink); }
+    button:disabled { opacity: .5; cursor: wait; }
+    .badges { display: flex; flex-wrap: wrap; gap: 6px; font-size: 12px; }
+    .badge { border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; color: var(--muted); }
+    .tier { color: #fff; border: 0; font-weight: 600; }
+    .tier.gas { background: var(--gas); } .tier.liquid { background: var(--liquid); } .tier.crystal { background: var(--crystal); }
+    .table-wrap { overflow: auto; max-height: 320px; border: 1px solid var(--line); border-radius: 6px; }
+    table { border-collapse: collapse; width: 100%; font-size: 13px; }
+    th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+    th { position: sticky; top: 0; background: #fff; font-weight: 600; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .error { color: #b91c1c; }
+    details pre { white-space: pre-wrap; font-size: 12px; background: var(--bg); padding: 8px; border-radius: 6px; margin: 6px 0 0; }
+    .empty { color: var(--muted); font-size: 13px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Atlas</h1><span class="story">Customer console</span>
+    <span class="by">no backend code: every panel is answered by Slime</span>
+  </header>
+  <main id="panels"></main>
+  <template id="panel">
+    <section class="panel">
+      <h2></h2>
+      <p class="story"></p>
+      <div class="intent"></div>
+      <div class="controls"></div>
+      <div class="badges"></div>
+      <div class="result"><p class="empty">Press Run.</p></div>
+    </section>
+  </template>
+  <script>
+    const ROUTE_LABEL = { query: 'POST /v0/query', crystal: 'Crystal endpoint', 'self-hosted': 'self-hosted multi-source', null: 'not configured' };
+
+    const text = (tag, value, className) => Object.assign(document.createElement(tag), { textContent: value, ...(className ? { className } : {}) });
+
+    function formatCell(name, value, input) {
+      if (value === null || value === undefined) return '—';
+      if (/Cents$/.test(name)) return (value / 100).toLocaleString('en', { style: 'currency', currency: 'EUR' });
+      if (name === 'paidRevenue' && input.currency) return value.toLocaleString('en', { style: 'currency', currency: input.currency });
+      return String(value);
+    }
+
+    function renderTable(rows, input) {
+      if (!rows.length) return text('p', 'No rows.', 'empty');
+      const columns = Object.keys(rows[0]);
+      const table = document.createElement('table');
+      const head = table.createTHead().insertRow();
+      for (const column of columns) head.append(text('th', column));
+      const body = table.createTBody();
+      for (const row of rows) {
+        const tr = body.insertRow();
+        for (const column of columns) tr.append(text('td', formatCell(column, row[column], input), typeof row[column] === 'number' ? 'num' : ''));
+      }
+      const wrap = document.createElement('div');
+      wrap.className = 'table-wrap';
+      wrap.append(table);
+      return wrap;
+    }
+
+    function renderBadges(box, result) {
+      box.replaceChildren();
+      const { meta = {}, route, roundTripMs } = result;
+      if (meta.tier) box.append(text('span', meta.tier, `badge tier ${meta.tier}`));
+      box.append(text('span', ROUTE_LABEL[route] ?? route, 'badge'));
+      if (meta.timingsMs) box.append(text('span', `engine ${meta.timingsMs.total} ms`, 'badge'));
+      box.append(text('span', `round trip ${roundTripMs} ms`, 'badge'));
+      if (meta.timingsMs?.generate) box.append(text('span', `generated in ${meta.timingsMs.generate} ms`, 'badge'));
+      if (meta.review && meta.review !== 'none') box.append(text('span', `review ${meta.review}`, 'badge'));
+      if (meta.steps) box.append(text('span', `sources: ${[...new Set(meta.steps.map((step) => step.source))].join(' + ')}`, 'badge'));
+    }
+
+    function renderCode(meta) {
+      const code = [meta.sql && `-- SQL\n${meta.sql}`, meta.shapeJs && `// shape\n${meta.shapeJs}`].filter(Boolean).join('\n\n');
+      if (!code) return null;
+      const details = document.createElement('details');
+      details.append(text('summary', 'The code that answered'), text('pre', code));
+      return details;
+    }
+
+    async function run(panel, input, view) {
+      const response = await fetch(`/api/panels/${panel.id}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ input }) });
+      const result = await response.json();
+      renderBadges(view.badges, result);
+      if (result.error) {
+        view.result.replaceChildren(text('p', `${result.error.code}: ${result.error.message}`, 'error'));
+        return;
+      }
+      view.result.replaceChildren(...[renderTable(result.data, input), renderCode(result.meta ?? {})].filter(Boolean));
+    }
+
+    function mount(panel) {
+      const node = document.getElementById('panel').content.firstElementChild.cloneNode(true);
+      node.querySelector('h2').textContent = panel.title;
+      node.querySelector('.story').textContent = panel.story;
+      node.querySelector('.intent').textContent = `intent: ${panel.intent}`;
+      const controls = node.querySelector('.controls');
+      const selects = {};
+      for (const [name, { label, options }] of Object.entries(panel.inputs)) {
+        const select = document.createElement('select');
+        select.setAttribute('aria-label', label);
+        for (const option of options) select.append(new Option(option, option));
+        selects[name] = select;
+        controls.append(select);
+      }
+      const view = { badges: node.querySelector('.badges'), result: node.querySelector('.result') };
+      const buttons = [text('button', 'Run', 'primary'), text('button', 'Run ×5')];
+      const input = () => Object.fromEntries(Object.entries(selects).map(([name, select]) => [name, select.value]));
+      const go = async (times) => {
+        buttons.forEach((button) => (button.disabled = true));
+        try {
+          for (let i = 0; i < times; i++) await run(panel, input(), view);
+        } catch (error) {
+          view.result.replaceChildren(text('p', String(error), 'error'));
+        } finally {
+          buttons.forEach((button) => (button.disabled = false));
+        }
+      };
+      buttons[0].onclick = () => go(1);
+      buttons[1].onclick = () => go(5);
+      controls.append(...buttons);
+      view.badges.append(text('span', ROUTE_LABEL[panel.route], 'badge'));
+      document.getElementById('panels').append(node);
+    }
+
+    fetch('/api/panels').then((response) => response.json()).then((panels) => panels.forEach(mount));
+  </script>
+</body>
+</html>

@@ -134,7 +134,7 @@ jobs:
             package-lock.json
             examples/multi-source/package-lock.json
       - run: psql "postgres://slime_admin:slime_admin@localhost:54329/slime" -v ON_ERROR_STOP=1 -f examples/express/db/init.sql
-      # Runs on the packed tarball, as an app installing the package would; Notion and the films API are replayed from fixtures.
+      # Runs on the packed tarball, as an app installing the package would; Notion and the two public APIs are replayed from fixtures.
       - run: npm ci
       - run: npm pack -w @slime-cloud/core --pack-destination "$RUNNER_TEMP"
       - run: npm ci
@@ -145,6 +145,24 @@ jobs:
         working-directory: examples/multi-source
         env:
           REQUIRE_DB: "1"
+
+  example-customer-site:
+    name: Customer site example
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: examples/customer-site
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: examples/customer-site/package-lock.json
+      # A fake Slime stands in for the upstreams: no network, no keys.
+      - run: npm ci
+      - run: npm test
 
   runtime:
     name: Slime Cloud runtime
