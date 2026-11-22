@@ -26,7 +26,7 @@ export function sourceProblems(options: SourceOptions): string[] {
   return [...namedSourceProblems(sources), ...sourceCountProblems(sources), ...generatorProblems(sources, options.generator)];
 }
 
-export function isApiSourceShape(source: unknown): boolean {
+function isApiSourceShape(source: unknown): boolean {
   return typeof source === 'object' && source !== null && (source as { kind?: unknown }).kind === 'api';
 }
 

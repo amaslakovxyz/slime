@@ -40,6 +40,7 @@ export function postgresConnector(options: PostgresConnectorOptions): Connector 
 }
 
 class PostgresConnector implements Connector {
+  readonly kind = 'sql';
   readonly name = 'postgres';
   readonly #pool: pg.Pool;
   readonly #schema: string;

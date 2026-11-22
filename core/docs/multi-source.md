@@ -204,8 +204,8 @@ new SlimeConfig({
 
 - `connector: x` stays valid and means `sources: { db: x }` (G6).
 - **Two kinds of source.**
-  - `sql`: today's `Connector`. Its `kind` is optional and defaults to `'sql'`,
-    so existing custom connectors compile unchanged.
+  - `sql`: today's `Connector`, with `kind: 'sql'`. (It was optional at first,
+    for custom connectors; required since the package has no outside users.)
   - `api`: a new port.
 - **Proposed API source port.** It reuses `ColumnInfo`, `RunResult` and
   `SafetyReport` from `connectors/types.ts`:

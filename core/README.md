@@ -108,8 +108,7 @@ const slime = await createSlime(new SlimeConfig({
 - `bench/`: `npm run bench`. `cases.mjs` holds 8 cases with reference
   queries; `run.mjs` runs them through the built package against the demo
   database, with Groq, Claude (given an API key), or the example's offline
-  handlers. [protocol-cases.md](./bench/protocol-cases.md) records the dropped
-  structured protocol and 35 request cases kept as benchmark material.
+  handlers.
 - `test/`: `node:test` suites run through `tsx`, mirroring `src/`;
   `test/support/` holds the database helpers.
 - `docs/`: [request-format.md](./docs/request-format.md) is the request

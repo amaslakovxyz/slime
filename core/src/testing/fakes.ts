@@ -22,6 +22,7 @@ export interface ScriptedConnector extends Connector {
 export function fakeConnector({ rows = [], cost = 1, truncated = false, isSafe = true }: ConnectorScript = {}): ScriptedConnector {
   let runCount = 0;
   return {
+    kind: 'sql',
     name: 'fake',
     get runCount() {
       return runCount;

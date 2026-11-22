@@ -8,14 +8,12 @@ dependency `@anthropic-ai/sdk`.
 
 - `claude-client.ts`: `claudeClient`, the `ModelClient` (`../model-client.ts`)
   for Claude, in `'native'` output mode.
-- `index.ts`: `claudeGenerator`, `claudeReviewer` and `claudeOptimizer`,
-  built by `modelRoles` (`../roles.ts`).
+- `index.ts`: `claude = providerRoles(claudeClient)` (`../roles.ts`).
 
 ## Interface
 
 - `claude.generator({ apiKey, model, effort?, maxRetries? })`,
-  `claude.reviewer({ ... })` and `claude.optimizer({ ... })` (also exported
-  as `claudeGenerator`, `claudeReviewer`, `claudeOptimizer`). The optimizer
+  `claude.reviewer({ ... })` and `claude.optimizer({ ... })`. The optimizer
   sends no dictionary: it sees only code. The plan's example uses
   `claude-haiku-5-5` to generate and `claude-opus-5-5` to review.
 

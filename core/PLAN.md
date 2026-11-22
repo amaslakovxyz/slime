@@ -136,11 +136,11 @@ key, so Slime generates again, and the old handler stays until it expires
 
 A structured protocol (`from`, `where` with operators, `groupBy`, paths) was
 designed and dropped on 2026-11-20. It turned the request into a query
-language to learn. In the 35 cases analysed in
-[bench/protocol-cases.md](bench/protocol-cases.md), 5 needed new operators and
+language to learn. In the 35 cases analysed
+(`bench/protocol-cases.md`, removed; in git history), 5 needed new operators and
 grouping was the weak spot, while the ambiguous cases (#18, #19, #23) were
-about what a term means, which structure doesn't fix. The protocol is in this
-file's git history, and the cases stay as benchmark material.
+about what a term means, which structure doesn't fix. The protocol and the
+cases are in git history.
 
 ### 4.1 Fields
 
@@ -382,7 +382,7 @@ core/
 ├── package.json          # @slime-cloud/core, "exports" per subpath, peerDeps optional
 ├── tsconfig.json         # typecheck only (noEmit)
 ├── tsconfig.build.json   # build → dist/, declarations on
-├── bench/                # run.mjs + cases.mjs (npm run bench), protocol-cases.md
+├── bench/                # run.mjs + cases.mjs (npm run bench)
 ├── scripts/
 │   └── check-pack.mjs    # what npm pack would ship (derived from exports and bin)
 ├── docs/                 # request-format.md

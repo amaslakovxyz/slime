@@ -40,8 +40,24 @@ const MULTI_SOURCE_GENERATION: RolePrompt = { instructions: MULTI_SOURCE_GENERAT
 const MULTI_SOURCE_REVIEW: RolePrompt = { instructions: MULTI_SOURCE_REVIEW_INSTRUCTIONS, jsonFormat: REVIEW_JSON_FORMAT };
 const PART_SEPARATOR = '\n\n';
 
+/** A provider's public entry: each role built from the same client options. */
+export interface ProviderRoles<Options> {
+  generator(options: Options): Generator;
+  reviewer(options: Options): Reviewer;
+  optimizer(options: Options): Optimizer;
+}
+
 export function modelRoles(client: ModelClient): ModelRoles {
   return Object.freeze({ generator: generatorFor(client), reviewer: reviewerFor(client), optimizer: optimizerFor(client) });
+}
+
+/** The only provider-specific part is the client; prompts, schemas and roles are shared. */
+export function providerRoles<Options>(clientFor: (options: Options) => ModelClient): ProviderRoles<Options> {
+  return Object.freeze({
+    generator: (options: Options) => modelRoles(clientFor(options)).generator,
+    reviewer: (options: Options) => modelRoles(clientFor(options)).reviewer,
+    optimizer: (options: Options) => modelRoles(clientFor(options)).optimizer,
+  });
 }
 
 function generatorFor(client: ModelClient): Generator {

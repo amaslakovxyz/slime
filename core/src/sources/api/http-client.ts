@@ -7,7 +7,7 @@ import { readCapped } from './read-capped.js';
 import { fetchWithDeadline, type FetchFunction } from './retry.js';
 import { buildUrl, isSameOrigin, type QueryValue } from './safe-url.js';
 
-export const MAX_RESPONSE_BYTES = 10 * 1024 * 1024;
+const MAX_RESPONSE_BYTES = 10 * 1024 * 1024;
 const MAX_REDIRECTS = 3;
 const FIRST_REDIRECT = 300;
 const FIRST_NON_REDIRECT = 400;

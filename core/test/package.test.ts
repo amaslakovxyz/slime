@@ -48,12 +48,12 @@ test('adapters have their own subpaths, so the main entry never loads them (C7)'
   for (const provider of ['claude', 'groq'] as const) {
     assert.deepEqual(pkg.exports[`./${provider}`], { types: `./dist/models/${provider}/index.d.ts`, default: `./dist/models/${provider}/index.js` });
   }
-  assert.deepEqual(Object.keys(await import('../src/models/claude/index.js')).sort(), ['claude', 'claudeGenerator', 'claudeOptimizer', 'claudeReviewer']);
-  assert.deepEqual(Object.keys(await import('../src/models/groq/index.js')).sort(), ['groq', 'groqGenerator', 'groqOptimizer', 'groqReviewer']);
+  assert.deepEqual(Object.keys(await import('../src/models/claude/index.js')).sort(), ['claude']);
+  assert.deepEqual(Object.keys(await import('../src/models/groq/index.js')).sort(), ['groq']);
   assert.deepEqual(pkg.exports['./notion'], { types: './dist/sources/notion/index.d.ts', default: './dist/sources/notion/index.js' });
   assert.deepEqual(Object.keys(await import('../src/sources/notion/index.js')).sort(), ['NOTION_VERSION', 'notionSource']);
   assert.deepEqual(pkg.exports['./models'], { types: './dist/models/index.d.ts', default: './dist/models/index.js' });
-  assert.deepEqual(Object.keys(await import('../src/models/index.js')).sort(), ['modelRoles', 'parseJsonReply']);
+  assert.deepEqual(Object.keys(await import('../src/models/index.js')).sort(), ['modelRoles', 'parseJsonReply', 'providerRoles']);
   assert.deepEqual(pkg.exports['./crystallize'], { types: './dist/crystallize/index.d.ts', default: './dist/crystallize/index.js' });
   assert.deepEqual(pkg.exports['./testing'], { types: './dist/testing/index.d.ts', default: './dist/testing/index.js' });
   assert.deepEqual(Object.keys(await import('../src/testing/index.js')).sort(), [

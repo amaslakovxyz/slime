@@ -24,7 +24,7 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 // A zone is required, so a value never depends on the server's zone.
 const DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/;
 
-export const LEAF_TYPES = Object.freeze(['string', 'number', 'integer', 'boolean', 'date', 'datetime'] as const);
+const LEAF_TYPES = Object.freeze(['string', 'number', 'integer', 'boolean', 'date', 'datetime'] as const);
 export type LeafType = (typeof LEAF_TYPES)[number];
 
 const LEAF_CHECKS: Readonly<Record<LeafType, (value: unknown) => boolean>> = {
