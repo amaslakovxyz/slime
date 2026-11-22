@@ -7,6 +7,7 @@ Project-wide docs. Code-local docs live next to their code and are listed at the
 | [product/concepts_brief.md](product/concepts_brief.md) | Current | Konstantin | Slime v0 tech stack, scope and benchmark results. |
 | [product/2026-11-21-agent-integrations-research.md](product/2026-11-21-agent-integrations-research.md) | Record | @Tony | Slime for coding agents: research record behind the unified frame (federation, Linear/Notion limits, N+1, "no customer data"). |
 | [product/product_frame_v0_2.md](product/product_frame_v0_2.md) | Design | @Tony | Unified product frame (slime-client / slime-cloud): merged decisions from both 2026-11-21 research tracks, demo vertical, risks. |
+| [product/customer-demo-use-cases.md](product/customer-demo-use-cases.md) | Current | @Tony | Customer demo: three use cases from the customer's coding agent (Cloud endpoint, Crystal, self-hosted multi-source), fast-value table, demo script, measured run. |
 | [product/slime_runtime_master_spec.md](product/slime_runtime_master_spec.md) | Vision | — | Pitch and target architecture (V8/Wasm, Redis, connectors). Conflicts in places with the dev spec. |
 | [architecture/architecture-spec.md](architecture/architecture-spec.md), [architecture/architecture.excalidraw](architecture/architecture.excalidraw) | Design | @Tony | Bun/intents/Gatekeeper dev spec and its diagram. Implemented only on unmerged `feat/shop-bench`, `chore/gas-v0-plan`. The engine on main is `core/`. |
 | [architecture/slime-cloud.html](architecture/slime-cloud.html) | Superseded | @Tony | Slime Cloud admin + per-endpoint Lambda provisioner (removed): topology, lifecycle, data model, IAM, pricing. Superseded by the cloud MVP design below. Open in a browser. |
@@ -24,6 +25,7 @@ Project-wide docs. Code-local docs live next to their code and are listed at the
 - [../core/docs/multi-source.md](../core/docs/multi-source.md) (Current, multi-source handlers: Postgres + Notion + REST APIs; built, live Notion run pending)
 - [../core/docs/multi-source-implementation.md](../core/docs/multi-source-implementation.md) (Plan, step-by-step implementation of multi-source handlers; P0–P6 done except P5.5 and P6.5)
 - [../examples/multi-source/README.md](../examples/multi-source/README.md) (Current, multi-source example)
+- [../examples/customer-site/README.md](../examples/customer-site/README.md) (Current, customer demo site)
 - [../examples/express/README.md](../examples/express/README.md) (Current, example app and demo database)
 - [../platform/runtime/README.md](../platform/runtime/README.md) (Current)
 - [../platform/infra/README.md](../platform/infra/README.md) and [../platform/infra/FINOPS.md](../platform/infra/FINOPS.md) (Current)
