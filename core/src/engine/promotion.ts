@@ -14,6 +14,7 @@ export interface PromotionDeps {
   background: BackgroundTasks;
   gasToLiquidRuns: number;
   fixturesPerHandler: number;
+  crystalReadyRuns: number;
   /** Undefined when no reviewer is configured: handlers are then promoted after their runs alone. */
   review: ((record: HandlerRecord) => Promise<ReviewOutcome>) | undefined;
   emit: (event: SlimeEvent) => void;
@@ -24,6 +25,8 @@ export class HandlerPromotion {
   readonly #deps: PromotionDeps;
   // One review at a time: reviews are background work and share the generation limits.
   #reviewQueue: Promise<void> = Promise.resolve();
+  // crystalReady is said once per handler and instance; acting on it is the host's call.
+  readonly #announced = new Set<string>();
 
   constructor(deps: PromotionDeps) {
     this.#deps = deps;
@@ -39,6 +42,7 @@ export class HandlerPromotion {
   }
 
   afterRun(record: HandlerRecord): void {
+    this.#announceIfReady(record);
     if (record.tier !== 'gas' || record.runs < this.#deps.gasToLiquidRuns) return;
     const { review } = this.#deps;
     if (!review) return this.#promote(record);
@@ -64,7 +68,16 @@ export class HandlerPromotion {
     record.tier = 'liquid';
     this.#deps.cache.keep(record.key);
     this.#deps.emit({ type: 'promoted', handlerKey: record.key, tier: 'liquid' });
+    this.#announceIfReady(record);
     const saved = structuredClone(record);
     this.#deps.background.run(() => this.#deps.store.put(HANDLERS_NS, record.key, saved));
+  }
+
+  // The same readiness the crystallize job checks: Liquid, enough runs, and a review that passed or never ran.
+  #announceIfReady(record: HandlerRecord): void {
+    const hasPassedReview = record.review === 'approved' || record.review === 'none';
+    if (record.tier !== 'liquid' || !hasPassedReview || record.runs < this.#deps.crystalReadyRuns || this.#announced.has(record.key)) return;
+    this.#announced.add(record.key);
+    this.#deps.emit({ type: 'crystalReady', handlerKey: record.key, runs: record.runs });
   }
 }

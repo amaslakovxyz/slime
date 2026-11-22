@@ -81,7 +81,9 @@ classes and functions here are internal.
 - **`meta`.** `meta.sql`, `shapeJs`, `assumptions` and `steps` show the code
   that answered (R9). Literals in the intent become `meta.warnings` (R7).
 - **Events.** `onEvent` gets `generated` for each generation and revision,
-  `reviewed` for each review, `promoted` for each promotion, and `error` for
+  `reviewed` for each review, `promoted` for each promotion, `crystalReady`
+  once per handler when a Liquid handler with an approved (or no) review
+  reaches `tiers.crystalReadyRuns` (the crystallize job's own readiness), and `error` for
   each failed query or background task.
 - **Promotion (M4 rule).** After `gasToLiquidRuns` successful runs, a Gas
   handler is reviewed (one review at a time) and, once approved, promoted to

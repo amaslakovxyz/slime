@@ -115,3 +115,31 @@ describe('after a restart (R8)', () => {
     assert.deepEqual([meta.tier, meta.cache, generator.calls], ['liquid', 'hit', 0]);
   });
 });
+
+describe('ready to crystallize (crystalReady)', () => {
+  const readyEvents = (events: SlimeEvent[]) => events.filter((event) => event.type === 'crystalReady');
+
+  test('is emitted once, when a Liquid handler reaches crystalReadyRuns', async () => {
+    const { slime, events } = await startSlime({ generator: stubGenerator(firstThenRevised), tiers: { crystalReadyRuns: 5 } });
+    const metas = await runAndFlush(slime, 4);
+    assert.deepEqual(readyEvents(events), []);
+    await runAndFlush(slime, 3);
+    assert.deepEqual(readyEvents(events), [{ type: 'crystalReady', handlerKey: metas[0]!.handlerKey, runs: 5 }]);
+  });
+
+  test('with a threshold at or below promotion, it follows the promotion', async () => {
+    const { slime, events } = await startSlime({ generator: stubGenerator(firstThenRevised), tiers: { crystalReadyRuns: 1 } });
+    await runAndFlush(slime);
+    assert.deepEqual(eventTypes(events), ['generated', 'promoted', 'crystalReady']);
+  });
+
+  test('waits for an approved review; a rejected handler is never ready', async () => {
+    const approved = await startSlime({ generator: stubGenerator(firstThenRevised), reviewer: stubReviewer(['approve']), tiers: { crystalReadyRuns: 3 } });
+    await runAndFlush(approved.slime);
+    assert.deepEqual(eventTypes(approved.events), ['generated', 'reviewed', 'promoted', 'crystalReady']);
+
+    const rejected = await startSlime({ generator: stubGenerator(firstThenRevised), reviewer: stubReviewer(['reject']), tiers: { crystalReadyRuns: 3, maxReviews: 1 } });
+    await runAndFlush(rejected.slime, 6);
+    assert.deepEqual(readyEvents(rejected.events), []);
+  });
+});

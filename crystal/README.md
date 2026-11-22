@@ -34,8 +34,9 @@ await crystallizer.run({ keys });      // only these request keys
 await crystallizer.verify();           // the folder against this instance's database
 ```
 
-It uses the instance's connector, store, sandbox, limits and provenance, and
-its **live** run counts: after promotion a handler's runs and fixtures grow in
+It uses the instance's connector, store, sandbox, limits and provenance, its
+`tiers.crystalReadyRuns` as the default `minRuns` (the threshold of core's
+`crystalReady` event, so the event and the job agree), and its **live** run counts: after promotion a handler's runs and fixtures grow in
 memory only, so a job that reads the store alone sees too few runs. The
 standalone `crystallize({ connector, store, dir })` is for hosts that keep the
 store's counts current themselves (Slime Cloud syncs them).

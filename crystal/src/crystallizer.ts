@@ -11,7 +11,7 @@ export interface CrystallizerOptions {
   dir: string;
   /** Omit to move Liquid code over unchanged, if it passes the allowlist. */
   optimizer?: Optimizer;
-  /** Successful runs a Liquid handler needs before it is crystallized. */
+  /** Successful runs a Liquid handler needs before it is crystallized; defaults to the instance's tiers.crystalReadyRuns, the threshold of its crystalReady event. */
   minRuns?: number;
   optimizeTimeoutMs?: number;
 }
@@ -49,7 +49,7 @@ export class Crystallizer {
       limits,
       provenance: this.#slime.provenance(),
       ...(optimizer ? { optimizer } : {}),
-      ...(minRuns === undefined ? {} : { minRuns }),
+      minRuns: minRuns ?? internals.tiers.crystalReadyRuns,
       ...(optimizeTimeoutMs === undefined ? {} : { optimizeTimeoutMs }),
       ...(keys ? { keys } : {}),
       ...(isDryRun ? { isDryRun } : {}),

@@ -69,6 +69,7 @@ export class SlimeEngine implements Slime {
       background: this.#background,
       gasToLiquidRuns: config.tiers.gasToLiquidRuns,
       fixturesPerHandler: config.tiers.fixturesPerHandler,
+      crystalReadyRuns: config.tiers.crystalReadyRuns,
       review: this.#reviewFunction(),
       emit: (event) => this.#emit(event),
     });

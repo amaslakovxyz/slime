@@ -33,7 +33,7 @@ there.
   - `tiers?: Partial<TierOptions>` and `limits?: Partial<LimitOptions>`;
   - `onEvent?: (event: SlimeEvent) => void`.
 - `DEFAULT_TIERS`, frozen:
-  `{ gasToLiquidRuns: 3, gasWindowMs: 3600000, maxReviews: 2, fixturesPerHandler: 5 }`.
+  `{ gasToLiquidRuns: 3, gasWindowMs: 3600000, maxReviews: 2, fixturesPerHandler: 5, crystalReadyRuns: 10 }`.
 - `DEFAULT_LIMITS`, frozen:
   `{ maxRepairs: 1, generationBudgetMs: 25000, reviewTimeoutMs: 60000, maxConcurrentGenerations: 2, maxGenerationsPerHour: 200, statementTimeoutMs: 2000, rowCap: 1000, maxQueryCost: 1000000, shapeTimeoutMs: 200, shapeMemoryBytes: 33554432 }`.
 - `CrystalRegistry` is `Readonly<Record<string, unknown>>` for now; its

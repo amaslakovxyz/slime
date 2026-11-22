@@ -18,6 +18,7 @@ export {
   type ErrorEvent,
   type GeneratedEvent,
   type LimitOptions,
+  type CrystalReadyEvent,
   type PromotedEvent,
   type ReviewedEvent,
   type SlimeEvent,

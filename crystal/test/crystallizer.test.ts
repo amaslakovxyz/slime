@@ -68,6 +68,16 @@ describe('Crystallizer', () => {
     assert.ok(reports.every(({ reasons }) => /10 of 11 successful runs/.test(reasons.join())));
   });
 
+  test('waits for the instance\'s crystalReadyRuns by default, the threshold of its crystalReady event', async () => {
+    const store = memoryStore();
+    const generator = stubGenerator(() => artifact('SELECT name, cents FROM accounts WHERE ($1::text IS NULL OR country = $1::text)', ['country'], SHAPE));
+    const slime = await createSlime(new SlimeConfig({ connector: fakeConnector({ rows: ROWS }), store, generator, tiers: { gasToLiquidRuns: 2, crystalReadyRuns: 4 } }));
+    instances.push(slime);
+    for (const country of COUNTRIES.slice(0, 4)) await slime.query({ ...EUROS, input: { country } });
+    const reports = await new Crystallizer(slime, { dir: await crystalDir() }).run({ isDryRun: true });
+    assert.deepEqual(reports.map(({ outcome }) => outcome), ['crystallized']);
+  });
+
   test('refuses anything that is not an engine', () => {
     assert.throws(() => new Crystallizer({} as Slime, { dir: '.' }), /not a Slime instance made by createSlime\(\)/);
   });
