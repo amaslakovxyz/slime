@@ -8,7 +8,8 @@ import { SlimeConfig, createSlime, handlerKeyFor, memoryStore, type Slime } from
 import { artifact, fakeConnector, stubGenerator } from '@slime-cloud/core/testing';
 import { Crystallizer } from '../src/crystallizer.js';
 import { crystallize } from '../src/crystallize.js';
-import { readManifest } from '../src/manifest.js';
+import { readManifest, renderManifest } from '../src/manifest.js';
+import { writeFile } from 'node:fs/promises';
 
 const ROWS = [{ name: 'Acme', cents: 1250 }];
 const EUROS = { intent: 'accounts in a country with their balance in euros', output: [{ name: 'string', euros: 'number' }] };
@@ -76,6 +77,25 @@ describe('Crystallizer', () => {
     for (const country of COUNTRIES.slice(0, 4)) await slime.query({ ...EUROS, input: { country } });
     const reports = await new Crystallizer(slime, { dir: await crystalDir() }).run({ isDryRun: true });
     assert.deepEqual(reports.map(({ outcome }) => outcome), ['crystallized']);
+  });
+
+  test('prune deletes the Liquid handlers whose Crystal is older than the cutoff', async () => {
+    const { slime, store } = await grownSlime();
+    const dir = await crystalDir();
+    const crystallizer = new Crystallizer(slime, { dir });
+    await crystallizer.run();
+    assert.deepEqual(await crystallizer.prune(), [], 'fresh Crystal keeps its Liquid handler');
+
+    const manifest = await readManifest(dir);
+    const [oldKey, newKey] = Object.keys(manifest.entries);
+    manifest.entries[oldKey!]!.createdAt = new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString();
+    await writeFile(join(dir, 'manifest.json'), renderManifest(manifest));
+    assert.deepEqual(await crystallizer.prune({ isDryRun: true }), [oldKey]);
+    assert.ok(await store.get('handlers', oldKey!), 'a dry run deletes nothing');
+    assert.deepEqual(await crystallizer.prune(), [oldKey]);
+    assert.equal(await store.get('handlers', oldKey!), undefined);
+    assert.ok(await store.get('handlers', newKey!));
+    assert.deepEqual(await crystallizer.prune({ olderThanDays: 0 }), [newKey]);
   });
 
   test('refuses anything that is not an engine', () => {

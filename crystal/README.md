@@ -32,6 +32,7 @@ const crystallizer = new Crystallizer(slime, { dir: './slime-crystal' });
 await crystallizer.run();              // ready Liquid handlers → Crystal; equivalence checked before writing
 await crystallizer.run({ keys });      // only these request keys
 await crystallizer.verify();           // the folder against this instance's database
+await crystallizer.prune();            // delete Liquid handlers whose Crystal is 14+ days old
 ```
 
 It uses the instance's connector, store, sandbox, limits and provenance, its
@@ -40,6 +41,11 @@ It uses the instance's connector, store, sandbox, limits and provenance, its
 memory only, so a job that reads the store alone sees too few runs. The
 standalone `crystallize({ connector, store, dir })` is for hosts that keep the
 store's counts current themselves (Slime Cloud syncs them).
+
+While a Crystal is in the folder it answers first; its Liquid handler stays in
+the store as the fallback core uses when the Crystal stops fitting the data
+(a migration). `prune({ olderThanDays = 14, isDryRun })` deletes it once the
+Crystal has been in place that long, through `slime.evict`.
 
 Source layout (`src/`):
 

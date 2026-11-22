@@ -4,6 +4,7 @@ import { HANDLERS_NS, slimeInternals, type SlimeInternals } from '@slime-cloud/c
 import type { HandlerRecord, Optimizer, Slime, SlimeStore, StoreEntry } from '@slime-cloud/core';
 import { checkCrystalFolder } from './check.js';
 import { crystallize, type CrystalReport } from './crystallize.js';
+import { readManifest } from './manifest.js';
 import { verifyCrystalFolder } from './verify.js';
 
 export interface CrystallizerOptions {
@@ -23,7 +24,17 @@ export interface CrystallizeRun {
   isDryRun?: boolean;
 }
 
+export interface PruneOptions {
+  /** How long a Crystal must have existed before its Liquid handler goes. */
+  olderThanDays?: number;
+  /** List what would go, delete nothing. */
+  isDryRun?: boolean;
+}
+
 const READ_ONLY_VIEW = 'the crystallize job only reads the store';
+// Long enough for a broken Crystal to show up while its Liquid handler can still answer instead.
+export const DEFAULT_PRUNE_DAYS = 14;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export class Crystallizer {
   readonly #slime: Slime;
@@ -54,6 +65,23 @@ export class Crystallizer {
       ...(keys ? { keys } : {}),
       ...(isDryRun ? { isDryRun } : {}),
     });
+  }
+
+  /**
+   * Deletes Liquid handlers that have been Crystal for olderThanDays (from memory and the
+   * store, through slime.evict). While a Crystal is in the folder it answers first, so its
+   * Liquid handler only matters as the fallback when the Crystal stops fitting the data.
+   * Returns the keys it deleted (or would delete).
+   */
+  async prune({ olderThanDays = DEFAULT_PRUNE_DAYS, isDryRun = false }: PruneOptions = {}): Promise<string[]> {
+    const { entries } = await readManifest(this.#options.dir);
+    const cutoff = Date.now() - olderThanDays * DAY_MS;
+    const saved = new Set((await slimeInternals(this.#slime).store.list(HANDLERS_NS)).map(({ key }) => key));
+    const keys = Object.entries(entries)
+      .filter(([key, entry]) => saved.has(key) && Date.parse(entry.createdAt) <= cutoff)
+      .map(([key]) => key);
+    if (!isDryRun) for (const key of keys) await this.#slime.evict(key);
+    return keys;
   }
 
   /** The folder's problems without a database; empty means it passes. */

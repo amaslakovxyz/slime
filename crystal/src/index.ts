@@ -7,7 +7,7 @@ export { pinCrystalFolder } from './pin.js';
 export { COST_TOLERANCE, verifyCrystalFolder, type VerifyOptions } from './verify.js';
 export { parseCases, type CrystalCases } from './cases.js';
 export { CrystalCodeError, checkShapeSource } from './allowlist.js';
-export { Crystallizer, type CrystallizeRun, type CrystallizerOptions } from './crystallizer.js';
+export { Crystallizer, DEFAULT_PRUNE_DAYS, type CrystallizeRun, type CrystallizerOptions, type PruneOptions } from './crystallizer.js';
 export { DEFAULT_MIN_RUNS, crystallize, type CrystalOutcome, type CrystalReport, type CrystallizeOptions } from './crystallize.js';
 export { MANIFEST_FILE, moduleFileFor, parseManifest, readManifest, type Manifest, type ManifestEntry } from './manifest.js';
 export { parseModule, type CrystalCode } from './module-format.js';
