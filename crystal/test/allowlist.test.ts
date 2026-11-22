@@ -1,8 +1,8 @@
 // The allowlist Crystal code must pass to run in the app's process with no sandbox (C10).
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { CrystalCodeError, checkShapeSource } from '../../src/crystallize/allowlist.js';
-import { parseModule, renderModule } from '../../src/crystallize/module-format.js';
+import { CrystalCodeError, checkShapeSource } from '../src/allowlist.js';
+import { parseModule, renderModule } from '../src/module-format.js';
 
 const accepts = (body: string) => checkShapeSource(`function shape(rows, input) { ${body} }`);
 const refuses = (body: string, why: RegExp) =>

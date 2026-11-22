@@ -3,10 +3,10 @@
 ## Overview
 
 Serving Crystal handlers (PLAN.md C10, M5). Crystal handlers are modules
-written by the crystallize job (`../../crystallize/`). An app imports the
+written by the crystallize job (`@slime-cloud/crystal`). An app imports the
 generated `index.mjs` and passes its `crystals` as `crystal` in `SlimeConfig`;
 its shapes are functions. A host that stores the modules elsewhere (Slime
-Cloud: S3) parses them with `parseModule` from `@slime-cloud/core/crystallize`
+Cloud: S3) parses them with `parseModule` from `@slime-cloud/crystal`
 and passes handlers whose shapes are the source strings.
 
 - The types (`CrystalHandler`, `CrystalRegistry`, `ShapeFunction`) are in
@@ -39,7 +39,7 @@ and passes handlers whose shapes are the source strings.
   imported or evaluated in the host's process.
 - **Another schema is reported once.** A handler made against another schema
   is served as it is, and `createSlime()` emits one warning.
-- **Never imports the job.** This folder never imports `../../crystallize/`, so a
+- **Never imports the job.** Core never imports `@slime-cloud/crystal`, so a
   serving process never loads `acorn`.
 
 ## Side Effects

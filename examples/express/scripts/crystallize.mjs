@@ -1,7 +1,7 @@
 // Turns the Liquid handlers Slime saved in .slime/ into Crystal modules in
 // slime-crystal/, with the same config the server uses. Commit the folder; CI runs
 // `npm run check:crystal`, and the server serves it from then on (C10).
-import { crystallize } from '@slime-cloud/core/crystallize';
+import { crystallize } from '@slime-cloud/crystal';
 import { databaseFromEnv } from '../src/config.mjs';
 
 const CRYSTAL_DIR = new URL('../slime-crystal', import.meta.url).pathname;

@@ -4,10 +4,9 @@
 // `slime-crystal verify` still compares the edit with the original Liquid handler.
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { assertReadOnlySql } from '../artifact/checks/sql.js';
-import { sha256 } from '../shared/hash.js';
 import { readManifest, writeManifestAndIndex } from './manifest.js';
 import { parseModule } from './module-format.js';
+import { assertReadOnlySql, sha256 } from '@slime-cloud/core/tooling';
 
 /** The keys whose module it re-pinned; throws, pinning nothing, when a changed module fails a check. */
 export async function pinCrystalFolder(dir: string): Promise<string[]> {

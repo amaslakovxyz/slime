@@ -125,7 +125,7 @@ Key facts about core today (main @ 441c84b):
 | Generation | Generate, lint, `check` (cost), run; on failure the error text goes back to the model for repair | `core/src/engine/generation/generate.ts` |
 | Sandbox | QuickJS (WASM) in worker threads; JSON in, JSON out; no `process`, `require` or `fetch` (tested) | `core/src/sandbox/quickjs/*`, `core/test/sandbox/quickjs.test.ts` |
 | Lifecycle | Gas → liquid after `gasToLiquidRuns` successful runs, plus an approved review if a reviewer is set. Knows nothing about sources. | `core/src/engine/promotion.ts` |
-| Crystal | A liquid handler rewritten into a JS module committed to the app: `sql` + in-process `shape`. Checked by an allowlist, SQL lint and an equivalence test that replays recorded inputs and compares results with the original. | `core/src/engine/crystal/*`, `core/src/crystallize/*` |
+| Crystal | A liquid handler rewritten into a JS module committed to the app: `sql` + in-process `shape`. Checked by an allowlist, SQL lint and an equivalence test that replays recorded inputs and compares results with the original. | `core/src/engine/crystal/*`, `crystal/src/*` |
 
 **How handlers are found and refreshed.** The request key hashes only the
 normalized intent, the input names and the output shape. Each stored handler
@@ -771,7 +771,7 @@ known so far.
 | Execution | Parallel steps, deadline, abort on any failure, input type check per run, truncation rule, `meta.steps`, `shape(data, input)` | `core/src/engine/execution/execute.ts`, `generate.ts`, `slime-engine.ts` (split), `meta.ts`, `events.ts` |
 | Sandbox | The first `shape` argument may be an object of step rows; API rows checked for plain JSON | `core/src/sandbox/types.ts`, `core/src/sandbox/quickjs/quickjs-runner.ts` |
 | Models | Generation and review prompts for steps (in a new file); JSON reply format and schema; offline generator accepts v2 | `core/src/models/prompts-multi-source.ts`, `roles.ts`, `schemas.ts`, `offline/` |
-| Crystal | Skip handlers with API steps, with a `skipped` outcome | `core/src/crystallize/crystallize.ts` |
+| Crystal | Skip handlers with API steps, with a `skipped` outcome | `crystal/src/crystallize.ts` |
 | HTTP | New deadline retry helper; constrained client. `groq-client.ts` is not touched. | `core/src/sources/api/*` |
 | Adapters | `defineApiSource`; `notion/` subpath and its export | `core/src/sources/api/*`, `core/src/sources/api/notion/*`, `core/package.json` |
 | Testing | `fakeApiSource`, `apiSourceContract`, fixture stub, fixtures | `core/src/testing/*`, `core/test/**`, `core/test/package.test.ts` (new export) |

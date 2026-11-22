@@ -1,26 +1,14 @@
 // The crystallize job: turns proven Liquid handlers into Crystal modules in the
 // app's own code (C10). The app runs it from its own script with its own config.
-import { asSingleQuery, type SingleQuery } from '../artifact/artifact.js';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { DEFAULT_LIMITS } from '../config/defaults.js';
-import type { LimitOptions } from '../config/options.js';
-import { SQL_SOURCE_DEFAULT_NAME } from '../config/source-rules.js';
-import { HANDLERS_NS, recordFromStore } from '../handler/record.js';
-import type { HandlerRecord } from '../handler/record.js';
-import { changedProvenance, type HandlerProvenance } from '../request/key.js';
-import { paramTypesForModel } from '../request/params.js';
-import type { Connector } from '../sources/sql/types.js';
-import type { Optimizer } from '../models/types.js';
-import { QuickJSRunner } from '../sandbox/quickjs/quickjs-runner.js';
-import type { SandboxRunner } from '../sandbox/types.js';
-import type { SlimeStore } from '../stores/types.js';
 import { verifyCandidate, type EquivalenceDeps } from './equivalence.js';
-import { sha256 } from '../shared/hash.js';
 import { moduleFileFor, readManifest, writeManifestAndIndex, type Manifest } from './manifest.js';
 import type { CrystalCode } from './module-format.js';
 import { serviceNameFor, serviceNames } from './services.js';
 import { casesFileFor, renderCases } from './cases.js';
+import { HANDLERS_NS, SQL_SOURCE_DEFAULT_NAME, asSingleQuery, paramTypesForModel, recordFromStore, sha256, type SingleQuery } from '@slime-cloud/core/tooling';
+import { DEFAULT_LIMITS, QuickJSRunner, changedProvenance, type Connector, type HandlerProvenance, type HandlerRecord, type LimitOptions, type Optimizer, type SandboxRunner, type SlimeStore } from '@slime-cloud/core';
 
 export interface CrystallizeOptions {
   /** A read-only connector: the equivalence test runs both versions against the database. */

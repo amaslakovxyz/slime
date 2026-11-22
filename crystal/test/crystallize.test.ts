@@ -7,20 +7,11 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { after, describe, test } from 'node:test';
-import { SlimeConfig } from '../../src/config/slime-config.js';
-import { createSlime } from '../../src/create-slime.js';
-import type { CrystalRegistry } from '../../src/handler/crystal.js';
-import { SERVICES_FILE, checkCrystalFolder, crystallize, type CrystallizeOptions } from '../../src/crystallize/index.js';
-import { crystalService } from '../../src/engine/crystal/service.js';
-import { moduleFileFor, renderManifest, readManifest } from '../../src/crystallize/manifest.js';
-import { sha256 } from '../../src/shared/hash.js';
-import type { HandlerRecord } from '../../src/handler/record.js';
-import type { OptimizedCode, Optimizer } from '../../src/models/types.js';
-import { requestKey } from '../../src/request/key.js';
-import { parseRequest } from '../../src/request/parse.js';
-import { memoryStore } from '../../src/stores/memory-store.js';
-import type { SlimeStore } from '../../src/stores/types.js';
-import { artifact, fakeConnector, fakeGenerator } from '../../src/testing/fakes.js';
+import { SERVICES_FILE, checkCrystalFolder, crystallize, type CrystallizeOptions } from '../src/index.js';
+import { moduleFileFor, renderManifest, readManifest } from '../src/manifest.js';
+import { SlimeConfig, createSlime, crystalService, handlerKeyFor, memoryStore, type CrystalRegistry, type HandlerRecord, type OptimizedCode, type Optimizer, type SlimeStore } from '@slime-cloud/core';
+import { sha256 } from '@slime-cloud/core/tooling';
+import { artifact, fakeConnector, fakeGenerator } from '@slime-cloud/core/testing';
 
 const ROWS = [
   { name: 'Acme', cents: 1250 },
@@ -31,10 +22,10 @@ const EUROS = [
   { name: 'Globex', euros: 9 },
 ];
 const REQUEST = { intent: 'accounts in a country with their balance in euros', input: { country: 'DE' }, output: [{ name: 'string', euros: 'number' }] };
-const KEY = requestKey(parseRequest(REQUEST));
+const KEY = handlerKeyFor(REQUEST);
 const SQL = 'SELECT name, cents FROM accounts WHERE ($1::text IS NULL OR country = $1::text)';
 const LIQUID_SHAPE = 'function shape(rows) { return rows.map((r) => ({ name: r.name, euros: r.cents / 100 })); }';
-const BIN = new URL('../../src/crystallize/bin.ts', import.meta.url).pathname;
+const BIN = new URL('../src/bin.ts', import.meta.url).pathname;
 const runFile = promisify(execFile);
 
 const temporaryDirs: string[] = [];

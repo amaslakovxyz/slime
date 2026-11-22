@@ -52,8 +52,8 @@ const slime = await createSlime(new SlimeConfig({
 }));
 ```
 
-> **Status:** M5 is done: Crystal. `crystallize()` (`@slime-cloud/core/crystallize`)
-> turns proven Liquid handlers into `.mjs` modules in the app's code, and the
+> **Status:** M5 is done: Crystal. `crystallize()` (the separate package
+> [`@slime-cloud/crystal`](../crystal/README.md)) turns proven Liquid handlers into `.mjs` modules in the app's code, and the
 > app passes the generated `index.mjs` as `crystal`. `slime-crystal check`
 > re-checks the folder in CI: an imported Crystal runs without a sandbox, so
 > **run it in your CI**. M4 (Claude and Groq models, review, promotion) is built; its live
@@ -129,8 +129,9 @@ contract test it must pass.
 
 - **One main entry, plus adapter subpaths.** `package.json` `exports` has
   `.`, `./postgres`, `./models`, `./claude`, `./groq`, `./notion`,
-  `./crystallize`, `./testing` and `./shape-worker` (C7), plus the
-  `slime-crystal` bin. `test/package.test.ts` pins every entry's value exports.
+  `./testing`, `./tooling` (engine internals for `@slime-cloud/crystal`, no
+  compatibility promise of its own) and `./shape-worker` (C7). The
+  `slime-crystal` bin lives in `@slime-cloud/crystal`. `test/package.test.ts` pins every entry's value exports.
 - **What ships.** ESM only (`type: module`), Node `>=22`, compiled `dist/`
   and `README.md` only (`files`). `scripts/check-pack.mjs` enforces this in
   CI.

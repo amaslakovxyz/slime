@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, describe, test } from 'node:test';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
-import type { Manifest, ManifestEntry } from '@slime-cloud/core/crystallize';
+import type { Manifest, ManifestEntry } from '@slime-cloud/crystal';
 import { CrystallizeConflictError, S3CrystalStore } from '../src/crystal-store.js';
 import { FakeS3 } from './fake-s3.js';
 import { BUCKET, harness, isDatabaseAvailable, keyOf, type Harness } from './tenant-harness.js';

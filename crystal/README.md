@@ -1,13 +1,29 @@
-# crystallize
+# @slime-cloud/crystal
 
 ## Overview
 
-The `@slime-cloud/core/crystallize` entry (PLAN.md C10, M5) and the
-`slime-crystal` bin: turn proven Liquid handlers into Crystal modules in the
-app's own code, and check that folder in CI. It also exports what a host
-needs to load Crystal modules as data (`parseModule`, `parseManifest`,
-`readManifest`): Slime Cloud's runtime imports it for that. An app that
-imports its generated `index.mjs` never loads this folder.
+Crystallize turns proven Liquid handlers into Crystal: reviewed code in the
+app's own repository (PLAN.md C10, M5). This package is the build-time side:
+
+- the crystallize job, which writes the Crystal folder (modules, manifest,
+  `index.mjs`, typed `services.mjs`, and the `cases` each Crystal is verified
+  against);
+- the `slime-crystal` CLI for CI and for whoever edits the folder: `check`,
+  `pin` and `verify`;
+- what a host needs to load Crystal modules as data (`parseModule`,
+  `parseManifest`, `readManifest`): Slime Cloud's runtime imports it for that.
+
+Serving Crystal is not here: `@slime-cloud/core` runs it (`runCrystal`, and
+`crystalService` behind `services.mjs`), so an app that imports its generated
+`index.mjs` or `services.mjs` never loads this package or `acorn`. This package
+uses core's internals through `@slime-cloud/core/tooling` and peers on the
+exact core version.
+
+```sh
+npm install --save-dev @slime-cloud/crystal   # beside @slime-cloud/core
+```
+
+Source layout (`src/`):
 
 - `crystallize.ts`: the job.
 - `equivalence.ts`: the equivalence test a candidate must pass.
@@ -17,7 +33,7 @@ imports its generated `index.mjs` never loads this folder.
 - `manifest.ts`: `manifest.json` and the generated `index.mjs` /
   `index.d.mts`.
 - `services.ts`: the generated `services.mjs` / `services.d.mts`, one typed
-  service method per Crystal (`crystalService` from the main entry).
+  service method per Crystal (`crystalService` from `@slime-cloud/core`).
 - `cases.ts`: `<key>.cases.json`, the reference a Crystal is verified
   against: the Liquid handler's code and its recorded inputs.
 - `pin.ts`: re-pins edited modules (never a cases file).
@@ -111,6 +127,14 @@ imports its generated `index.mjs` never loads this folder.
 
 ## Verification
 
-- `test/crystallize/allowlist.test.ts`: the allowlist and the module format.
-- `test/crystallize/crystallize.test.ts`: the job, the optimizer and its fallbacks,
-  `check`, the bin's exit codes, and serving the result.
+Run `npm run build -w @slime-cloud/core` first: this package type-checks and
+runs against core's `dist/`. Then `npm test -w @slime-cloud/crystal`.
+
+- `test/allowlist.test.ts`: the allowlist and the module format.
+- `test/crystallize.test.ts`: the job, the optimizer and its fallbacks,
+  `check`, the bin's exit codes, serving the result, and service methods.
+- `test/services.test.ts`: service names and types.
+- `test/verify.test.ts`: `pin` and `verify`, with fakes and against the demo
+  Postgres.
+- `test/engine.test.ts`: the job with a real engine (a shared sandbox, MS9).
+- `test/boundary.test.ts`: core is reached only through its package entries.

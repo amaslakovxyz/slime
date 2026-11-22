@@ -2,9 +2,8 @@ import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { assertReadOnlySql } from '../artifact/checks/sql.js';
-import { sha256 } from '../shared/hash.js';
 import { parseModule, type CrystalCode } from './module-format.js';
+import { assertReadOnlySql, sha256 } from '@slime-cloud/core/tooling';
 
 interface ModuleExports {
   sql?: unknown;

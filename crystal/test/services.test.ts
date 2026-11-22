@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { renderServiceTypes, serviceNameFor, serviceNames } from '../../src/crystallize/services.js';
-import type { Manifest, ManifestEntry } from '../../src/crystallize/manifest.js';
+import { renderServiceTypes, serviceNameFor, serviceNames } from '../src/services.js';
+import type { Manifest, ManifestEntry } from '../src/manifest.js';
 
 function entry(overrides: Partial<ManifestEntry>): ManifestEntry {
   return {

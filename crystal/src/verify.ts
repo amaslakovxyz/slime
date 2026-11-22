@@ -4,20 +4,13 @@
 // plan than that handler. Nothing a model or a reviewer says can pass it instead.
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { isApiStep, type Artifact, type SqlStep } from '../artifact/artifact.js';
-import { DEFAULT_LIMITS } from '../config/defaults.js';
-import type { LimitOptions } from '../config/options.js';
-import { bindParams, queryLimits } from '../engine/execution/execute.js';
-import type { HandlerRecord } from '../handler/record.js';
-import type { InputValues } from '../request/parse.js';
-import { QuickJSRunner } from '../sandbox/quickjs/quickjs-runner.js';
-import type { SandboxRunner } from '../sandbox/types.js';
-import type { Connector } from '../sources/sql/types.js';
 import { parseCases, type CrystalCases } from './cases.js';
 import { checkCrystalFolder } from './check.js';
 import { verifyCandidate, type EquivalenceDeps } from './equivalence.js';
 import { readManifest, type ManifestEntry } from './manifest.js';
 import { parseModule, type CrystalCode } from './module-format.js';
+import { bindParams, isApiStep, queryLimits } from '@slime-cloud/core/tooling';
+import { DEFAULT_LIMITS, QuickJSRunner, type Artifact, type Connector, type HandlerRecord, type InputValues, type LimitOptions, type SandboxRunner, type SqlStep } from '@slime-cloud/core';
 
 export interface VerifyOptions {
   /** A read-only connector: both the Liquid reference and the Crystal run against it. */

@@ -32,7 +32,7 @@ async function verify(folder: string): Promise<string[]> {
   const urlIndex = flags.indexOf(DATABASE_URL_FLAG);
   const url = urlIndex >= 0 ? flags[urlIndex + 1] : undefined;
   if (!url) usage();
-  const { postgresConnector } = await import('../sources/sql/postgres/index.js');
+  const { postgresConnector } = await import('@slime-cloud/core/postgres');
   const connector = postgresConnector({ url: url! });
   try {
     return await verifyCrystalFolder(folder, { connector });

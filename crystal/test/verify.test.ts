@@ -4,20 +4,16 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, describe, test } from 'node:test';
-import { checkCrystalFolder, crystallize, pinCrystalFolder, verifyCrystalFolder } from '../../src/crystallize/index.js';
-import { moduleFileFor, readManifest } from '../../src/crystallize/manifest.js';
-import type { HandlerRecord } from '../../src/handler/record.js';
-import { requestKey } from '../../src/request/key.js';
-import { parseRequest } from '../../src/request/parse.js';
-import type { Connector } from '../../src/sources/sql/types.js';
-import { memoryStore } from '../../src/stores/memory-store.js';
-import { postgresConnector } from '../../src/sources/sql/postgres/index.js';
-import { artifact, fakeConnector } from '../../src/testing/fakes.js';
-import { isDatabaseAvailable, READER_URL } from '../support/database.js';
+import { checkCrystalFolder, crystallize, pinCrystalFolder, verifyCrystalFolder } from '../src/index.js';
+import { moduleFileFor, readManifest } from '../src/manifest.js';
+import { isDatabaseAvailable, READER_URL } from './support/database.js';
+import { handlerKeyFor, memoryStore, type Connector, type HandlerRecord } from '@slime-cloud/core';
+import { postgresConnector } from '@slime-cloud/core/postgres';
+import { artifact, fakeConnector } from '@slime-cloud/core/testing';
 
 const ROWS = [{ name: 'Acme', cents: 1250 }, { name: 'Globex', cents: 99 }];
 const REQUEST = { intent: 'accounts in a country with their balance in euros', input: { country: 'DE' }, output: [{ name: 'string', euros: 'number' }] };
-const KEY = requestKey(parseRequest(REQUEST));
+const KEY = handlerKeyFor(REQUEST);
 const SQL = 'SELECT name, cents FROM accounts WHERE ($1::text IS NULL OR country = $1::text)';
 const SHAPE = 'function shape(rows) { return rows.map((r) => ({ name: r.name, euros: r.cents / 100 })); }';
 const EXPENSIVE_SQL = 'SELECT name, cents FROM accounts CROSS JOIN invoices WHERE ($1::text IS NULL OR country = $1::text)';
@@ -122,7 +118,7 @@ describe('verify against the demo Postgres', { skip: !(await isDatabaseAvailable
   const PURE_SQL = 'SELECT p.name AS plan, count(*)::int AS accounts FROM accounts a JOIN plans p ON p.id = a.plan_id WHERE ($1::text IS NULL OR a.country = $1::text) GROUP BY p.name ORDER BY p.name';
   const COSTLY_SQL = `${PURE_SQL.replace(' GROUP BY', ' AND (SELECT count(*) FROM invoices CROSS JOIN usage_events) >= 0 GROUP BY')}`;
   const PLANS = { intent: 'number of accounts on each plan in a country', input: { country: 'DE' }, output: [{ plan: 'string', accounts: 'integer' }] };
-  const PLANS_KEY = requestKey(parseRequest(PLANS));
+  const PLANS_KEY = handlerKeyFor(PLANS);
 
   async function realCrystal(db: Connector): Promise<string> {
     const dir = await mkdtemp(join(tmpdir(), 'slime-verify-pg-'));

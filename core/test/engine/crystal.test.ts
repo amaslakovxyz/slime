@@ -1,22 +1,17 @@
 // Crystal handlers whose shape is source text (hosts that load modules as data) and
 // the sandbox runner a host shares across engines.
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { after, describe, test } from 'node:test';
+import { describe, test } from 'node:test';
 import { SlimeConfig } from '../../src/config/slime-config.js';
 import { createSlime } from '../../src/create-slime.js';
 import type { CrystalHandler, CrystalRegistry } from '../../src/handler/crystal.js';
-import { crystallize } from '../../src/crystallize/index.js';
-import { readManifest } from '../../src/crystallize/manifest.js';
 import { requestKey } from '../../src/request/key.js';
 import { parseRequest } from '../../src/request/parse.js';
 import { QuickJSRunner } from '../../src/sandbox/quickjs/quickjs-runner.js';
 import type { SandboxRunner } from '../../src/sandbox/types.js';
 import { SlimeError } from '../../src/shared/errors.js';
 import { memoryStore } from '../../src/stores/memory-store.js';
-import { artifact, fakeConnector, fakeGenerator } from '../../src/testing/fakes.js';
+import { fakeConnector, fakeGenerator } from '../../src/testing/fakes.js';
 
 const ROWS = [
   { name: 'Acme', cents: 1250 },
@@ -33,9 +28,6 @@ const SHAPE_SOURCE = 'function shape(rows) { return rows.map((r) => ({ name: r.n
 // Exponential recursion with a shallow stack: it never overflows, it just never ends.
 const ENDLESS_RECURSION = 'function shape(rows) { function grow(n) { return n > 40 ? 0 : grow(n + 1) + grow(n + 1); } return grow(0); }';
 const SHAPE_TIMEOUT_MS = 200;
-
-const temporaryDirs: string[] = [];
-after(() => Promise.all(temporaryDirs.map((dir) => rm(dir, { recursive: true, force: true }))));
 
 function crystalWith(shape: CrystalHandler['shape']): CrystalRegistry {
   return {
@@ -106,44 +98,6 @@ describe('an injected sandbox runner', () => {
       assert.deepEqual(await runner.run({ code: 'function shape(rows) { return rows.length; }', rows: [1, 2], input: {} }, { timeoutMs: 500, memoryBytes: 16 * 1024 * 1024 }), 2);
     } finally {
       await runner.close();
-    }
-  });
-
-  test('crystallize() uses it, leaves it running, and its equivalence test accepts a string-shape candidate', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'slime-crystal-runner-'));
-    temporaryDirs.push(dir);
-    const store = memoryStore();
-    await store.put('handlers', KEY, {
-      key: KEY,
-      intent: REQUEST.intent,
-      output: REQUEST.output,
-      artifact: artifact(SQL, ['country'], SHAPE_SOURCE),
-      paramTypes: { country: 'string' },
-      provenance: { schemaHash: 'schema', dictionaryHash: 'dictionary', promptHash: 'prompt', model: 'model' },
-      tier: 'liquid',
-      review: 'approved',
-      runs: 12,
-      fixtures: [{ country: 'DE' }],
-      createdAt: '2026-11-21T00:00:00.000Z',
-    });
-    let shapeRuns = 0;
-    const shared = new QuickJSRunner();
-    const counting: SandboxRunner = {
-      run: (job, limits) => {
-        shapeRuns++;
-        return shared.run(job, limits);
-      },
-      close: () => shared.close(),
-    };
-    try {
-      const [report] = await crystallize({ connector: fakeConnector({ rows: ROWS }), store, dir, runner: counting });
-      assert.equal(report?.outcome, 'crystallized');
-      assert.ok((await readManifest(dir)).entries[KEY]);
-      // Liquid and the candidate both ran in the sandbox, once per recorded input.
-      assert.equal(shapeRuns, 2);
-      assert.equal(await shared.run({ code: 'function shape() { return 1; }', rows: [], input: {} }, { timeoutMs: 500, memoryBytes: 16 * 1024 * 1024 }), 1);
-    } finally {
-      await shared.close();
     }
   });
 });

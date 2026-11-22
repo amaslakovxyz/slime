@@ -54,7 +54,9 @@ test('adapters have their own subpaths, so the main entry never loads them (C7)'
   assert.deepEqual(Object.keys(await import('../src/sources/api/notion/index.js')).sort(), ['NOTION_VERSION', 'notionSource']);
   assert.deepEqual(pkg.exports['./models'], { types: './dist/models/index.d.ts', default: './dist/models/index.js' });
   assert.deepEqual(Object.keys(await import('../src/models/index.js')).sort(), ['modelRoles', 'parseJsonReply', 'providerRoles']);
-  assert.deepEqual(pkg.exports['./crystallize'], { types: './dist/crystallize/index.d.ts', default: './dist/crystallize/index.js' });
+  assert.equal(pkg.exports['./crystallize'], undefined, 'the crystallize job is @slime-cloud/crystal');
+  assert.deepEqual(pkg.exports['./tooling'], { types: './dist/tooling.d.ts', default: './dist/tooling.js' });
+  assert.deepEqual(Object.keys(await import('../src/tooling.js')).sort(), ['HANDLERS_NS', 'SQL_SOURCE_DEFAULT_NAME', 'asSingleQuery', 'assertReadOnlySql', 'bindParams', 'canonicalJSON', 'executeArtifact', 'isApiStep', 'paramTypesForModel', 'queryLimits', 'recordFromStore', 'runCrystal', 'sha256']);
   assert.deepEqual(pkg.exports['./testing'], { types: './dist/testing/index.d.ts', default: './dist/testing/index.js' });
   assert.deepEqual(Object.keys(await import('../src/testing/index.js')).sort(), [
     'FAKE_SECRET',
@@ -85,6 +87,6 @@ test('database drivers and model SDKs are optional peer dependencies (C7)', () =
   }
 });
 
-test('ships the slime-crystal bin for the app\'s CI (C10)', () => {
-  assert.deepEqual(pkg.bin, { 'slime-crystal': './dist/crystallize/bin.js' });
+test('ships no bin: slime-crystal is @slime-cloud/crystal (C10)', () => {
+  assert.equal(pkg.bin, undefined);
 });

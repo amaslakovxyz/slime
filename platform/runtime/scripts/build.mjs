@@ -1,6 +1,6 @@
 // Bundles the runtime for AWS Lambda into dist/lambda/ (zipped by Terraform,
-// platform/infra/platform/runtime.tf). @slime-cloud/core comes from its built dist/
-// (build it first: npm run build -w @slime-cloud/core). Output must be
+// platform/infra/platform/runtime.tf). @slime-cloud/core and @slime-cloud/crystal come
+// from their built dist/ (build both first: npm run build -w @slime-cloud/core -w @slime-cloud/crystal). Output must be
 // deterministic: the same source gives the same zip hash, so Terraform plans
 // show no change for no change.
 //
@@ -54,6 +54,6 @@ function resolveShapeWorker() {
   try {
     return runtimeRequire.resolve('@slime-cloud/core/shape-worker');
   } catch {
-    throw new Error("@slime-cloud/core's shape worker is missing: build the core first (npm run build -w @slime-cloud/core)");
+    throw new Error("@slime-cloud/core's shape worker is missing: build the core first (npm run build -w @slime-cloud/core -w @slime-cloud/crystal)");
   }
 }

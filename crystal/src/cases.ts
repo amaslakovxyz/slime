@@ -2,8 +2,7 @@
 // the inputs it was proven on. Written once by crystallize and pinned in
 // manifest.json, so an edited module is always compared with the original, never
 // with a reference rewritten to match it.
-import type { Artifact } from '../artifact/artifact.js';
-import type { InputValues } from '../request/parse.js';
+import type { Artifact, InputValues } from '@slime-cloud/core';
 
 export const CASES_EXTENSION = '.cases.json';
 
