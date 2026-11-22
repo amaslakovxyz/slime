@@ -47,7 +47,7 @@ Paths are the endpoint's own; the Lambda serves them under `/ep/<id>/`.
 | `GET /v0/handlers`, `DELETE /v0/handlers/<key>` | `slm_` | live handlers and Crystals; evict one |
 | `GET /v0/lifecycle` | `slm_` | saved, live and Crystal rows, thresholds, warnings; `instance: true` on Lambda, where Gas rows are this instance's only |
 | `GET /v0/events?limit=&before=&after=` | `slm_` | `{ total, events, hasOlder, hasNewer }`, newest first, the same on every instance: `limit` 1-100 (default 50), `before`/`after` an event's `id` for the older or newer page (not both; anything else is 400); `total` is the endpoint's usage count |
-| `POST /v0/crystallize` `{keys}` | `slm_` | crystallize reports; on Lambda the Crystals go to S3 and this instance swaps its engine at once, other instances within the TTL |
+| `POST /v0/crystallize` `{keys?}` | `slm_` | crystallize reports (no `keys`: every ready handler); on Lambda the Crystals go to S3 and this instance swaps its engine at once, other instances within the TTL. Mounted only with a Crystal store: always on Lambda, locally only with `SLIME_CRYSTAL_DIR` |
 | `POST /v0/reload` | `slm_` | 204; on Lambda this instance forgets the endpoint's settings and engine, locally a no-op |
 
 Router answers on Lambda: 404 `ENDPOINT_NOT_FOUND` (malformed id, or no
@@ -55,6 +55,13 @@ parameters under its SSM path), 401 `UNAUTHORIZED` (wrong or missing key, or
 any path outside `/ep/<id>/`, root `/healthz` included), 503 `NOT_READY` (the
 endpoint's engine cannot start, for example an unreachable database or no
 `DATABASE_URL`; the message names the cause).
+
+Both entries: a body above 16 KB on `POST /v0/query` or `POST /v0/e/<key>` is
+413 `INVALID_REQUEST`; an unexpected error is 500 `INTERNAL`; core errors keep
+their status (`core/docs/request-format.md`). A path the endpoint does not
+serve (for example `/ep/<id>//v0/query` from a URL joined with an extra `/`)
+is Hono's plain-text `404 Not Found`, not the JSON error shape. The endpoint
+URL the admin stores ends in `/`, so join it as `<url>v0/query`.
 
 ## Commands
 
