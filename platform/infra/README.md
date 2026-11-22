@@ -137,27 +137,36 @@ from `feat/cloud-mvp`; step 7 runs on merge.
    code. The next CI plan shows no changes. Build branch applies in Linux
    (`node:22`) to avoid it; admin (input-hash trigger) and landing already match.
 
-### Temporary test database (`slime-test-db`, not in Terraform)
+### Test and demo database (`slime-test-db`, not in Terraform)
 
-A throwaway RDS for the cloud end-to-end run, created by hand on 2026-11-22:
-PostgreSQL 16, `db.t4g.micro`, 20 GB gp3, one AZ, no backups, encrypted, public
-(the runtime Lambda has no VPC and no fixed IPs; security group `slime-test-db`
-opens 5432, SSL is forced, passwords are random). It holds the demo schema from
-`examples/express/db/init.sql`.
+An RDS created by hand on 2026-11-22: PostgreSQL 16, `db.t4g.micro`, 20 GB gp3,
+one AZ, no backups, encrypted, public (the runtime Lambda has no VPC and no
+fixed IPs; security group `slime-test-db` opens 5432, SSL is forced, passwords
+are random). It holds two databases:
 
-- URLs: SSM `/slime/test-db/READER_URL` (the read-only `slime_reader`, use this
-  for endpoints) and `/slime/test-db/MASTER_URL`. Both end in
+- `slime`: the SaaS demo schema from `examples/express/db/init.sql`, used by the
+  cloud smoke. Read-only `slime_reader`: SSM `/slime/test-db/READER_URL`.
+- `shop`: the demo online shop from `examples/shop/db/shop.sql`
+  ([examples/shop](../../examples/shop/README.md)). Read-only `shop_reader`:
+  SSM `/slime/test-db/SHOP_READER_URL`. Reload with
+  `examples/shop/scripts/load-rds.sh` (drops and recreates `shop` and rotates
+  the reader password).
+
+Access and lifecycle:
+
+- URLs: the two reader URLs above (use these for endpoints) and
+  `/slime/test-db/MASTER_URL`. All end in
   `?sslmode=require&uselibpqcompat=true`: `pg` 8.x treats plain `sslmode=require`
   as verify-full, and the RDS CA is not in Node's trust store.
 - Full cloud lifecycle: `SMOKE_DB_URL=$(aws ssm get-parameter --with-decryption
   --name /slime/test-db/READER_URL --query Parameter.Value --output text) npm run
   e2e:cloud` in `platform/admin` (with `SMOKE_EMAIL`/`SMOKE_PASSWORD`).
-- Stops on Monday 2026-11-23 20:00 Europe/Berlin (EventBridge Scheduler
-  `slime-test-db-stop-monday`, role `slime-test-db-scheduler`). A stopped RDS
-  starts again by itself after 7 days. Remove it for good with
+- Runs permanently since 2026-11-22 (the stop schedule and its role are
+  deleted), ≈ $20/month; budget `slime-monthly` was raised to $30 for it
+  (`bootstrap/variables.tf`). Remove it for good with
   `aws rds delete-db-instance --db-instance-identifier slime-test-db
-  --skip-final-snapshot`, then delete the security group, the schedule, the role
-  and `/slime/test-db/*`.
+  --skip-final-snapshot`, then delete the security group and `/slime/test-db/*`
+  (three parameters).
 
 ## Rules for `platform/`
 
