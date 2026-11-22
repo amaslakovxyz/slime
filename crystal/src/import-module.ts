@@ -2,10 +2,11 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { parseModule, type CrystalCode } from './module-format.js';
-import { assertReadOnlySql, sha256 } from '@slime-cloud/core/tooling';
+import { isStepsCode, parseModule, sqlStatementsOf, type CrystalCode } from './module-format.js';
+import { assertReadOnlySql, canonicalJSON, sha256 } from '@slime-cloud/core/tooling';
 
 interface ModuleExports {
+  steps?: unknown;
   sql?: unknown;
   params?: unknown;
   shape?: unknown;
@@ -23,7 +24,7 @@ const IMPORT_PREFIX = join(tmpdir(), 'slime-crystal-');
  */
 export async function importCheckedModule(text: string): Promise<CrystalCode> {
   const code = parseModule(text);
-  assertReadOnlySql(code.sql);
+  for (const { sql } of sqlStatementsOf(code)) assertReadOnlySql(sql);
   const dir = await mkdtemp(IMPORT_PREFIX);
   const file = join(dir, `${sha256(text)}.mjs`);
   await writeFile(file, text);
@@ -37,9 +38,10 @@ export async function importCheckedModule(text: string): Promise<CrystalCode> {
 }
 
 function assertExportsMatch(exports: ModuleExports, code: CrystalCode): void {
-  if (exports.sql !== code.sql || JSON.stringify(exports.params) !== JSON.stringify(code.params)) {
-    throw new Error('module exports do not match its source');
-  }
+  const isSame = isStepsCode(code)
+    ? canonicalJSON(exports.steps) === canonicalJSON(code.steps)
+    : exports.sql === code.sql && JSON.stringify(exports.params) === JSON.stringify(code.params);
+  if (!isSame) throw new Error('module exports do not match its source');
   const hasShapeFunction = typeof exports.shape === 'function';
   if (code.shape ? !hasShapeFunction : exports.shape !== null) throw new Error('module `shape` export is wrong');
 }

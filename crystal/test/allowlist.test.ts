@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { CrystalCodeError, checkShapeSource } from '../src/allowlist.js';
-import { parseModule, renderModule } from '../src/module-format.js';
+import { apiSourcesOf, inputNamesOf, parseModule, renderModule, sqlStatementsOf, type QueryCode, type StepsCode } from '../src/module-format.js';
 
 const accepts = (body: string) => checkShapeSource(`function shape(rows, input) { ${body} }`);
 const refuses = (body: string, why: RegExp) =>
@@ -86,7 +86,7 @@ describe('Crystal allowlist: refused', () => {
 describe('Crystal module format', () => {
   test('renders and parses back the same code, without trailing whitespace', () => {
     const code = { sql: 'SELECT name FROM plans WHERE id = $1::int', params: ['id'], shape: 'function shape(rows) {\n  return rows.map((r) => r.name);  \n}' };
-    const parsed = parseModule(renderModule(code));
+    const parsed = parseModule(renderModule(code)) as QueryCode;
     assert.deepEqual([parsed.sql, parsed.params], [code.sql, code.params]);
     assert.equal(parsed.shape, 'function shape(rows) {\n  return rows.map((r) => r.name);\n}');
     assert.equal(parseModule(renderModule({ ...code, shape: null })).shape, null);
@@ -98,5 +98,69 @@ describe('Crystal module format', () => {
     assert.throws(() => parseModule(base.replace('"SELECT 1"', '`SELECT ${1}`')), CrystalCodeError);
     assert.throws(() => parseModule(base.replace('[]', '[process.env.X]')), CrystalCodeError);
     assert.throws(() => parseModule(base.replace('export const shape = null;', 'export const shape = (r) => r;')), CrystalCodeError);
+  });
+});
+
+describe('Crystal module format: steps', () => {
+  const STEPS: StepsCode = {
+    steps: [
+      { name: 'accounts', source: 'db', sql: 'SELECT name FROM accounts WHERE plan = $1::text', params: ['plan'] },
+      { name: 'feedback', source: 'notion', operation: 'feedback.query', args: [{ param: 'sentiment', input: null, value: 'negative' }, { param: 'account', input: 'account', value: null }] },
+    ],
+    shape: 'function shape(data, input) {\n  return data.accounts.map((a) => ({ name: a.name, open: data.feedback.length }));\n}',
+  };
+
+  test('renders and parses back the same steps and shape', () => {
+    const parsed = parseModule(renderModule(STEPS));
+    assert.deepEqual(parsed, STEPS);
+    assert.deepEqual(sqlStatementsOf(parsed), [{ sql: STEPS.steps[0] && 'sql' in STEPS.steps[0] ? STEPS.steps[0].sql : '', params: ['plan'] }]);
+    assert.deepEqual(inputNamesOf(parsed), ['plan', 'account']);
+    assert.deepEqual(apiSourcesOf(parsed), ['notion']);
+  });
+
+  test('writes exactly the keys a step has, whatever the stored artifact carried', () => {
+    const extra = { ...STEPS, steps: [{ ...STEPS.steps[0]!, note: 'from the model' } as never, STEPS.steps[1]!] };
+    assert.deepEqual(parseModule(renderModule(extra)), STEPS);
+  });
+
+  test('a null shape only with a single step', () => {
+    assert.throws(() => parseModule(renderModule({ ...STEPS, shape: null })), /single step/);
+    assert.deepEqual(parseModule(renderModule({ steps: [STEPS.steps[0]!], shape: null })), { steps: [STEPS.steps[0]], shape: null });
+  });
+
+  test('`steps` holds plain values only: nothing that runs, nothing from outside', () => {
+    const base = renderModule(STEPS);
+    for (const [from, to] of [
+      ['"negative"', 'process.env.X'],
+      ['"negative"', '`neg${1}`'],
+      ['"negative"', 'String("negative")'],
+      ['"value": null', '"value": null, ...{}'],
+      ['"value": null', '"value": null, get x() { return 1; }'],
+      ['"value": null', '["value"]: null'],
+      ['"negative"', '/negative/'],
+    ] as const) {
+      assert.throws(() => parseModule(base.replace(from, to)), CrystalCodeError, `${from} -> ${to}`);
+    }
+  });
+
+  test('every step has exactly its keys and types', () => {
+    const base = renderModule(STEPS);
+    for (const [from, to] of [
+      ['"name": "accounts"', '"name": "feedback"'],
+      ['"name": "accounts"', '"name": "1st"'],
+      ['"params": [\n      "plan"\n    ]', '"params": [1]'],
+      ['"operation": "feedback.query"', '"operation": ""'],
+      ['"input": null,\n        "value": "negative"', '"input": "x",\n        "value": "negative"'],
+      ['"input": null,\n        "value": "negative"', '"input": null,\n        "value": null'],
+      ['"source": "db",', '"source": "db", "extra": 1,'],
+    ] as const) {
+      assert.ok(base.includes(from), from);
+      assert.throws(() => parseModule(base.replace(from, to)), CrystalCodeError, `${from} -> ${to}`);
+    }
+  });
+
+  test('a steps shape passes the same allowlist', () => {
+    const hostile = renderModule({ ...STEPS, shape: 'function shape(data) { return process.env; }' });
+    assert.throws(() => parseModule(hostile), CrystalCodeError);
   });
 });

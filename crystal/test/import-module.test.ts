@@ -6,5 +6,5 @@ const MODULE = 'export const sql = "SELECT 1 AS one";\nexport const params = [];
 
 test('the same module imported many times at once never loses its temporary copy', async () => {
   const imports = await Promise.all(Array.from({ length: 20 }, () => importCheckedModule(MODULE)));
-  assert.ok(imports.every(({ sql }) => sql === 'SELECT 1 AS one'));
+  assert.ok(imports.every((code) => 'sql' in code && code.sql === 'SELECT 1 AS one'));
 });

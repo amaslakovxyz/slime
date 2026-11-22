@@ -53,10 +53,13 @@ export class Crystallizer {
     }
     await this.#slime.flush();
     const internals = slimeInternals(this.#slime);
-    const { connector, runner, limits } = internals;
+    const { connector, sources, apiSchemas, sqlSourceName, runner, limits } = internals;
     const { dir, optimizer, minRuns, optimizeTimeoutMs } = this.#options;
     return crystallize({
       connector,
+      sources,
+      apiSchemas,
+      sqlSourceName,
       store: withLiveRecords(internals),
       dir,
       runner,
@@ -92,10 +95,10 @@ export class Crystallizer {
     return checkCrystalFolder(this.#options.dir);
   }
 
-  /** The folder's problems on this instance's database: equivalence with each Liquid reference, and plan cost. */
+  /** The folder's problems on this instance's sources: equivalence with each Liquid reference, and plan cost. */
   verify(): Promise<string[]> {
-    const { connector, runner, limits } = slimeInternals(this.#slime);
-    return verifyCrystalFolder(this.#options.dir, { connector, runner, limits });
+    const { connector, sources, apiSchemas, runner, limits } = slimeInternals(this.#slime);
+    return verifyCrystalFolder(this.#options.dir, { connector, sources, apiSchemas, runner, limits });
   }
 }
 

@@ -3,7 +3,7 @@
 import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { INDEX_FILE, INDEX_TYPES_FILE, MODULE_EXTENSION, readManifest, renderIndex, renderIndexTypes, type Manifest } from './manifest.js';
-import { parseModule } from './module-format.js';
+import { parseModule, sqlStatementsOf } from './module-format.js';
 import { SERVICES_FILE, SERVICES_TYPES_FILE, renderServiceTypes, renderServices } from './services.js';
 import { assertReadOnlySql, sha256 } from '@slime-cloud/core/tooling';
 
@@ -32,7 +32,7 @@ async function moduleProblem(dir: string, file: string, pinnedSha256: string): P
     const text = await readFile(join(dir, file), 'utf8');
     if (sha256(text) !== pinnedSha256) return `${file} does not match the hash pinned in manifest.json; ${REGENERATE}`;
     // A re-pinned hand edit still has to pass the allowlist and the read-only lint.
-    assertReadOnlySql(parseModule(text).sql);
+    for (const { sql } of sqlStatementsOf(parseModule(text))) assertReadOnlySql(sql);
     return undefined;
   } catch (error) {
     return `${file}: ${(error as Error).message}`;

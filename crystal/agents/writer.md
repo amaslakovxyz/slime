@@ -11,9 +11,19 @@ Modules to optimize (request keys): {{KEYS}}
 
 For each key:
 
-- `<key>.mjs` is the module you may edit. It has exactly three exports:
-  `export const sql = "...";`, `export const params = [...];` and either
-  `export function shape(rows, input) { ... }` or `export const shape = null;`.
+- `<key>.mjs` is the module you may edit, in one of two forms:
+  - a query module, exactly three exports: `export const sql = "...";`,
+    `export const params = [...];` and either
+    `export function shape(rows, input) { ... }` or `export const shape = null;`;
+  - a steps module, exactly two exports: `export const steps = [...]` (each
+    step `{ name, source, sql, params }` for SQL, or
+    `{ name, source, operation, args }` for an API source) and
+    `export function shape(data, input) { ... }`, where `data` holds each
+    step's rows by step name.
+  A steps module whose steps are all SQL may become a query module (one query
+  that does the steps' work). Leave a steps module with an API step (one with
+  `operation`) as it is: `verify` here has no API sources, so it refuses any
+  edit to it.
 - `<key>.cases.json` is the reference: `liquid` is the handler the module must
   stay equivalent to, and `inputs` are the recorded inputs it is tested on.
   Read it; never edit it.

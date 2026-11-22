@@ -149,7 +149,12 @@ async function modulesForReview(keys) {
     const entry = entries[key];
     const cases = parseCases(await readFile(join(dir, entry.cases), 'utf8'));
     const module = await readFile(join(dir, entry.file), 'utf8');
-    const steps = cases.liquid.steps.map((step) => `SQL step "${step.name}", params ${JSON.stringify(step.params)}:\n\`\`\`sql\n${step.sql}\n\`\`\``);
+    const steps = cases.liquid.steps.map((step) =>
+      'sql' in step
+        ? `SQL step "${step.name}", params ${JSON.stringify(step.params)}:\n\`\`\`sql\n${step.sql}\n\`\`\``
+        : `API step "${step.name}": ${step.source} ${step.operation}, args ${JSON.stringify(step.args)}`,
+    );
+    const isStepsModule = /^export const steps = /m.test(module);
     sections.push(
       [
         `### ${key.slice(0, KEY_PREFIX)}: ${entry.intent}`,
@@ -160,7 +165,7 @@ async function modulesForReview(keys) {
         ...steps,
         cases.liquid.shapeJs ? `shape(data, input), where data has one property per step:\n\`\`\`js\n${cases.liquid.shapeJs}\n\`\`\`` : 'shape: none (the step\'s rows are the output)',
         '',
-        'Crystal module (shape takes the SQL rows directly):',
+        isStepsModule ? 'Crystal module (steps run as in Liquid; shape takes data by step name):' : 'Crystal module (shape takes the SQL rows directly):',
         `\`\`\`js\n${module}\`\`\``,
       ].join('\n'),
     );

@@ -95,13 +95,20 @@ Source layout (`src/`):
 
 ## Interface
 
-- `crystallize({ connector, store, dir, optimizer?, minRuns = 10, provenance?,
-  limits?, runner?, optimizeTimeoutMs?, isDryRun? }): Promise<CrystalReport[]>`. The app runs it
-  from its own script with its own config; core reads no env. Each report has
-  an `outcome` (`crystallized`, `already`, `not-ready`, `failed`) and its
-  reasons. A `runner` the host passes is used and left running; without one
+- `crystallize({ connector, sources?, apiSchemas?, sqlSourceName?, store, dir,
+  optimizer?, minRuns = 10, provenance?, limits?, runner?, optimizeTimeoutMs?,
+  isDryRun?, keys? }): Promise<CrystalReport[]>`. `Crystallizer` calls it with
+  the instance's parts; apps rarely call it directly. Each report has an
+  `outcome` (`crystallized`, `already`, `not-ready`, `skipped` for an
+  unsatisfiable handler, `failed`) and its reasons. A `runner` the host passes is used and left running; without one
   the job builds its own and closes it.
 - `checkCrystalFolder(dir): Promise<string[]>`: every problem, or none.
+- **Two module forms.** A handler that is one SQL query becomes a query module:
+  `export const sql`, `export const params`, `export function shape(rows,
+  input)` (or `shape = null`). Any other handler (API steps, several SQL
+  steps) becomes a steps module: `export const steps = [...]`, a plain literal
+  of its Liquid steps, and `export function shape(data, input)`, `data` holding
+  each step's rows by name. The optimizer rewrites query modules only.
 - **Service methods.** The folder also gets `services.mjs` and
   `services.d.mts`: for each Crystal, a function named from its intent
   (`topNAccountsByTotalPaid`, kept in `manifest.json` as `service`, so it
@@ -110,22 +117,28 @@ Source layout (`src/`):
   no Slime instance: the SQL runs through the connector (read-only, row cap,
   timeouts), the shape runs natively, and the output and R6 checks still
   apply. Inputs are optional and nullable (R5); an unknown input name is
-  `INVALID_REQUEST`.
+  `INVALID_REQUEST`. A Crystal that calls API sources takes the app's sources
+  map instead of the connector (`manifest.json` lists them as `sources`):
+  `await accountsOnAPlan({ db, notion }, { plan: 'Pro' })`.
 - `slime-crystal check <dir>`: exit 0 when clean, 1 with problems, 2 on bad
   usage. No database or model.
 - **Editing a Crystal** (a person or an agent optimizing it):
-  1. edit `<key>.mjs` (only `sql`, `params` and `shape`);
+  1. edit `<key>.mjs` (only `sql`, `params` and `shape`, or `steps` and `shape`);
   2. `slime-crystal pin <dir>`: re-runs the allowlist and the read-only lint on
      each changed module, pins its new hash (`isOptimized: true`) and
      regenerates `index.mjs` and `services.mjs`. It never re-pins a cases file;
   3. `slime-crystal verify <dir> --database-url <read-only url>`: `check`, then
      on every recorded input the Crystal's output must equal the Liquid
      reference's (both run against that database), and its plan cost must be
-     at most `COST_TOLERANCE` (1.1) times the reference's. This is the gate for
-     merging an edit; reviews, human or agent, come on top of it.
+     at most `COST_TOLERANCE` (1.1) times the reference's (summed over SQL
+     steps). This is the gate for merging an edit; reviews, human or agent,
+     come on top of it. A module that calls API sources needs the app's
+     sources to run, which the CLI doesn't have: there it passes only while it
+     is exactly its Liquid code, and an edited one is verified with
+     `Crystallizer.verify()` on the app's instance.
 - Loading modules as data: `parseModule(source)` parses a module, checks its
   structure and runs the allowlist on its shape, and returns `{ sql, params,
-  shape }` with `shape` as source text; `parseManifest(json)` and
+  shape }` or `{ steps, shape }` with `shape` as source text; `parseManifest(json)` and
   `readManifest(dir)` read `manifest.json` (version 1); `MANIFEST_FILE` and
   `moduleFileFor(key)` name the files.
 - Also exported: `checkShapeSource`, `CrystalCodeError`, `DEFAULT_MIN_RUNS`,
@@ -138,16 +151,19 @@ Source layout (`src/`):
   and at least one recorded input, not already in the manifest, and, when
   `provenance` is passed, made with that provenance (otherwise `not-ready`:
   "made with another schemaHash, …").
-- **Candidates:** the optimizer's version first (when there is an
-  optimizer), then the unchanged Liquid code. The first that passes is
-  written.
+- **Candidates:** for a query module, the optimizer's version first (when
+  there is an optimizer), then the unchanged Liquid code; for a steps module,
+  the unchanged Liquid code. The first that passes is written.
 - **A candidate passes when:**
   - its shape function passes the allowlist;
-  - its params are inputs of the request;
+  - its params (and API arguments taken from input) are inputs of the request;
+  - `steps` is a plain literal (strings, numbers, booleans, null, arrays,
+    objects with plain keys) with exactly the keys of a SQL or API step;
   - its module passes the allowlist and the read-only SQL lint, and imports
     with exports that match its source;
   - on every recorded input it gives the same output as the Liquid handler
-    (SQL plus the sandboxed shape), with floats rounded to 9 significant
+    (its steps plus the sandboxed shape; API steps call the app's sources,
+    so the job runs where they are: on the instance, through `Crystallizer`), with floats rounded to 9 significant
     digits, list order included. The candidate's shape runs as source in the
     same sandbox and limits as Liquid's, never as a function in the job's
     process;
@@ -174,7 +190,8 @@ Source layout (`src/`):
 ## Side Effects
 
 - The job reads the store, runs both versions of each handler against the
-  database, may call the optimizer model, and writes the Crystal folder.
+  database and the API sources it reads, may call the optimizer model, and
+  writes the Crystal folder.
 - `import-module.ts` writes a temporary copy to the OS temp folder, imports
   it, and deletes it.
 
@@ -190,5 +207,8 @@ runs against core's `dist/`. Then `npm test -w @slime-cloud/crystal`.
 - `test/verify.test.ts`: `pin` and `verify`, with fakes and against the demo
   Postgres.
 - `test/engine.test.ts`: the job with a real engine (a shared sandbox, MS9).
+- `test/crystallize-steps.test.ts`: a multi-step handler (SQL and API) as a
+  steps Crystal: written, served, as a service, and verified with and without
+  the app's sources.
 - `test/crystallizer.test.ts`: `Crystallizer` with live run counts and keys.
 - `test/boundary.test.ts`: core is reached only through its package entries.
