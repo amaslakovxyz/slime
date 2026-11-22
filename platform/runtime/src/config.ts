@@ -97,7 +97,8 @@ async function modelsFrom(env: Env): Promise<Models> {
   const generatorModel = env.SLIME_MODEL || DEFAULT_MODELS[provider].generator;
   const reviewerModel = env.SLIME_REVIEW_MODEL || DEFAULT_MODELS[provider].reviewer;
   const generatorEffort = (env.SLIME_EFFORT || 'low') as Effort;
-  const reviewerEffort = (env.SLIME_REVIEW_EFFORT || 'high') as Effort;
+  // Low effort: Sonnet reviews in about 1.5 s instead of 4 s (bench 2026-11-22); verify and equivalence still gate Crystal.
+  const reviewerEffort = (env.SLIME_REVIEW_EFFORT || 'low') as Effort;
   if (provider === 'groq') {
     const { groq } = await import('@slime-cloud/core/groq');
     const apiKey = env.GROQ_API_KEY ?? '';

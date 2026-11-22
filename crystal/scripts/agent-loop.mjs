@@ -6,7 +6,7 @@
 //
 //   node crystal/scripts/agent-loop.mjs --dir <crystal folder> --database-url <read-only url>
 //     [--keys k1,k2] [--rounds 2] [--report <file>] [--cli "node crystal/dist/bin.js"]
-//     [--writer-model <model>] [--reviewer-model <model>] [--max-budget-usd <n>]
+//     [--writer-model <model>] [--reviewer-model <model>] [--writer-effort <level>] [--reviewer-effort low] [--max-budget-usd <n>]
 //
 // Needs the `claude` CLI and a built @slime-cloud/crystal. With ANTHROPIC_API_KEY set it
 // runs --bare (CI); otherwise it uses the local login, without MCP servers or skills.
@@ -43,6 +43,10 @@ const { values: args } = parseArgs({
     cli: { type: 'string', default: 'node crystal/dist/bin.js' },
     'writer-model': { type: 'string', default: 'claude-sonnet-5-5' },
     'reviewer-model': { type: 'string', default: 'claude-sonnet-5-5' },
+    // Reviewers at low effort answer about twice as fast. The writer keeps the CLI default:
+    // at low effort its edits were rejected more often, and an extra round costs more than it saves.
+    'writer-effort': { type: 'string', default: '' },
+    'reviewer-effort': { type: 'string', default: 'low' },
     'max-budget-usd': { type: 'string', default: '10' },
   },
 });
@@ -92,7 +96,7 @@ async function runWriter(keys, feedback) {
     .replaceAll('{{DATABASE_URL}}', databaseUrl)
     .replaceAll('{{FEEDBACK}}', feedback ? `## Notes from the last round, fix these\n\n${feedback}` : '');
   const allowed = ['Read', 'Glob', 'Grep', 'Edit', `Bash(${args.cli} pin:*)`, `Bash(${args.cli} verify:*)`];
-  const result = await claude({ prompt, model: args['writer-model'], tools: 'Read,Glob,Grep,Edit,Bash', allowed });
+  const result = await claude({ prompt, model: args['writer-model'], effort: args['writer-effort'], tools: 'Read,Glob,Grep,Edit,Bash', allowed });
   const denied = (result.permission_denials ?? []).map(({ tool_name: tool, tool_input: input }) => (input?.command ? `${tool}: ${input.command}` : tool));
   return { turns: result.num_turns, isError: result.is_error === true, denied };
 }
@@ -135,7 +139,7 @@ async function runReviewers(keys) {
   return Promise.all(
     REVIEWERS.map(async (reviewer) => {
       const prompt = (await readFile(join(AGENTS_DIR, `${reviewer}.md`), 'utf8')).replaceAll('{{MODULES}}', modules);
-      const result = await claude({ prompt, model: args['reviewer-model'], tools: '', allowed: [], schema: VERDICT_SCHEMA });
+      const result = await claude({ prompt, model: args['reviewer-model'], effort: args['reviewer-effort'], tools: '', allowed: [], schema: VERDICT_SCHEMA });
       const { verdict, problems } = result.structured_output ?? { verdict: 'reject', problems: ['the reviewer returned no verdict'] };
       return { reviewer, verdict, problems };
     }),
@@ -188,10 +192,10 @@ async function changedModules(keys, snapshot) {
   return changed;
 }
 
-async function claude({ prompt, model, tools, allowed, schema }) {
+async function claude({ prompt, model, effort, tools, allowed, schema }) {
   const emptyMcp = join(await mkdtemp(join(tmpdir(), 'crystal-agent-mcp-')), 'mcp.json');
   await writeFile(emptyMcp, '{"mcpServers":{}}');
-  const flags = ['-p', prompt, '--output-format', 'json', '--model', model, '--tools', tools, '--disable-slash-commands', '--strict-mcp-config', '--mcp-config', emptyMcp, '--max-budget-usd', args['max-budget-usd']];
+  const flags = ['-p', prompt, '--output-format', 'json', '--model', model, ...(effort ? ['--effort', effort] : []), '--tools', tools, '--disable-slash-commands', '--strict-mcp-config', '--mcp-config', emptyMcp, '--max-budget-usd', args['max-budget-usd']];
   if (process.env.ANTHROPIC_API_KEY) flags.push('--bare');
   if (schema) flags.push('--json-schema', JSON.stringify(schema));
   if (allowed.length > 0) flags.push('--allowedTools', ...allowed);

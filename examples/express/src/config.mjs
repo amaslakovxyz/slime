@@ -10,6 +10,8 @@ const DEMO_DATABASE_URL = 'postgres://slime_reader:slime_reader@localhost:54329/
 const GROQ_MODEL = 'openai/gpt-oss-120b';
 const CLAUDE_GENERATOR_MODEL = 'claude-haiku-5-5';
 const CLAUDE_REVIEW_MODEL = 'claude-sonnet-5-5';
+/** Sonnet at low effort reviews and optimizes about twice as fast; verify and equivalence still gate Crystal. */
+const CLAUDE_SONNET_EFFORT = 'low';
 
 /** The app's own meaning of words and its rules for generated SQL (§4.4). */
 const GLOSSARY = { revenue: 'sum of paid invoices, in cents' };
@@ -47,7 +49,7 @@ async function chooseModels(env) {
   if (env.ANTHROPIC_API_KEY) {
     const { claude } = await import('@slime-cloud/core/claude');
     const apiKey = env.ANTHROPIC_API_KEY;
-    return { generator: claude.generator({ apiKey, model: CLAUDE_GENERATOR_MODEL }), reviewer: claude.reviewer({ apiKey, model: CLAUDE_REVIEW_MODEL }) };
+    return { generator: claude.generator({ apiKey, model: CLAUDE_GENERATOR_MODEL }), reviewer: claude.reviewer({ apiKey, model: CLAUDE_REVIEW_MODEL, effort: CLAUDE_SONNET_EFFORT }) };
   }
   throw new Error('Set GROQ_API_KEY or ANTHROPIC_API_KEY: Slime generates a handler for each new request with that model.');
 }
@@ -64,7 +66,7 @@ async function importCrystals() {
 export async function optimizerFromEnv(env = process.env) {
   if (env.ANTHROPIC_API_KEY) {
     const { claude } = await import('@slime-cloud/core/claude');
-    return claude.optimizer({ apiKey: env.ANTHROPIC_API_KEY, model: 'claude-sonnet-5-5' });
+    return claude.optimizer({ apiKey: env.ANTHROPIC_API_KEY, model: CLAUDE_REVIEW_MODEL, effort: CLAUDE_SONNET_EFFORT });
   }
   if (env.GROQ_API_KEY) {
     const { groq } = await import('@slime-cloud/core/groq');
