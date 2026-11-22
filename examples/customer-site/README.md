@@ -4,6 +4,10 @@
 backend. Its coding agent wrote one Slime request per panel (`src/panels.mjs`)
 instead of SQL, endpoints and a data layer. The use cases and the demo script are in
 [docs/product/customer-demo-use-cases.md](../../docs/product/customer-demo-use-cases.md).
+For the hackathon audience: [atlas-demo.md](../../docs/product/atlas-demo.md) (one page)
+and [atlas-demo-cheatsheet.md](../../docs/product/atlas-demo-cheatsheet.md) (who does what,
+with diagrams). Public deploy plan:
+[2026-11-22-atlas-public-site-plan.md](../../docs/product/2026-11-22-atlas-public-site-plan.md).
 
 | File | What |
 |---|---|
