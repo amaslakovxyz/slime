@@ -1,6 +1,6 @@
 import type { SlimeMode } from '../config/options.js';
 import { literalsInIntent } from '../request/parse.js';
-import type { Execution } from './execute.js';
+import type { Execution } from './execution/execute.js';
 import type { CacheOutcome, QueryMeta } from './types.js';
 import type { ReviewStatus, Tier } from '../handler/record.js';
 

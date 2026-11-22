@@ -121,10 +121,10 @@ Key facts about core today (main @ 441c84b):
 | Source | One `Connector`: `describe()`, `check(sql)`, `run(sql)`, `safetyCheck()`, `close()` | `core/src/sources/sql/types.ts` |
 | Handler | `Artifact = { unsatisfiable, sql, params, shapeJs, assumptions }` | `core/src/models/types.ts` |
 | Dictionary | Tables, columns, keys, enum values, comments, glossary and rules, rendered as text; `schemaHash = sha256(schema)` | `core/src/dictionary/dictionary.ts` |
-| Execution | `connector.run(sql)`, then `shape(rows, input)` in QuickJS, then output validation | `core/src/engine/execute.ts` |
-| Generation | Generate, lint, `check` (cost), run; on failure the error text goes back to the model for repair | `core/src/engine/generate.ts` |
+| Execution | `connector.run(sql)`, then `shape(rows, input)` in QuickJS, then output validation | `core/src/engine/execution/execute.ts` |
+| Generation | Generate, lint, `check` (cost), run; on failure the error text goes back to the model for repair | `core/src/engine/generation/generate.ts` |
 | Sandbox | QuickJS (WASM) in worker threads; JSON in, JSON out; no `process`, `require` or `fetch` (tested) | `core/src/sandbox/quickjs/*`, `core/test/sandbox/quickjs.test.ts` |
-| Lifecycle | Gas → liquid after `gasToLiquidRuns` successful runs, plus an approved review if a reviewer is set. Knows nothing about sources. | `core/src/engine/lifecycle.ts` |
+| Lifecycle | Gas → liquid after `gasToLiquidRuns` successful runs, plus an approved review if a reviewer is set. Knows nothing about sources. | `core/src/engine/promotion.ts` |
 | Crystal | A liquid handler rewritten into a JS module committed to the app: `sql` + in-process `shape`. Checked by an allowlist, SQL lint and an equivalence test that replays recorded inputs and compares results with the original. | `core/src/engine/crystal/*`, `core/src/crystallize/*` |
 
 **How handlers are found and refreshed.** The request key hashes only the
@@ -766,9 +766,9 @@ known so far.
 | Startup | `describe()` and `safetyCheck()` over every source through the redacting wrapper; locked-mode check of saved v2 handlers | `core/src/create-slime.ts`, `core/src/sources/api/call-source.ts` |
 | Dictionary | Render API sources; `schemaHash` over every source; per-source hashes in provenance | `core/src/dictionary/dictionary.ts`, `core/src/request/key.ts` |
 | Handler | `Artifact` v2 with steps; single-SQL-step normalization; saved-handler lint on load | `core/src/models/types.ts`, `core/src/engine/types.ts`, `core/src/engine/handler-cache.ts` |
-| Errors | `SOURCE_ERROR`, `QUERY_TOO_LARGE`; `FINAL_CODES`; value-free v2 repair messages | `core/src/shared/errors.ts`, `core/src/engine/generate.ts`, `core/src/request/shape.ts` |
-| Lint | Step rules (§3.5) | `core/src/engine/checks/*` |
-| Execution | Parallel steps, deadline, abort on any failure, input type check per run, truncation rule, `meta.steps`, `shape(data, input)` | `core/src/engine/execute.ts`, `generate.ts`, `slime-engine.ts` (split), `meta.ts`, `events.ts` |
+| Errors | `SOURCE_ERROR`, `QUERY_TOO_LARGE`; `FINAL_CODES`; value-free v2 repair messages | `core/src/shared/errors.ts`, `core/src/engine/generation/generate.ts`, `core/src/request/shape.ts` |
+| Lint | Step rules (§3.5) | `core/src/artifact/checks/*` |
+| Execution | Parallel steps, deadline, abort on any failure, input type check per run, truncation rule, `meta.steps`, `shape(data, input)` | `core/src/engine/execution/execute.ts`, `generate.ts`, `slime-engine.ts` (split), `meta.ts`, `events.ts` |
 | Sandbox | The first `shape` argument may be an object of step rows; API rows checked for plain JSON | `core/src/sandbox/types.ts`, `core/src/sandbox/quickjs/quickjs-runner.ts` |
 | Models | Generation and review prompts for steps (in a new file); JSON reply format and schema; offline generator accepts v2 | `core/src/models/prompts-multi-source.ts`, `roles.ts`, `schemas.ts`, `offline/` |
 | Crystal | Skip handlers with API steps, with a `skipped` outcome | `core/src/crystallize/crystallize.ts` |

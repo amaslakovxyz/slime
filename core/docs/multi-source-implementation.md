@@ -365,7 +365,7 @@ multi-source". If P0 changes one, update the steps that cite it.
 - **Done when:** typecheck passes; all tests pass unchanged; P1.0 pins unchanged.
 
 ### P2.4 Error codes and value-free repair messages (4 h)
-- **Files:** `core/src/shared/errors.ts`, `core/src/engine/generate.ts`, `core/src/request/shape.ts`, new `core/src/engine/repair-message.ts`.
+- **Files:** `core/src/shared/errors.ts`, `core/src/engine/generation/generate.ts`, `core/src/request/shape.ts`, new `core/src/engine/generation/repair-message.ts`.
 - **Change:**
   - Add `SOURCE_ERROR: 502` and `QUERY_TOO_LARGE: 422` to `STATUS_BY_CODE`.
     Add `SOURCE_ERROR` to `FINAL_CODES`; `QUERY_TOO_LARGE` stays repairable
@@ -384,7 +384,7 @@ multi-source". If P0 changes one, update the steps that cite it.
 - **Done when:** tests pass; P1.0 pins unchanged.
 
 ### P2.5 Step lint (5 h)
-- **Files:** new `core/src/engine/checks/steps.ts`; `core/src/engine/checks/sql.ts` (export the per-SQL checks taking `{ sql, params, shapeJs }`).
+- **Files:** new `core/src/artifact/checks/steps.ts`; `core/src/artifact/checks/sql.ts` (export the per-SQL checks taking `{ sql, params, shapeJs }`).
 - **Change:** `lintSteps(artifact, context)`. The context is
   `{ sqlSourceName, apiSchemas, inputNames, maxSteps }`. Each rule throws
   `INVALID_HANDLER` with one sentence:
@@ -429,7 +429,7 @@ multi-source". If P0 changes one, update the steps that cite it.
 - **Done when:** tests pass.
 
 ### P2.7 Step executor (8 h)
-- **Files:** new `core/src/engine/execute-steps.ts`, new `core/src/engine/step-args.ts`; `core/src/engine/execute.ts` (dispatch).
+- **Files:** new `core/src/engine/execution/steps.ts`, new `core/src/engine/execution/step-args.ts`; `core/src/engine/execution/execute.ts` (dispatch).
 - **Change:**
   - `executeArtifact` keeps the v1 path untouched. A v2 artifact goes to
     `executeSteps(deps, job)`, whose deps gain `sources` and `apiSchemas`.
@@ -488,7 +488,7 @@ multi-source". If P0 changes one, update the steps that cite it.
 - **Done when:** tests pass.
 
 ### P2.8 Generation, normalization and meta (6 h)
-- **Files:** `core/src/engine/generate.ts`, new `core/src/engine/normalize-artifact.ts`, `core/src/engine/meta.ts`, `core/src/engine/events.ts`, `core/src/engine/types.ts` (`QueryMeta`, `StepTiming`), `core/src/config/options.ts` (`GeneratedEvent`).
+- **Files:** `core/src/engine/generation/generate.ts`, new `core/src/engine/normalize-artifact.ts`, `core/src/engine/meta.ts`, `core/src/engine/events.ts`, `core/src/engine/types.ts` (`QueryMeta`, `StepTiming`), `core/src/config/options.ts` (`GeneratedEvent`).
 - **Change:**
   - `GenerationDeps` gains `sources`, `apiSchemas`, `format`.
   - Right after `assertSatisfiable`, call `normalizeArtifact(artifact)`. A v2

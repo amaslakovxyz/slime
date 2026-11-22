@@ -1,15 +1,15 @@
 // The v2 step executor (design §3.5, MS6, MS7) with a fake connector and fake API sources.
 import assert from 'node:assert/strict';
 import { after, describe, test } from 'node:test';
-import { DEFAULT_LIMITS } from '../../src/config/defaults.js';
-import type { Connector } from '../../src/sources/sql/types.js';
-import { executeArtifact, type ExecutionDeps } from '../../src/engine/execute.js';
-import type { ApiStep, Artifact, SqlStep } from '../../src/artifact/artifact.js';
-import { QuickJSRunner } from '../../src/sandbox/quickjs/quickjs-runner.js';
-import { SlimeError } from '../../src/shared/errors.js';
-import type { ApiSchema, ApiSource } from '../../src/sources/api/types.js';
-import { FAKE_SECRET, fakeApiSource, type FakeOperation } from '../../src/testing/fake-api-source.js';
-import { fakeConnector } from '../../src/testing/fakes.js';
+import { DEFAULT_LIMITS } from '../../../src/config/defaults.js';
+import type { Connector } from '../../../src/sources/sql/types.js';
+import { executeArtifact, type ExecutionDeps } from '../../../src/engine/execution/execute.js';
+import type { ApiStep, Artifact, SqlStep } from '../../../src/artifact/artifact.js';
+import { QuickJSRunner } from '../../../src/sandbox/quickjs/quickjs-runner.js';
+import { SlimeError } from '../../../src/shared/errors.js';
+import type { ApiSchema, ApiSource } from '../../../src/sources/api/types.js';
+import { FAKE_SECRET, fakeApiSource, type FakeOperation } from '../../../src/testing/fake-api-source.js';
+import { fakeConnector } from '../../../src/testing/fakes.js';
 
 const runner = new QuickJSRunner();
 after(() => runner.close());

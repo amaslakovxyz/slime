@@ -1,5 +1,5 @@
 import { SlimeError } from '../../shared/errors.js';
-import { assertValidOutput, bindParams, queryLimits, type Execution, type ExecutionDeps } from '../execute.js';
+import { assertValidOutput, bindParams, queryLimits, type Execution, type ExecutionDeps } from '../execution/execute.js';
 import type { InputValues } from '../../request/parse.js';
 import type { CrystalHandler, ShapeFunction } from '../../handler/crystal.js';
 

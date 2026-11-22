@@ -1,11 +1,11 @@
 // Crystal comes first: reviewed, equivalence-tested code that ships with the app (C10).
-import type { ParsedRequest } from '../request/parse.js';
-import { checkParamTypes } from '../request/params.js';
-import { runCrystal } from './crystal/run-crystal.js';
-import type { CrystalHandler } from '../handler/crystal.js';
-import { queryMeta } from './meta.js';
-import type { EngineParts } from './slime-engine.js';
-import type { QueryResult } from './types.js';
+import type { ParsedRequest } from '../../request/parse.js';
+import { checkParamTypes } from '../../request/params.js';
+import { runCrystal } from './run-crystal.js';
+import type { CrystalHandler } from '../../handler/crystal.js';
+import { queryMeta } from '../meta.js';
+import type { EngineParts } from '../slime-engine.js';
+import type { QueryResult } from '../types.js';
 
 export interface CrystalAnswer {
   key: string;

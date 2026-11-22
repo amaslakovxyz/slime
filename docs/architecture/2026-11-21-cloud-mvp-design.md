@@ -320,7 +320,7 @@ s3://slime-crystals-025772230981/endpoints/<id>/crystal/<crystal key>.mjs
 ```
 
 - **Loading.** The TenantCache reads `manifest.json`, then each listed module. It computes the module's SHA-256 and compares it with the manifest's `sha256`; a mismatch drops that Crystal and adds a Lifecycle warning. It then calls core `parseModule(source)`, which parses the module, checks its structure and runs the allowlist on `shape`. It builds a `CrystalHandler` whose `shape` is the **source string**, plus the manifest's `intent`, `output`, `paramTypes`, `schemaHash` and `review`. Nothing is imported, written to `/tmp` for loading, or evaluated outside QuickJS.
-- **Execution (core change).** `runCrystal` takes the engine's runner. When `shape` is a string, it runs it through `runner.run({code, rows, input}, {timeoutMs: shapeTimeoutMs, memoryBytes: shapeMemoryBytes})`, the same path and limits as Liquid in `executeArtifact` (`core/src/engine/execute.ts:29-38`). Function shapes, used by self-hosted apps that import `index.mjs`, keep running in-process as today.
+- **Execution (core change).** `runCrystal` takes the engine's runner. When `shape` is a string, it runs it through `runner.run({code, rows, input}, {timeoutMs: shapeTimeoutMs, memoryBytes: shapeMemoryBytes})`, the same path and limits as Liquid in `executeArtifact` (`core/src/engine/execution/execute.ts:29-38`). Function shapes, used by self-hosted apps that import `index.mjs`, keep running in-process as today.
 - **Crystallize in the Lambda.**
   1. `POST /ep/<id>/v0/crystallize {keys}` reaches one instance.
   2. It flushes, syncs live runs, and downloads the current manifest and modules into a private work folder `/tmp/slime/<id>/<random>/`. Already-frozen keys then report `already`.
@@ -569,7 +569,7 @@ Work happens in `.worktrees/cloud-mvp` on branch `feat/cloud-mvp`. Commits follo
 
 #### Group 1: core (sandboxed Crystals, injected runner)
 
-##### 1. `core/src/engine/crystal/types.ts` (Modify)
+##### 1. `core/src/handler/crystal.ts` (Modify)
 
 *   **Type / Scope**: TypeScript types.
 *   **Proposed Changes**: `CrystalHandler.shape` becomes `ShapeFunction | string | null`. A string is the source of `function shape(rows, input)` and runs in the sandbox. A function keeps running in-process for apps that import `index.mjs`. Update the doc comment.

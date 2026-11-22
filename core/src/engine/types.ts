@@ -1,6 +1,6 @@
 // The Slime instance API (PLAN.md §5).
 import type { SlimeMode } from '../config/options.js';
-import type { StepTiming } from './execute-steps.js';
+import type { StepTiming } from './execution/steps.js';
 import type { HandlerProvenance } from '../request/key.js';
 import type { SlimeRequest } from '../request/parse.js';
 import type { ReviewStatus, StoredTier, Tier } from '../handler/record.js';

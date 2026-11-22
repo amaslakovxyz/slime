@@ -1,14 +1,14 @@
-import { assertWithinLimit } from './checks/limit.js';
-import type { LimitOptions } from '../config/options.js';
-import { SlimeError } from '../shared/errors.js';
-import type { Connector, QueryLimits } from '../sources/sql/types.js';
-import type { Artifact } from '../artifact/artifact.js';
-import type { SandboxRunner, ShapeInput } from '../sandbox/types.js';
-import type { ApiSchema } from '../sources/api/types.js';
-import type { Source } from '../sources/types.js';
-import { executeSteps, type StepTiming } from './execute-steps.js';
-import type { InputValues } from '../request/parse.js';
-import { validateData, type Shape } from '../request/shape.js';
+import { assertWithinLimit } from './output-limit.js';
+import type { LimitOptions } from '../../config/options.js';
+import { SlimeError } from '../../shared/errors.js';
+import type { Connector, QueryLimits } from '../../sources/sql/types.js';
+import type { Artifact } from '../../artifact/artifact.js';
+import type { SandboxRunner, ShapeInput } from '../../sandbox/types.js';
+import type { ApiSchema } from '../../sources/api/types.js';
+import type { Source } from '../../sources/types.js';
+import { executeSteps, type StepTiming } from './steps.js';
+import type { InputValues } from '../../request/parse.js';
+import { validateData, type Shape } from '../../request/shape.js';
 
 export interface ExecutionDeps {
   connector: Connector;

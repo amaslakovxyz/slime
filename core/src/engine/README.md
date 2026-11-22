@@ -6,27 +6,45 @@ The Slime instance that `createSlime()` returns (PLAN.md §5, §7 M2). A query
 is parsed, keyed, answered from a cached or saved handler, or generated on a
 miss, then run and checked against `output`.
 
+Orchestration, at the top:
+
 - `slime-engine.ts`: `SlimeEngine`, which implements `Slime` (`query`,
   `handlers`, `stats`, `evict`, `flush`, `close`).
 - `handler-cache.ts`: Gas handlers in memory until `gasWindowMs` ends; saved
-  handlers read from the store's `handlers` namespace on a miss.
-- `generate.ts`: generation with repairs within `generationBudgetMs`, lint,
-  the `maxQueryCost` check and the first run.
-- `execute.ts`: runs a handler: SQL through the connector, the shaping
-  function in the sandbox, the output check and the R6 limit check.
-- `coalescer.ts`: concurrent identical requests share one generation.
-- `generation-limits.ts`: `maxGenerationsPerHour` per instance over a fixed
-  hour, and `maxConcurrentGenerations` slots.
-- `lifecycle.ts`: counts runs and promotes Gas to Liquid (M4 rule), with a
+  handlers read from the store on a miss.
+- `promotion.ts`: counts runs and promotes Gas to Liquid (M4 rule), with a
   review first when a reviewer is configured.
-- `review-loop.ts`: review, then revise with the reviewer's notes, up to
-  `maxReviews` reviews.
+- `coalescer.ts`: concurrent identical requests share one generation.
 - `background.ts`: work off the request path (reviews, store writes);
   `flush()` waits for it.
+- `engine-deps.ts`: the dependency bundles handed to generation, execution and
+  the source lifecycle.
 - `events.ts`: `emitSafely` (a throwing `onEvent` never fails a query) and
   the `generated` and `error` event builders.
 - `meta.ts`: builds `meta` for every tier.
 - `types.ts`: the public instance API types.
+
+Making handlers, in `generation/`:
+
+- `generate.ts`: generation with repairs within `generationBudgetMs`, lint,
+  the `maxQueryCost` check and the first run.
+- `repair-message.ts`: what a failed attempt tells the model, without values.
+- `review-loop.ts`: review, then revise with the reviewer's notes, up to
+  `maxReviews` reviews.
+- `limits.ts`: `maxGenerationsPerHour` per instance over a fixed hour, and
+  `maxConcurrentGenerations` slots.
+
+Running handlers, in `execution/`:
+
+- `execute.ts`: runs a handler's steps, then the output check.
+- `steps.ts`: every step in parallel under one deadline; SQL through the
+  connector, API steps through `callSource`, then `shape(data, input)` in the
+  sandbox.
+- `step-args.ts`: an API step's arguments, type-checked on every run.
+- `output-limit.ts`: the R6 check, a list no longer than `input.limit`.
+
+Serving Crystal, in [crystal/](./crystal/README.md): `run-crystal.ts` and
+`answer.ts`.
 
 ## Interface
 

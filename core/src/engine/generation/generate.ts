@@ -1,18 +1,18 @@
-import type { Artifact } from '../artifact/artifact.js';
-import { lintSteps } from '../artifact/checks/steps.js';
-import type { ApiSchema } from '../sources/api/types.js';
-import type { Source } from '../sources/types.js';
-import type { LimitOptions } from '../config/options.js';
-import { SlimeError } from '../shared/errors.js';
-import type { Connector } from '../sources/sql/types.js';
-import type { Generator, ModelUsage } from '../models/types.js';
-import type { SandboxRunner } from '../sandbox/types.js';
-import type { HandlerProvenance } from '../request/key.js';
-import type { ParsedRequest } from '../request/parse.js';
-import { checkParamTypes, paramTypesForModel, type ParamTypes } from '../request/params.js';
-import { bindParams, executeArtifact, queryLimits, type Execution } from './execute.js';
+import type { Artifact } from '../../artifact/artifact.js';
+import { lintSteps } from '../../artifact/checks/steps.js';
+import type { ApiSchema } from '../../sources/api/types.js';
+import type { Source } from '../../sources/types.js';
+import type { LimitOptions } from '../../config/options.js';
+import { SlimeError } from '../../shared/errors.js';
+import type { Connector } from '../../sources/sql/types.js';
+import type { Generator, ModelUsage } from '../../models/types.js';
+import type { SandboxRunner } from '../../sandbox/types.js';
+import type { HandlerProvenance } from '../../request/key.js';
+import type { ParsedRequest } from '../../request/parse.js';
+import { checkParamTypes, paramTypesForModel, type ParamTypes } from '../../request/params.js';
+import { bindParams, executeArtifact, queryLimits, type Execution } from '../execution/execute.js';
 import { repairMessage } from './repair-message.js';
-import type { HandlerRecord } from '../handler/record.js';
+import type { HandlerRecord } from '../../handler/record.js';
 
 export interface GenerationDeps {
   generator: Generator;

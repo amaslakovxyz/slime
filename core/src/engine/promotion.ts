@@ -5,10 +5,10 @@ import type { SlimeStore } from '../stores/types.js';
 import type { BackgroundTasks } from './background.js';
 import { type HandlerCache } from './handler-cache.js';
 import { HANDLERS_NS } from '../handler/record.js';
-import type { ReviewOutcome } from './review-loop.js';
+import type { ReviewOutcome } from './generation/review-loop.js';
 import type { HandlerRecord } from '../handler/record.js';
 
-export interface LifecycleDeps {
+export interface PromotionDeps {
   store: SlimeStore;
   cache: HandlerCache;
   background: BackgroundTasks;
@@ -20,12 +20,12 @@ export interface LifecycleDeps {
 }
 
 /** Gas → Liquid (§7, M4 rule): enough successful runs, then an approved review when a reviewer is set. */
-export class HandlerLifecycle {
-  readonly #deps: LifecycleDeps;
+export class HandlerPromotion {
+  readonly #deps: PromotionDeps;
   // One review at a time: reviews are background work and share the generation limits.
   #reviewQueue: Promise<void> = Promise.resolve();
 
-  constructor(deps: LifecycleDeps) {
+  constructor(deps: PromotionDeps) {
     this.#deps = deps;
   }
 

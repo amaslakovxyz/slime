@@ -1,6 +1,6 @@
 // What a failed attempt tells the model on repair: codes, paths and types, never
 // values, because rows can hold text written by outside users (MS15, S8).
-import type { SlimeError } from '../shared/errors.js';
+import type { SlimeError } from '../../shared/errors.js';
 
 const QUOTED = /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g;
 const QUOTED_PLACEHOLDER = '<value>';

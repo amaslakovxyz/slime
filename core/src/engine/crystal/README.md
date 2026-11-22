@@ -12,6 +12,7 @@ and passes handlers whose shapes are the source strings.
 - The types (`CrystalHandler`, `CrystalRegistry`, `ShapeFunction`) are in
   `../../handler/crystal.ts`.
 - `run-crystal.ts`: `runCrystal(deps, crystal, input)`.
+- `answer.ts`: `answerFromCrystal`, the engine's Crystal path with its `meta`.
 
 ## Interface
 

@@ -1,10 +1,10 @@
-import type { SlimeEvent } from '../config/events.js';
-import type { ModelUsage, ReviewRequest, Reviewer } from '../models/types.js';
-import { generatedEvent } from './events.js';
-import { paramTypesForModel } from '../request/params.js';
+import type { SlimeEvent } from '../../config/events.js';
+import type { ModelUsage, ReviewRequest, Reviewer } from '../../models/types.js';
+import { generatedEvent } from '../events.js';
+import { paramTypesForModel } from '../../request/params.js';
 import { generateHandler, type GenerationDeps } from './generate.js';
-import type { GenerationLimits } from './generation-limits.js';
-import type { HandlerRecord } from '../handler/record.js';
+import type { GenerationLimits } from './limits.js';
+import type { HandlerRecord } from '../../handler/record.js';
 
 export interface ReviewDeps {
   reviewer: Reviewer;
