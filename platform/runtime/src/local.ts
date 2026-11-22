@@ -15,7 +15,7 @@ import { isAuthorized, parseCrystalTokens } from './auth.js';
 import { slimeConfigFromEnv } from './config.js';
 import { RecentRequests } from './events.js';
 import { UsageMeter } from './usage.js';
-import { syncLiveRuns } from './live-runs.js';
+import { saveRunsOnExit, syncLiveRuns } from './live-runs.js';
 
 export { syncLiveRuns };
 
@@ -154,9 +154,13 @@ async function main(): Promise<void> {
     const crystals = Object.keys(config.crystal || {}).length;
     console.log(JSON.stringify({ listening: `http://localhost:${port}/`, crystals, mode: config.mode }));
   });
-  const stop = () => server.close(() => process.exit(0));
-  process.on('SIGTERM', stop);
-  process.on('SIGINT', stop);
+  // Liquid run counts live in memory: save them before the runner's restart takes the process down.
+  const stop = async () => {
+    if (store) await saveRunsOnExit(slime, store);
+    server.close(() => process.exit(0));
+  };
+  process.on('SIGTERM', () => void stop());
+  process.on('SIGINT', () => void stop());
 }
 
 function header(req: IncomingMessage, name: string): string | undefined {

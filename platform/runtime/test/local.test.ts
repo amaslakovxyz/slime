@@ -170,6 +170,17 @@ describe('store helpers', () => {
     assert.equal(await store.get('handlers', 'gas-only'), undefined);
   });
 
+  test('saveRunsOnExit saves live runs even when the flush hangs or fails', async () => {
+    const { saveRunsOnExit } = await import('../src/live-runs.js');
+    const handlers = () => [{ key: 'a', intent: 'i', tier: 'liquid' as const, runs: 12, createdAt: '1' }];
+    for (const flush of [() => new Promise<void>(() => {}), () => Promise.reject(new Error('review store down'))]) {
+      const store = memoryStore();
+      await store.put('handlers', 'a', { key: 'a', runs: 3 });
+      await saveRunsOnExit({ flush, handlers } as never, store, 20);
+      assert.equal(((await store.get('handlers', 'a')) as { runs: number }).runs, 12);
+    }
+  });
+
   test('toSavedHandler marks a record made with another provenance as stale, only when given the current one', () => {
     const provenance = { schemaHash: 'old', dictionaryHash: 'd', promptHash: 'p', model: 'm' };
     const record = { key: 'a', intent: 'i', tier: 'liquid', runs: 12, review: 'approved', fixtures: [{}], createdAt: '1', provenance };
