@@ -41,7 +41,7 @@ const { values: args } = parseArgs({
     report: { type: 'string' },
     // This repository's build; an app passes "npx slime-crystal".
     cli: { type: 'string', default: 'node crystal/dist/bin.js' },
-    'writer-model': { type: 'string', default: 'claude-opus-5-5' },
+    'writer-model': { type: 'string', default: 'claude-sonnet-5-5' },
     'reviewer-model': { type: 'string', default: 'claude-sonnet-5-5' },
     'max-budget-usd': { type: 'string', default: '10' },
   },

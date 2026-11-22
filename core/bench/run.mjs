@@ -1,7 +1,7 @@
 // The bench (M6): the built package against the demo database. Correctness of
 // each case, cache hits for repeats and other values, and timings.
 //   GROQ_API_KEY=... npm run bench -w @slime-cloud/core          (openai/gpt-oss-120b)
-//   ANTHROPIC_API_KEY=... npm run bench -w @slime-cloud/core     (claude-haiku-5-5 + claude-opus-5-5 review)
+//   ANTHROPIC_API_KEY=... npm run bench -w @slime-cloud/core     (claude-haiku-5-5 + claude-sonnet-5-5 review)
 // Optional: DATABASE_URL, BENCH_CASES (another case file, e.g. examples/shop/bench-cases.mjs), and case names to run only those.
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -95,7 +95,7 @@ async function chooseModels() {
   if (process.env.ANTHROPIC_API_KEY) {
     const { claude } = await import('@slime-cloud/core/claude');
     const apiKey = process.env.ANTHROPIC_API_KEY;
-    return { label: 'claude-haiku-5-5, reviewed by claude-opus-5-5', generator: claude.generator({ apiKey, model: 'claude-haiku-5-5' }), reviewer: claude.reviewer({ apiKey, model: 'claude-opus-5-5' }) };
+    return { label: 'claude-haiku-5-5, reviewed by claude-sonnet-5-5', generator: claude.generator({ apiKey, model: 'claude-haiku-5-5' }), reviewer: claude.reviewer({ apiKey, model: 'claude-sonnet-5-5' }) };
   }
   console.error('The bench measures a model: set GROQ_API_KEY or ANTHROPIC_API_KEY.');
   process.exit(1);

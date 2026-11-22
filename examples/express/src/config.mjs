@@ -9,7 +9,7 @@ export const CRYSTAL_DIR = `${APP_DIR}slime-crystal`;
 const DEMO_DATABASE_URL = 'postgres://slime_reader:slime_reader@localhost:54329/slime';
 const GROQ_MODEL = 'openai/gpt-oss-120b';
 const CLAUDE_GENERATOR_MODEL = 'claude-haiku-5-5';
-const CLAUDE_REVIEW_MODEL = 'claude-opus-5-5';
+const CLAUDE_REVIEW_MODEL = 'claude-sonnet-5-5';
 
 /** The app's own meaning of words and its rules for generated SQL (§4.4). */
 const GLOSSARY = { revenue: 'sum of paid invoices, in cents' };
@@ -64,7 +64,7 @@ async function importCrystals() {
 export async function optimizerFromEnv(env = process.env) {
   if (env.ANTHROPIC_API_KEY) {
     const { claude } = await import('@slime-cloud/core/claude');
-    return claude.optimizer({ apiKey: env.ANTHROPIC_API_KEY, model: 'claude-opus-5-5' });
+    return claude.optimizer({ apiKey: env.ANTHROPIC_API_KEY, model: 'claude-sonnet-5-5' });
   }
   if (env.GROQ_API_KEY) {
     const { groq } = await import('@slime-cloud/core/groq');

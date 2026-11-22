@@ -25,7 +25,7 @@ interface Models {
 
 const MEBIBYTE = 1024 * 1024;
 const DEFAULT_MODELS = {
-  claude: { generator: 'claude-haiku-5-5', reviewer: 'claude-opus-5-5' },
+  claude: { generator: 'claude-haiku-5-5', reviewer: 'claude-sonnet-5-5' },
   groq: { generator: 'openai/gpt-oss-120b', reviewer: 'openai/gpt-oss-120b' },
 } as const;
 

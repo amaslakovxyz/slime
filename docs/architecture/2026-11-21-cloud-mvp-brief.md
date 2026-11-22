@@ -140,7 +140,7 @@ Three resolutions were proposed:
 
 **10. Medium: model spend is outside the $15 AWS budget.**
 - The freeze only blocks AWS resources (`FINOPS.md:43`).
-- The default reviewer is `claude-opus-5-5` (`config.ts:24`).
+- The default reviewer is `claude-sonnet-5-5` (`config.ts:24`).
 - The review timeout is 60 s against a 30 s Lambda timeout, so reviews that are cut off are retried and paid again (`lambda.ts:46-48`).
 - Resolution: set an Anthropic workspace spend limit, a per-endpoint daily quota (later, from objection 4), and a cheaper default reviewer or Groq for invited users.
 

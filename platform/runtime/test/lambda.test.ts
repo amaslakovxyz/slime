@@ -71,7 +71,7 @@ describe('config from env (the sandbox variable names)', () => {
   test('claude is the default provider, with a reviewer unless SLIME_REVIEW=off', async () => {
     const withReview = await slimeConfigFromEnv({ ...BASE_ENV, SLIME_PROVIDER: '', ANTHROPIC_API_KEY: 'test' });
     const withoutReview = await slimeConfigFromEnv({ ...BASE_ENV, SLIME_PROVIDER: '', ANTHROPIC_API_KEY: 'test', SLIME_REVIEW: 'off' });
-    assert.deepEqual([withReview.generator?.model, withReview.reviewer?.model], ['claude-haiku-5-5', 'claude-opus-5-5']);
+    assert.deepEqual([withReview.generator?.model, withReview.reviewer?.model], ['claude-haiku-5-5', 'claude-sonnet-5-5']);
     assert.equal(withoutReview.reviewer, undefined);
     await Promise.all([withReview.connector.close(), withoutReview.connector.close()]);
   });
