@@ -81,8 +81,9 @@ components:
                 500, QUERY_ERROR 500, QUERY_TOO_EXPENSIVE 500, INVALID_HANDLER
                 500, GENERATION_FAILED 502, SOURCE_ERROR 502, GENERATION_TIMEOUT
                 504, EXECUTION_TIMEOUT 504; runtime UNAUTHORIZED 401,
-                ENDPOINT_NOT_FOUND 404, INTERNAL 500, NOT_READY 503 (engine
-                cannot start), INVALID_REQUEST 413 (body above 16 KB).
+                ENDPOINT_NOT_FOUND 404, NOT_FOUND 404 (path or method the
+                endpoint does not serve; since PR #59), INTERNAL 500, NOT_READY
+                503 (engine cannot start), INVALID_REQUEST 413 (body above 16 KB).
                 PROPOSED: CRYSTAL_NOT_READY 409, REVIEW_REQUIRED 409,
                 ACCOUNT_EXISTS 409. The first draft's INVALID_INPUT maps onto
                 INVALID_REQUEST (+ expected/missing), PROVIDER_ERROR onto
@@ -108,6 +109,7 @@ components:
                 # shipped — runtime and Lambda router
                 - UNAUTHORIZED
                 - ENDPOINT_NOT_FOUND
+                - NOT_FOUND
                 - NOT_READY
                 - INTERNAL
                 # proposed

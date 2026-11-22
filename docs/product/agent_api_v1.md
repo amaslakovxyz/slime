@@ -326,6 +326,7 @@ Shipped codes:
 | `WRITE_REFUSED`, `ACCESS_DENIED` | 403 | core |
 | `HANDLER_NOT_FOUND` | 404 | core (crystal route) |
 | `ENDPOINT_NOT_FOUND` | 404 | Lambda router |
+| `NOT_FOUND` | 404 | runtime: a path or method the endpoint does not serve (since PR #59) |
 | `INTENT_UNSATISFIABLE`, `QUERY_TOO_LARGE` | 422 | core |
 | `GENERATION_RATE_LIMITED` | 429 | core |
 | `SHAPE_MISMATCH`, `SANDBOX_ERROR`, `QUERY_ERROR`, `QUERY_TOO_EXPENSIVE`, `INVALID_HANDLER`, `INTERNAL` | 500 | core; `INTERNAL` runtime |
@@ -342,7 +343,8 @@ maps onto the shipped `GENERATION_FAILED` (the model call failed).
 5xx is meant for Slime's own failures; a malformed client request should
 never be a 5xx. Main is close but not there: `INVALID_HANDLER` (500) is
 still what a generation that cannot map an input ends in (section 2).
-Unknown paths answer a plain-text `404 Not Found`, outside the envelope.
+A path or method the endpoint does not serve answers `404 NOT_FOUND` inside
+the envelope (PR #59; before it, a plain-text `404 Not Found`).
 
 ## Token model
 
