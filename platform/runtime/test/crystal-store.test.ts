@@ -146,7 +146,7 @@ const PLANS_IN_COUNTRY = {
   output: [{ plan: 'string', accounts: [{ name: 'string' }] }],
 };
 
-/** 12 runs of a request with a shape: Liquid after 3 (offline has no reviewer), ready to crystallize after 10. */
+/** 12 runs of a request with a shape: Liquid after 3 (canned handlers, no reviewer), ready to crystallize after 10. */
 async function liquidHandler(h: Harness): Promise<{ key: string; answer: unknown }> {
   let answer: unknown;
   let key = '';

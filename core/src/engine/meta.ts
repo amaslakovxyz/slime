@@ -1,4 +1,3 @@
-import type { SlimeMode } from '../config/options.js';
 import { literalsInIntent } from '../request/parse.js';
 import type { Execution } from './execution/execute.js';
 import type { CacheOutcome, QueryMeta } from './types.js';
@@ -17,7 +16,6 @@ export interface MetaParts {
   review: ReviewStatus;
   execution: Execution;
   code: GeneratedCode;
-  mode: SlimeMode;
   intent: string;
   totalMs: number;
   generateMs?: number;
@@ -27,7 +25,7 @@ const MS_PRECISION = 100;
 // Repeated in warnings so a client that only checks warnings still learns the data is incomplete.
 const TRUNCATED_WARNING = 'The result was cut at the row cap, so data is incomplete; narrow the request or page it with limit and offset.';
 
-export function queryMeta({ handlerKey, tier, cache, review, execution, code, mode, intent, totalMs, generateMs }: MetaParts): QueryMeta {
+export function queryMeta({ handlerKey, tier, cache, review, execution, code, intent, totalMs, generateMs }: MetaParts): QueryMeta {
   const timingsMs = {
     total: roundMs(totalMs),
     run: roundMs(execution.runMs),
@@ -36,13 +34,12 @@ export function queryMeta({ handlerKey, tier, cache, review, execution, code, mo
   };
   const warnings = literalsInIntent(intent).map(literalWarning);
   if (execution.truncated) warnings.push(TRUNCATED_WARNING);
-  const steps = mode === 'explore' && execution.steps ? { steps: execution.steps } : {};
-  return { handlerKey, tier, cache, truncated: execution.truncated, timingsMs, warnings, review, ...steps, ...generatedCodeFor(mode, code) };
+  const steps = execution.steps ? { steps: execution.steps } : {};
+  return { handlerKey, tier, cache, truncated: execution.truncated, timingsMs, warnings, review, ...steps, ...generatedCode(code) };
 }
 
-// R9, R11: generated code is shown in explore mode only.
-function generatedCodeFor(mode: SlimeMode, { sql, shapeJs, assumptions }: GeneratedCode): Pick<QueryMeta, 'sql' | 'shapeJs' | 'assumptions'> {
-  if (mode === 'locked') return {};
+// R9: the code that answered, so the caller can see what ran.
+function generatedCode({ sql, shapeJs, assumptions }: GeneratedCode): Pick<QueryMeta, 'sql' | 'shapeJs' | 'assumptions'> {
   return { sql, assumptions, ...(shapeJs ? { shapeJs } : {}) };
 }
 

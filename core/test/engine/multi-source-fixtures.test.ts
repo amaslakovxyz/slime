@@ -42,9 +42,9 @@ function notionFetch({ schema = SCHEMA, queryStatus }: { schema?: unknown; query
 const instances: Slime[] = [];
 after(() => Promise.all(instances.map((slime) => slime.close())));
 
-async function start(store: SlimeStore, fetchImpl: FetchFunction, generator?: StubGenerator): Promise<Slime> {
+async function start(store: SlimeStore, fetchImpl: FetchFunction, generator: StubGenerator): Promise<Slime> {
   const notion = notionSource({ token: 'ntn_secret', dataSources: { feedback: DATA_SOURCE }, fetchImpl });
-  const slime = await createSlime(new SlimeConfig({ sources: { db: fakeConnector({ rows: [{ name: 'Acme' }] }), notion }, store, tiers: { gasToLiquidRuns: 1 }, ...(generator ? { generator } : {}) }));
+  const slime = await createSlime(new SlimeConfig({ sources: { db: fakeConnector({ rows: [{ name: 'Acme' }] }), notion }, store, tiers: { gasToLiquidRuns: 1 }, generator }));
   instances.push(slime);
   return slime;
 }
@@ -58,7 +58,7 @@ async function savedStore(generator: StubGenerator): Promise<SlimeStore> {
 }
 
 describe('the engine over the Notion adapter', () => {
-  test('a new Notion property changes the schema hash, so explore mode regenerates', async () => {
+  test('a new Notion property changes the schema hash, so the handler is generated again', async () => {
     const generator = stubGenerator(() => HANDLER);
     const store = await savedStore(generator);
     const withProperty = { ...SCHEMA, properties: { ...SCHEMA.properties, Priority: { name: 'Priority', type: 'select', select: { options: [{ name: 'High' }] } } } };
@@ -67,17 +67,21 @@ describe('the engine over the Notion adapter', () => {
     assert.equal(generator.calls, 2);
   });
 
-  test('a renamed property makes locked mode refuse the saved handler, with the reason', async () => {
-    const store = await savedStore(stubGenerator(() => HANDLER));
+  test('a renamed property means the saved handler is not served: it is generated again (MS14)', async () => {
+    const generator = stubGenerator(() => HANDLER);
+    const store = await savedStore(generator);
     const { Sentiment, ...rest } = SCHEMA.properties;
     const renamed = { ...SCHEMA, properties: { ...rest, Mood: { ...Sentiment, name: 'Mood' } } };
-    const locked = await start(store, notionFetch({ schema: renamed }));
-    await assert.rejects(locked.query(REQUEST), { code: 'HANDLER_NOT_FOUND', message: /"feedback.query" has no such param/ });
+    const slime = await start(store, notionFetch({ schema: renamed }), generator);
+    // The stub writes the old handler again, which lint now refuses.
+    await assert.rejects(slime.query(REQUEST), { code: 'INVALID_HANDLER', message: /"feedback.query" has no such param/ });
+    assert.ok(generator.calls > 1);
   });
 
   test('Notion answering 503 gives a retryable SOURCE_ERROR and no data', async () => {
-    const store = await savedStore(stubGenerator(() => HANDLER));
-    const locked = await start(store, notionFetch({ queryStatus: 503 }));
-    await assert.rejects(locked.query(REQUEST), { code: 'SOURCE_ERROR', retryable: true, details: { source: 'notion', operation: 'feedback.query', status: 503, attempts: 1 } });
+    const generator = stubGenerator(() => HANDLER);
+    const store = await savedStore(generator);
+    const slime = await start(store, notionFetch({ queryStatus: 503 }), generator);
+    await assert.rejects(slime.query(REQUEST), { code: 'SOURCE_ERROR', retryable: true, details: { source: 'notion', operation: 'feedback.query', status: 503, attempts: 1 } });
   });
 });

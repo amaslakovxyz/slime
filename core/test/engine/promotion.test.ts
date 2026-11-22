@@ -10,7 +10,7 @@ import type { HandlerRecord } from '../../src/handler/record.js';
 import type { GenerationRequest } from '../../src/models/types.js';
 import type { SlimeStore } from '../../src/stores/types.js';
 import { memoryStore } from '../../src/stores/memory-store.js';
-import { artifact, fakeConnector, stubGenerator, stubReviewer } from '../../src/testing/fakes.js';
+import { artifact, fakeConnector, fakeGenerator, stubGenerator, stubReviewer } from '../../src/testing/fakes.js';
 
 const ROWS = [{ name: 'Acme' }];
 const REQUEST = { intent: 'accounts in a country', input: { country: 'DE' }, output: [{ name: 'string' }] };
@@ -30,7 +30,7 @@ interface Started {
 async function startSlime(options: Partial<SlimeOptions> = {}): Promise<Started> {
   const store = options.store ?? memoryStore();
   const events: SlimeEvent[] = [];
-  const config = new SlimeConfig({ connector: fakeConnector({ rows: ROWS }), store, onEvent: (event) => events.push(event), ...options });
+  const config = new SlimeConfig({ connector: fakeConnector({ rows: ROWS }), store, generator: fakeGenerator(), onEvent: (event) => events.push(event), ...options });
   const slime = await createSlime(config);
   openInstances.push(slime);
   return { slime, store, events };
@@ -103,14 +103,15 @@ describe('promotion to Liquid (M4)', () => {
   });
 });
 
-describe('explore → locked (R8)', () => {
-  test('a handler promoted in explore mode is served after a restart in locked mode', async () => {
-    const explore = await startSlime({ generator: stubGenerator(firstThenRevised) });
-    await runAndFlush(explore.slime);
+describe('after a restart (R8)', () => {
+  test('a promoted handler is served from the store, with no model call', async () => {
+    const first = await startSlime({ generator: stubGenerator(firstThenRevised) });
+    await runAndFlush(first.slime);
 
-    const locked = await startSlime({ store: explore.store });
-    const { data, meta } = await locked.slime.query(REQUEST);
+    const generator = stubGenerator(firstThenRevised);
+    const restarted = await startSlime({ store: first.store, generator });
+    const { data, meta } = await restarted.slime.query(REQUEST);
     assert.deepEqual(data, ROWS);
-    assert.deepEqual([meta.tier, meta.cache], ['liquid', 'hit']);
+    assert.deepEqual([meta.tier, meta.cache, generator.calls], ['liquid', 'hit', 0]);
   });
 });

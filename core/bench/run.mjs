@@ -2,12 +2,9 @@
 // each case, cache hits for repeats and other values, and timings.
 //   GROQ_API_KEY=... npm run bench -w @slime-cloud/core          (openai/gpt-oss-120b)
 //   ANTHROPIC_API_KEY=... npm run bench -w @slime-cloud/core     (claude-haiku-5-5 + claude-opus-5-5 review)
-//   npm run bench -w @slime-cloud/core                           (offline handlers: checks the bench, not a model)
 // Optional: DATABASE_URL, and case names to run only those.
-import { readFileSync } from 'node:fs';
 import { cases } from './cases.mjs';
 
-const OFFLINE_HANDLERS = new URL('../../examples/express/offline-handlers.json', import.meta.url).pathname;
 const DATABASE_URL = process.env.DATABASE_URL ?? 'postgres://slime_reader:slime_reader@localhost:54329/slime';
 const DECIMALS = 100;
 
@@ -93,6 +90,6 @@ async function chooseModels() {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     return { label: 'claude-haiku-5-5, reviewed by claude-opus-5-5', generator: claude.generator({ apiKey, model: 'claude-haiku-5-5' }), reviewer: claude.reviewer({ apiKey, model: 'claude-opus-5-5' }) };
   }
-  const { offlineGenerator } = await import('@slime-cloud/core/offline');
-  return { label: 'offline handlers (no model)', generator: offlineGenerator(JSON.parse(readFileSync(OFFLINE_HANDLERS, 'utf8'))) };
+  console.error('The bench measures a model: set GROQ_API_KEY or ANTHROPIC_API_KEY.');
+  process.exit(1);
 }

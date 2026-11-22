@@ -21,10 +21,10 @@ there.
 - `SlimeConfig`: `constructor(options: SlimeOptions)` and
   `with(overrides): SlimeConfig`.
   - Its read-only fields are `connector`, `generator`, `reviewer`, `store`,
-    `crystal`, `glossary`, `rules`, `tiers`, `limits`, `onEvent` and `mode`
-    (`'explore' | 'locked'`).
+    `crystal`, `glossary`, `rules`, `tiers`, `limits` and `onEvent`.
 - `SlimeOptions`:
   - `connector` (required);
+  - `generator` (required);
   - `generator?` and `reviewer?`;
   - `store?: SlimeStore` (omitted: `createSlime()` builds the default file
     store in `./.slime`, M2);
@@ -66,8 +66,8 @@ there.
   strings.
 - **`rules`** must be an array of non-empty strings.
 - **`onEvent`**, when set, must be a function.
-- **Mode comes from the generator:** `mode` is `'explore'` when a generator
-  is set and `'locked'` otherwise (C6).
+- **A generator is required.** Every request no saved or Crystal handler
+  answers is generated; there is no serve-only mode.
 - **Immutable.** The config instance is frozen. `glossary`, `rules`, `tiers`,
   `limits` and `crystal` are frozen copies. The store, the connector, the generator, the reviewer and `onEvent` are kept
   as given.

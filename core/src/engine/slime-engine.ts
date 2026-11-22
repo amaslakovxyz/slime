@@ -47,8 +47,6 @@ interface ResolvedHandler {
   generateMs?: number;
 }
 
-const LOCKED_MISS = 'Slime is locked: only saved handlers are served, and none matches this request.';
-
 export class SlimeEngine implements Slime {
   readonly #parts: EngineParts;
   readonly #cache: HandlerCache;
@@ -61,7 +59,7 @@ export class SlimeEngine implements Slime {
     const { config, store, provenance } = parts;
     this.#parts = parts;
     const savedContext = { sqlSourceName: config.sqlSourceName, apiSchemas: parts.apiSchemas, maxSteps: config.limits.maxSteps };
-    this.#cache = new HandlerCache({ store, mode: config.mode, provenance, sqlSourceName: config.sqlSourceName, gasWindowMs: config.tiers.gasWindowMs, savedHandlerProblem: (record) => savedHandlerProblem(record, savedContext) });
+    this.#cache = new HandlerCache({ store, provenance, sqlSourceName: config.sqlSourceName, gasWindowMs: config.tiers.gasWindowMs, savedHandlerProblem: (record) => savedHandlerProblem(record, savedContext) });
     this.#limits = new GenerationLimits({ maxPerHour: config.limits.maxGenerationsPerHour, maxConcurrent: config.limits.maxConcurrentGenerations });
     this.#background = new BackgroundTasks((error) => this.#emit(errorEvent(error)));
     this.#promotion = new HandlerPromotion({
@@ -89,7 +87,7 @@ export class SlimeEngine implements Slime {
   }
 
   stats(): SlimeStats {
-    return { mode: this.#parts.config.mode, handlers: this.#cache.countByTier(), generationsThisHour: this.#limits.generationsThisHour, generationsInFlight: this.#limits.inFlight };
+    return { handlers: this.#cache.countByTier(), generationsThisHour: this.#limits.generationsThisHour, generationsInFlight: this.#limits.inFlight };
   }
 
   provenance(): HandlerProvenance {
@@ -123,7 +121,7 @@ export class SlimeEngine implements Slime {
     const { record, cache, firstRun, generateMs } = await this.#resolve(key, request);
     const execution = firstRun ?? (await this.#runSaved(record, request.input));
     const { tier, review, artifact, intent } = record;
-    const meta = queryMeta({ handlerKey: key, tier, cache, review, execution, code: { sql: sqlOf(artifact), shapeJs: artifact.shapeJs, assumptions: artifact.assumptions }, mode: this.#parts.config.mode, intent, totalMs: performance.now() - startedAt, ...(generateMs === undefined ? {} : { generateMs }) });
+    const meta = queryMeta({ handlerKey: key, tier, cache, review, execution, code: { sql: sqlOf(artifact), shapeJs: artifact.shapeJs, assumptions: artifact.assumptions }, intent, totalMs: performance.now() - startedAt, ...(generateMs === undefined ? {} : { generateMs }) });
     return { data: execution.data, meta };
   }
 
@@ -132,10 +130,7 @@ export class SlimeEngine implements Slime {
   async #resolve(key: string, request: ParsedRequest): Promise<ResolvedHandler> {
     const found = await this.#cache.find(key);
     if (found) return { record: found, cache: 'hit' };
-    const { generator } = this.#parts.config;
-    if (!generator) throw new SlimeError('HANDLER_NOT_FOUND', LOCKED_MISS);
-
-    const { promise, isShared } = this.#generations.run(key, () => this.#generate(generator, key, request));
+    const { promise, isShared } = this.#generations.run(key, () => this.#generate(this.#parts.config.generator, key, request));
     const outcome = await promise;
     if (isShared) return { record: outcome.record, cache: 'coalesced' };
     return { record: outcome.record, cache: 'miss', firstRun: outcome.execution, generateMs: outcome.usage.ms };
@@ -164,7 +159,7 @@ export class SlimeEngine implements Slime {
 
   #reviewFunction(): ((record: HandlerRecord) => Promise<ReviewOutcome>) | undefined {
     const { generator, reviewer, limits } = this.#parts.config;
-    if (!generator || !reviewer) return undefined;
+    if (!reviewer) return undefined;
     const deps = { reviewer, generation: generationDeps(this.#parts, generator), limits: this.#limits, maxReviews: this.#parts.config.tiers.maxReviews, reviewTimeoutMs: limits.reviewTimeoutMs, emit: (event: SlimeEvent) => this.#emit(event) };
     return (record) => reviewUntilSettled(deps, record);
   }

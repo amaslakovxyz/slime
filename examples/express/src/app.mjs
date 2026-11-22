@@ -5,7 +5,7 @@ import { SlimeError } from '@slime-cloud/core';
 
 const INTERNAL_ERROR = { code: 'INTERNAL', message: 'Unexpected server error.', retryable: true };
 
-/** Named routes: the intents an app ships with. In locked mode they act as routes to saved handlers (R8). */
+/** Named routes: the intents an app ships with; the client never sends one (R11). */
 const ROUTES = [
   {
     path: '/api/plans/accounts',
@@ -35,7 +35,7 @@ const ROUTES = [
 
 /**
  * `exposeDevQuery` adds POST /dev/query, which passes any request to Slime.
- * Only for development in explore mode: in production it would let any
+ * Only for local development: in production it would let any
  * client generate queries against everything the database user can read (R8, R11).
  */
 export function createApp(slime, { exposeDevQuery = false } = {}) {

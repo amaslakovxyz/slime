@@ -23,7 +23,7 @@ import type { CrystalCode } from './module-format.js';
 export interface CrystallizeOptions {
   /** A read-only connector: the equivalence test runs both versions against the database. */
   connector: Connector;
-  /** The store explore mode filled with Liquid handlers. */
+  /** The store Slime filled with Liquid handlers. */
   store: SlimeStore;
   /** The Crystal folder in the app, for example './slime-crystal'. */
   dir: string;

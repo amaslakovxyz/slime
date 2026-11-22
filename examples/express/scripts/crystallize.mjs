@@ -1,12 +1,12 @@
-// Turns the Liquid handlers explore mode saved in .slime/ into Crystal modules in
+// Turns the Liquid handlers Slime saved in .slime/ into Crystal modules in
 // slime-crystal/, with the same config the server uses. Commit the folder; CI runs
 // `npm run check:crystal`, and the server serves it from then on (C10).
 import { crystallize } from '@slime-cloud/core/crystallize';
-import { slimeConfigFromEnv } from '../src/config.mjs';
+import { databaseFromEnv } from '../src/config.mjs';
 
 const CRYSTAL_DIR = new URL('../slime-crystal', import.meta.url).pathname;
 
-const config = await slimeConfigFromEnv();
+const config = databaseFromEnv();
 const optimizer = await chooseOptimizer(process.env);
 try {
   const reports = await crystallize({ connector: config.connector, store: config.store, dir: CRYSTAL_DIR, ...(optimizer ? { optimizer } : {}) });

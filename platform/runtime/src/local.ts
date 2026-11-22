@@ -4,10 +4,13 @@
 // this process's env (config.ts) plus:
 //   PORT               listen port
 //   SLIME_CRYSTAL_DIR  where Crystallize writes modules; read again on restart
+//   SLIME_CANNED_HANDLERS  tests only (the admin E2E): a JSON file of canned
+//                      handlers that stand in for the model
 // Every route needs x-api-key: the endpoint key, or for POST /v0/e/<key> that
 // Crystal's own token (CRYSTAL_TOKENS). POST /v0/reload is a no-op here (the
 // runner restarts the process instead), so the admin calls the same routes in
 // both modes.
+import { readFileSync } from 'node:fs';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { isAuthorized } from './auth.js';
@@ -20,10 +23,19 @@ const FLUSH_LIMIT_MS = Number(process.env.SLIME_FLUSH_LIMIT_MS || 5_000);
 /** The runner SIGKILLs 3 s after SIGTERM. */
 const STOP_SAVE_LIMIT_MS = 2_000;
 
+/** The admin E2E runs endpoints without a model: a test double, never loaded by the Lambda entry. */
+async function cannedGeneratorFromEnv() {
+  const file = process.env.SLIME_CANNED_HANDLERS;
+  if (!file) return undefined;
+  const { cannedGenerator } = await import('@slime-cloud/core/testing');
+  return cannedGenerator(JSON.parse(readFileSync(file, 'utf8')));
+}
+
 async function main(): Promise<void> {
   const port = Number(process.env.PORT || 8700);
   const crystalDir = process.env.SLIME_CRYSTAL_DIR;
-  const runtime = await endpointRuntime(process.env, crystalDir ? { crystalStore: new DirCrystalStore(crystalDir) } : {});
+  const generator = await cannedGeneratorFromEnv();
+  const runtime = await endpointRuntime(process.env, { ...(crystalDir ? { crystalStore: new DirCrystalStore(crystalDir) } : {}), ...(generator ? { generator } : {}) });
 
   const server = createServer(async (req, res) => {
     try {
@@ -44,7 +56,7 @@ async function main(): Promise<void> {
     }
   });
   server.listen(port, '127.0.0.1', () => {
-    console.log(JSON.stringify({ listening: `http://localhost:${port}/`, crystals: runtime.crystalCount, mode: runtime.slime.stats().mode }));
+    console.log(JSON.stringify({ listening: `http://localhost:${port}/`, crystals: runtime.crystalCount, ...(generator ? { generator: 'canned (test)' } : {}) }));
   });
   server.on('error', (err) => {
     console.error(JSON.stringify({ fatal: startupErrorMessage(err) }));

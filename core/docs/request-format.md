@@ -35,8 +35,8 @@ Input values are never part of the key, so `{ limit: 5 }` and `{ limit: 50 }`
 use the same handler. Rewording the intent, adding or removing a parameter,
 or changing `output` makes a new handler.
 
-A wrong answer is fixed by rewording the intent. In explore mode, the
-generated SQL and the model's assumptions are in `meta` (below).
+A wrong answer is fixed by rewording the intent. The generated SQL and the
+model's assumptions are in `meta` (below).
 
 ## Parameters
 
@@ -83,7 +83,7 @@ right types and date formats. A result that doesn't match fails with
 | `timingsMs` | `total`, `run`, `shape`, and `generate` on a miss. |
 | `warnings` | For example, a value written into the intent. |
 | `review` | Where the handler is on its way to Liquid: `none` until it has had enough successful runs (`gasToLiquidRuns`, 3 by default), `pending` while a model reviews it in the background, then `approved` (saved as Liquid) or `rejected`. It changes between calls of one handler; a client can ignore it. |
-| `sql`, `shapeJs`, `assumptions` | **Explore mode only:** what was generated, and how the model read the intent. |
+| `sql`, `shapeJs`, `assumptions` | What was generated, and how the model read the intent. |
 
 ## Errors
 
@@ -95,7 +95,7 @@ Failures are thrown as `SlimeError`. Each has a `code`, a fixed HTTP
 | `INVALID_REQUEST` | 400 | The request or an input value breaks the rules above. |
 | `WRITE_REFUSED` | 403 | The request asks to change data, or the SQL tried to. |
 | `ACCESS_DENIED` | 403 | The database user may not read a table or column. |
-| `HANDLER_NOT_FOUND` | 404 | Locked mode, and no saved or Crystal handler matches. |
+| `HANDLER_NOT_FOUND` | 404 | A host-specific lookup found nothing, for example an unknown Crystal key. |
 | `INTENT_UNSATISFIABLE` | 422 | The database can't answer this request. |
 | `GENERATION_RATE_LIMITED` | 429 | The hourly generation limit, or the model provider's (retryable). |
 | `SHAPE_MISMATCH` | 500 | The result doesn't match `output`. |
@@ -160,7 +160,7 @@ step is SQL is turned into a v1 artifact before it first runs.
 
 | Field | Meaning |
 |---|---|
-| `steps` | **Explore mode only:** one entry per step, `{ name, source, rows, ms }`, plus `sql` for a SQL step, or `operation` and `args` for an API step. |
+| `steps` | One entry per step, `{ name, source, rows, ms }`, plus `sql` for a SQL step, or `operation` and `args` for an API step. |
 | `sql` | For a v2 handler, the SQL steps joined with `\n-- step <name>\n`. |
 | `timingsMs.run` | For a v2 handler, the wall time of all steps together. |
 | `truncated` | For a single-step handler, as today. A multi-step handler with a truncated step fails instead (`QUERY_TOO_LARGE`). |
@@ -175,12 +175,11 @@ step is SQL is turned into a v1 artifact before it first runs.
 An input value whose type doesn't match the API parameter it is bound to is an
 `INVALID_REQUEST`, checked on every run.
 
-## Modes, and who may send what
+## Who may send what
 
-- **Explore mode** (a `generator` is configured) generates handlers for new
-  requests. Use it in development.
-- **Locked mode** (no `generator`) serves only saved and Crystal handlers.
-  Use it in production: there, intents act as named routes.
+- **Every new request is generated.** A `generator` is required: a request no
+  saved or Crystal handler answers gets a handler written for it. To pin
+  production to known code, crystallize the handlers you rely on.
 - **Never pass a client's request body straight to `query()`,** and never
   take authorization from `input`. A client can set any input value, or
   `null` to drop a filter. Each endpoint should choose its intent and

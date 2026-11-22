@@ -29,7 +29,7 @@ const notion = notionSource({ token: required('NOTION_TOKEN'), dataSources: real
 const options = { timeoutMs: 30_000, rowCap: 1_000, signal: new AbortController().signal };
 await notion.safetyCheck(options);
 await notion.describe(options);
-// Exactly the calls the example's offline handlers and core's contract tests make.
+// Exactly the calls the example's canned test handlers and core's contract tests make.
 await notion.call('feedback.query', { sentiment: 'negative', status: 'Open' }, options);
 await notion.call('feedback.query', { sentiment: 'negative' }, options);
 await notion.call('feedback.query', { sentiment: null }, options);

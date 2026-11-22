@@ -16,10 +16,10 @@ export interface CrystalAnswer {
 
 export async function answerFromCrystal({ config, runner }: EngineParts, { key, crystal, request, startedAt }: CrystalAnswer): Promise<QueryResult> {
   checkParamTypes(crystal.paramTypes, request.input);
-  const { connector, limits, mode } = config;
+  const { connector, limits } = config;
   // The engine's runner: a source-text shape (a Crystal loaded as data) runs in the sandbox with Liquid's limits.
   const execution = await runCrystal({ connector, runner, limits }, crystal, request.input);
   const code = { sql: crystal.sql, shapeJs: crystal.shape ? String(crystal.shape) : null, assumptions: [] };
-  const meta = queryMeta({ handlerKey: key, tier: 'crystal', cache: 'hit', review: crystal.review, execution, code, mode, intent: request.intent, totalMs: performance.now() - startedAt });
+  const meta = queryMeta({ handlerKey: key, tier: 'crystal', cache: 'hit', review: crystal.review, execution, code, intent: request.intent, totalMs: performance.now() - startedAt });
   return { data: execution.data, meta };
 }

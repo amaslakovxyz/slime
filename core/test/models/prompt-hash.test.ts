@@ -1,5 +1,5 @@
 // Every saved handler records its generator's promptHash; a changed hash
-// regenerates all of them in explore mode (§4.7). These pins make any change
+// regenerates all of them (§4.7). These pins make any change
 // to prompt text, or to how a provider assembles it, a deliberate one.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';

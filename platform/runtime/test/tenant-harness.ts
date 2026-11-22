@@ -1,13 +1,17 @@
 // The Lambda router and tenant cache wired to fakes (SSM, S3, DynamoDB) and the demo
 // Postgres (examples/express/db/init.sql: its docker compose, or CI's service), with
-// the offline provider, so a test drives endpoints end to end with no AWS and no model.
+// canned handlers instead of a model, so a test drives endpoints end to end with no AWS and no model.
+import { readFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import pg from 'pg';
 import { QuickJSRunner, type StoreEntry } from '@slime-cloud/core';
+import { cannedGenerator } from '@slime-cloud/core/testing';
 import { S3CrystalStore } from '../src/crystal-store.js';
 import { endpointRuntime, type EndpointRuntime } from '../src/endpoint-runtime.js';
+
+const CANNED_HANDLERS = JSON.parse(readFileSync(new URL('./canned-handlers.json', import.meta.url), 'utf8'));
 import { createRouter } from '../src/lambda.js';
 import { DynamoSlimeStore } from '../src/store-dynamodb.js';
 import { ENDPOINTS_SSM_PREFIX, TenantCache } from '../src/tenants.js';
@@ -69,7 +73,7 @@ export interface Harness {
   built: { id: string; runtime: EndpointRuntime }[];
   /** The endpoint ids whose runtime was closed, in order. */
   closed: string[];
-  /** Writes the endpoint's settings as the admin does: offline provider, the demo database. */
+  /** Writes the endpoint's settings as the admin does: Groq (replaced by canned handlers here), the demo database. */
   addEndpoint(id: string, values?: Record<string, string>): void;
   /** The endpoint's current engine on this instance. */
   runtimeOf(id: string): Promise<EndpointRuntime>;
@@ -101,7 +105,7 @@ export async function harness({ maxEntries = 8, ttlMs = 30_000 }: HarnessOptions
     log: () => {},
     build: async (env, deps) => {
       const id = env.SLIME_TENANT_ID ?? '';
-      const runtime = await endpointRuntime(env, { ...deps, storeClient: dynamo, log: () => {} });
+      const runtime = await endpointRuntime(env, { ...deps, storeClient: dynamo, generator: cannedGenerator(CANNED_HANDLERS), log: () => {} });
       const close = runtime.close;
       runtime.close = async () => {
         closed.push(id);
@@ -121,7 +125,7 @@ export async function harness({ maxEntries = 8, ttlMs = 30_000 }: HarnessOptions
     built,
     closed,
     addEndpoint(id: string, values: Record<string, string> = {}): void {
-      ssm.putAll(`${ENDPOINTS_SSM_PREFIX}${id}/`, { DATABASE_URL: DEMO_DATABASE_URL, SLIME_API_KEY: keyOf(id), SLIME_PROVIDER: 'offline', ...values });
+      ssm.putAll(`${ENDPOINTS_SSM_PREFIX}${id}/`, { DATABASE_URL: DEMO_DATABASE_URL, SLIME_API_KEY: keyOf(id), SLIME_PROVIDER: 'groq', ...values });
     },
     async runtimeOf(id: string): Promise<EndpointRuntime> {
       const tenant = await tenants.get(id);

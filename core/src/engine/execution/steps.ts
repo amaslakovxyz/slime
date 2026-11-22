@@ -27,7 +27,7 @@ export interface StepsJob {
   input: InputValues;
 }
 
-/** One step of a run, for meta.steps in explore mode (R9). */
+/** One step of a run, for meta.steps (R9). */
 export interface StepTiming {
   name: string;
   source: string;

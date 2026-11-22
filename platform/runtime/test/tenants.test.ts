@@ -1,6 +1,6 @@
 // The Lambda router and tenant cache: routing on the endpoint id, auth per endpoint,
 // settings re-read per TTL, LRU eviction, and no endpoint setting in process.env.
-// SSM, S3 and DynamoDB are fakes; endpoints run on the demo Postgres, offline provider.
+// SSM, S3 and DynamoDB are fakes; endpoints run on the demo Postgres, canned handlers for the model.
 import './setup.js';
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
@@ -231,7 +231,7 @@ describe('tenant cache with live engines', { skip: !hasDatabase && 'demo Postgre
   test('a missing DATABASE_URL is 503 naming it, for the key holder only, and is retried on the next request', async () => {
     const h = await harness({ ttlMs: TTL_MS });
     try {
-      h.ssm.putAll(`${ENDPOINTS_SSM_PREFIX}${A}/`, { SLIME_API_KEY: keyOf(A), SLIME_PROVIDER: 'offline' });
+      h.ssm.putAll(`${ENDPOINTS_SSM_PREFIX}${A}/`, { SLIME_API_KEY: keyOf(A), SLIME_PROVIDER: 'groq' });
       assert.equal((await h.call(`/ep/${A}/healthz`)).status, 401, 'no cause shown without the key');
       for (let attempt = 0; attempt < 2; attempt++) {
         const { status, json } = await h.call(`/ep/${A}/healthz`, { key: keyOf(A) });

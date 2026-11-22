@@ -216,7 +216,7 @@ jobs:
       - run: npm run build
 
   # Playwright against `npm run local` (admin + local runner): DynamoDB Local,
-  # the demo database and the offline model, so no credentials or model keys.
+  # the demo database and canned handlers for the model (SLIME_CANNED_HANDLERS), so no credentials or model keys.
   admin-e2e:
     name: Slime Cloud admin E2E
     runs-on: ubuntu-latest

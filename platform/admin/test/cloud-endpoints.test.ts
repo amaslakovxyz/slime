@@ -110,7 +110,7 @@ describe('cloud endpoint flows (fake runtime, DynamoDB Local)', { skip }, () => 
     for (const TableName of Object.values(tables)) await client.send(new DeleteTableCommand({ TableName })).catch(() => {});
   });
 
-  const create = (who: string, provider = 'offline') => createEndpoint(who, { name: 'cloud', provider, databaseUrl: DB_URL });
+  const create = (who: string, provider = 'claude') => createEndpoint(who, { name: 'cloud', provider, databaseUrl: DB_URL });
 
   test('create writes provisioning with the endpoint URL and the provider secret; healthz 200 settles it ready', async () => {
     const who = owner('create');

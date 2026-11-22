@@ -27,7 +27,7 @@ and passes handlers whose shapes are the source strings.
 ## Invariants
 
 - **Crystal is served first** (`../slime-engine.ts`), keyed by request
-  key, in explore and locked mode. Input types are checked against the
+  key, before the cache or generation. Input types are checked against the
   recorded `paramTypes` (R4).
 - **Function shapes: no sandbox.** A function shape runs in the app's
   process. The allowlist checked it when the job wrote it, and
@@ -49,6 +49,6 @@ and passes handlers whose shapes are the source strings.
 
 ## Verification
 
-- `test/crystallize/crystallize.test.ts` serves a crystallized handler in locked mode.
+- `test/crystallize/crystallize.test.ts` serves a crystallized handler.
 - `test/engine/crystal.test.ts`: string shapes give the function form's data
   and stop at the shape time limit; an injected runner outlives `close()`.

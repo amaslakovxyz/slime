@@ -80,8 +80,8 @@ Prompts, schemas and roles are shared, never per provider.
 [src/models/README.md](../src/models/README.md) has the error and rate-limit
 rules.
 
-For tests and demos without a model, `offlineGenerator(handlers)` from
-`@slime-cloud/core/offline` serves hand-written handlers by intent.
+For tests without a model, `cannedGenerator(handlers)` from
+`@slime-cloud/core/testing` serves hand-written handlers by intent.
 
 ## State
 

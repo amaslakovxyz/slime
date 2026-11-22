@@ -7,11 +7,12 @@ const DEFAULT_PORT = 3000;
 // Print what Slime generates and promotes, so a wrong answer can be fixed by rewording the intent (R9).
 const config = await slimeConfigFromEnv(process.env, { onEvent: logEvent });
 const slime = await createSlime(config);
-const isExplore = config.mode === 'explore';
+// Off unless asked for: /dev/query lets any client generate a query (R8, R11).
+const exposeDevQuery = process.env.SLIME_DEV_QUERY === '1';
 const port = Number(process.env.PORT || DEFAULT_PORT);
 
-const server = createApp(slime, { exposeDevQuery: isExplore }).listen(port, () => {
-  console.log(`Slime example on http://localhost:${port} (${config.mode} mode${isExplore ? ', POST /dev/query enabled' : ''})`);
+const server = createApp(slime, { exposeDevQuery }).listen(port, () => {
+  console.log(`Slime example on http://localhost:${port}${exposeDevQuery ? ' (POST /dev/query enabled)' : ''}`);
 });
 
 for (const signal of ['SIGINT', 'SIGTERM']) {

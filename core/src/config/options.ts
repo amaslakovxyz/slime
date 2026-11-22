@@ -39,15 +39,13 @@ export interface LimitOptions {
 
 export type { CrystalRegistry };
 
-export type SlimeMode = 'explore' | 'locked';
-
 export interface SlimeOptions {
   /** Shorthand for sources: { db: connector } (MS1). */
   connector?: Connector;
   /** Exactly one SQL source (a Connector) and any number of API sources (MS1). */
   sources?: Record<string, Source>;
-  /** Omit for locked mode: only saved handlers are served (C6). */
-  generator?: Generator;
+  /** Writes a handler for every request no saved handler answers. */
+  generator: Generator;
   /** Omit to skip reviews. */
   reviewer?: Reviewer;
   /** Omit for the file store in ./.slime, which createSlime() builds (C14). */

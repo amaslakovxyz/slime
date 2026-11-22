@@ -20,7 +20,6 @@ export {
   type PromotedEvent,
   type ReviewedEvent,
   type SlimeEvent,
-  type SlimeMode,
   type SlimeOptionOverrides,
   type SlimeOptions,
   type TierOptions,

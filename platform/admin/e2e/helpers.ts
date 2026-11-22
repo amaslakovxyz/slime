@@ -70,7 +70,7 @@ export async function deleteEndpoint(page: Page, endpointId: string): Promise<vo
 }
 
 /** One of the Offline provider's canned handlers on the demo schema; `limit` becomes the Crystal route's input. */
-export const OFFLINE_QUERY = {
+export const DEMO_QUERY = {
   intent: 'top N accounts by total paid invoice amount in cents, highest first',
   input: { limit: 5 },
   output: [{ name: 'string', totalPaidCents: 'integer' }],
@@ -87,7 +87,8 @@ export async function lifecycleJourney(
   { name, databaseUrl, onCreated }: { name: string; databaseUrl: string; /** So a failed run can still delete what it made. */ onCreated?: (endpointId: string) => void },
 ): Promise<void> {
   const id = await test.step('CUJ 2: create on the demo database -> ready', async () => {
-    const endpointId = await createEndpoint(page, { name, provider: 'offline', databaseUrl });
+    // Locally the runtime answers with canned handlers (SLIME_CANNED_HANDLERS); in the cloud, Groq generates once.
+    const endpointId = await createEndpoint(page, { name, provider: 'groq', databaseUrl });
     onCreated?.(endpointId);
     await expectStatus(page, 'ready');
     return endpointId;
@@ -102,7 +103,7 @@ export async function lifecycleJourney(
 
   await test.step('CUJ 3: twelve requests turn the handler Liquid and ready to crystallize', async () => {
     for (let i = 0; i < 12; i++) {
-      const res = await request.post(`${url}v0/query`, { headers: { 'x-api-key': apiKey }, data: OFFLINE_QUERY });
+      const res = await request.post(`${url}v0/query`, { headers: { 'x-api-key': apiKey }, data: DEMO_QUERY });
       expect(res.status(), await res.text()).toBe(200);
     }
     await expect(page.getByRole('button', { name: /^Crystallize / })).toBeVisible({ timeout: 60_000 });
@@ -125,12 +126,12 @@ export async function lifecycleJourney(
 
     // In the cloud other warm instances pick the new token up within the settings TTL (30 s).
     await expect(async () => {
-      const crystal = await request.post(`${url}v0/e/${key}`, { headers: { 'x-api-key': token }, data: { input: OFFLINE_QUERY.input } });
+      const crystal = await request.post(`${url}v0/e/${key}`, { headers: { 'x-api-key': token }, data: { input: DEMO_QUERY.input } });
       expect(crystal.status(), await crystal.text()).toBe(200);
       expect((await crystal.json()).meta.tier).toBe('crystal');
     }).toPass({ timeout: 45_000, intervals: [1_000, 5_000] });
 
-    const dispatch = await request.post(`${url}v0/query`, { headers: { 'x-api-key': token }, data: OFFLINE_QUERY });
+    const dispatch = await request.post(`${url}v0/query`, { headers: { 'x-api-key': token }, data: DEMO_QUERY });
     expect(dispatch.status()).toBe(401);
   });
 

@@ -11,7 +11,8 @@ import { SlimeConfigError, SlimeError, type ErrorCode } from '../../src/shared/e
 import { requestKey } from '../../src/request/key.js';
 import { parseRequest, type InputValues, type SlimeRequest } from '../../src/request/parse.js';
 import { memoryStore } from '../../src/stores/memory-store.js';
-import { artifact, fakeConnector, stubGenerator } from '../../src/testing/fakes.js';
+import { artifact, fakeConnector, fakeGenerator, stubGenerator } from '../../src/testing/fakes.js';
+import { sqlOf } from '../../src/artifact/artifact.js';
 
 const ROWS = [{ name: 'Acme' }, { name: 'Globex' }];
 const OUTPUT = [{ name: 'string' }];
@@ -24,7 +25,7 @@ const openInstances: Slime[] = [];
 after(() => Promise.all(openInstances.map((slime) => slime.close())));
 
 async function startSlime(options: Partial<SlimeOptions> = {}): Promise<Slime> {
-  const slime = await createSlime(new SlimeConfig({ connector: fakeConnector({ rows: ROWS }), store: memoryStore(), ...options }));
+  const slime = await createSlime(new SlimeConfig({ connector: fakeConnector({ rows: ROWS }), store: memoryStore(), generator: fakeGenerator(), ...options }));
   openInstances.push(slime);
   return slime;
 }
@@ -105,29 +106,29 @@ describe('engine: Gas path (M2)', () => {
   });
 });
 
-describe('engine: modes and saved handlers (§4.7, R8)', () => {
-  test('locked mode serves a saved handler and refuses to generate', async () => {
+describe('engine: saved handlers (§4.7, R8)', () => {
+  async function currentRecord(request: SlimeRequest, rules: string[] = []): Promise<HandlerRecord> {
+    const schema = await fakeConnector().describe();
+    const dictionary = buildDictionary({ sqlSourceName: 'db', schema, glossary: {}, rules });
+    const provenance = { schemaHash: dictionary.schemaHash, dictionaryHash: dictionary.hash, promptHash: 'stub-prompt', model: 'stub-model' };
+    return savedRecord(request, { provenance });
+  }
+
+  test('a saved handler with today\'s provenance is served without a model call', async () => {
     const request = topAccounts({ country: 'DE', plan: null });
     const store = memoryStore();
-    await store.put('handlers', savedRecord(request).key, savedRecord(request));
-    const slime = await startSlime({ store });
+    const record = await currentRecord(request);
+    await store.put('handlers', record.key, record);
+    const generator = stubGenerator(() => filteredArtifact);
+    const slime = await startSlime({ store, generator });
 
     const { data, meta } = await slime.query(request);
     assert.deepEqual(data, ROWS);
     assert.deepEqual([meta.tier, meta.cache], ['liquid', 'hit']);
-    await assert.rejects(slime.query({ ...request, intent: 'some other question' }), failsWith('HANDLER_NOT_FOUND'));
+    assert.equal(generator.calls, 0);
   });
 
-  test('locked mode warns once at startup about handlers made against another schema', async () => {
-    const request = topAccounts({ country: 'DE', plan: null });
-    const store = memoryStore();
-    await store.put('handlers', savedRecord(request).key, savedRecord(request));
-    const events: SlimeEvent[] = [];
-    await startSlime({ store, onEvent: (event) => events.push(event) });
-    assert.deepEqual(events.map(({ type }) => type), ['warning']);
-  });
-
-  test('explore mode regenerates a saved handler whose provenance changed', async () => {
+  test('a saved handler whose provenance changed is generated again', async () => {
     const request = topAccounts({ country: 'DE', plan: null });
     const store = memoryStore();
     await store.put('handlers', savedRecord(request).key, savedRecord(request));
@@ -137,17 +138,11 @@ describe('engine: modes and saved handlers (§4.7, R8)', () => {
     assert.equal(generator.calls, 1);
   });
 
-  test('changing rules changes the dictionary and regenerates a saved handler in explore mode (D6)', async () => {
+  test('changing rules changes the dictionary and generates the saved handler again (D6)', async () => {
     const request = topAccounts({ country: 'DE', plan: null });
-    const schema = await fakeConnector().describe();
-    const savedUnderRules = (rules: string[]): HandlerRecord => {
-      const dictionary = buildDictionary({ sqlSourceName: 'db', schema, glossary: {}, rules });
-      const provenance = { schemaHash: dictionary.schemaHash, dictionaryHash: dictionary.hash, promptHash: 'stub-prompt', model: 'stub-model' };
-      return savedRecord(request, { provenance });
-    };
     const cacheWith = async (rules: string[]) => {
       const store = memoryStore();
-      const record = savedUnderRules(['Count only paid invoices.']);
+      const record = await currentRecord(request, ['Count only paid invoices.']);
       await store.put('handlers', record.key, record);
       const slime = await startSlime({ store, rules, generator: stubGenerator(() => filteredArtifact) });
       return (await slime.query(request)).meta.cache;
@@ -156,22 +151,22 @@ describe('engine: modes and saved handlers (§4.7, R8)', () => {
     assert.equal(await cacheWith(['Count open invoices too.']), 'miss');
   });
 
-  test('generated code is in meta only in explore mode (R9, R11)', async () => {
+  test('meta shows the code that answered, generated or saved (R9)', async () => {
     const request = topAccounts({ country: 'DE', plan: null });
-    const explore = await startSlime({ generator: stubGenerator(() => filteredArtifact) });
-    assert.equal((await explore.query(request)).meta.sql, FILTERED_SQL);
+    const fresh = await startSlime({ generator: stubGenerator(() => filteredArtifact) });
+    assert.equal((await fresh.query(request)).meta.sql, FILTERED_SQL);
 
     const store = memoryStore();
-    await store.put('handlers', savedRecord(request).key, savedRecord(request));
-    const locked = await startSlime({ store });
-    const { meta } = await locked.query(request);
-    assert.deepEqual([meta.sql, meta.shapeJs, meta.assumptions], [undefined, undefined, undefined]);
+    const record = await currentRecord(request);
+    await store.put('handlers', record.key, record);
+    const saved = await startSlime({ store });
+    assert.equal((await saved.query(request)).meta.sql, sqlOf(record.artifact));
   });
 });
 
 describe('engine: startup, warnings, events and eviction', () => {
   test('refuses to start when the database user can write', async () => {
-    await assert.rejects(createSlime(new SlimeConfig({ connector: fakeConnector({ isSafe: false }), store: memoryStore() })), SlimeConfigError);
+    await assert.rejects(createSlime(new SlimeConfig({ connector: fakeConnector({ isSafe: false }), store: memoryStore(), generator: fakeGenerator() })), SlimeConfigError);
   });
 
   test('a literal in the intent is a warning, not an error (R7)', async () => {
@@ -210,7 +205,7 @@ describe('engine: startup, warnings, events and eviction', () => {
   test('stats and handlers describe what is cached', async () => {
     const slime = await startSlime({ generator: stubGenerator(() => filteredArtifact) });
     await slime.query(topAccounts({ country: 'DE', plan: null }));
-    assert.deepEqual(slime.stats(), { mode: 'explore', handlers: { gas: 1, liquid: 0 }, generationsThisHour: 1, generationsInFlight: 0 });
+    assert.deepEqual(slime.stats(), { handlers: { gas: 1, liquid: 0 }, generationsThisHour: 1, generationsInFlight: 0 });
     assert.deepEqual(slime.handlers().map(({ intent, tier, runs }) => ({ intent, tier, runs })), [{ intent: TOP_ACCOUNTS, tier: 'gas', runs: 1 }]);
   });
 });

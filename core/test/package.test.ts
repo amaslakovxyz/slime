@@ -41,9 +41,8 @@ test('the public entry exports createSlime, the config, the stores, the sandbox 
 });
 
 test('adapters have their own subpaths, so the main entry never loads them (C7)', async () => {
-  assert.deepEqual(pkg.exports['./offline'], { types: './dist/models/offline/index.d.ts', default: './dist/models/offline/index.js' });
+  assert.equal(pkg.exports['./offline'], undefined, 'canned handlers are a test double: @slime-cloud/core/testing');
   assert.deepEqual(pkg.exports['./postgres'], { types: './dist/sources/sql/postgres/index.d.ts', default: './dist/sources/sql/postgres/index.js' });
-  assert.deepEqual(Object.keys(await import('../src/models/offline/index.js')), ['offlineGenerator']);
   assert.deepEqual(Object.keys(await import('../src/sources/sql/postgres/index.js')), ['postgresConnector']);
   for (const provider of ['claude', 'groq'] as const) {
     assert.deepEqual(pkg.exports[`./${provider}`], { types: `./dist/models/${provider}/index.d.ts`, default: `./dist/models/${provider}/index.js` });
@@ -59,6 +58,7 @@ test('adapters have their own subpaths, so the main entry never loads them (C7)'
   assert.deepEqual(Object.keys(await import('../src/testing/index.js')).sort(), [
     'FAKE_SECRET',
     'artifact',
+    'cannedGenerator',
     'describeApiSourceContract',
     'describeConnectorContract',
     'describeModelClientContract',

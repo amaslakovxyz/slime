@@ -1,5 +1,4 @@
 // Builds the SlimeConfig from this app's environment. Core never reads env; the app does.
-import { readFileSync } from 'node:fs';
 import { SlimeConfig } from '@slime-cloud/core';
 import { notionSource } from '@slime-cloud/core/notion';
 import { postgresConnector } from '@slime-cloud/core/postgres';
@@ -39,12 +38,12 @@ export async function slimeConfigFromEnv(env = process.env, overrides = {}) {
     sources: { db: postgresConnector({ url: env.DATABASE_URL || DEMO_DATABASE_URL }), notion, films: ghibliFilms(fetchImpl ? { fetchImpl } : {}) },
     glossary: { revenue: 'sum of paid invoices, in cents' },
     rules: ['Revenue counts only invoices with status paid.'],
-    ...(await chooseModels(env)),
+    ...(overrides.generator ? {} : await chooseModels(env)),
     ...overrides,
   });
 }
 
-/** A model key picks a provider; without one, the offline handlers stand in for a model. */
+/** A model key picks the provider; tests pass their own `generator`. */
 async function chooseModels(env) {
   if (env.GROQ_API_KEY) {
     const { groq } = await import('@slime-cloud/core/groq');
@@ -56,8 +55,7 @@ async function chooseModels(env) {
     const apiKey = env.ANTHROPIC_API_KEY;
     return { generator: claude.generator({ apiKey, model: CLAUDE_GENERATOR_MODEL }), reviewer: claude.reviewer({ apiKey, model: CLAUDE_REVIEW_MODEL }) };
   }
-  const { offlineGenerator } = await import('@slime-cloud/core/offline');
-  return { generator: offlineGenerator(JSON.parse(readFileSync(new URL('offline-handlers.json', APP_DIR), 'utf8'))) };
+  throw new Error('Set GROQ_API_KEY or ANTHROPIC_API_KEY: Slime generates a handler for each new request with that model.');
 }
 
 // Replays test/fixtures: Notion's from one folder, the films API's from another.

@@ -3,6 +3,7 @@ import './setup.js';
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { SlimeConfig, createSlime, handlerKeyFor, type HandlerRecord } from '@slime-cloud/core';
+import { cannedGenerator } from '@slime-cloud/core/testing';
 import { migrateLegacyHandlers, toHandlerRecord, type LegacyItem } from '../src/legacy-handlers.js';
 import { DynamoSlimeStore } from '../src/store-dynamodb.js';
 import { FakeDynamo } from './fake-dynamo.js';
@@ -63,7 +64,7 @@ describe('legacy handler migration (M7)', () => {
     assert.equal(await store.get('handlers', handlerKeyFor(REQUEST)), undefined);
   });
 
-  test('a migrated handler is served in locked mode', async () => {
+  test('a migrated handler is read, then generated again: it was made with the sandbox\'s provenance', async () => {
     const client = tableWith(legacyItem('old1', 3));
     const store = new DynamoSlimeStore({ table: TABLE, tenantId: TENANT, client });
     await migrateLegacyHandlers({ client, table: TABLE, tenantId: TENANT, store });
@@ -77,11 +78,12 @@ describe('legacy handler migration (M7)', () => {
       safetyCheck: async () => ({ ok: true, user: 'reader', problems: [] }),
       close: async () => {},
     };
-    const slime = await createSlime(new SlimeConfig({ connector, store }));
+    const generator = cannedGenerator({ [REQUEST.intent]: ARTIFACT });
+    const slime = await createSlime(new SlimeConfig({ connector, store, generator }));
     try {
       const { data, meta } = await slime.query(REQUEST);
       assert.deepEqual(data, rows);
-      assert.deepEqual([meta.tier, meta.cache], ['liquid', 'hit']);
+      assert.deepEqual([meta.tier, meta.cache], ['gas', 'miss']);
     } finally {
       await slime.close();
     }

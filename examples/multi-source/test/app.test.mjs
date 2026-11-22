@@ -1,14 +1,17 @@
 // The three demo intents end to end (T7): demo Postgres, replayed Notion and
-// films responses, the offline handlers. Skipped without Postgres unless REQUIRE_DB=1.
+// films responses, canned handlers instead of a model. Skipped without Postgres unless REQUIRE_DB=1.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
+import { readFileSync } from 'node:fs';
 import pg from 'pg';
 import { createSlime } from '@slime-cloud/core';
+import { cannedGenerator } from '@slime-cloud/core/testing';
 import { createApp } from '../src/app.mjs';
 import { slimeConfigFromEnv } from '../src/config.mjs';
 
 const DATABASE_URL = process.env.DATABASE_URL || 'postgres://slime_reader:slime_reader@localhost:54329/slime';
 const ENV = { FETCH_FIXTURES: '1', DATABASE_URL };
+const CANNED_HANDLERS = JSON.parse(readFileSync(new URL('./canned-handlers.json', import.meta.url), 'utf8'));
 
 async function isDatabaseAvailable() {
   const client = new pg.Client({ connectionString: DATABASE_URL, connectionTimeoutMillis: 2_000 });
@@ -28,7 +31,7 @@ describe('the multi-source example', { skip: !isDatabaseUp && 'Postgres is not r
   let slime;
   let app;
   before(async () => {
-    slime = await createSlime(await slimeConfigFromEnv(ENV));
+    slime = await createSlime(await slimeConfigFromEnv(ENV, { generator: cannedGenerator(CANNED_HANDLERS) }));
     app = createApp(slime);
   });
   after(() => slime?.close());
@@ -38,8 +41,8 @@ describe('the multi-source example', { skip: !isDatabaseUp && 'Postgres is not r
     return { status: response.status, body: await response.json() };
   };
 
-  test('/health reports explore mode', async () => {
-    assert.equal((await (await app.request('/health')).json()).mode, 'explore');
+  test('/health reports the handler counts', async () => {
+    assert.deepEqual(Object.keys((await (await app.request('/health')).json()).handlers).sort(), ['gas', 'liquid']);
   });
 
   test('intent 1: Postgres + Notion', async () => {

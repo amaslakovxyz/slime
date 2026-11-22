@@ -47,6 +47,12 @@ export default defineConfig({
         reuseExistingServer: !process.env.CI,
         timeout: 180_000,
         // Merged over process.env (and over .env.local, which never overrides the environment).
-        env: { PORT: String(LOCAL_PORT), ADMIN_ALLOWED_EMAILS: 'e2e@example.com', NEXT_TELEMETRY_DISABLED: '1' },
+        // SLIME_CANNED_HANDLERS: the local runtime answers with canned handlers instead of a model (test only).
+        env: {
+          PORT: String(LOCAL_PORT),
+          ADMIN_ALLOWED_EMAILS: 'e2e@example.com',
+          NEXT_TELEMETRY_DISABLED: '1',
+          SLIME_CANNED_HANDLERS: resolve(adminDir, '../runtime/test/canned-handlers.json'),
+        },
       },
 });

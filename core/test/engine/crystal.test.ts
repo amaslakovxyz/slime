@@ -16,7 +16,7 @@ import { QuickJSRunner } from '../../src/sandbox/quickjs/quickjs-runner.js';
 import type { SandboxRunner } from '../../src/sandbox/types.js';
 import { SlimeError } from '../../src/shared/errors.js';
 import { memoryStore } from '../../src/stores/memory-store.js';
-import { artifact, fakeConnector } from '../../src/testing/fakes.js';
+import { artifact, fakeConnector, fakeGenerator } from '../../src/testing/fakes.js';
 
 const ROWS = [
   { name: 'Acme', cents: 1250 },
@@ -44,7 +44,7 @@ function crystalWith(shape: CrystalHandler['shape']): CrystalRegistry {
 }
 
 async function slimeWith(crystal: CrystalRegistry, runner?: SandboxRunner) {
-  const config = new SlimeConfig({ connector: fakeConnector({ rows: ROWS }), store: memoryStore(), crystal, limits: { shapeTimeoutMs: SHAPE_TIMEOUT_MS } });
+  const config = new SlimeConfig({ connector: fakeConnector({ rows: ROWS }), store: memoryStore(), generator: fakeGenerator(), crystal, limits: { shapeTimeoutMs: SHAPE_TIMEOUT_MS } });
   return createSlime(config, runner ? { runner } : {});
 }
 

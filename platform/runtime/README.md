@@ -33,7 +33,7 @@ replace the `file:` path with a version; nothing else changes.
 | [src/usage.ts](src/usage.ts) | Daily usage counters (`USAGE#<endpoint>` / `YYYY-MM-DD` in `SLIME_USAGE_TABLE`): requests and latency per tier, generations, LLM tokens, handler snapshot per tier. `USAGE_ATTRIBUTES` lists every attribute written; the runtime role's IAM condition (`platform/infra/platform/runtime.tf`) mirrors it |
 | [src/legacy-handlers.ts](src/legacy-handlers.ts), [src/migrate-cli.ts](src/migrate-cli.ts) | One-off copy of the sandbox runtime's handlers into the core's format |
 | [scripts/build.mjs](scripts/build.mjs) | Deterministic bundle into `dist/lambda/` (same source, same zip hash), handler `index.handler` |
-| `offline/handlers.json` | Canned handlers for `SLIME_PROVIDER=offline` |
+| `test/canned-handlers.json` | Canned handlers the tests and the local admin E2E use instead of a model |
 
 ## Routes
 
@@ -91,9 +91,8 @@ the admin), or the local process env (set by the admin's runner):
 | `DATABASE_URL` | the read-only database user; required |
 | `SLIME_API_KEY` | the endpoint key (`slm_…`) |
 | `CRYSTAL_TOKENS` | JSON `{ "<crystal key>": "slc_…" }`: each Crystal's own token for `POST /v0/e/<key>` |
-| `SLIME_PROVIDER` | `claude` (default), `groq` or `offline` |
+| `SLIME_PROVIDER` | `claude` (default) or `groq` |
 | `ANTHROPIC_API_KEY` / `GROQ_API_KEY` | the provider's key (shared prefix on Lambda) |
-| `SLIME_MODE` | `locked`: no generation, saved and Crystal handlers only |
 | `SLIME_MODEL`, `SLIME_EFFORT` | generator model and effort |
 | `SLIME_REVIEW`, `SLIME_REVIEW_MODEL`, `SLIME_REVIEW_EFFORT` | `off` skips reviews; reviewer model and effort |
 | `SLIME_CRYSTAL` | `off` serves no Crystals (kill switch) |
@@ -128,10 +127,9 @@ No longer read: `META_DATABASE_URL`, `SLIME_META_TABLE`, `SLIME_THINKING`,
 3. **Roll back** by redeploying the previous bundle: it reads the untouched
    sandbox items.
 
-Migrated handlers record the sandbox's scope as their provenance. In locked
-mode they are served as they are. In explore mode the provenance doesn't match
-(the sandbox had no dictionary), so each one is regenerated on its next
-request.
+Migrated handlers record the sandbox's scope as their provenance, which never
+matches (the sandbox had no dictionary), so each one is generated again on its
+next request. Every endpoint generates on a miss; there is no serve-only mode.
 
 ## Behavior
 

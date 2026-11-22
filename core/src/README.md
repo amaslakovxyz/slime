@@ -10,7 +10,7 @@ The folders say what the system is made of:
 
 | Kind | Folder | What it is |
 |---|---|---|
-| **Port** | [models/](./models/README.md) | Generator, Reviewer, Optimizer. `types.ts`, `ModelClient` + `claude/`, `groq/`, `offline/`. |
+| **Port** | [models/](./models/README.md) | Generator, Reviewer, Optimizer. `types.ts`, `ModelClient` + `claude/`, `groq/`. |
 | **Port** | [sources/](./sources/README.md) | Where data comes from: one SQL source (`sql/`, `Connector` + `postgres/`) and any number of API sources (`api/`, `ApiSource` + `defineApiSource`, `notion/`). `lifecycle.ts` starts and closes them all. |
 | **Port** | [stores/](./stores/README.md) | Slime's own key-value state. `types.ts` + file and memory stores. |
 | **Port** | [sandbox/](./sandbox/README.md) | Where generated shaping code runs. `types.ts` + `quickjs/`. |
@@ -39,9 +39,9 @@ the API:
 | `./postgres` | `sources/sql/postgres/index.ts` |
 | `./notion` | `sources/api/notion/index.ts` |
 | `./models` | `models/index.ts`: `modelRoles`, `parseJsonReply`, `ModelClient` types |
-| `./claude`, `./groq`, `./offline` | `models/<name>/index.ts` |
+| `./claude`, `./groq` | `models/<name>/index.ts` |
 | `./crystallize` | `crystallize/index.ts` (and the `slime-crystal` bin) |
-| `./testing` | `testing/index.ts`: `describeStoreContract`, `describeConnectorContract`, `describeModelClientContract`, fakes |
+| `./testing` | `testing/index.ts`: `describeStoreContract`, `describeConnectorContract`, `describeApiSourceContract`, `describeModelClientContract`, `cannedGenerator`, fakes |
 | `./shape-worker` | `sandbox/quickjs/shape-worker.ts`, for bundlers that copy the worker |
 
 `test/package.test.ts` pins every entry's value exports.
@@ -49,8 +49,8 @@ the API:
 **`create-slime.ts`**: `createSlime(config, { runner }?)`. Startup order
 (`sources/lifecycle.ts`): every source's safety check (an unsafe database
 user throws `SlimeConfigError`), every source's `describe()`, then
-`store.init()` and the dictionary. In locked mode it emits one
-`warning` event when saved handlers were made against another schema. A
+`store.init()` and the dictionary. It emits one `warning` event when Crystal
+handlers were made against another schema. A
 `runner` the host passes is shared: the engine uses it and `close()` leaves it
 running. Without one, the engine builds its own `QuickJSRunner` and closes it.
 

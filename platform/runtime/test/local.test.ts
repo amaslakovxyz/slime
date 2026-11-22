@@ -19,7 +19,7 @@ function fakeSlime(queries: unknown[] = []): Slime {
       return { data: [{ ok: true }], meta: meta('k1', 'crystal') };
     },
     handlers: () => [{ key: 'k2', intent: 'gas one', tier: 'gas', runs: 2, createdAt: '2026-01-02' }],
-    stats: () => ({ mode: 'explore', handlers: { gas: 1, liquid: 0 }, generationsThisHour: 0, generationsInFlight: 0 }),
+    stats: () => ({ handlers: { gas: 1, liquid: 0 }, generationsThisHour: 0, generationsInFlight: 0 }),
   } as unknown as Slime;
 }
 

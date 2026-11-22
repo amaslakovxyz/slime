@@ -89,7 +89,7 @@ export function toHandlerRecord(item: LegacyItem): HandlerRecord {
     output: legacy.output,
     artifact: legacy.artifact,
     paramTypes: Object.fromEntries(Object.entries(legacy.inputSig).map(([name, type]) => [name, COARSE_TYPES[type] ?? null])),
-    // The sandbox scope had no dictionary; explore mode regenerates on the mismatch, locked mode serves (§4.7).
+    // The sandbox scope had no dictionary, so a migrated handler is generated again on its first request (§4.7).
     provenance: { schemaHash: legacy.schemaHash, dictionaryHash: 'sandbox', promptHash: legacy.promptHash, model: legacy.model },
     tier: 'liquid',
     review: reviewStatusOf(legacy.review.status),

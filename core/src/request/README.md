@@ -111,11 +111,10 @@ and `Shape`.
 - `requestKey` hashes `{ v: 1, normalized intent, sorted input NAMES, output }`.
   Input values and input types are never part of the key.
 - The request key alone is a handler's store key (§4.7). Provenance is stored
-  inside the handler, never hashed into the key, so locked mode (no generator,
-  possibly a slightly different schema) finds what explore mode saved.
-- Explore mode treats any `changedProvenance` result as a miss and
-  regenerates; locked mode serves the handler and warns once if `schemaHash`
-  changed. `engine/handler-cache.ts` applies this.
+  inside the handler, never hashed into the key, so a handler made with
+  another prompt or model is replaced under the same key.
+- Any `changedProvenance` result is a miss: the handler is generated again.
+  `engine/handler-cache.ts` applies this.
 - Bumping `KEY_VERSION` invalidates every existing key; change it only on purpose.
 
 ## Side Effects

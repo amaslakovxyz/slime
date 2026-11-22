@@ -24,8 +24,6 @@ Providers, each its own subpath:
 
 - [claude/](./claude/README.md): `@slime-cloud/core/claude` (needs `@anthropic-ai/sdk`).
 - [groq/](./groq/README.md): `@slime-cloud/core/groq` (plain `fetch`).
-- [offline/](./offline/README.md): `@slime-cloud/core/offline`, a `Generator`
-  that serves hand-written handlers, for tests and CI.
 
 ## Interface
 
@@ -72,7 +70,7 @@ A provider outside core does the same against `@slime-cloud/core/models` and
 - **One set of prompts** for every instance, with or without API sources.
 - **Byte-stable.** `promptHash(provider, ...parts)` (16 hex characters) is
   recorded in every handler; editing a prompt, or how `roles.ts` assembles
-  it, regenerates handlers in explore mode. `test/models/prompt-hash.test.ts`
+  it, regenerates saved handlers. `test/models/prompt-hash.test.ts`
   pins the current hashes.
 - **Never values or rows.** A model sees parameter names and types, never
   input values or rows. The optimizer sees only code, never the intent.

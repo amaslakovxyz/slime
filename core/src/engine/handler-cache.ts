@@ -1,13 +1,10 @@
-import type { SlimeMode } from '../config/options.js';
 import { changedProvenance, type HandlerProvenance } from '../request/key.js';
-import { SlimeError } from '../shared/errors.js';
 import type { SlimeStore } from '../stores/types.js';
 import type { HandlerSummary } from './types.js';
 import { HANDLERS_NS, recordFromStore, type HandlerRecord, type StoredTier } from '../handler/record.js';
 
 export interface HandlerCacheSettings {
   store: SlimeStore;
-  mode: SlimeMode;
   provenance: HandlerProvenance;
   sqlSourceName: string;
   gasWindowMs: number;
@@ -74,16 +71,13 @@ export class HandlerCache {
     return [...this.#handlers.values()].filter(({ expiresAt }) => expiresAt > now).map(({ record }) => record);
   }
 
-  // Explore mode regenerates an unfit handler; locked mode can't, so it says why instead of serving it (MS14).
+  // An unfit handler is a miss: it is generated again for today's sources (MS14).
   #fitsSources(saved: HandlerRecord): boolean {
-    const problem = this.#settings.savedHandlerProblem?.(saved);
-    if (problem === undefined) return true;
-    if (this.#settings.mode === 'explore') return false;
-    throw new SlimeError('HANDLER_NOT_FOUND', `The saved handler no longer fits the configured sources: ${problem}`);
+    return this.#settings.savedHandlerProblem?.(saved) === undefined;
   }
 
-  // Locked mode can't regenerate, so it serves what it has (§4.7).
+  // A handler made with another schema, dictionary, prompt or model is generated again (§4.7).
   #isUsable(saved: HandlerRecord): boolean {
-    return this.#settings.mode === 'locked' || changedProvenance(saved.provenance, this.#settings.provenance).length === 0;
+    return changedProvenance(saved.provenance, this.#settings.provenance).length === 0;
   }
 }
