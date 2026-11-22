@@ -15,10 +15,26 @@ stack with a `build.sh` gets it run before plan/apply (platform builds the
 runtime bundle and the admin). Apply refuses plans with pure deletes; replacements pass.
 Run it by hand with `allow_destroy` when a delete is intended.
 
-Once a stack is applied by CI, do not apply it from a branch: the next push to
-`main` would plan your branch-only resources away (the delete guard stops it).
-The one planned exception is the cloud MVP cutover below, applied from its
-branch so that the CI apply after merge shows no changes.
+A push to `main` deploys when it touches any input of a deployed artifact:
+`platform/**`, `core/**`, `crystal/**`, the root `package.json` or
+`package-lock.json`, or the workflow itself. Docs- and examples-only merges do
+not deploy. Before apply, a run checks that `main` has not changed those inputs
+since its own commit; if it has, the run skips apply (a notice says so) and
+leaves it to the newer run. So a **Re-run** of an old run never rolls prod
+back. To redeploy the current `main`, use **Run workflow**.
+
+Once a stack is applied by CI, change it only through a pull request:
+
+- do not `terraform apply` it from a laptop or a branch: the next push to
+  `main` would plan your branch-only resources away (the delete guard stops it);
+- do not edit its resources with `aws` CLI or the console (for example
+  `aws lambda update-function-configuration`): the next apply reverts managed
+  attributes, and until then prod differs from `main`.
+
+The one planned exception was the cloud MVP cutover below, applied from its
+branch so that the CI apply after merge shows no changes. Resources that are
+deliberately outside Terraform are listed where they are used: the SSM secrets
+(below) and the temporary test database.
 
 ```mermaid
 flowchart LR
