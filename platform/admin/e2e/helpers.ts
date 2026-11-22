@@ -110,8 +110,10 @@ export async function lifecycleJourney(
 
   await test.step('Crystallize brings the Crystal card', async () => {
     await page.getByRole('button', { name: /^Crystallize / }).click();
-    await expect(page.locator('.lc-reports li.ok')).toContainText('crystallized', { timeout: 60_000 });
+    // The card is the durable proof: the report list is transient, and locally the restart
+    // that follows re-renders the page and can drop it before it is seen.
     await expect(page.getByTestId('crystal-card')).toBeVisible({ timeout: 60_000 });
+    await expect(page.locator('.lc-reports li.bad')).toHaveCount(0);
     await expectStatus(page, 'ready');
   });
 
