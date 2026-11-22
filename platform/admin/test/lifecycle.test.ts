@@ -7,7 +7,18 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import type { Endpoint } from '../lib/endpoints';
-import { REQUESTS_PAGE_SIZE, readLifecycle, readRequests, stagesOf, toRow, type LifecycleData, type RuntimeHandler } from '../lib/lifecycle';
+import {
+  REQUESTS_PAGE_SIZE,
+  readLifecycle,
+  readRequests,
+  stagesOf,
+  tierStats,
+  toRow,
+  transitionsOf,
+  type LifecycleData,
+  type RuntimeEvent,
+  type RuntimeHandler,
+} from '../lib/lifecycle';
 import { secretStore } from '../lib/secrets';
 
 const t = { liquidRuns: 3, crystalRuns: 10 };
@@ -39,10 +50,14 @@ describe('toRow', () => {
   test('a stale saved Liquid handler is never pickable and says it regenerates', () => {
     const row = toRow(h({ tier: 'liquid', runs: 12, review: 'approved', stale: true }), t);
     assert.equal(row.canCrystallize, false);
+    assert.equal(row.stale, true);
+    assert.equal(toRow(h({ tier: 'liquid', runs: 12 }), t).stale, false);
     assert.equal(row.progressLabel, 'stale · regenerates on next request');
     assert.equal(row.progressPct, 0);
     const stages = stagesOf('ready', [h({ tier: 'liquid', runs: 12, stale: true })], 12);
     assert.deepEqual(stages.map((s) => s.state), ['done', 'done', 'now', 'todo']);
+    // It still sits in the Liquid tier: the stage counts it, the transition does not.
+    assert.equal(stages[2]!.count, 1);
   });
 
   test('a Crystal is its own endpoint and is never picked again', () => {
@@ -69,7 +84,73 @@ describe('stagesOf', () => {
     assert.deepEqual(states(stagesOf('ready', [h({ tier: 'liquid', runs: 4 })], 4)), ['done', 'done', 'done', 'now']);
     const all = stagesOf('ready', [h({ tier: 'crystal', runs: 12 })], 12);
     assert.deepEqual(states(all), ['done', 'done', 'done', 'done']);
-    assert.equal(all[1]!.note, '1 handler · 12 requests');
+    // The Gas badge counts Gas handlers; the note says the agent is linked, not a second, different count.
+    assert.equal(all[1]!.note, 'agent linked · 12 requests');
+  });
+
+  test('the diagram is the handler lifecycle: Connected, then Gas, Liquid, Crystal', () => {
+    const stages = stagesOf('ready', [], 0, t);
+    assert.deepEqual(stages.map((s) => s.id), ['connected', 'gas', 'liquid', 'crystal']);
+    assert.deepEqual(stages.map((s) => s.label), ['Connected', 'Gas', 'Liquid', 'Crystal']);
+    assert.equal(stages[1]!.note, 'waiting for the first request');
+    assert.equal(stages[2]!.note, 'after 3 runs');
+  });
+
+  test('each tier stage counts the handlers in that tier now', () => {
+    const handlers = [h({ key: 'a' }), h({ key: 'b' }), h({ key: 'c', tier: 'liquid', runs: 5 }), h({ key: 'd', tier: 'crystal', runs: 12 })];
+    const stages = stagesOf('ready', handlers, 20, t);
+    assert.deepEqual(stages.map((s) => s.count), [undefined, 2, 1, 1]);
+    // Notes describe the stage; the badge alone carries the count, so the two never disagree.
+    assert.deepEqual(stages.map((s) => s.note), ['read-only', 'agent linked · 20 requests', 'saved · survives restarts', 'own route and token']);
+  });
+});
+
+describe('transitionsOf', () => {
+  test('names the trigger, who moves it, and the handlers on the way', () => {
+    const handlers = [
+      h({ key: 'a', runs: 1 }),
+      h({ key: 'b', runs: 3, review: 'pending' }),
+      h({ key: 'c', tier: 'liquid', runs: 4 }),
+      h({ key: 'd', tier: 'liquid', runs: 11 }),
+      h({ key: 'e', tier: 'liquid', runs: 12, stale: true }),
+    ];
+    const [toGas, toLiquid, toCrystal] = transitionsOf(handlers, 9, t);
+    assert.deepEqual(
+      [toGas!.id, toLiquid!.id, toCrystal!.id],
+      ['connected-gas', 'gas-liquid', 'liquid-crystal'],
+    );
+    assert.equal(toGas!.actor, 'agent');
+    assert.equal(toLiquid!.actor, 'automatic');
+    assert.equal(toCrystal!.actor, 'operator');
+    assert.match(toLiquid!.rule, /3 successful runs/);
+    assert.match(toCrystal!.rule, /10 runs/);
+    assert.deepEqual([toGas!.short, toLiquid!.short, toCrystal!.short], ['first request', '3 runs + review', '10 runs + Crystallize']);
+    // Gas: both are counting; one reached the run threshold and waits for the review.
+    assert.deepEqual([toLiquid!.onTheWay, toLiquid!.ready], [2, 1]);
+    // Liquid: the stale row is neither on the way nor pickable.
+    assert.deepEqual([toCrystal!.onTheWay, toCrystal!.ready], [2, 1]);
+    assert.equal(toGas!.done, true);
+  });
+
+  test('before the first request nothing has crossed', () => {
+    const [toGas, toLiquid, toCrystal] = transitionsOf([], 0, t);
+    assert.equal(toGas!.done, false);
+    assert.equal(toLiquid!.done, false);
+    assert.equal(toCrystal!.done, false);
+  });
+});
+
+describe('tierStats', () => {
+  const e = (tier: RuntimeEvent['tier'], ms: number): RuntimeEvent => ({ at: '2026-11-22T10:00:00Z', handlerKey: 'abc', tier, cache: 'hit', ms });
+
+  test('counts and averages the recent requests answered by a tier', () => {
+    const events = [e('gas', 4), e('gas', 2), e('liquid', 3), e('crystal', 1.5)];
+    assert.deepEqual(tierStats(events, 'gas'), { requests: 2, avgMs: 3 });
+    assert.deepEqual(tierStats(events, 'crystal'), { requests: 1, avgMs: 1.5 });
+  });
+
+  test('a tier with no recent requests has no average', () => {
+    assert.deepEqual(tierStats([], 'liquid'), { requests: 0, avgMs: null });
   });
 });
 

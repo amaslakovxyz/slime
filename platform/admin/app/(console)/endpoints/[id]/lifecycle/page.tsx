@@ -2,10 +2,11 @@ import Link from 'next/link';
 import { LivePoller } from '@/app/ui/live-poller';
 import { crystalTokenHints } from '@/lib/crystal-tokens';
 import { isCloud } from '@/lib/env';
-import { readLifecycle, stagesOf, toRow } from '@/lib/lifecycle';
+import { DEFAULT_THRESHOLDS, readLifecycle, stagesOf, tierStats, toRow, transitionsOf } from '@/lib/lifecycle';
 import { loadEndpoint } from '../data';
 import { AgentSnippet } from './agent-snippet';
 import { LifecycleBoard } from './board';
+import { LifecycleDiagram } from './diagram';
 
 // One endpoint is a dispatch buffer: every request lands here, each distinct
 // request becomes a handler, and the operator picks which proven ones become
@@ -17,7 +18,11 @@ export default async function LifecyclePage({ params }: { params: Promise<{ id: 
   const cloud = isCloud();
   const handlers = data.ok ? data.handlers : [];
   const total = data.ok ? data.total : 0;
-  const stages = stagesOf(ep.status, handlers, total, data.ok ? data.thresholds : undefined);
+  const thresholds = data.ok ? data.thresholds : DEFAULT_THRESHOLDS;
+  const stages = stagesOf(ep.status, handlers, total, thresholds);
+  const transitions = transitionsOf(handlers, total, thresholds);
+  const events = data.ok ? data.events : [];
+  const stats = { gas: tierStats(events, 'gas'), liquid: tierStats(events, 'liquid'), crystal: tierStats(events, 'crystal') };
   const rows = data.ok ? handlers.map((h) => toRow(h, data.thresholds)) : [];
   // The total counts every request the endpoint answered; "since" is only true while the feed still lists them all.
   const firstAt = data.ok && data.events.length && data.events.length >= data.total ? data.events[data.events.length - 1]?.at : undefined;
@@ -25,14 +30,6 @@ export default async function LifecyclePage({ params }: { params: Promise<{ id: 
   return (
     <>
       <LivePoller />
-      <ol className="lc-rail" aria-label="Stages">
-        {stages.map((s, i) => (
-          <li key={s.id} className={`lc-stage lc-${s.state} lc-s-${s.id}`}>
-            <span className="lc-dot">{s.state === 'done' ? '✓' : i + 1}</span>
-            <b>{s.label}</b>
-          </li>
-        ))}
-      </ol>
 
       {data.ok &&
         data.warnings.map((w, i) => (
@@ -56,6 +53,18 @@ export default async function LifecyclePage({ params }: { params: Promise<{ id: 
           </div>
         </div>
       )}
+
+      <LifecycleDiagram
+        stages={stages}
+        transitions={transitions}
+        rows={rows}
+        stats={stats}
+        recent={events.length}
+        total={total}
+        firstAt={firstAt}
+        status={ep.status}
+        cloud={cloud}
+      />
 
       <section className="card lc-card">
         <h2 className="lc-h"><span className="lc-num">1</span>Connect your agent</h2>

@@ -72,6 +72,7 @@ MVP design (L20–L23).
 | L21 | Cloud Crystals run as data in the engine's QuickJS runner with Liquid's time and memory limits, after a SHA-256 check against the manifest; they are never `import()`ed. Self-hosted apps that import `index.mjs` keep running Crystal functions in-process. | One process holds every endpoint's settings: a heavy or hostile Crystal must not stall or read them. |
 | L22 | In the cloud, `POST /v0/reload` replaces the restart: after Crystallize or a settings change the admin calls it on the instance it reaches; other warm instances pick up changes within the 30 s settings TTL. Locally `/v0/reload` is a no-op (204). | There is no process to restart, and per-endpoint functions are gone. |
 | L23 | Gas rows and live run counts are per Lambda instance in the cloud, so the cloud Lifecycle view is approximate. The live feed (`/v0/events`) moved to the store on 2026-11-22 and is the same on every instance. | Durable counters and a shared feed need a store; out of scope for the MVP. |
+| L24 | The stage rail became an interactive diagram (2026-11-22): Connected → Gas → Liquid → Crystal with clickable stages and arrows, and a side panel that explains the selection (what it is, where the code lives, model tokens, the next rule with the endpoint's thresholds, the handlers in it). The panel follows the current stage until the operator picks one; the pick is client state and survives the 2 s poll. Crystal is ice-blue (`#8FD3FF`) across the admin, as on the landing page. | The rail showed four ticks without Gas, mixed setup steps with handler tiers, and did not render the notes `stagesOf` computed; the lavender Crystal read almost white. |
 
 ## 4. Components
 
@@ -138,8 +139,11 @@ MVP design (L20–L23).
   derive
   * per handler: stage, progress label (`n/3 to Liquid`, `n/10 to Crystal`,
     `ready to crystallize`), review label;
-  * the rail: Connected (endpoint `ready`), Agent linked (any handler),
-    Liquid (any Liquid or Crystal), Crystal (any Crystal).
+  * the lifecycle diagram (L24): Connected (endpoint `ready`), Gas (any
+    handler; the first request links the agent), Liquid (any Liquid or
+    Crystal), Crystal (any Crystal); each tier stage counts its handlers now;
+    the three transitions with their trigger, actor and the handlers on the
+    way; per-tier request count and mean engine time over the recent feed.
   * Review label comes from the engine (`HandlerSummary.review`, saved records,
     Crystal manifest); no inference from runs. `pending` → `reviewing…`; a
     non-Gas handler with `none` → `no reviewer`; Gas with `none` → `—`.

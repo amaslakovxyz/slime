@@ -14,10 +14,11 @@
   --gas-bg: rgba(56, 248, 184, 0.1);
   --gas-border: rgba(56, 248, 184, 0.35);
 
-  --crystal-accent: #F2EAFF;
-  --crystal-glow: #C4B5FD;
-  --crystal-bg: rgba(196, 181, 253, 0.12);
-  --crystal-border: rgba(196, 181, 253, 0.35);
+  /* Crystal reads ice-blue, as on the landing page: the brand book's lavender looked almost white. */
+  --crystal-accent: #DDF3FF;
+  --crystal-glow: #8FD3FF;
+  --crystal-bg: rgba(143, 211, 255, 0.12);
+  --crystal-border: rgba(143, 211, 255, 0.4);
 
   --wireframe-grey: #6E5C77;
   --text-pure: #F8F6FC;
@@ -398,12 +399,12 @@ p {
 }
 
 .stat-savings {
-  border-color: rgba(196, 181, 253, 0.28);
+  border-color: rgba(143, 211, 255, 0.28);
 }
 
 .stat-savings .stat-value {
   color: var(--crystal-accent);
-  text-shadow: 0 0 22px rgba(196, 181, 253, 0.35);
+  text-shadow: 0 0 22px rgba(143, 211, 255, 0.35);
 }
 
 .status-line {
@@ -500,12 +501,12 @@ p {
 }
 
 .tier-crystal {
-  border: 1px solid rgba(196, 181, 253, 0.6);
+  border: 1px solid rgba(143, 211, 255, 0.6);
   border-radius: 6px;
-  box-shadow: 0 0 34px rgba(196, 181, 253, 0.12), inset 0 0 0 1px rgba(242, 234, 255, 0.04);
+  box-shadow: 0 0 34px rgba(143, 211, 255, 0.12), inset 0 0 0 1px rgba(221, 243, 255, 0.04);
   background:
-    linear-gradient(135deg, rgba(196, 181, 253, 0.14), transparent 42%),
-    linear-gradient(315deg, rgba(242, 234, 255, 0.06), transparent 38%),
+    linear-gradient(135deg, rgba(143, 211, 255, 0.14), transparent 42%),
+    linear-gradient(315deg, rgba(221, 243, 255, 0.06), transparent 38%),
     var(--bg-surface);
 }
 
@@ -517,7 +518,7 @@ p {
   right: 0;
   width: 46px;
   height: 46px;
-  background: linear-gradient(225deg, rgba(196, 181, 253, 0.4) 0 50%, transparent 50%);
+  background: linear-gradient(225deg, rgba(143, 211, 255, 0.4) 0 50%, transparent 50%);
 }
 
 .tier-head {
@@ -557,7 +558,7 @@ p {
 
 .tier-crystal .tier-name {
   color: var(--crystal-accent);
-  text-shadow: 0 0 18px rgba(196, 181, 253, 0.45);
+  text-shadow: 0 0 18px rgba(143, 211, 255, 0.45);
 }
 
 .tier-desc {
@@ -1643,15 +1644,15 @@ code.inline {
 
 .savings-card {
   min-height: 100%;
-  border-color: rgba(196, 181, 253, 0.3);
-  background: linear-gradient(135deg, rgba(196, 181, 253, 0.1), transparent 45%), var(--bg-surface);
+  border-color: rgba(143, 211, 255, 0.3);
+  background: linear-gradient(135deg, rgba(143, 211, 255, 0.1), transparent 45%), var(--bg-surface);
 }
 
 .savings-value {
   margin: 4px 0 10px;
   font-size: 34px;
   color: var(--crystal-accent);
-  text-shadow: 0 0 24px rgba(196, 181, 253, 0.4);
+  text-shadow: 0 0 24px rgba(143, 211, 255, 0.4);
 }
 
 .savings-card .card-sub {
@@ -1934,21 +1935,76 @@ code.inline {
 }
 
 /* ---- Lifecycle tab (lc-*) ---- */
-.lc-rail { display: grid; grid-template-columns: repeat(4, 1fr); list-style: none; padding: 0; margin: 0 0 24px; }
-.lc-stage { position: relative; padding-top: 32px; color: var(--wireframe-grey); }
-.lc-stage::before { content: ""; position: absolute; top: 11px; left: 0; right: 0; height: 2px; background: var(--border-color); }
-.lc-stage:first-child::before { left: 12px; }
-.lc-stage:last-child::before { right: calc(100% - 12px); }
-.lc-stage b { display: block; font-size: 13px; font-weight: 600; }
-.lc-stage small { font-size: 12px; color: var(--wireframe-grey); }
-.lc-dot { position: absolute; top: 0; left: 0; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--border-bright); background: var(--bg-canvas); display: grid; place-items: center; font-size: 11px; z-index: 1; }
-.lc-done { color: var(--text-pure); }
-.lc-done::before { background: linear-gradient(90deg, var(--plasma-primary), var(--plasma-shadow)); }
-.lc-done .lc-dot { border-color: var(--plasma-primary); background: var(--plasma-primary); color: #fff; box-shadow: 0 0 14px var(--glow-primary); }
-.lc-s-linked.lc-done .lc-dot { border-color: var(--gas-accent); background: var(--gas-accent); color: #000; box-shadow: 0 0 14px rgba(56, 248, 184, 0.5); }
-.lc-s-crystal.lc-done .lc-dot { border-color: var(--crystal-glow); background: var(--crystal-accent); color: #000; box-shadow: 0 0 16px rgba(196, 181, 253, 0.7); }
-.lc-now .lc-dot { animation: lc-pulse 1.4s infinite; }
-@keyframes lc-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 20, 118, 0.5); } 50% { box-shadow: 0 0 0 7px rgba(255, 20, 118, 0); } }
+/* Lifecycle diagram: a vertical flow of stages and arrows; the panel beside it explains the selection.
+   Each stage and arrow takes its tier's colour through --tone; Connected stays neutral so plasma means Liquid. */
+.lc-t-connected { --tone: var(--text-muted); --tone-ink: #0B070C; }
+.lc-t-gas { --tone: var(--gas-accent); --tone-ink: #04140E; }
+.lc-t-liquid { --tone: var(--plasma-primary); --tone-ink: #fff; }
+.lc-t-crystal { --tone: var(--crystal-glow); --tone-ink: #04121C; }
+
+.lc-life-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.lc-life-body { display: grid; grid-template-columns: minmax(240px, 300px) minmax(0, 1fr); gap: 24px; align-items: start; }
+.lc-flow { list-style: none; margin: 0; padding: 0; }
+.lc-node, .lc-edge { display: grid; grid-template-columns: 28px minmax(0, 1fr); column-gap: 12px; width: 100%; background: none; border: 1px solid transparent; border-radius: var(--radius-control); color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.lc-node { align-items: center; padding: 8px 10px; }
+.lc-node:hover, .lc-edge:hover { background: var(--bg-surface-hover); }
+.lc-node.on, .lc-edge.on { background: var(--bg-surface-hover); border-color: color-mix(in srgb, var(--tone) 55%, transparent); }
+.lc-node:focus-visible, .lc-edge:focus-visible { outline: 2px solid var(--tone); outline-offset: 2px; }
+.lc-dot { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--border-bright); background: var(--bg-canvas); display: grid; place-items: center; font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.lc-done .lc-dot { border-color: var(--tone); background: var(--tone); color: var(--tone-ink); box-shadow: 0 0 14px color-mix(in srgb, var(--tone) 45%, transparent); }
+.lc-t-connected.lc-done .lc-dot { background: var(--bg-surface-hover); color: var(--text-pure); box-shadow: none; }
+.lc-now .lc-dot { border-color: var(--tone); color: var(--text-pure); animation: lc-pulse 1.4s infinite; }
+.lc-node-text { display: grid; min-width: 0; }
+.lc-node-text b { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--text-muted); }
+.lc-done .lc-node-text b, .lc-now .lc-node-text b { color: var(--text-pure); }
+.lc-node-text small { font-size: 12px; color: var(--text-muted); overflow-wrap: anywhere; }
+.lc-count { min-width: 20px; padding: 0 6px; border-radius: 999px; background: color-mix(in srgb, var(--tone) 16%, transparent); border: 1px solid color-mix(in srgb, var(--tone) 45%, transparent); color: var(--tone); font-size: 11px; line-height: 18px; text-align: center; }
+.lc-t-liquid .lc-count { color: var(--plasma-highlight); }
+.lc-edge { align-items: stretch; padding: 0 10px; min-height: 40px; }
+.lc-edge-line { position: relative; justify-self: center; width: 2px; background: var(--border-color); }
+.lc-edge-line::after { content: ""; position: absolute; bottom: 2px; left: 50%; width: 6px; height: 6px; border-right: 2px solid var(--border-bright); border-bottom: 2px solid var(--border-bright); transform: translateX(-50%) rotate(45deg); }
+.lc-edge-done .lc-edge-line { background: linear-gradient(180deg, var(--border-bright), var(--tone)); }
+.lc-edge-done .lc-edge-line::after { border-color: var(--tone); }
+.lc-edge-text { align-self: center; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--text-muted); padding: 6px 0; }
+.lc-edge-ready { padding: 0 7px; border-radius: 999px; background: color-mix(in srgb, var(--tone) 18%, transparent); color: var(--tone); font-size: 11px; line-height: 18px; }
+
+.lc-panel { min-width: 0; background: var(--bg-canvas); border: 1px solid var(--border-color); border-radius: var(--radius-control); padding: 18px 20px; }
+.lc-panel-head { display: flex; align-items: center; gap: 10px; }
+.lc-panel-head h3 { margin: 0; font-size: 17px; font-weight: 600; }
+.lc-swatch { width: 12px; height: 12px; border-radius: 50%; background: var(--tone); box-shadow: 0 0 10px color-mix(in srgb, var(--tone) 60%, transparent); }
+.lc-chip { margin-left: auto; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--border-bright); color: var(--text-muted); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; }
+.lc-chip-done { border-color: var(--gas-border); color: var(--gas-accent); }
+.lc-chip-now { border-color: var(--plasma-primary); color: var(--plasma-highlight); }
+.lc-panel-summary { margin: 10px 0 14px; color: var(--text-muted); font-size: 14px; }
+.lc-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0 0 14px; }
+.lc-stats > div { background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 10px; padding: 10px 12px; }
+.lc-stats dt { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+.lc-stats dd { margin: 2px 0 0; font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.lc-stats dd small { font-size: 12px; font-weight: 400; color: var(--text-muted); }
+.lc-cap::first-letter { text-transform: uppercase; }
+.lc-facts { display: grid; gap: 6px; margin: 0 0 14px; font-size: 13px; }
+.lc-facts > div { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 10px; }
+.lc-facts dt { color: var(--text-muted); }
+.lc-facts dd { margin: 0; }
+.lc-panel-hint { margin: 0 0 12px; font-size: 13px; color: var(--crystal-glow); }
+.lc-plist h4 { margin: 0 0 6px; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); font-weight: 600; }
+.lc-plist ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.lc-plist a { display: grid; grid-template-columns: 62px minmax(0, 1fr) 60px auto; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 8px; color: var(--text-pure); font-size: 13px; }
+.lc-plist a:hover { background: var(--bg-surface-hover); }
+.lc-plist-intent { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lc-plist .lc-bar { width: 60px; }
+.lc-plist-label { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.lc-table tr:target td { background: color-mix(in srgb, var(--plasma-primary) 8%, transparent); }
+
+@media (max-width: 1100px) {
+  .lc-life-body { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  .lc-stats { grid-template-columns: minmax(0, 1fr); }
+  .lc-plist a { grid-template-columns: 56px minmax(0, 1fr); }
+  .lc-plist .lc-bar, .lc-plist-label { display: none; }
+}
+@keyframes lc-pulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--tone, var(--plasma-primary)) 50%, transparent); } 50% { box-shadow: 0 0 0 7px transparent; } }
 
 .lc-card { margin-bottom: 18px; }
 .lc-h { font-size: 15px; font-weight: 600; margin: 0 0 2px; display: flex; align-items: center; gap: 10px; }
@@ -1990,9 +2046,9 @@ code.inline {
 .lc-feed div { display: grid; grid-template-columns: 76px 70px 64px 1fr 80px; gap: 8px; padding: 2px 0; }
 .lc-ms { text-align: right; }
 
-.lc-crys { border-color: var(--crystal-border); background: radial-gradient(500px 200px at 100% 0%, rgba(196, 181, 253, 0.1), transparent 70%), var(--bg-surface); }
+.lc-crys { border-color: var(--crystal-border); background: radial-gradient(500px 200px at 100% 0%, rgba(143, 211, 255, 0.1), transparent 70%), var(--bg-surface); }
 .lc-crys-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 6px; }
-.lc-btn-crystal { background: var(--crystal-accent); color: #1a1020; border-color: transparent; box-shadow: 0 0 22px rgba(196, 181, 253, 0.45); }
+.lc-btn-crystal { background: var(--crystal-accent); color: #1a1020; border-color: transparent; box-shadow: 0 0 22px rgba(143, 211, 255, 0.45); }
 .lc-btn-crystal:disabled { opacity: 0.35; box-shadow: none; cursor: not-allowed; }
 .lc-reports { list-style: none; padding: 0; margin: 14px 0 0; font-size: 13px; }
 .lc-reports li { padding: 3px 0; }
@@ -2003,7 +2059,6 @@ code.inline {
 .lc-route > div { flex: 1; }
 
 @media (max-width: 720px) {
-  .lc-rail { grid-template-columns: repeat(2, 1fr); row-gap: 16px; }
   .lc-table th:nth-child(6), .lc-table td:nth-child(6), .lc-table th:nth-child(5), .lc-table td:nth-child(5) { display: none; }
 }
 .lc-route-body { display: grid; gap: 4px; min-width: 0; }
@@ -2022,7 +2077,6 @@ code.inline {
 .lc-sub td { border-top: 0; padding-top: 0; }
 .lc-row-crystal td { border-bottom: 0; }
 .lc-sub .lc-route { margin: 0 0 4px; }
-.lc-stage { padding-top: 30px; }
 
 /* Requests log pages: Newest / Newer on the left, Older on the right. */
 .pager { display: flex; justify-content: space-between; gap: 12px; margin-top: 16px; }

@@ -118,6 +118,18 @@ export async function lifecycleJourney(
     await expectStatus(page, 'ready');
   });
 
+  await test.step('the lifecycle diagram explains the stage the operator selects, across live polls', async () => {
+    const crystal = page.locator('[data-stage="crystal"]');
+    await crystal.click();
+    await expect(crystal).toHaveAttribute('aria-pressed', 'true');
+    const panel = page.getByTestId('lifecycle-panel');
+    await expect(panel).toContainText('Its own endpoint');
+    // The page refreshes every 2 s; the selection is client state and must survive it.
+    await page.waitForTimeout(4_500);
+    await expect(crystal).toHaveAttribute('aria-pressed', 'true');
+    await expect(panel.getByRole('link', { name: /^#[0-9a-f]{6}/ })).toHaveCount(1);
+  });
+
   await test.step('the Crystal token opens its own route and nothing else', async () => {
     const card = page.getByTestId('crystal-card');
     const key = (await card.getAttribute('data-key'))!;
