@@ -72,7 +72,7 @@ const slime = await createSlime(new SlimeConfig({
 * their first implementations:
   * the Postgres connector, the Notion API source and `defineApiSource` for
     other REST APIs (read-only, through a constrained HTTP client);
-  * Claude, Groq and offline generators;
+  * Claude and Groq generators;
   * stores for Slime's own state: files (the default) and memory, with no
     extra packages. Any other backend (Postgres, DynamoDB, Redis) is a custom
     `SlimeStore` the app passes in.
@@ -113,8 +113,8 @@ contract test it must pass.
   come from `package.json` `exports` and `bin`.
 - `bench/`: `npm run bench`. `cases.mjs` holds 8 cases with reference
   queries; `run.mjs` runs them through the built package against the demo
-  database, with Groq, Claude (given an API key), or the example's offline
-  handlers.
+  database, with Groq or Claude (it needs `GROQ_API_KEY` or
+  `ANTHROPIC_API_KEY`).
 - `test/`: `node:test` suites run through `tsx`, mirroring `src/`;
   `test/support/` holds the database helpers.
 - `docs/`: [request-format.md](./docs/request-format.md) is the request
@@ -128,7 +128,7 @@ contract test it must pass.
 ## Global Invariants
 
 - **One main entry, plus adapter subpaths.** `package.json` `exports` has
-  `.`, `./postgres`, `./models`, `./claude`, `./groq`, `./offline`,
+  `.`, `./postgres`, `./models`, `./claude`, `./groq`, `./notion`,
   `./crystallize`, `./testing` and `./shape-worker` (C7), plus the
   `slime-crystal` bin. `test/package.test.ts` pins every entry's value exports.
 - **What ships.** ESM only (`type: module`), Node `>=22`, compiled `dist/`

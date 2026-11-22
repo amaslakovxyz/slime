@@ -1,5 +1,5 @@
 // The model ports: Generator, Reviewer and Optimizer. Providers live in sibling
-// folders (claude/, groq/, offline/).
+// folders (claude/, groq/).
 import type { ParamTypesForModel } from '../request/params.js';
 import type { Shape } from '../request/shape.js';
 import type { Artifact } from '../artifact/artifact.js';

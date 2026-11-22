@@ -13,6 +13,7 @@ export {
   type StubReviewer,
   type Verdict,
 } from './fakes.js';
+export { cannedGenerator, type CannedHandlers, type CannedOptions } from './canned-generator.js';
 export { describeApiSourceContract, type ApiSourceContractCase, type ApiSourceContractOptions, type ApiSourceFactory } from './api-source-contract.js';
 export { fixtureFetch, fixtureKey, type Fixture, type FixtureFetch, type FixtureRequest, type FixtureResponse } from './fixture-fetch.js';
 export {

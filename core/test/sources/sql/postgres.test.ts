@@ -5,13 +5,13 @@ import { after, before, describe, test } from 'node:test';
 import { SlimeConfig } from '../../../src/config/slime-config.js';
 import { createSlime } from '../../../src/create-slime.js';
 import { SlimeError } from '../../../src/shared/errors.js';
-import { offlineGenerator } from '../../../src/models/offline/index.js';
 import type { Connector, QueryLimits } from '../../../src/sources/sql/types.js';
 import { valuesInCheck } from '../../../src/sources/sql/postgres/enum-values.js';
 import { postgresConnector } from '../../../src/sources/sql/postgres/index.js';
 import { memoryStore } from '../../../src/stores/memory-store.js';
 import { READER_URL, WRITER_URL, asWriter, isDatabaseAvailable } from '../../support/database.js';
 import { describeConnectorContract } from '../../../src/testing/connector-contract.js';
+import { cannedGenerator } from '../../../src/testing/canned-generator.js';
 import { artifact, fakeGenerator } from '../../../src/testing/fakes.js';
 
 const hasDatabase = await isDatabaseAvailable();
@@ -131,9 +131,9 @@ describe('Postgres connector with other credentials (M3)', { skip: !hasDatabase 
 });
 
 describe('engine on Postgres (M3)', { skip: !hasDatabase }, () => {
-  test('answers a request end to end with the offline generator', async () => {
+  test('answers a request end to end with canned handlers', async () => {
     const intent = 'plans priced at least a minimum, by name';
-    const generator = offlineGenerator({ [intent]: artifact('SELECT name FROM plans WHERE monthly_price_cents >= $1::int ORDER BY name', ['minPriceCents']) });
+    const generator = cannedGenerator({ [intent]: artifact('SELECT name FROM plans WHERE monthly_price_cents >= $1::int ORDER BY name', ['minPriceCents']) });
     const slime = await createSlime(new SlimeConfig({ connector: postgresConnector({ url: READER_URL }), generator, store: memoryStore() }));
     try {
       const { data } = await slime.query({ intent, input: { minPriceCents: 9900 }, output: [{ name: 'string' }] });

@@ -24,8 +24,6 @@ Providers, each its own subpath:
 
 - [claude/](./claude/README.md): `@slime-cloud/core/claude` (needs `@anthropic-ai/sdk`).
 - [groq/](./groq/README.md): `@slime-cloud/core/groq` (plain `fetch`).
-- [offline/](./offline/README.md): `@slime-cloud/core/offline`, a `Generator`
-  that serves hand-written handlers, for tests and CI.
 
 ## Interface
 

@@ -18,10 +18,6 @@
       "types": "./dist/models/index.d.ts",
       "default": "./dist/models/index.js"
     },
-    "./offline": {
-      "types": "./dist/models/offline/index.d.ts",
-      "default": "./dist/models/offline/index.js"
-    },
     "./postgres": {
       "types": "./dist/sources/sql/postgres/index.d.ts",
       "default": "./dist/sources/sql/postgres/index.js"
