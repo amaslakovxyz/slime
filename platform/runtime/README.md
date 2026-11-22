@@ -93,8 +93,8 @@ the admin), or the local process env (set by the admin's runner):
 | `CRYSTAL_TOKENS` | JSON `{ "<crystal key>": "slc_…" }`: each Crystal's own token for `POST /v0/e/<key>` |
 | `SLIME_PROVIDER` | `claude` (default) or `groq` |
 | `ANTHROPIC_API_KEY` / `GROQ_API_KEY` | the provider's key (shared prefix on Lambda) |
-| `SLIME_MODEL`, `SLIME_EFFORT` | generator model and effort |
-| `SLIME_REVIEW`, `SLIME_REVIEW_MODEL`, `SLIME_REVIEW_EFFORT` | `off` skips reviews; reviewer model and effort |
+| `SLIME_MODEL`, `SLIME_EFFORT` | generator model and effort (default `low`) |
+| `SLIME_REVIEW`, `SLIME_REVIEW_MODEL`, `SLIME_REVIEW_EFFORT` | `off` skips reviews; reviewer model and effort (default `low`) |
 | `SLIME_CRYSTAL` | `off` serves no Crystals (kill switch) |
 | `MAX_GENERATIONS_PER_HOUR`, `ROW_CAP`, `STATEMENT_TIMEOUT_MS`, ... | limits and tiers (`src/config.ts` lists them) |
 | `CRYSTAL_MIN_RUNS` | runs a Liquid handler needs before Crystallize (default 10); also the engine's `tiers.crystalReadyRuns`, so its `crystalReady` event fires at the same count |

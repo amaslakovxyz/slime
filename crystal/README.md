@@ -70,7 +70,7 @@ Agents may rewrite a Crystal, never the gate that judges it (`agents/`,
 node crystal/scripts/agent-loop.mjs --dir <crystal folder> --database-url <read-only url> --report report.json
 ```
 
-It runs the `claude` CLI (Sonnet writes and reviews): `--bare` with
+It runs the `claude` CLI (Sonnet writes and reviews; reviewers at `--effort low` by default): `--bare` with
 `ANTHROPIC_API_KEY`, else the local login without MCP servers or skills.
 `.github/workflows/crystal-agents.yml` runs the whole loop on the express
 example (grown with canned handlers, no model) and opens the PR.
