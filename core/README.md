@@ -93,6 +93,12 @@ const slime = await createSlime(new SlimeConfig({
 * PR #7, `docs/oss-saas-split-design.md`: the layers (core → server →
   platform) and the `@slime-cloud` name.
 
+## Extending
+
+[docs/extending.md](./docs/extending.md) lists every extension point (data
+sources, model providers, stores, the sandbox, events), its interface and the
+contract test it must pass.
+
 ## Subdirectories & System Boundaries
 
 - [src/](./src/README.md): the package sources, grouped by what the system
