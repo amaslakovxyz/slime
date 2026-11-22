@@ -4,7 +4,7 @@
 // with that endpoint's own env object. It reads only the env it is given, never
 // process.env, so one endpoint's settings cannot reach another's.
 import { changedProvenance, createSlime, type Generator, type HandlerProvenance, type SandboxRunner, type Slime, type SlimeStore } from '@slime-cloud/core';
-import { crystallize, DEFAULT_MIN_RUNS } from '@slime-cloud/core/crystallize';
+import { crystallize, DEFAULT_MIN_RUNS } from '@slime-cloud/crystal';
 import type { Hono } from 'hono';
 import { createApp, type CrystallizeOutcome, type SavedHandler } from './app.js';
 import { parseCrystalTokens } from './auth.js';

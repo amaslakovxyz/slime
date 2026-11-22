@@ -23,7 +23,6 @@ const ALLOWED: Readonly<Record<string, readonly string[]>> = {
   config: ['shared', 'sources', 'artifact', 'handler', 'models', 'stores'],
   testing: BELOW_ENGINE,
   engine: BELOW_ENGINE,
-  crystallize: [...BELOW_ENGINE, 'engine'],
 };
 
 function sourceFiles(dir: string): string[] {

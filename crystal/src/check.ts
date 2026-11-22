@@ -2,10 +2,10 @@
 // doesn't re-check Crystal at startup (C10).
 import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { assertReadOnlySql } from '../artifact/checks/sql.js';
 import { INDEX_FILE, INDEX_TYPES_FILE, MODULE_EXTENSION, readManifest, renderIndex, renderIndexTypes, type Manifest } from './manifest.js';
-import { sha256 } from '../shared/hash.js';
 import { parseModule } from './module-format.js';
+import { SERVICES_FILE, SERVICES_TYPES_FILE, renderServiceTypes, renderServices } from './services.js';
+import { assertReadOnlySql, sha256 } from '@slime-cloud/core/tooling';
 
 const REGENERATE = 'run crystallize again instead of editing it';
 
@@ -19,7 +19,7 @@ export async function checkCrystalFolder(dir: string): Promise<string[]> {
   }
   const problems: string[] = [];
   for (const [key, entry] of Object.entries(manifest.entries)) {
-    const problem = await moduleProblem(dir, entry.file, entry.sha256);
+    const problem = (await moduleProblem(dir, entry.file, entry.sha256)) ?? (await casesProblem(dir, entry.cases, entry.casesSha256));
     if (problem) problems.push(`${key}: ${problem}`);
   }
   problems.push(...(await generatedFileProblems(dir, manifest)));
@@ -39,10 +39,20 @@ async function moduleProblem(dir: string, file: string, pinnedSha256: string): P
   }
 }
 
+// The reference is never re-pinned (pin.ts): a changed one means someone rewrote what the Crystal is compared with.
+async function casesProblem(dir: string, file: string | undefined, pinnedSha256: string | undefined): Promise<string | undefined> {
+  if (!file || !pinnedSha256) return undefined;
+  const text = await readFile(join(dir, file), 'utf8').catch(() => undefined);
+  if (text === undefined) return `${file} is missing`;
+  return sha256(text) === pinnedSha256 ? undefined : `${file} does not match the hash pinned in manifest.json; only crystallize writes the reference`;
+}
+
 async function generatedFileProblems(dir: string, manifest: Manifest): Promise<string[]> {
   const expected = [
     { file: INDEX_FILE, text: renderIndex(manifest) },
     { file: INDEX_TYPES_FILE, text: renderIndexTypes() },
+    { file: SERVICES_FILE, text: renderServices(manifest) },
+    { file: SERVICES_TYPES_FILE, text: renderServiceTypes(manifest) },
   ];
   // A folder nothing was crystallized into yet has no generated files, and that's fine.
   const isEmpty = Object.keys(manifest.entries).length === 0;
@@ -56,7 +66,7 @@ async function generatedFileProblems(dir: string, manifest: Manifest): Promise<s
 }
 
 async function unlistedModules(dir: string, manifest: Manifest): Promise<string[]> {
-  const listed = new Set([INDEX_FILE, ...Object.values(manifest.entries).map(({ file }) => file)]);
+  const listed = new Set([INDEX_FILE, SERVICES_FILE, ...Object.values(manifest.entries).map(({ file }) => file)]);
   const files = await readdir(dir).catch(() => []);
   return files.filter((file) => file.endsWith(MODULE_EXTENSION) && !listed.has(file)).map((file) => `${file} is not in manifest.json`);
 }

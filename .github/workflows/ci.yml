@@ -24,7 +24,7 @@ jobs:
       - uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
 
   core:
-    name: Core tests
+    name: Core and Crystal tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # The demo database from examples/express/db/init.sql, for the Postgres connector tests.
@@ -48,8 +48,8 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
       # Boundary: the open-source core never imports Slime Cloud packages or AWS.
-      - name: Core does not import Slime Cloud or AWS
-        run: "! grep -rnE \"@slime-cloud/(runtime|server|control-plane)|platform/runtime|@aws-sdk/\" core/src"
+      - name: Core and Crystal do not import Slime Cloud or AWS
+        run: "! grep -rnE \"@slime-cloud/(runtime|server|control-plane)|platform/runtime|@aws-sdk/\" core/src crystal/src"
       - run: npm ci
       - run: psql "postgres://slime_admin:slime_admin@localhost:54329/slime" -v ON_ERROR_STOP=1 -f examples/express/db/init.sql
       - run: npm run typecheck -w @slime-cloud/core
@@ -60,6 +60,13 @@ jobs:
       # What would be published: compiled dist/ with types, no sources or tests.
       - run: npm run build -w @slime-cloud/core
       - run: npm run check:pack -w @slime-cloud/core
+      # @slime-cloud/crystal type-checks and runs against core's dist/, so it comes after the build.
+      - run: npm run typecheck -w @slime-cloud/crystal
+      - run: npm test -w @slime-cloud/crystal
+        env:
+          REQUIRE_DB: "1"
+      - run: npm run build -w @slime-cloud/crystal
+      - run: npm run check:pack -w @slime-cloud/crystal
 
   example:
     name: Example app
@@ -89,10 +96,10 @@ jobs:
       - run: psql "postgres://slime_admin:slime_admin@localhost:54329/slime" -v ON_ERROR_STOP=1 -f examples/express/db/init.sql
       # The example runs on the packed tarball, as an app installing the package would (M6).
       - run: npm ci
-      - run: npm pack -w @slime-cloud/core --pack-destination "$RUNNER_TEMP"
+      - run: npm pack -w @slime-cloud/core -w @slime-cloud/crystal --pack-destination "$RUNNER_TEMP"
       - run: npm ci
         working-directory: examples/express
-      - run: npm install --no-save "$RUNNER_TEMP"/slime-cloud-core-*.tgz
+      - run: npm install --no-save "$RUNNER_TEMP"/slime-cloud-core-*.tgz "$RUNNER_TEMP"/slime-cloud-crystal-*.tgz
         working-directory: examples/express
       - run: npm test
         working-directory: examples/express
@@ -172,7 +179,7 @@ jobs:
       # built dist/; the core's own dependencies come from the root workspace.
       - run: npm ci
         working-directory: .
-      - run: npm run build -w @slime-cloud/core
+      - run: npm run build -w @slime-cloud/core -w @slime-cloud/crystal
         working-directory: .
       - run: npm ci
       - run: psql "postgres://slime_admin:slime_admin@localhost:54329/slime" -v ON_ERROR_STOP=1 -f examples/express/db/init.sql
@@ -260,7 +267,7 @@ jobs:
       # The local runner starts platform/runtime, which links the built core.
       - run: npm ci
         working-directory: .
-      - run: npm run build -w @slime-cloud/core
+      - run: npm run build -w @slime-cloud/core -w @slime-cloud/crystal
         working-directory: .
       - run: npm ci
         working-directory: platform/runtime

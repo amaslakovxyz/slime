@@ -7,19 +7,11 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { after, describe, test } from 'node:test';
-import { SlimeConfig } from '../../src/config/slime-config.js';
-import { createSlime } from '../../src/create-slime.js';
-import type { CrystalRegistry } from '../../src/handler/crystal.js';
-import { checkCrystalFolder, crystallize, type CrystallizeOptions } from '../../src/crystallize/index.js';
-import { moduleFileFor, renderManifest, readManifest } from '../../src/crystallize/manifest.js';
-import { sha256 } from '../../src/shared/hash.js';
-import type { HandlerRecord } from '../../src/handler/record.js';
-import type { OptimizedCode, Optimizer } from '../../src/models/types.js';
-import { requestKey } from '../../src/request/key.js';
-import { parseRequest } from '../../src/request/parse.js';
-import { memoryStore } from '../../src/stores/memory-store.js';
-import type { SlimeStore } from '../../src/stores/types.js';
-import { artifact, fakeConnector, fakeGenerator } from '../../src/testing/fakes.js';
+import { SERVICES_FILE, checkCrystalFolder, crystallize, type CrystallizeOptions } from '../src/index.js';
+import { moduleFileFor, renderManifest, readManifest } from '../src/manifest.js';
+import { SlimeConfig, createSlime, crystalService, handlerKeyFor, memoryStore, type CrystalRegistry, type HandlerRecord, type OptimizedCode, type Optimizer, type SlimeStore } from '@slime-cloud/core';
+import { sha256 } from '@slime-cloud/core/tooling';
+import { artifact, fakeConnector, fakeGenerator } from '@slime-cloud/core/testing';
 
 const ROWS = [
   { name: 'Acme', cents: 1250 },
@@ -30,10 +22,10 @@ const EUROS = [
   { name: 'Globex', euros: 9 },
 ];
 const REQUEST = { intent: 'accounts in a country with their balance in euros', input: { country: 'DE' }, output: [{ name: 'string', euros: 'number' }] };
-const KEY = requestKey(parseRequest(REQUEST));
+const KEY = handlerKeyFor(REQUEST);
 const SQL = 'SELECT name, cents FROM accounts WHERE ($1::text IS NULL OR country = $1::text)';
 const LIQUID_SHAPE = 'function shape(rows) { return rows.map((r) => ({ name: r.name, euros: r.cents / 100 })); }';
-const BIN = new URL('../../src/crystallize/bin.ts', import.meta.url).pathname;
+const BIN = new URL('../src/bin.ts', import.meta.url).pathname;
 const runFile = promisify(execFile);
 
 const temporaryDirs: string[] = [];
@@ -97,6 +89,27 @@ describe('crystallize (M5)', () => {
     } finally {
       await slime.close();
     }
+  });
+
+  test('writes a typed service method per Crystal; the app calls it natively, without the engine', async () => {
+    const { dir } = await runJob(liquidRecord());
+    const manifest = await readManifest(dir);
+    assert.equal(manifest.entries[KEY]?.service, 'accountsInACountryWithTheir');
+    const services = await readFile(join(dir, SERVICES_FILE), 'utf8');
+    assert.match(services, /export const accountsInACountryWithTheir = \$service\(\$crystals\[/);
+    const types = await readFile(join(dir, 'services.d.mts'), 'utf8');
+    assert.match(types, /accountsInACountryWithTheir\(connector: Connector, input: \{ "country"\?: string \| null \}, options\?: CrystalServiceOptions\): Promise<Array<\{ "name": string; "euros": number \}>>/);
+
+    const service = crystalService((await importRegistry(dir))[KEY]!);
+    assert.deepEqual(await service(fakeConnector({ rows: ROWS }), { country: 'DE' }), EUROS);
+    await assert.rejects(service(fakeConnector({ rows: ROWS }), { country: 49 }), { code: 'INVALID_REQUEST' });
+    await assert.rejects(service(fakeConnector({ rows: ROWS }), { contry: 'DE' }), { code: 'INVALID_REQUEST', message: /Unknown input contry/ });
+  });
+
+  test('a hand-edited services.mjs fails the check', async () => {
+    const { dir } = await runJob(liquidRecord());
+    await writeFile(join(dir, SERVICES_FILE), 'export const hacked = () => process.env;\n');
+    assert.match((await checkCrystalFolder(dir)).join('\n'), /services\.mjs does not match manifest\.json/);
   });
 
   test('skips handlers that are not ready, and ones already crystallized', async () => {

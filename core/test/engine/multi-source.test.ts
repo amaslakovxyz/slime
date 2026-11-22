@@ -1,15 +1,11 @@
 // Multi-source handlers through the whole engine: promotion, review, final source
-// errors, repair, Crystal, and one run against the demo database (P2.10).
+// errors, repair, and one run against the demo database (P2.10).
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { after, describe, test } from 'node:test';
 import { SlimeConfig, type SlimeOptions } from '../../src/config/slime-config.js';
 import { postgresConnector } from '../../src/sources/sql/postgres/index.js';
 import { createSlime } from '../../src/create-slime.js';
 import { changedProvenance } from '../../src/request/key.js';
-import { crystallize } from '../../src/crystallize/index.js';
 import type { Slime } from '../../src/engine/types.js';
 import type { Artifact, SqlStep } from '../../src/artifact/artifact.js';
 import { memoryStore } from '../../src/stores/memory-store.js';
@@ -83,32 +79,6 @@ describe('multi-source handlers in the engine', () => {
     const slime = await start({ generator, sources: { db: fakeConnector({ rows: ROWS }), notion }, limits: { rowCap: 3 } });
     assert.deepEqual((await slime.query(REQUEST)).data, [{ name: 'Acme', open: 0 }, { name: 'Globex', open: 0 }]);
     assert.equal(generator.calls, 2);
-  });
-
-  describe('Crystal (MS9)', () => {
-    const dirs: string[] = [];
-    after(() => Promise.all(dirs.map((dir) => rm(dir, { recursive: true, force: true }))));
-
-    // With main's provenance check (M.2): the job compares against the instance's current provenance.
-    async function crystalOutcome(artifact: Artifact): Promise<string | undefined> {
-      const store = memoryStore();
-      const slime = await start({ generator: stubGenerator(() => artifact), store, tiers: { gasToLiquidRuns: 1 } });
-      await slime.query(REQUEST);
-      await slime.flush();
-      const dir = await mkdtemp(join(tmpdir(), 'slime-crystal-'));
-      dirs.push(dir);
-      const [report] = await crystallize({ connector: fakeConnector({ rows: ROWS }), store, dir, minRuns: 1, isDryRun: true, provenance: slime.provenance() });
-      return report?.outcome;
-    }
-
-    test('a single-SQL-step handler, stored as v1, crystallizes', async () => {
-      const singleSql: Artifact = { ...COMBINED, steps: [ACCOUNTS], shapeJs: 'function shape(data) { return data.accounts.map((a) => ({ name: a.name, open: 0 })); }' };
-      assert.equal(await crystalOutcome(singleSql), 'crystallized');
-    });
-
-    test('a handler with an API step is skipped', async () => {
-      assert.equal(await crystalOutcome(COMBINED), 'skipped');
-    });
   });
 
   test('provenance() carries the prompt hash and per-source hashes (M.2)', async () => {

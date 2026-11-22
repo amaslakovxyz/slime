@@ -21,7 +21,6 @@ The folders say what the system is made of:
 | Engine | [dictionary/](./dictionary/README.md) | The dictionary text and hashes shown to models. |
 | Setup | [config/](./config/README.md) | `SlimeConfig` (`slime-config.ts`), its option types, defaults and validation. |
 | Shared | `shared/` | `errors.ts` (`SlimeError`, codes), `guards.ts`, `hash.ts` (`sha256`, `canonicalJSON`). |
-| Tooling | [crystallize/](./crystallize/README.md) | The crystallize job and `slime-crystal check`. |
 | Tooling | `testing/` | Contract suites for every port, and test doubles. |
 
 Every port folder has the same shape: `types.ts` holds the contract, each
@@ -40,7 +39,7 @@ the API:
 | `./notion` | `sources/api/notion/index.ts` |
 | `./models` | `models/index.ts`: `modelRoles`, `parseJsonReply`, `ModelClient` types |
 | `./claude`, `./groq` | `models/<name>/index.ts` |
-| `./crystallize` | `crystallize/index.ts` (and the `slime-crystal` bin) |
+| `./tooling` | `tooling.ts`: the engine internals `@slime-cloud/crystal` uses (`executeArtifact`, `runCrystal`, `assertReadOnlySql`, `recordFromStore`, ...); not for apps |
 | `./testing` | `testing/index.ts`: `describeStoreContract`, `describeConnectorContract`, `describeApiSourceContract`, `describeModelClientContract`, `cannedGenerator`, fakes |
 | `./shape-worker` | `sandbox/quickjs/shape-worker.ts`, for bundlers that copy the worker |
 

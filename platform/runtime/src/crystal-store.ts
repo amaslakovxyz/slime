@@ -19,7 +19,7 @@ import {
   PutObjectCommand,
 } from '@aws-sdk/client-s3';
 import type { CrystalHandler, CrystalRegistry } from '@slime-cloud/core';
-import { MANIFEST_FILE, moduleFileFor, parseManifest, parseModule, readManifest, type Manifest } from '@slime-cloud/core/crystallize';
+import { MANIFEST_FILE, moduleFileFor, parseManifest, parseModule, readManifest, type Manifest } from '@slime-cloud/crystal';
 
 /** An endpoint's Crystals as one engine serves them. */
 export interface CrystalLoad {
