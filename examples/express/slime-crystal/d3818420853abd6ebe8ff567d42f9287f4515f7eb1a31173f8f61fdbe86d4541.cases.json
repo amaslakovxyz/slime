@@ -1,0 +1,35 @@
+{
+  "liquid": {
+    "version": 2,
+    "unsatisfiable": null,
+    "steps": [
+      {
+        "name": "rows",
+        "source": "db",
+        "sql": "SELECT a.name AS \"name\", sum(i.amount_cents)::int AS \"totalPaidCents\" FROM accounts a JOIN invoices i ON i.account_id = a.id AND i.status = 'paid' GROUP BY a.id, a.name ORDER BY 2 DESC LIMIT $1::int",
+        "params": [
+          "limit"
+        ]
+      }
+    ],
+    "shapeJs": null,
+    "assumptions": []
+  },
+  "inputs": [
+    {
+      "limit": 1
+    },
+    {
+      "limit": 2
+    },
+    {
+      "limit": 3
+    },
+    {
+      "limit": 4
+    },
+    {
+      "limit": 5
+    }
+  ]
+}

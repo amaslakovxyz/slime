@@ -1,0 +1,35 @@
+{
+  "liquid": {
+    "version": 2,
+    "unsatisfiable": null,
+    "steps": [
+      {
+        "name": "rows",
+        "source": "db",
+        "sql": "SELECT a.name AS \"name\", count(*)::int AS \"failedInvoices\" FROM accounts a JOIN invoices i ON i.account_id = a.id WHERE i.status = 'failed' AND i.issued_at >= $1::timestamptz GROUP BY a.id, a.name",
+        "params": [
+          "since"
+        ]
+      }
+    ],
+    "shapeJs": null,
+    "assumptions": []
+  },
+  "inputs": [
+    {
+      "since": "2026-01-01"
+    },
+    {
+      "since": "2026-02-01"
+    },
+    {
+      "since": "2026-03-01"
+    },
+    {
+      "since": "2026-04-01"
+    },
+    {
+      "since": "2026-05-01"
+    }
+  ]
+}

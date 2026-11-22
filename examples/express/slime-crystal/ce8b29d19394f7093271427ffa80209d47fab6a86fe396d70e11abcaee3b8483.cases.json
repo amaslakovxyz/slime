@@ -1,0 +1,35 @@
+{
+  "liquid": {
+    "version": 2,
+    "unsatisfiable": null,
+    "steps": [
+      {
+        "name": "rows",
+        "source": "db",
+        "sql": "SELECT to_char(date_trunc('month', issued_at), 'YYYY-MM') AS \"month\", sum(amount_cents)::int AS \"revenueCents\" FROM invoices WHERE status = 'paid' AND issued_at >= $1::timestamptz GROUP BY 1 ORDER BY 1",
+        "params": [
+          "since"
+        ]
+      }
+    ],
+    "shapeJs": null,
+    "assumptions": []
+  },
+  "inputs": [
+    {
+      "since": "2026-01-01"
+    },
+    {
+      "since": "2026-02-01"
+    },
+    {
+      "since": "2026-03-01"
+    },
+    {
+      "since": "2026-04-01"
+    },
+    {
+      "since": "2026-05-01"
+    }
+  ]
+}

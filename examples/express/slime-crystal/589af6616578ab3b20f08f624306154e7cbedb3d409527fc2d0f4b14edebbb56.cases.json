@@ -1,0 +1,19 @@
+{
+  "liquid": {
+    "version": 2,
+    "unsatisfiable": null,
+    "steps": [
+      {
+        "name": "rows",
+        "source": "db",
+        "sql": "SELECT p.name AS \"plan\", count(a.id)::int AS \"accounts\" FROM plans p JOIN accounts a ON a.plan_id = p.id GROUP BY p.id, p.name",
+        "params": []
+      }
+    ],
+    "shapeJs": null,
+    "assumptions": []
+  },
+  "inputs": [
+    {}
+  ]
+}
