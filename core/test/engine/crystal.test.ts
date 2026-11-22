@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { SlimeConfig } from '../../src/config/slime-config.js';
 import { createSlime } from '../../src/create-slime.js';
-import type { CrystalHandler, CrystalRegistry } from '../../src/handler/crystal.js';
+import type { CrystalRegistry, QueryCrystal } from '../../src/handler/crystal.js';
 import { requestKey } from '../../src/request/key.js';
 import { parseRequest } from '../../src/request/parse.js';
 import { QuickJSRunner } from '../../src/sandbox/quickjs/quickjs-runner.js';
@@ -29,7 +29,7 @@ const SHAPE_SOURCE = 'function shape(rows) { return rows.map((r) => ({ name: r.n
 const ENDLESS_RECURSION = 'function shape(rows) { function grow(n) { return n > 40 ? 0 : grow(n + 1) + grow(n + 1); } return grow(0); }';
 const SHAPE_TIMEOUT_MS = 200;
 
-function crystalWith(shape: CrystalHandler['shape']): CrystalRegistry {
+function crystalWith(shape: QueryCrystal['shape']): CrystalRegistry {
   return {
     [KEY]: { sql: SQL, params: ['country'], shape, intent: REQUEST.intent, output: REQUEST.output, paramTypes: { country: 'string' }, schemaHash: 'schema', review: 'approved' },
   };

@@ -29,7 +29,7 @@ export interface Execution {
   truncated: boolean;
   runMs: number;
   shapeMs: number;
-  /** Absent for Crystal, which runs one query. */
+  /** Absent for a single-query Crystal. */
   steps?: StepTiming[];
 }
 

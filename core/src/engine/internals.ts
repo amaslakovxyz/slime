@@ -3,12 +3,19 @@
 import type { LimitOptions, TierOptions } from '../config/options.js';
 import type { HandlerRecord } from '../handler/record.js';
 import type { SandboxRunner } from '../sandbox/types.js';
+import type { ApiSchema } from '../sources/api/types.js';
 import type { Connector } from '../sources/sql/types.js';
+import type { Source } from '../sources/types.js';
 import type { SlimeStore } from '../stores/types.js';
 import type { Slime } from './types.js';
 
 export interface SlimeInternals {
   connector: Connector;
+  /** Every source by name, the SQL one included: API steps run through them. */
+  sources: Readonly<Record<string, Source>>;
+  sqlSourceName: string;
+  /** API sources' schemas, as described at startup. */
+  apiSchemas: Readonly<Record<string, ApiSchema>>;
   /** The store the instance reads and writes, the default file store included. */
   store: SlimeStore;
   runner: SandboxRunner;

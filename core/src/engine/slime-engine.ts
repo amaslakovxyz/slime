@@ -84,8 +84,9 @@ export class SlimeEngine implements Slime {
       review: this.#reviewFunction(),
       emit: (event) => this.#emit(event),
     });
-    const { connector, limits, tiers } = config;
-    registerInternals(this, { connector, store, runner: parts.runner, limits, tiers, liveRecords: () => this.#cache.records() });
+    const { connector, sources, sqlSourceName, limits, tiers } = config;
+    const { apiSchemas } = parts;
+    registerInternals(this, { connector, sources, sqlSourceName, apiSchemas, store, runner: parts.runner, limits, tiers, liveRecords: () => this.#cache.records() });
   }
 
   async query(request: SlimeRequest): Promise<QueryResult> {
