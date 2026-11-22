@@ -165,9 +165,36 @@ export type LifecycleData = LiveLifecycle | { ok: false; reason: string };
  */
 const lastRead = new Map<string, LiveLifecycle>();
 
+/** Consecutive missed polls per endpoint, while ready. Reset on any good read. */
+const missed = new Map<string, number>();
+
+/**
+ * Keep the board for a few polls after a missed read. LivePoller refreshes every 2 s, and a live
+ * endpoint routinely misses a poll because it is busy serving the very request we polled about —
+ * without this grace the Requests widget flickers away on every incoming request. While updating the
+ * last answer always stands in (a restart can outlast the grace); once the runtime is really gone the
+ * board collapses to the notice.
+ */
+const READ_MISS_GRACE = 3;
+function localMiss(ep: Endpoint, reason: string): LifecycleData {
+  if (ep.status === 'updating') return lastRead.get(ep.endpointId) ?? { ok: false, reason: 'Restarting the endpoint…' };
+  const last = lastRead.get(ep.endpointId);
+  const n = (missed.get(ep.endpointId) ?? 0) + 1;
+  if (last && n <= READ_MISS_GRACE) {
+    missed.set(ep.endpointId, n);
+    return last;
+  }
+  missed.delete(ep.endpointId);
+  lastRead.delete(ep.endpointId);
+  return { ok: false, reason };
+}
+
 /** Server only: reads the endpoint's runtime with its own token. */
 export async function readLifecycle(ep: Endpoint): Promise<LifecycleData> {
-  if (ep.status !== 'ready' && ep.status !== 'updating') lastRead.delete(ep.endpointId);
+  if (ep.status !== 'ready' && ep.status !== 'updating') {
+    lastRead.delete(ep.endpointId);
+    missed.delete(ep.endpointId);
+  }
   if (ep.status === 'failed') return { ok: false, reason: ep.error ? `Endpoint failed: ${ep.error}` : 'Endpoint failed.' };
   if (!ep.url || (ep.status !== 'ready' && ep.status !== 'updating')) return { ok: false, reason: `Endpoint is ${ep.status}.` };
   const token = await secretStore().get(ep.endpointId, 'SLIME_API_KEY');
@@ -179,7 +206,10 @@ export async function readLifecycle(ep: Endpoint): Promise<LifecycleData> {
     const get = (path: string) =>
       fetch(new URL(path, ep.url), { headers: { 'x-api-key': token }, cache: 'no-store', signal: AbortSignal.timeout(timeoutMs) });
     const [life, feed] = await Promise.all([get('v0/lifecycle'), get('v0/events')]);
-    if (!life.ok || !feed.ok) return { ok: false, reason: `Runtime answered ${life.status}/${feed.status}.` };
+    if (!life.ok || !feed.ok) {
+      const reason = `Runtime answered ${life.status}/${feed.status}.`;
+      return cloud ? { ok: false, reason } : localMiss(ep, reason);
+    }
     const l = (await life.json()) as { handlers: RuntimeHandler[]; thresholds?: Thresholds; warnings?: string[]; instance?: boolean };
     const f = (await feed.json()) as { total: number; events: RuntimeEvent[] };
     const data: LiveLifecycle = {
@@ -192,12 +222,11 @@ export async function readLifecycle(ep: Endpoint): Promise<LifecycleData> {
       instance: l.instance === true,
     };
     if (!cloud) lastRead.set(ep.endpointId, data);
+    missed.delete(ep.endpointId);
     return data;
   } catch {
     if (cloud) return { ok: false, reason: 'Endpoint runtime did not answer.' };
-    if (ep.status === 'updating') return lastRead.get(ep.endpointId) ?? { ok: false, reason: 'Restarting the endpoint…' };
-    lastRead.delete(ep.endpointId);
-    return { ok: false, reason: 'Endpoint is not running. Is `npm run local` up?' };
+    return localMiss(ep, 'Endpoint is not running. Is `npm run local` up?');
   }
 }
 
