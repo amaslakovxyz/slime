@@ -22,6 +22,9 @@ export interface ManifestEntry {
   createdAt: string;
   /** Its function name in services.mjs; set once, so a rename never breaks the app. */
   service?: string;
+  /** The reference `verify` compares it with (cases.ts), and that file's pinned hash. */
+  cases?: string;
+  casesSha256?: string;
 }
 
 export interface Manifest {

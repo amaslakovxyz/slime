@@ -20,7 +20,7 @@ export async function checkCrystalFolder(dir: string): Promise<string[]> {
   }
   const problems: string[] = [];
   for (const [key, entry] of Object.entries(manifest.entries)) {
-    const problem = await moduleProblem(dir, entry.file, entry.sha256);
+    const problem = (await moduleProblem(dir, entry.file, entry.sha256)) ?? (await casesProblem(dir, entry.cases, entry.casesSha256));
     if (problem) problems.push(`${key}: ${problem}`);
   }
   problems.push(...(await generatedFileProblems(dir, manifest)));
@@ -38,6 +38,14 @@ async function moduleProblem(dir: string, file: string, pinnedSha256: string): P
   } catch (error) {
     return `${file}: ${(error as Error).message}`;
   }
+}
+
+// The reference is never re-pinned (pin.ts): a changed one means someone rewrote what the Crystal is compared with.
+async function casesProblem(dir: string, file: string | undefined, pinnedSha256: string | undefined): Promise<string | undefined> {
+  if (!file || !pinnedSha256) return undefined;
+  const text = await readFile(join(dir, file), 'utf8').catch(() => undefined);
+  if (text === undefined) return `${file} is missing`;
+  return sha256(text) === pinnedSha256 ? undefined : `${file} does not match the hash pinned in manifest.json; only crystallize writes the reference`;
 }
 
 async function generatedFileProblems(dir: string, manifest: Manifest): Promise<string[]> {

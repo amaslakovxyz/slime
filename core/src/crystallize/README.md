@@ -18,7 +18,11 @@ imports its generated `index.mjs` never loads this folder.
   `index.d.mts`.
 - `services.ts`: the generated `services.mjs` / `services.d.mts`, one typed
   service method per Crystal (`crystalService` from the main entry).
-- `check.ts` and `bin.ts`: `slime-crystal check <dir>`.
+- `cases.ts`: `<key>.cases.json`, the reference a Crystal is verified
+  against: the Liquid handler's code and its recorded inputs.
+- `pin.ts`: re-pins edited modules (never a cases file).
+- `verify.ts`: equivalence with the reference and plan cost, on a database.
+- `check.ts` and `bin.ts`: `slime-crystal check | pin | verify`.
 
 ## Interface
 
@@ -39,7 +43,17 @@ imports its generated `index.mjs` never loads this folder.
   apply. Inputs are optional and nullable (R5); an unknown input name is
   `INVALID_REQUEST`.
 - `slime-crystal check <dir>`: exit 0 when clean, 1 with problems, 2 on bad
-  usage.
+  usage. No database or model.
+- **Editing a Crystal** (a person or an agent optimizing it):
+  1. edit `<key>.mjs` (only `sql`, `params` and `shape`);
+  2. `slime-crystal pin <dir>`: re-runs the allowlist and the read-only lint on
+     each changed module, pins its new hash (`isOptimized: true`) and
+     regenerates `index.mjs` and `services.mjs`. It never re-pins a cases file;
+  3. `slime-crystal verify <dir> --database-url <read-only url>`: `check`, then
+     on every recorded input the Crystal's output must equal the Liquid
+     reference's (both run against that database), and its plan cost must be
+     at most `COST_TOLERANCE` (1.1) times the reference's. This is the gate for
+     merging an edit; reviews, human or agent, come on top of it.
 - Loading modules as data: `parseModule(source)` parses a module, checks its
   structure and runs the allowlist on its shape, and returns `{ sql, params,
   shape }` with `shape` as source text; `parseManifest(json)` and
@@ -84,6 +98,8 @@ imports its generated `index.mjs` never loads this folder.
   - compares `index.mjs`, `index.d.mts`, `services.mjs` and
     `services.d.mts` with ones rendered from the manifest;
   - refuses `.mjs` files missing from the manifest;
+  - refuses a cases file whose hash differs from the one crystallize pinned:
+    only crystallize writes the reference;
   - accepts an empty folder (nothing crystallized yet).
 
 ## Side Effects

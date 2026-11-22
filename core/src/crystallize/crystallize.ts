@@ -20,6 +20,7 @@ import { sha256 } from '../shared/hash.js';
 import { moduleFileFor, readManifest, writeManifestAndIndex, type Manifest } from './manifest.js';
 import type { CrystalCode } from './module-format.js';
 import { serviceNameFor, serviceNames } from './services.js';
+import { casesFileFor, renderCases } from './cases.js';
 
 export interface CrystallizeOptions {
   /** A read-only connector: the equivalence test runs both versions against the database. */
@@ -144,8 +145,11 @@ async function candidatesFor({ options }: JobContext, record: HandlerRecord, { s
 
 async function saveCrystal({ options, manifest }: JobContext, record: HandlerRecord, candidate: Candidate, text: string): Promise<void> {
   const file = moduleFileFor(record.key);
+  const casesFile = casesFileFor(record.key);
+  const casesText = renderCases({ liquid: record.artifact, inputs: record.fixtures });
   await mkdir(options.dir, { recursive: true });
   await writeFile(join(options.dir, file), text);
+  await writeFile(join(options.dir, casesFile), casesText);
   const { intent, output, paramTypes, provenance, review } = record;
   manifest.entries[record.key] = {
     file,
@@ -160,5 +164,7 @@ async function saveCrystal({ options, manifest }: JobContext, record: HandlerRec
     provenance,
     createdAt: new Date().toISOString(),
     service: serviceNameFor(intent, record.key, new Set(serviceNames(manifest).values())),
+    cases: casesFile,
+    casesSha256: sha256(casesText),
   };
 }
