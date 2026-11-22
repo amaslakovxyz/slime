@@ -4,8 +4,8 @@
 // every part (endpoint-runtime.ts); the Lambda router serves these under /ep/<id>/.
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
-import { SlimeError, type Connector, type CrystalRegistry, type QueryMeta, type Slime } from '@slime-cloud/core';
-import { MAX_PAGE_LIMIT, type PageQuery, type RequestFeed } from './events.js';
+import { SlimeError, type Connector, type CrystalRegistry, type LayerSpan, type QueryMeta, type Slime } from '@slime-cloud/core';
+import { MAX_PAGE_LIMIT, type PageQuery, type RequestFailure, type RequestFeed } from './events.js';
 
 /** A handler as the admin's Lifecycle tab sees it. */
 export interface LifecycleHandler {
@@ -35,7 +35,8 @@ export interface CrystallizeOutcome {
 export interface RuntimeParts {
   slime: Slime;
   connector: Connector;
-  crystal: CrystalRegistry | false;
+  /** Absent behaves as `false`: no Crystal routes. */
+  crystal?: CrystalRegistry | false;
   /** Sees every answered query (usage metering). */
   onQuery?: (meta: QueryMeta) => void;
   /** One JSON line per answered query; defaults to stdout. */
@@ -102,14 +103,32 @@ export function mergeHandlers(lists: LifecycleHandler[][]): LifecycleHandler[] {
 
 const MAX_BODY_BYTES = 16 * 1024;
 
+function edgeSpan(contentLength: string | undefined, credential: 'API key' | 'Crystal token'): LayerSpan {
+  return { layer: 'edge', status: 'pass', note: contentLength ? `${credential} · body ${contentLength} B` : credential };
+}
+
+const FALLBACK_STOP: Record<string, LayerSpan['layer']> = { INVALID_REQUEST: 'key', HANDLER_NOT_FOUND: 'route' };
+
+function failureOf(error: unknown, ms: number, edge: LayerSpan): RequestFailure {
+  if (!(error instanceof SlimeError)) return { status: 500, code: 'INTERNAL', ms, trace: [edge] };
+  const trace = error.trace ?? [{ layer: FALLBACK_STOP[error.code] ?? 'execute', status: 'stop' as const, note: `${error.code}: ${error.message}`.slice(0, 200) }];
+  return { status: error.status, code: error.code, ms, trace: [edge, ...trace], ...(error.handlerKey ? { handlerKey: error.handlerKey } : {}) };
+}
+
 export function createApp({ slime, connector, crystal, onQuery, log, events, savedHandlers, crystallize, thresholds, warnings, isPerInstance }: RuntimeParts): Hono {
   const app = new Hono();
   const logLine = log ?? ((line: Record<string, unknown>) => console.log(JSON.stringify(line)));
 
-  const limitBody = bodyLimit({
-    maxSize: MAX_BODY_BYTES,
-    onError: (c) => c.json({ error: { code: 'INVALID_REQUEST', message: 'Body larger than 16 KB.', retryable: false } }, 413),
-  });
+  const limitBody = (credential: 'API key' | 'Crystal token', route?: 'crystal') =>
+    bodyLimit({
+      maxSize: MAX_BODY_BYTES,
+      onError: (c) => {
+        const message = 'Body larger than 16 KB.';
+        const edge: LayerSpan = { layer: 'edge', status: 'stop', note: `INVALID_REQUEST: ${message}` };
+        events?.recordFailure({ status: 413, code: 'INVALID_REQUEST', ms: 0, trace: [edge] }, route);
+        return c.json({ error: { code: 'INVALID_REQUEST', message, retryable: false } }, 413);
+      },
+    });
 
   app.onError((error, c) => {
     if (error instanceof SlimeError) return c.json({ error: error.toJSON() }, error.status as 400);
@@ -120,17 +139,25 @@ export function createApp({ slime, connector, crystal, onQuery, log, events, sav
   // The one data endpoint. Behind the API key: callers are the tenant's own backend, not browsers.
   app.post(
     '/v0/query',
-    limitBody,
+    limitBody('API key'),
     async (c) => {
-      const body = await c.req.json().catch(() => {
-        throw new SlimeError('INVALID_REQUEST', 'Body must be valid JSON.');
-      });
-      const { data, meta } = await slime.query(body);
-      onQuery?.(meta);
-      events?.record(meta);
-      c.header('Server-Timing', `total;dur=${meta.timingsMs.total}, generate;dur=${meta.timingsMs.generate ?? 0}`);
-      logLine({ at: new Date().toISOString(), handler: meta.handlerKey, tier: meta.tier, cache: meta.cache, ms: meta.timingsMs });
-      return c.json({ data, meta });
+      const startedAt = performance.now();
+      const edge = edgeSpan(c.req.header('content-length'), 'API key');
+      let body: unknown;
+      try {
+        body = await c.req.json().catch(() => {
+          throw new SlimeError('INVALID_REQUEST', 'Body must be valid JSON.');
+        });
+        const { data, meta } = await slime.query(body as never);
+        onQuery?.(meta);
+        events?.record(meta, undefined, { body, edge });
+        c.header('Server-Timing', `total;dur=${meta.timingsMs.total}, generate;dur=${meta.timingsMs.generate ?? 0}`);
+        logLine({ at: new Date().toISOString(), handler: meta.handlerKey, tier: meta.tier, cache: meta.cache, ms: meta.timingsMs });
+        return c.json({ data, meta });
+      } catch (error) {
+        events?.recordFailure(failureOf(error, performance.now() - startedAt, edge), undefined, { body, edge });
+        throw error;
+      }
     },
   );
 
@@ -150,29 +177,38 @@ export function createApp({ slime, connector, crystal, onQuery, log, events, sav
   // A Crystal is its own endpoint: intent and output are fixed, the body carries only `input`.
   // The handler key hashes the input names, so the exact name set is required: a missing or
   // unknown name is refused, and the call can never miss the Crystal and generate.
-  app.post('/v0/e/:key', limitBody, async (c) => {
-    const key = c.req.param('key');
-    // Own keys only: `constructor` or `__proto__` must not resolve to Object.prototype members.
-    const handler = crystal && Object.hasOwn(crystal, key) ? crystal[key] : undefined;
-    if (!handler) throw new SlimeError('HANDLER_NOT_FOUND', 'No Crystal with this key on this endpoint.');
-    const body = (await c.req.json().catch(() => ({}))) as { input?: Record<string, unknown> };
-    const input = body.input && typeof body.input === 'object' ? body.input : {};
-    const wanted = Object.entries(handler.paramTypes).map(([name, type]) => `${name}${type ? ` (${type})` : ''}`);
-    const takes = wanted.length ? `This endpoint takes input: ${wanted.join(', ')}.` : 'This endpoint takes no input.';
-    // null means "not given", but the name must still be sent. Own properties only: an
-    // inherited name such as `toString` would otherwise pass and change the key.
-    const missing = Object.keys(handler.paramTypes).filter((name) => !Object.hasOwn(input, name));
-    if (missing.length) {
-      throw new SlimeError('INVALID_REQUEST', `${takes} Missing: ${missing.join(', ')}.`);
+  app.post('/v0/e/:key', limitBody('Crystal token', 'crystal'), async (c) => {
+    const edge = edgeSpan(c.req.header('content-length'), 'Crystal token');
+    const startedAt = performance.now();
+    let requestBody: unknown;
+    try {
+      const key = c.req.param('key');
+      // Own keys only: `constructor` or `__proto__` must not resolve to Object.prototype members.
+      const handler = crystal && Object.hasOwn(crystal, key) ? crystal[key] : undefined;
+      if (!handler) throw new SlimeError('HANDLER_NOT_FOUND', 'No Crystal with this key on this endpoint.');
+      const body = (await c.req.json().catch(() => ({}))) as { input?: Record<string, unknown> };
+      const input = body.input && typeof body.input === 'object' ? body.input : {};
+      requestBody = { intent: handler.intent, input };
+      const wanted = Object.entries(handler.paramTypes).map(([name, type]) => `${name}${type ? ` (${type})` : ''}`);
+      const takes = wanted.length ? `This endpoint takes input: ${wanted.join(', ')}.` : 'This endpoint takes no input.';
+      // null means "not given", but the name must still be sent. Own properties only: an
+      // inherited name such as `toString` would otherwise pass and change the key.
+      const missing = Object.keys(handler.paramTypes).filter((name) => !Object.hasOwn(input, name));
+      if (missing.length) {
+        throw new SlimeError('INVALID_REQUEST', `${takes} Missing: ${missing.join(', ')}.`);
+      }
+      const unknown = Object.keys(input).filter((name) => !Object.hasOwn(handler.paramTypes, name));
+      if (unknown.length) {
+        throw new SlimeError('INVALID_REQUEST', `${takes} Unknown: ${unknown.join(', ')}.`);
+      }
+      const { data, meta } = await slime.query({ intent: handler.intent, input, output: handler.output } as never);
+      onQuery?.(meta);
+      events?.record(meta, 'crystal', { body: requestBody, edge });
+      return c.json({ data, meta });
+    } catch (error) {
+      events?.recordFailure(failureOf(error, performance.now() - startedAt, edge), 'crystal', { body: requestBody, edge });
+      throw error;
     }
-    const unknown = Object.keys(input).filter((name) => !Object.hasOwn(handler.paramTypes, name));
-    if (unknown.length) {
-      throw new SlimeError('INVALID_REQUEST', `${takes} Unknown: ${unknown.join(', ')}.`);
-    }
-    const { data, meta } = await slime.query({ intent: handler.intent, input, output: handler.output } as never);
-    onQuery?.(meta);
-    events?.record(meta, 'crystal');
-    return c.json({ data, meta });
   });
 
   if (events) {
