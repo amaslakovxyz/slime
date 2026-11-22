@@ -1,0 +1,35 @@
+{
+  "liquid": {
+    "version": 2,
+    "unsatisfiable": null,
+    "steps": [
+      {
+        "name": "rows",
+        "source": "db",
+        "sql": "SELECT p.name AS plan, a.name FROM accounts a JOIN plans p ON p.id = a.plan_id WHERE a.country = $1::text ORDER BY p.name, a.name",
+        "params": [
+          "country"
+        ]
+      }
+    ],
+    "shapeJs": "function shape(data, input) {\nfunction shape(rows) {\n  const byPlan = new Map();\n  for (const r of rows) {\n    if (!byPlan.has(r.plan)) byPlan.set(r.plan, []);\n    byPlan.get(r.plan).push({ name: r.name });\n  }\n  return [...byPlan].map(([plan, accounts]) => ({ plan, accounts }));\n}\nreturn shape(data.rows, input);\n}",
+    "assumptions": []
+  },
+  "inputs": [
+    {
+      "country": "DE"
+    },
+    {
+      "country": "US"
+    },
+    {
+      "country": "FR"
+    },
+    {
+      "country": "GB"
+    },
+    {
+      "country": "NL"
+    }
+  ]
+}

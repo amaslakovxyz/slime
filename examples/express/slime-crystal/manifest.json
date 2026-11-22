@@ -1,0 +1,162 @@
+{
+  "version": 1,
+  "entries": {
+    "39bca0095965f027cffc2652cf6a04ecee3cd9a681647ff78b4622a8f6aba876": {
+      "file": "39bca0095965f027cffc2652cf6a04ecee3cd9a681647ff78b4622a8f6aba876.mjs",
+      "sha256": "398861e60e0d1fe9e59865b3e9969266ec6f1d5189838dd072b6f09ecbfeed87",
+      "intent": "accounts with failed invoices since a date, with how many failed invoices each",
+      "output": [
+        {
+          "name": "string",
+          "failedInvoices": "integer"
+        }
+      ],
+      "paramTypes": {
+        "since": "string"
+      },
+      "schemaHash": "e7cc09cf02ab05a06deda1b045eacc201577c47e37b014bf38f957ae14d3d0bb",
+      "review": "none",
+      "isOptimized": false,
+      "notes": [],
+      "provenance": {
+        "schemaHash": "e7cc09cf02ab05a06deda1b045eacc201577c47e37b014bf38f957ae14d3d0bb",
+        "dictionaryHash": "27df76ba759119756dca7587d16499e4bad3b27c5c894c293edf7a71ce8addf2",
+        "promptHash": "68e1c8a140d3dcebe1f3bc570bd651680fdcdccfe308c853aa8a28aabec99a11",
+        "model": "canned",
+        "sourceHashes": {
+          "db": "e7cc09cf02ab05a06deda1b045eacc201577c47e37b014bf38f957ae14d3d0bb"
+        }
+      },
+      "createdAt": "2026-11-22T10:31:41.524Z",
+      "service": "accountsWithFailedInvoicesSinceA",
+      "cases": "39bca0095965f027cffc2652cf6a04ecee3cd9a681647ff78b4622a8f6aba876.cases.json",
+      "casesSha256": "e2ec72e7a7a415166443a4055b117b68f0f1a9e050d033a8a7bc69bcd03868e0"
+    },
+    "3d6d0442112bc8c9cb9b9d594f10d2faebdbdec4736b7ceb262ea013b3b71eaf": {
+      "file": "3d6d0442112bc8c9cb9b9d594f10d2faebdbdec4736b7ceb262ea013b3b71eaf.mjs",
+      "sha256": "87024305fcabf8e6c374e3da345cce5eef58f1114f5d62ec5e05dbe11ae26fec",
+      "intent": "plans that have accounts in a given country, each with the list of those account names",
+      "output": [
+        {
+          "plan": "string",
+          "accounts": [
+            {
+              "name": "string"
+            }
+          ]
+        }
+      ],
+      "paramTypes": {
+        "country": "string"
+      },
+      "schemaHash": "e7cc09cf02ab05a06deda1b045eacc201577c47e37b014bf38f957ae14d3d0bb",
+      "review": "none",
+      "isOptimized": false,
+      "notes": [],
+      "provenance": {
+        "schemaHash": "e7cc09cf02ab05a06deda1b045eacc201577c47e37b014bf38f957ae14d3d0bb",
+        "dictionaryHash": "27df76ba759119756dca7587d16499e4bad3b27c5c894c293edf7a71ce8addf2",
+        "promptHash": "68e1c8a140d3dcebe1f3bc570bd651680fdcdccfe308c853aa8a28aabec99a11",
+        "model": "canned",
+        "sourceHashes": {
+          "db": "e7cc09cf02ab05a06deda1b045eacc201577c47e37b014bf38f957ae14d3d0bb"
+        }
+      },
+      "createdAt": "2026-11-22T10:31:41.541Z",
+      "service": "plansThatHaveAccountsInA",
+      "cases": "3d6d0442112bc8c9cb9b9d594f10d2faebdbdec4736b7ceb262ea013b3b71eaf.cases.json",
+      "casesSha256": "73f504982956d08d686a19c9da8df423f0b70ee5db8597a344c21cc858655438"
+    },
+    "589af6616578ab3b20f08f624306154e7cbedb3d409527fc2d0f4b14edebbb56": {
+      "file": "589af6616578ab3b20f08f624306154e7cbedb3d409527fc2d0f4b14edebbb56.mjs",
+      "sha256": "051e207747a13c2fdfa67e4dacab449d44d373f98244772230e3210c4b487fd8",
+      "intent": "number of accounts on each plan",
+      "output": [
+        {
+          "plan": "string",
+          "accounts": "integer"
+        }
+      ],
+      "paramTypes": {},
+      "schemaHash": "e7cc09cf02ab05a06deda1b045eacc201577c47e37b014bf38f957ae14d3d0bb",
+      "review": "none",
+      "isOptimized": false,
+      "notes": [],
+      "provenance": {
+        "schemaHash": "e7cc09cf02ab05a06deda1b045eacc201577c47e37b014bf38f957ae14d3d0bb",
+        "dictionaryHash": "27df76ba759119756dca7587d16499e4bad3b27c5c894c293edf7a71ce8addf2",
+        "promptHash": "68e1c8a140d3dcebe1f3bc570bd651680fdcdccfe308c853aa8a28aabec99a11",
+        "model": "canned",
+        "sourceHashes": {
+          "db": "e7cc09cf02ab05a06deda1b045eacc201577c47e37b014bf38f957ae14d3d0bb"
+        }
+      },
+      "createdAt": "2026-11-22T10:31:41.485Z",
+      "service": "numberOfAccountsOnEachPlan",
+      "cases": "589af6616578ab3b20f08f624306154e7cbedb3d409527fc2d0f4b14edebbb56.cases.json",
+      "casesSha256": "2e9266c8d8ad75eb6041423fb6b02629b43a1f231a0e3da0f6f93bd3bf750783"
+    },
+    "ce8b29d19394f7093271427ffa80209d47fab6a86fe396d70e11abcaee3b8483": {
+      "file": "ce8b29d19394f7093271427ffa80209d47fab6a86fe396d70e11abcaee3b8483.mjs",
+      "sha256": "a9aaf938477182cfc023b4387f17c3489a9d42ac9ea471adb6b32275ddad0c4d",
+      "intent": "total paid invoice revenue in cents per month since a given date, month formatted YYYY-MM, oldest first",
+      "output": [
+        {
+          "month": "string",
+          "revenueCents": "integer"
+        }
+      ],
+      "paramTypes": {
+        "since": "string"
+      },
+      "schemaHash": "e7cc09cf02ab05a06deda1b045eacc201577c47e37b014bf38f957ae14d3d0bb",
+      "review": "none",
+      "isOptimized": false,
+      "notes": [],
+      "provenance": {
+        "schemaHash": "e7cc09cf02ab05a06deda1b045eacc201577c47e37b014bf38f957ae14d3d0bb",
+        "dictionaryHash": "27df76ba759119756dca7587d16499e4bad3b27c5c894c293edf7a71ce8addf2",
+        "promptHash": "68e1c8a140d3dcebe1f3bc570bd651680fdcdccfe308c853aa8a28aabec99a11",
+        "model": "canned",
+        "sourceHashes": {
+          "db": "e7cc09cf02ab05a06deda1b045eacc201577c47e37b014bf38f957ae14d3d0bb"
+        }
+      },
+      "createdAt": "2026-11-22T10:31:41.513Z",
+      "service": "totalPaidInvoiceRevenueInCents",
+      "cases": "ce8b29d19394f7093271427ffa80209d47fab6a86fe396d70e11abcaee3b8483.cases.json",
+      "casesSha256": "64f3bb94d2a34d98594c9c6bc0e8be819d79bc6f8ae55607a031b281573eb3eb"
+    },
+    "d3818420853abd6ebe8ff567d42f9287f4515f7eb1a31173f8f61fdbe86d4541": {
+      "file": "d3818420853abd6ebe8ff567d42f9287f4515f7eb1a31173f8f61fdbe86d4541.mjs",
+      "sha256": "d41dc5076be1b9ff1a667beea86a3e47f3a9e1992979f45589ff5280379092a1",
+      "intent": "top N accounts by total paid invoice amount in cents, highest first",
+      "output": [
+        {
+          "name": "string",
+          "totalPaidCents": "integer"
+        }
+      ],
+      "paramTypes": {
+        "limit": "number"
+      },
+      "schemaHash": "e7cc09cf02ab05a06deda1b045eacc201577c47e37b014bf38f957ae14d3d0bb",
+      "review": "none",
+      "isOptimized": false,
+      "notes": [],
+      "provenance": {
+        "schemaHash": "e7cc09cf02ab05a06deda1b045eacc201577c47e37b014bf38f957ae14d3d0bb",
+        "dictionaryHash": "27df76ba759119756dca7587d16499e4bad3b27c5c894c293edf7a71ce8addf2",
+        "promptHash": "68e1c8a140d3dcebe1f3bc570bd651680fdcdccfe308c853aa8a28aabec99a11",
+        "model": "canned",
+        "sourceHashes": {
+          "db": "e7cc09cf02ab05a06deda1b045eacc201577c47e37b014bf38f957ae14d3d0bb"
+        }
+      },
+      "createdAt": "2026-11-22T10:31:41.501Z",
+      "service": "topNAccountsByTotalPaid",
+      "cases": "d3818420853abd6ebe8ff567d42f9287f4515f7eb1a31173f8f61fdbe86d4541.cases.json",
+      "casesSha256": "804a6b0620fcfb0022c4c29d2ced1f69ded2eead0141af4203193466fed2f69b"
+    }
+  }
+}
