@@ -31,92 +31,80 @@ async function isDatabaseAvailable() {
   }
 }
 
-/** `options` may be a function of the instance, for routes that need it (the crystallizer). */
-async function startServer(env, options) {
+const TOP_ACCOUNTS = { intent: 'top N accounts by total paid invoice amount in cents, highest first', output: [{ name: 'string', totalPaidCents: 'integer' }] };
+
+/** A fresh instance on the demo database, with a Crystallizer writing into a temporary folder. */
+async function startServer(env) {
   // crystal: false — the tests grow their own handlers, whatever slime-crystal/ holds.
   const slime = await createSlime(await slimeConfigFromEnv(env, { store: memoryStore(), generator: cannedGenerator(CANNED_HANDLERS), crystal: false }));
-  const server = createApp(slime, typeof options === 'function' ? options(slime) : options).listen(0);
+  const dir = await mkdtemp(join(tmpdir(), 'slime-example-crystal-'));
+  const server = createApp(slime, new Crystallizer(slime, { dir })).listen(0);
   await new Promise((resolve) => server.once('listening', resolve));
   const baseUrl = `http://localhost:${server.address().port}`;
+  const post = (path, body) => fetch(`${baseUrl}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: typeof body === 'string' ? body : JSON.stringify(body) });
   const stop = async () => {
     server.close();
     await slime.close();
+    await rm(dir, { recursive: true, force: true });
   };
-  return { baseUrl, stop };
+  return { baseUrl, dir, post, stop };
 }
 
 describe('example app (canned handlers)', { skip: !hasDatabase }, () => {
-  let app;
-  before(async () => {
-    app = await startServer(ENV, { exposeDevQuery: true });
-  });
-  after(() => app.stop());
-
-  test('a named endpoint answers, and a repeat with other values reuses the handler', async () => {
-    const first = await (await fetch(`${app.baseUrl}/api/accounts/top?limit=3`)).json();
-    const second = await (await fetch(`${app.baseUrl}/api/accounts/top?limit=5`)).json();
-    assert.equal(first.data.length, 3);
-    assert.deepEqual(Object.keys(first.data[0]).sort(), ['name', 'totalPaidCents']);
-    assert.deepEqual([first.meta.cache, second.meta.cache, second.data.length], ['miss', 'hit', 5]);
-  });
-
-  test('a bad parameter is a 400 with a SlimeError body', async () => {
-    const response = await fetch(`${app.baseUrl}/api/accounts/top?limit=many`);
-    assert.equal(response.status, 400);
-    assert.equal((await response.json()).error.code, 'INVALID_REQUEST');
-  });
-
-  test('a malformed JSON body is a 400 that is not retryable', async () => {
-    const response = await fetch(`${app.baseUrl}/dev/query`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{intent:' });
-    assert.equal(response.status, 400);
-    const { error } = await response.json();
-    assert.deepEqual([error.code, error.retryable], ['INVALID_REQUEST', false]);
-  });
-
-  test('POST /dev/query answers any request when it is enabled', async () => {
-    const response = await fetch(`${app.baseUrl}/dev/query`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ intent: 'number of accounts on each plan', output: [{ plan: 'string', accounts: 'integer' }] }),
-    });
-    assert.equal(response.status, 200);
-    assert.equal((await response.json()).data.length, 4);
-  });
-});
-
-describe('example app without /dev/query', { skip: !hasDatabase }, () => {
   let app;
   before(async () => {
     app = await startServer(ENV);
   });
   after(() => app.stop());
 
-  test('named endpoints still answer, and /dev/query does not exist', async () => {
-    assert.equal((await fetch(`${app.baseUrl}/api/plans/accounts`)).status, 200);
-    assert.equal((await fetch(`${app.baseUrl}/dev/query`, { method: 'POST' })).status, 404);
+  test('POST /query answers, and a repeat with other values reuses the handler', async () => {
+    const first = await (await app.post('/query', { ...TOP_ACCOUNTS, input: { limit: 3 } })).json();
+    const second = await (await app.post('/query', { ...TOP_ACCOUNTS, input: { limit: 5 } })).json();
+    assert.equal(first.data.length, 3);
+    assert.deepEqual(Object.keys(first.data[0]).sort(), ['name', 'totalPaidCents']);
+    assert.deepEqual([first.meta.cache, second.meta.cache, second.data.length], ['miss', 'hit', 5]);
+  });
+
+  test('a bad input value is a 400 with a SlimeError body', async () => {
+    const response = await app.post('/query', { ...TOP_ACCOUNTS, input: { limit: 'many' } });
+    assert.equal(response.status, 400);
+    assert.equal((await response.json()).error.code, 'INVALID_REQUEST');
+  });
+
+  test('a malformed JSON body is a 400 that is not retryable', async () => {
+    const response = await app.post('/query', '{intent:');
+    assert.equal(response.status, 400);
+    const { error } = await response.json();
+    assert.deepEqual([error.code, error.retryable], ['INVALID_REQUEST', false]);
+  });
+
+  test('POST /crystallize refuses keys that are not a list of strings', async () => {
+    const response = await app.post('/crystallize', { keys: 'all' });
+    assert.equal(response.status, 400);
+    assert.equal((await response.json()).error.code, 'INVALID_REQUEST');
+  });
+
+  test('GET /health returns the stats', async () => {
+    const response = await fetch(`${app.baseUrl}/health`);
+    assert.equal(response.status, 200);
+    assert.ok((await response.json()).handlers);
   });
 });
 
-describe('example app with POST /dev/crystallize', { skip: !hasDatabase }, () => {
+describe('example app: POST /crystallize', { skip: !hasDatabase }, () => {
   let app;
-  let dir;
   before(async () => {
-    dir = await mkdtemp(join(tmpdir(), 'slime-example-crystal-'));
-    app = await startServer(ENV, (slime) => ({ crystallizer: new Crystallizer(slime, { dir }) }));
+    app = await startServer(ENV);
   });
-  after(async () => {
-    await app.stop();
-    await rm(dir, { recursive: true, force: true });
-  });
+  after(() => app.stop());
 
   test('turns a handler used ten times into Crystal with a typed service method', async () => {
-    for (let limit = 1; limit <= 10; limit++) assert.equal((await fetch(`${app.baseUrl}/api/accounts/top?limit=${limit}`)).status, 200);
-    const response = await fetch(`${app.baseUrl}/dev/crystallize`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
-    const { reports } = await response.json();
+    for (let limit = 1; limit <= 10; limit++) assert.equal((await app.post('/query', { ...TOP_ACCOUNTS, input: { limit } })).status, 200);
+    const { reports } = await (await app.post('/crystallize', {})).json();
     assert.deepEqual(reports.map(({ outcome }) => outcome), ['crystallized']);
-    const manifest = JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8'));
+    const manifest = JSON.parse(await readFile(join(app.dir, 'manifest.json'), 'utf8'));
     const [entry] = Object.values(manifest.entries);
     assert.equal(entry.service, 'topNAccountsByTotalPaid');
-    assert.match(await readFile(join(dir, 'services.mjs'), 'utf8'), /export const topNAccountsByTotalPaid = /);
+    assert.match(await readFile(join(app.dir, 'services.mjs'), 'utf8'), /export const topNAccountsByTotalPaid = /);
   });
 });

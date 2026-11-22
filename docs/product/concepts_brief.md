@@ -257,7 +257,7 @@ SQL."*
   * Redis.
   * Embeddings or "semantic" matching.
 * **Crystal (built; its automation is planned):**
-  1. **`npm run crystallize`** takes Liquid handlers with at least
+  1. **`POST /crystallize`** (a `Crystallizer` on the running instance) takes Liquid handlers with at least
      `CRYSTAL_MIN_RUNS` runs and an approved review.
   2. **One model call per handler** rewrites the code. It sees the code only,
      never the request text or data.

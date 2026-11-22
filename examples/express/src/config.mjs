@@ -4,7 +4,7 @@ import { SlimeConfig, fileStore } from '@slime-cloud/core';
 import { postgresConnector } from '@slime-cloud/core/postgres';
 
 const APP_DIR = new URL('..', import.meta.url).pathname;
-/** Where Crystal modules live; the server imports them, the crystallize job writes them. */
+/** Where Crystal modules live; the server imports them, POST /crystallize writes them. */
 export const CRYSTAL_DIR = `${APP_DIR}slime-crystal`;
 const DEMO_DATABASE_URL = 'postgres://slime_reader:slime_reader@localhost:54329/slime';
 const GROQ_MODEL = 'openai/gpt-oss-120b';
@@ -28,8 +28,8 @@ export async function slimeConfigFromEnv(env = process.env, overrides = {}) {
   });
 }
 
-/** The demo database and the handler store, without a model: enough for the crystallize job. */
-export function databaseFromEnv(env = process.env) {
+/** The demo database and the handler store. */
+function databaseFromEnv(env = process.env) {
   return {
     // `||`, not `??`: an empty value copied from .env.example means unset.
     connector: postgresConnector({ url: env.DATABASE_URL || DEMO_DATABASE_URL }),
@@ -52,7 +52,7 @@ async function chooseModels(env) {
   throw new Error('Set GROQ_API_KEY or ANTHROPIC_API_KEY: Slime generates a handler for each new request with that model.');
 }
 
-/** Crystal handlers live in this app's code once `npm run crystallize` has written them (C10). */
+/** Crystal handlers live in this app's code once POST /crystallize has written them (C10). */
 async function importCrystals() {
   const index = `${CRYSTAL_DIR}/index.mjs`;
   if (!existsSync(index)) return {};

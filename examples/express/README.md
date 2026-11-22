@@ -2,11 +2,10 @@
 
 ## Overview
 
-An Express app whose endpoints are answered by `@slime-cloud/core` against
-the demo database. It shows the setup PLAN.md recommends (R8, R11):
+An Express app with three endpoints: Slime (`POST /query`), crystallize
+(`POST /crystallize`) and health (`GET /health`), against the demo database.
 
-- Each endpoint picks its intent and output and builds the input on the
-  server. Clients never send an intent or an identity value.
+- A client sends the whole request: `{ intent, input, output }`.
 - A Groq or Claude key is required: a request no saved handler (`.slime/`)
   or Crystal handler (`slime-crystal/`) answers is written by that model.
 - Crystallize the handlers you rely on, so production serves reviewed code.
@@ -27,25 +26,24 @@ npm start                                              # http://localhost:3000
 
 Endpoints:
 
-| Route | Intent |
-|---|---|
-| `GET /api/plans/accounts` | number of accounts on each plan |
-| `GET /api/accounts/top?limit=5` | top N accounts by total paid invoice amount |
-| `GET /api/revenue/monthly?since=2026-06-01` | paid revenue per month since a date |
-| `GET /api/accounts/failed-invoices?since=2026-01-01` | accounts with failed invoices since a date |
-| `GET /health` | `slime.stats()` |
-| `POST /dev/query` | any `{ intent, input, output }`, **only with `SLIME_DEV_QUERY=1`** |
-| `POST /dev/crystallize` | `{ keys? }`: ready handlers → Crystal in `slime-crystal/`, **only with `SLIME_DEV_CRYSTALLIZE=1`** |
+| Route | Body | Answer |
+|---|---|---|
+| `POST /query` | `{ intent, input?, output }` | Slime's `{ data, meta }` |
+| `POST /crystallize` | `{ keys? }` | `{ reports }`: ready handlers → Crystal in `slime-crystal/` |
+| `GET /health` | | `slime.stats()` |
 
-Environment (put it in `.env`: `npm start` and `npm run crystallize` load it,
-and git ignores it; `.env.example` lists the variables):
+```bash
+curl -X POST localhost:3000/query -H 'content-type: application/json' \
+  -d '{"intent":"top N accounts by total paid invoice amount in cents, highest first","input":{"limit":5},"output":[{"name":"string","totalPaidCents":"integer"}]}'
+```
+
+Environment (put it in `.env`: `npm start` loads it, and git ignores it;
+`.env.example` lists the variables):
 
 | Variable | Default | Meaning |
 |---|---|---|
 | `DATABASE_URL` | the demo `slime_reader` | a read-only database user |
-| `GROQ_API_KEY` / `ANTHROPIC_API_KEY` | unset | **required for `npm start`**: the model that writes handlers |
-| `SLIME_DEV_QUERY` | unset | `1`: add `POST /dev/query` (local development only) |
-| `SLIME_DEV_CRYSTALLIZE` | unset | `1`: add `POST /dev/crystallize` (local development only: it writes into `slime-crystal/`) |
+| `GROQ_API_KEY` / `ANTHROPIC_API_KEY` | unset | **required for `npm start`**: the model that writes handlers (and, Claude first, optimizes them on crystallize) |
 | `SLIME_STORE_DIR` | `./.slime` | where saved (Liquid) handlers are kept |
 | `PORT` | `3000` | |
 
@@ -53,15 +51,13 @@ From a new request to Crystal:
 
 1. Call the endpoints. After 3 successful runs a handler is
    reviewed (with a model key) and saved to `.slime/`.
-2. After 10 runs it is ready: with `SLIME_DEV_CRYSTALLIZE=1`,
-   `curl -X POST localhost:3000/dev/crystallize` writes it to `slime-crystal/`
-   (a `Crystallizer` on the running instance, which sees the live run counts;
-   `npm run crystallize` reads only the store, whose counts stop at promotion).
-   With a model key, an optimizer tries to simplify the code first.
+2. After 10 runs it is ready: `curl -X POST localhost:3000/crystallize`
+   writes it to `slime-crystal/` (a `Crystallizer` on the running instance,
+   which sees the live run counts). An optimizer tries to simplify the code first.
 3. Commit `slime-crystal/`. CI runs `npm run check:crystal`.
 
-`node scripts/grow-crystals.mjs` does steps 1–2 without a model (canned
-handlers, the demo database): it is how `.github/workflows/crystal-agents.yml`
+`node scripts/grow-crystals.mjs` does steps 1–2 through the same two endpoints,
+without a model (canned handlers, the demo database): it is how `.github/workflows/crystal-agents.yml`
 feeds the Crystal agent loop (`crystal/README.md`, "Agent loop"). The tests
 set `crystal: false`, so whatever `slime-crystal/` holds, they grow their own.
 4. The server loads `slime-crystal/index.mjs` at startup and serves those
@@ -70,10 +66,11 @@ set `crystal: false`, so whatever `slime-crystal/` holds, they grow their own.
 
 ## Invariants
 
-- **`/dev/query` is off unless `SLIME_DEV_QUERY=1`.** It lets a caller
-  generate queries against everything the database user can read.
-- **Values from the query string are passed as values,** never written into
-  an intent.
+- **Three endpoints.** Each request carries its own intent; there are no named routes.
+- **`/query` answers anything the database user can read,** and `/crystallize`
+  writes into this app's source folder: outside a demo, put both behind your
+  own auth and use a read-only database user that sees only what callers may.
+- **Input values are passed as values,** never written into an intent.
 - **Run `check:crystal` in CI.** Crystal code runs without a sandbox, and the
   check is what catches a hand-edited module.
 

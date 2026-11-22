@@ -13,7 +13,6 @@
     "db:down": "docker compose down -v",
     "start": "node --env-file-if-exists=.env src/server.mjs",
     "test": "node --test 'test/**/*.test.mjs'",
-    "crystallize": "node --env-file-if-exists=.env scripts/crystallize.mjs",
     "check:crystal": "slime-crystal check slime-crystal"
   },
   "dependencies": {
