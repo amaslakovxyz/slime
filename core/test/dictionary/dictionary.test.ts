@@ -23,11 +23,11 @@ const schema: SchemaInfo = {
 
 describe('dictionary (§4.4)', () => {
   test('renders tables, keys, enum values, glossary and rules without a model (D2)', () => {
-    const { text } = buildDictionary({ schema, glossary: { revenue: 'sum of paid invoices' }, rules: ['Count only paid invoices.'] });
+    const { text } = buildDictionary({ sqlSourceName: 'db', schema, glossary: { revenue: 'sum of paid invoices' }, rules: ['Count only paid invoices.'] });
     assert.equal(
       text,
       [
-        'Database: postgresql 16',
+        'Database source "db": postgresql 16',
         'Table accounts -- one row per customer\n  id integer not null primary key\n  plan_id integer null references plans.id\n  status text not null one of: active, canceled -- lifecycle',
         'Glossary:\n  revenue: sum of paid invoices',
         'Rules:\n  - Count only paid invoices.',
@@ -36,9 +36,9 @@ describe('dictionary (§4.4)', () => {
   });
 
   test('the same inputs give the same hash; rules change the dictionary but not the schema hash', () => {
-    const base = buildDictionary({ schema, glossary: {}, rules: [] });
-    assert.deepEqual(buildDictionary({ schema, glossary: {}, rules: [] }), base);
-    const withRule = buildDictionary({ schema, glossary: {}, rules: ['x'] });
+    const base = buildDictionary({ sqlSourceName: 'db', schema, glossary: {}, rules: [] });
+    assert.deepEqual(buildDictionary({ sqlSourceName: 'db', schema, glossary: {}, rules: [] }), base);
+    const withRule = buildDictionary({ sqlSourceName: 'db', schema, glossary: {}, rules: ['x'] });
     assert.notEqual(withRule.hash, base.hash);
     assert.equal(withRule.schemaHash, base.schemaHash);
   });
@@ -66,7 +66,7 @@ describe('dictionary with API sources (MS2, MS17)', () => {
   const films: ApiSchema = { service: 'Studio Ghibli API', operations: [{ name: 'films.list', params: [], columns: [{ name: 'title', type: 'string', nullable: false }] }] };
 
   test('names the SQL source and renders each API source after the tables', () => {
-    const { text } = buildDictionary({ schema, glossary: {}, rules: ['Count only paid invoices.'], apiSchemas: { notion: feedback, films } });
+    const { text } = buildDictionary({ sqlSourceName: 'db', schema, glossary: {}, rules: ['Count only paid invoices.'], apiSchemas: { notion: feedback, films } });
     assert.equal(
       text,
       [
@@ -94,18 +94,22 @@ describe('dictionary with API sources (MS2, MS17)', () => {
   });
 
   test('the schema hash depends on every source schema, never on rows', () => {
-    const base = buildDictionary({ schema, glossary: {}, rules: [], apiSchemas: { notion: feedback } });
-    assert.notEqual(base.schemaHash, buildDictionary({ schema, glossary: {}, rules: [] }).schemaHash);
+    const base = buildDictionary({ sqlSourceName: 'db', schema, glossary: {}, rules: [], apiSchemas: { notion: feedback } });
+    assert.notEqual(base.schemaHash, buildDictionary({ sqlSourceName: 'db', schema, glossary: {}, rules: [] }).schemaHash);
     const withColumn: ApiSchema = { ...feedback, operations: [{ ...feedback.operations[0]!, columns: [...feedback.operations[0]!.columns, { name: 'title', type: 'string', nullable: true }] }] };
-    assert.notEqual(buildDictionary({ schema, glossary: {}, rules: [], apiSchemas: { notion: withColumn } }).schemaHash, base.schemaHash);
-    assert.equal(buildDictionary({ schema, glossary: {}, rules: [], apiSchemas: { notion: feedback } }).schemaHash, base.schemaHash);
+    assert.notEqual(buildDictionary({ sqlSourceName: 'db', schema, glossary: {}, rules: [], apiSchemas: { notion: withColumn } }).schemaHash, base.schemaHash);
+    assert.equal(buildDictionary({ sqlSourceName: 'db', schema, glossary: {}, rules: [], apiSchemas: { notion: feedback } }).schemaHash, base.schemaHash);
   });
 
-  test('records one hash per source, and none without API sources', () => {
-    const { sourceHashes } = buildDictionary({ schema, glossary: {}, rules: [], apiSchemas: { notion: feedback, films } });
-    assert.deepEqual(Object.keys(sourceHashes ?? {}), ['db', 'notion', 'films']);
-    assert.equal(buildDictionary({ schema, glossary: {}, rules: [] }).sourceHashes, undefined);
-    const withoutFilms = buildDictionary({ schema, glossary: {}, rules: [], apiSchemas: { notion: feedback } }).sourceHashes;
-    assert.equal(withoutFilms?.db, sourceHashes?.db, 'the SQL source hash ignores API sources');
+  test('records one hash per source', () => {
+    const { sourceHashes } = buildDictionary({ sqlSourceName: 'db', schema, glossary: {}, rules: [], apiSchemas: { notion: feedback, films } });
+    assert.deepEqual(Object.keys(sourceHashes), ['db', 'notion', 'films']);
+    const withoutFilms = buildDictionary({ sqlSourceName: 'db', schema, glossary: {}, rules: [], apiSchemas: { notion: feedback } }).sourceHashes;
+    assert.equal(withoutFilms.db, sourceHashes.db, 'the SQL source hash ignores API sources');
+  });
+
+  test('a database alone keeps the database hash, so earlier handlers and Crystal still match (C10)', () => {
+    const databaseOnly = buildDictionary({ sqlSourceName: 'db', schema, glossary: {}, rules: [] });
+    assert.deepEqual(databaseOnly.sourceHashes, { db: databaseOnly.schemaHash });
   });
 });

@@ -5,7 +5,7 @@ import { after, describe, test } from 'node:test';
 import { SlimeConfig } from '../../../src/config/slime-config.js';
 import { createSlime } from '../../../src/create-slime.js';
 import type { Slime } from '../../../src/engine/types.js';
-import type { ArtifactV2 } from '../../../src/models/artifact-v2.js';
+import type { Artifact } from '../../../src/models/artifact.js';
 import type { GenerationRequest } from '../../../src/models/types.js';
 import { notionSource } from '../../../src/sources/notion/notion-source.js';
 import { memoryStore } from '../../../src/stores/memory-store.js';
@@ -20,7 +20,7 @@ const notion = () => notionSource({ token: 'ntn_secret', dataSources: { feedback
 const instances: Slime[] = [];
 after(() => Promise.all(instances.map((slime) => slime.close())));
 
-function handler(shapeJs: string): ArtifactV2 {
+function handler(shapeJs: string): Artifact {
   return {
     version: 2,
     unsatisfiable: null,

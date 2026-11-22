@@ -1,12 +1,10 @@
-import { lintArtifact } from './checks/sql.js';
-import { isArtifactV2, type AnyArtifact, type ArtifactV2 } from '../models/artifact-v2.js';
+import type { Artifact } from '../models/artifact.js';
 import { lintSteps } from './checks/steps.js';
-import { normalizeArtifact } from './normalize-artifact.js';
 import type { ApiSchema, Source } from '../sources/types.js';
 import type { LimitOptions } from '../config/options.js';
 import { SlimeError } from '../shared/errors.js';
 import type { Connector } from '../connectors/types.js';
-import type { ArtifactFormat, Generator, ModelUsage, ParamTypesForModel } from '../models/types.js';
+import type { Generator, ModelUsage, ParamTypesForModel } from '../models/types.js';
 import type { SandboxRunner } from '../sandbox/types.js';
 import type { HandlerProvenance } from '../request/key.js';
 import type { ParsedRequest } from '../request/parse.js';
@@ -22,11 +20,9 @@ export interface GenerationDeps {
   limits: Readonly<LimitOptions>;
   dictionaryText: string;
   provenance: HandlerProvenance;
-  /** 'v2' when the instance has API sources (MS3); missing means 'v1'. */
-  format?: ArtifactFormat;
-  sqlSourceName?: string;
-  sources?: Readonly<Record<string, Source>>;
-  apiSchemas?: Readonly<Record<string, ApiSchema>>;
+  sqlSourceName: string;
+  sources: Readonly<Record<string, Source>>;
+  apiSchemas: Readonly<Record<string, ApiSchema>>;
 }
 
 export interface GenerationJob {
@@ -43,7 +39,7 @@ export interface GenerationOutcome {
 }
 
 export interface PreviousAttempt {
-  artifact: AnyArtifact;
+  artifact: Artifact;
   error: string;
 }
 
@@ -64,36 +60,27 @@ export async function generateHandler(deps: GenerationDeps, { key, request, prev
 
   for (let attempt = 0; attempt <= deps.limits.maxRepairs && deadline - Date.now() >= MIN_ATTEMPT_MS; attempt++) {
     const generation = await deps.generator.generate(
-      // format is set only for v2, so a v1 request is the same object as before (MS3).
-      { context: deps.dictionaryText, intent: request.intent, params: forModel(paramTypes), output: request.output, ...(previous ? { previous } : {}), ...(deps.format === 'v2' ? { format: deps.format } : {}) },
+      { context: deps.dictionaryText, intent: request.intent, params: forModel(paramTypes), output: request.output, ...(previous ? { previous } : {}) },
       { timeoutMs: deadline - Date.now() },
     );
     addUsage(usage, generation);
     deadline += generation.waitMs; // provider rate-limit waits don't count against the budget
     assertSatisfiable(generation.artifact);
-    const artifact = normalizeArtifact(generation.artifact);
+    const { artifact } = generation;
     try {
       const execution = await tryArtifact(deps, artifact, request);
       return { record: newRecord({ deps, key, request, artifact, paramTypes }), execution, usage };
     } catch (error) {
       lastError = asSlimeError(error);
       if (FINAL_CODES.has(lastError.code)) throw lastError;
-      previous = { artifact, error: repairMessage(lastError, deps.format ?? 'v1') };
+      previous = { artifact, error: repairMessage(lastError) };
     }
   }
   throw lastError ?? new SlimeError('GENERATION_TIMEOUT', 'Ran out of generation time budget.', { retryable: true });
 }
 
-async function tryArtifact(deps: GenerationDeps, artifact: AnyArtifact, request: ParsedRequest): Promise<Execution> {
-  if (isArtifactV2(artifact)) return tryArtifactV2(deps, artifact, request);
-  lintArtifact(artifact, request.input);
-  await assertAffordable(deps, artifact.sql, bindParams(artifact.params, request.input));
-  return executeArtifact(deps, { artifact, output: request.output, input: request.input });
-}
-
-async function tryArtifactV2(deps: GenerationDeps, artifact: ArtifactV2, request: ParsedRequest): Promise<Execution> {
+async function tryArtifact(deps: GenerationDeps, artifact: Artifact, request: ParsedRequest): Promise<Execution> {
   const { sqlSourceName, apiSchemas } = deps;
-  if (sqlSourceName === undefined || !apiSchemas) throw new SlimeError('INVALID_HANDLER', 'This instance has no API sources, so it cannot run a multi-source handler.');
   lintSteps(artifact, { sqlSourceName, apiSchemas, input: request.input, maxSteps: deps.limits.maxSteps });
   for (const step of artifact.steps) {
     if (!('sql' in step)) continue;
@@ -109,7 +96,7 @@ async function assertAffordable(deps: GenerationDeps, sql: string, params: unkno
   }
 }
 
-function assertSatisfiable({ unsatisfiable }: AnyArtifact): void {
+function assertSatisfiable({ unsatisfiable }: Artifact): void {
   if (!unsatisfiable) return;
   const code = WRITE_LIKE_REASON.test(unsatisfiable) ? 'WRITE_REFUSED' : 'INTENT_UNSATISFIABLE';
   throw new SlimeError(code, unsatisfiable, { details: { enforcedBy: 'model' } });
@@ -119,7 +106,7 @@ interface NewRecordParts {
   deps: GenerationDeps;
   key: string;
   request: ParsedRequest;
-  artifact: AnyArtifact;
+  artifact: Artifact;
   paramTypes: ParamTypes;
 }
 

@@ -140,7 +140,7 @@ describe('engine: modes and saved handlers (§4.7, R8)', () => {
     const request = topAccounts({ country: 'DE', plan: null });
     const schema = await fakeConnector().describe();
     const savedUnderRules = (rules: string[]): HandlerRecord => {
-      const dictionary = buildDictionary({ schema, glossary: {}, rules });
+      const dictionary = buildDictionary({ sqlSourceName: 'db', schema, glossary: {}, rules });
       const provenance = { schemaHash: dictionary.schemaHash, dictionaryHash: dictionary.hash, promptHash: 'stub-prompt', model: 'stub-model' };
       return savedRecord(request, { provenance });
     };

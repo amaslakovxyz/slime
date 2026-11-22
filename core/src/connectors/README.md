@@ -13,6 +13,7 @@ contract; each implementation has its own folder and its own package subpath.
 
 | Method | Does |
 |---|---|
+| `kind` | Always `'sql'`; API sources have `'api'` (`../sources/types.ts`). |
 | `name` | Shown in errors and logs. |
 | `describe()` | `SchemaInfo`: the dialect and only what these credentials can read. Enum-like `values` come from the catalog, never from rows (D1). |
 | `check(sql, params, limits)` | A `QueryPlan` without running the query. `cost` is in the database's own units, or `null` when it has none (the engine then skips `maxQueryCost`). |
@@ -24,7 +25,7 @@ contract; each implementation has its own folder and its own package subpath.
 
 1. Copy `postgres/` to `<name>/` and export a factory from `<name>/index.ts`
    (`mysqlConnector(options): Connector`).
-2. Implement the contract:
+2. Implement the contract, with `kind: 'sql'`:
    - generated SQL uses `$1, $2, ...` placeholders; translate them if the
      driver uses another syntax;
    - run every query read-only, with a server-side timeout and a client-side

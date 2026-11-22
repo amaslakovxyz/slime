@@ -6,10 +6,14 @@ The model ports and everything providers share, so a bench compares models,
 not prompts.
 
 - `types.ts`: the ports the engine calls: `Generator`, `Reviewer` and
-  `Optimizer`, with `Artifact` and the request and result types.
+  `Optimizer`, with the request and result types.
+- `artifact.ts`: `Artifact`, the handler a model writes (steps plus
+  `shapeJs`); `fromStoredArtifact` reads the older single-query form from
+  stored records, and `asSingleQuery` gives Crystal its one-query form (MS3).
 - `model-client.ts`: `ModelClient`, the one interface a provider implements.
 - `roles.ts`: `modelRoles(client)` builds the Generator, Reviewer and
-  Optimizer from a client, with the shared prompts, schemas and prompt hash.
+  Optimizer from a client, with the shared prompts, schemas and prompt hash;
+  `providerRoles(clientFor)` turns a client factory into a provider's entry.
 - `prompts.ts`: the instructions, the JSON reply formats for providers
   without schema-constrained output, the user messages, and `promptHash()`.
 - `schemas.ts`: the zod schemas a reply must match.
@@ -44,9 +48,8 @@ Providers, each its own subpath:
    - throw `SlimeError`s: `GENERATION_RATE_LIMITED` and `GENERATION_TIMEOUT`
      (retryable), `GENERATION_FAILED` (retryable for a 5xx or a reply with
      wrong fields, final for a bad key or a refusal).
-2. In `<name>/index.ts`, export `<name>Generator`, `<name>Reviewer` and
-   `<name>Optimizer` as `modelRoles(<name>Client(options)).generator` etc.,
-   and a frozen `<name>` object, as `claude/index.ts` does.
+2. In `<name>/index.ts`, export `<name> = providerRoles(<name>Client)`, as
+   `claude/index.ts` does. Prompts, schemas and roles are never per provider.
 3. Add a `./<name>` entry to `package.json` `exports` (and an optional peer
    dependency if it needs an SDK), and the subpath to `test/package.test.ts`.
 4. In `test/models/<name>.test.ts`, call `describeModelClientContract` from
@@ -66,6 +69,7 @@ A provider outside core does the same against `@slime-cloud/core/models` and
   - `date` and `datetime` leaves;
   - a top-level object is one row, and `shapeJs` returns it or `null`;
   - the dictionary's rules win over the model's own judgment.
+- **One set of prompts** for every instance, with or without API sources.
 - **Byte-stable.** `promptHash(provider, ...parts)` (16 hex characters) is
   recorded in every handler; editing a prompt, or how `roles.ts` assembles
   it, regenerates handlers in explore mode. `test/models/prompt-hash.test.ts`

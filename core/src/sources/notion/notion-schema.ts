@@ -51,8 +51,8 @@ const RANGE_FILTERED = new Set(['date', 'created_time', 'last_edited_time']);
 const ID_COLUMN: ColumnInfo = { name: 'id', type: 'string', nullable: false, comment: 'Notion page id' };
 const MULTI_SELECT_COMMENT = 'option names joined with ", "';
 const DATE_COMMENT = 'start date only';
-export const QUERY_SUFFIX = '.query';
-export const ROW_ORDER = 'created desc';
+const QUERY_SUFFIX = '.query';
+const ROW_ORDER = 'created desc';
 
 export function operationFromDataSource(alias: string, dataSource: NotionDataSource, options: SchemaOptions = {}): NotionOperation {
   const taken = new Set(['id']);

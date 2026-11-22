@@ -53,7 +53,7 @@ const NOT_COMPARABLE = Symbol('not comparable');
 /** Liquid exactly as it runs today; an input it no longer answers has nothing to compare against. */
 async function liquidOutput(deps: EquivalenceDeps, { artifact, output }: HandlerRecord, input: InputValues): Promise<unknown> {
   try {
-    return (await executeArtifact(deps, { artifact, output, input })).data;
+    return (await executeArtifact({ ...deps, sources: {}, apiSchemas: {} }, { artifact, output, input })).data;
   } catch {
     return NOT_COMPARABLE;
   }

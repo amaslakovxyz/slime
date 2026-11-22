@@ -1,4 +1,5 @@
 import type { SlimeMode } from '../config/options.js';
+import { fromStoredArtifact, type Artifact, type LegacyArtifact } from '../models/artifact.js';
 import { changedProvenance, type HandlerProvenance } from '../request/key.js';
 import { SlimeError } from '../shared/errors.js';
 import type { SlimeStore } from '../stores/types.js';
@@ -6,10 +7,20 @@ import type { HandlerRecord, HandlerSummary, StoredTier } from './types.js';
 
 export const HANDLERS_NS = 'handlers';
 
+/** A record as a store returns it: older ones hold the single-query artifact. */
+type StoredRecord = Omit<HandlerRecord, 'artifact'> & { artifact: Artifact | LegacyArtifact };
+
+/** Every read of a saved handler goes through here, so nothing past the store sees the legacy form. */
+export function recordFromStore(value: unknown, sqlSourceName: string): HandlerRecord {
+  const stored = value as StoredRecord;
+  return { ...stored, artifact: fromStoredArtifact(stored.artifact, sqlSourceName) };
+}
+
 export interface HandlerCacheSettings {
   store: SlimeStore;
   mode: SlimeMode;
   provenance: HandlerProvenance;
+  sqlSourceName: string;
   gasWindowMs: number;
   /** Why a saved handler can't be served with today's sources (MS14); undefined when it can. */
   savedHandlerProblem?: (record: HandlerRecord) => string | undefined;
@@ -34,8 +45,10 @@ export class HandlerCache {
     if (cached && cached.expiresAt > Date.now()) return cached.record;
     this.#handlers.delete(key);
 
-    const saved = (await this.#settings.store.get(HANDLERS_NS, key)) as HandlerRecord | undefined;
-    if (!saved || !this.#isUsable(saved) || !this.#fitsSources(saved)) return undefined;
+    const value = await this.#settings.store.get(HANDLERS_NS, key);
+    if (value === undefined) return undefined;
+    const saved = recordFromStore(value, this.#settings.sqlSourceName);
+    if (!this.#isUsable(saved) || !this.#fitsSources(saved)) return undefined;
     this.#handlers.set(key, { record: saved, expiresAt: Number.POSITIVE_INFINITY });
     return saved;
   }

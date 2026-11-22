@@ -8,6 +8,11 @@
 | Scope | `core/` (`@slime-cloud/core`), one new adapter subpath, one example app |
 | Next step | Confirm handler shape and Crystal for API steps against [product frame v0.2](../../docs/product/product_frame_v0_2.md) (open questions); run P6.5; wire sources into `platform/runtime` |
 
+
+> **Update 2026-11-22:** the v1/v2 split described here is gone. Every handler now uses the
+> steps format, with one set of prompts; the single-query form is only read from old records
+> (PLAN.md MS3). Text below that keeps setups without API sources "byte-identical" is history.
+
 ## 0. Summary
 
 Slime is a backend library. A frontend sends `{ intent, input, output }`; a
@@ -204,8 +209,8 @@ new SlimeConfig({
 
 - `connector: x` stays valid and means `sources: { db: x }` (G6).
 - **Two kinds of source.**
-  - `sql`: today's `Connector`. Its `kind` is optional and defaults to `'sql'`,
-    so existing custom connectors compile unchanged.
+  - `sql`: today's `Connector`, with `kind: 'sql'`. (It was optional at first,
+    for custom connectors; required since the package has no outside users.)
   - `api`: a new port.
 - **Proposed API source port.** It reuses `ColumnInfo`, `RunResult` and
   `SafetyReport` from `connectors/types.ts`:

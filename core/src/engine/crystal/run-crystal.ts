@@ -4,7 +4,7 @@ import type { InputValues } from '../../request/parse.js';
 import type { CrystalHandler, ShapeFunction } from './types.js';
 
 /** The runner is needed only for string shapes; function shapes never touch it. */
-export type CrystalDeps = Omit<ExecutionDeps, 'runner'> & Partial<Pick<ExecutionDeps, 'runner'>>;
+export type CrystalDeps = Pick<ExecutionDeps, 'connector' | 'limits'> & Partial<Pick<ExecutionDeps, 'runner'>>;
 
 /**
  * Runs a Crystal handler: its SQL through the connector, then its shape. A function shape

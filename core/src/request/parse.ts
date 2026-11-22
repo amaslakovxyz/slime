@@ -31,7 +31,7 @@ const MAX_INTENT_LENGTH = 500;
 const MAX_INPUT_NAMES = 20;
 const INPUT_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
 /** R6: non-negative integers, or null for "not given". */
-export const PAGING_PARAMS = ['limit', 'offset'] as const;
+const PAGING_PARAMS = ['limit', 'offset'] as const;
 
 const LITERAL_PATTERNS: readonly LiteralPattern[] = [
   { label: 'quoted text', pattern: /["'][^"']+["']/ },

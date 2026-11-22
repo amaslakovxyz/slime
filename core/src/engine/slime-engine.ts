@@ -1,5 +1,5 @@
 import type { SlimeConfig } from '../config/slime-config.js';
-import { sqlOf } from '../models/artifact-v2.js';
+import { sqlOf } from '../models/artifact.js';
 import type { SlimeEvent } from '../config/options.js';
 import type { Dictionary } from '../dictionary/dictionary.js';
 import { SlimeError } from '../shared/errors.js';
@@ -60,7 +60,7 @@ export class SlimeEngine implements Slime {
     const { config, store, provenance } = parts;
     this.#parts = parts;
     const savedContext = { sqlSourceName: config.sqlSourceName, apiSchemas: parts.apiSchemas, maxSteps: config.limits.maxSteps };
-    this.#cache = new HandlerCache({ store, mode: config.mode, provenance, gasWindowMs: config.tiers.gasWindowMs, savedHandlerProblem: (record) => savedHandlerProblem(record, savedContext) });
+    this.#cache = new HandlerCache({ store, mode: config.mode, provenance, sqlSourceName: config.sqlSourceName, gasWindowMs: config.tiers.gasWindowMs, savedHandlerProblem: (record) => savedHandlerProblem(record, savedContext) });
     this.#limits = new GenerationLimits({ maxPerHour: config.limits.maxGenerationsPerHour, maxConcurrent: config.limits.maxConcurrentGenerations });
     this.#background = new BackgroundTasks((error) => this.#emit(errorEvent(error)));
     this.#lifecycle = new HandlerLifecycle({

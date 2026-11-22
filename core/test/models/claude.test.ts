@@ -10,7 +10,7 @@ import { describeModelClientContract, type ModelScenario } from '../../src/testi
 
 const OPTIONS = { apiKey: 'test-key', model: 'claude-haiku-5-5' };
 const REQUEST: GenerationRequest = { context: 'Database: postgresql 16', intent: 'all plans', params: {}, output: [{ name: 'string' }] };
-const ARTIFACT = { unsatisfiable: null, sql: 'SELECT name FROM plans', params: [], shapeJs: null, assumptions: [] };
+const ARTIFACT = { version: 2 as const, unsatisfiable: null, steps: [{ name: 'plans', source: 'db', sql: 'SELECT name FROM plans', params: [] }], shapeJs: null, assumptions: [] };
 const KEEP_ALIVE_MS = 1_000;
 // The SDK retries 429 and 5xx itself; this keeps its backoff short.
 const FAST_RETRY_AFTER = { 'retry-after-ms': '1' };

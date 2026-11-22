@@ -119,7 +119,7 @@ multi-source". If P0 changes one, update the steps that cite it.
 
 ### P0.3 Spike with the real schema and clients (6 h)
 - **Files:** `core/bench/spikes/multi-source-prompt.mjs` (new; not shipped, not
-  under `test/`, not in CI). It imports from the built `dist/`.
+  under `test/`, not in CI; removed once done, kept in git history). It imports from the built `dist/`.
 - **Change:**
   1. Write the `ArtifactV2Schema` zod schema exactly as P0.2 defines it, in the
      spike file; P2.2 moves it into core.
@@ -625,7 +625,7 @@ multi-source". If P0 changes one, update the steps that cite it.
 - **Done when:** a config with an API source starts with a real generator.
 
 ### P3.4 Manual live generation (2 h)
-- **Files:** `core/bench/spikes/multi-source-live.mjs` (outside the `npm test` glob).
+- **Files:** `core/bench/spikes/multi-source-live.mjs` (outside the `npm test` glob; removed once done, kept in git history).
 - **Change:** run a real Groq or Claude generator on the demo database plus a
   `fakeApiSource` shaped like Notion `feedback`. Ask demo intent 1 and print
   the handler and result.

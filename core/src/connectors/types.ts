@@ -59,8 +59,7 @@ export interface SafetyReport {
 }
 
 export interface Connector {
-  /** Optional so existing connectors compile unchanged; a missing kind means 'sql' (MS1). */
-  readonly kind?: 'sql';
+  readonly kind: 'sql';
   readonly name: string;
   /** Only what these credentials can read; nothing else is shown to the model. */
   describe(): Promise<SchemaInfo>;

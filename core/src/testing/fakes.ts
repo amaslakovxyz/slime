@@ -1,10 +1,13 @@
 // Test doubles for apps' and adapters' own tests, and core's: no database, no model.
 import type { Connector } from '../connectors/types.js';
-import type { AnyArtifact } from '../models/artifact-v2.js';
-import type { Artifact, GenerationRequest, Generator, Reviewer } from '../models/types.js';
+import { fromStoredArtifact, type Artifact } from '../models/artifact.js';
+import type { GenerationRequest, Generator, Reviewer } from '../models/types.js';
 
+const FAKE_SQL_SOURCE_NAME = 'db';
+
+/** A one-query handler on the "db" source; `shapeJs` is `function shape(rows, input)`. */
 export function artifact(sql: string, params: string[] = [], shapeJs: string | null = null): Artifact {
-  return { unsatisfiable: null, sql, params, shapeJs, assumptions: [] };
+  return fromStoredArtifact({ unsatisfiable: null, sql, params, shapeJs, assumptions: [] }, FAKE_SQL_SOURCE_NAME);
 }
 
 export interface ConnectorScript {
@@ -22,6 +25,7 @@ export interface ScriptedConnector extends Connector {
 export function fakeConnector({ rows = [], cost = 1, truncated = false, isSafe = true }: ConnectorScript = {}): ScriptedConnector {
   let runCount = 0;
   return {
+    kind: 'sql',
     name: 'fake',
     get runCount() {
       return runCount;
@@ -42,12 +46,11 @@ export interface StubGenerator extends Generator {
 }
 
 /** Returns `artifactFor(request)` after `delayMs`, and counts its calls. */
-export function stubGenerator(artifactFor: (request: GenerationRequest) => AnyArtifact, delayMs = 0): StubGenerator {
+export function stubGenerator(artifactFor: (request: GenerationRequest) => Artifact, delayMs = 0): StubGenerator {
   let calls = 0;
   return {
     model: 'stub-model',
     promptHash: 'stub-prompt',
-    multiSourcePromptHash: 'stub-multi-source-prompt',
     get calls() {
       return calls;
     },

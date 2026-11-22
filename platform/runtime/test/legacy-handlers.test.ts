@@ -69,6 +69,7 @@ describe('legacy handler migration (M7)', () => {
     await migrateLegacyHandlers({ client, table: TABLE, tenantId: TENANT, store });
     const rows = [{ name: 'Acme' }];
     const connector = {
+      kind: 'sql' as const,
       name: 'fake',
       describe: async () => ({ dialect: 'postgresql 16', tables: [] }),
       check: async () => ({ cost: 1, ms: 0 }),

@@ -1,8 +1,8 @@
-// Runs a v2 handler (design §3.5): every step in parallel under one deadline,
+// Runs a handler (design §3.5): every step in parallel under one deadline,
 // any failure aborts the API steps, then shape(data, input) in the sandbox.
 import type { LimitOptions } from '../config/options.js';
 import type { Connector } from '../connectors/types.js';
-import { isApiStep, type ApiStep, type ArtifactV2, type SqlStep, type Step } from '../models/artifact-v2.js';
+import { isApiStep, type ApiStep, type Artifact, type SqlStep, type Step } from '../models/artifact.js';
 import type { InputValues } from '../request/parse.js';
 import type { Shape } from '../request/shape.js';
 import type { SandboxRunner } from '../sandbox/types.js';
@@ -21,7 +21,7 @@ export interface StepsDeps {
 }
 
 export interface StepsJob {
-  artifact: ArtifactV2;
+  artifact: Artifact;
   output: Shape;
   input: InputValues;
 }

@@ -1,6 +1,6 @@
 // The Slime instance API (PLAN.md §5).
 import type { SlimeMode } from '../config/options.js';
-import type { AnyArtifact } from '../models/artifact-v2.js';
+import type { Artifact } from '../models/artifact.js';
 import type { StepTiming } from './execute-steps.js';
 import type { HandlerProvenance } from '../request/key.js';
 import type { InputValues, SlimeRequest } from '../request/parse.js';
@@ -17,7 +17,7 @@ export interface HandlerRecord {
   key: string;
   intent: string;
   output: Shape;
-  artifact: AnyArtifact;
+  artifact: Artifact;
   paramTypes: ParamTypes;
   provenance: HandlerProvenance;
   tier: StoredTier;
@@ -44,7 +44,7 @@ export interface QueryMeta {
   timingsMs: QueryTimings;
   warnings: string[];
   review: ReviewStatus;
-  /** v2, explore mode only: what each step read (R9). */
+  /** Explore mode only: what each step read (R9). */
   steps?: StepTiming[];
   /** sql, shapeJs and assumptions: explore mode only (R9). */
   sql?: string;

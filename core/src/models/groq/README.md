@@ -9,14 +9,12 @@ called with `fetch`, so it needs no extra package.
 - `groq-client.ts`: `groqClient`, the `ModelClient` (`../model-client.ts`)
   for Groq in `'prompt'` output mode: one JSON-mode request, with retries and
   reply checks.
-- `index.ts`: `groqGenerator`, `groqReviewer` and `groqOptimizer`, built by
-  `modelRoles` (`../roles.ts`).
+- `index.ts`: `groq = providerRoles(groqClient)` (`../roles.ts`).
 
 ## Interface
 
 - `groq.generator({ apiKey, model, reasoningEffort? })`,
-  `groq.reviewer({ ... })` and `groq.optimizer({ ... })` (also exported as
-  `groqGenerator`, `groqReviewer`, `groqOptimizer`). The sandbox benchmark
+  `groq.reviewer({ ... })` and `groq.optimizer({ ... })`. The sandbox benchmark
   used `openai/gpt-oss-120b`.
 
 ## Invariants
