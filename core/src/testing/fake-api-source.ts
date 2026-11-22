@@ -1,6 +1,6 @@
 // An in-memory ApiSource for core's and apps' tests: no network.
-import type { ColumnInfo } from '../connectors/types.js';
-import type { ApiSchema, ApiSource, CallOptions, ParamInfo } from '../sources/types.js';
+import type { ColumnInfo } from '../sources/types.js';
+import type { ApiSchema, ApiSource, CallOptions, ParamInfo } from '../sources/api/types.js';
 
 export type FakeRow = Record<string, unknown>;
 

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { columnName } from '../../../src/sources/notion/column-names.js';
-import { sanitizeMetadata } from '../../../src/sources/notion/sanitize.js';
+import { columnName } from '../../../../src/sources/api/notion/column-names.js';
+import { sanitizeMetadata } from '../../../../src/sources/api/notion/sanitize.js';
 
 describe('Notion column names (MS12)', () => {
   test('camelCases ASCII words and drops accents and punctuation', () => {

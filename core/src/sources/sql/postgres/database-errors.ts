@@ -1,4 +1,4 @@
-import { SlimeError } from '../../shared/errors.js';
+import { SlimeError } from '../../../shared/errors.js';
 
 const INSUFFICIENT_PRIVILEGE = '42501';
 const READ_ONLY_TRANSACTION = '25006';

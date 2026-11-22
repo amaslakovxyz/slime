@@ -68,7 +68,7 @@ const slime = await createSlime(new SlimeConfig({
 
 * the engine and tiers, the request format, safety checks, the QuickJS
   shaping sandbox, the background review and Crystal loading;
-* the contracts (Ports) for connectors, generators, reviewers and stores;
+* the contracts (Ports) for sources, generators, reviewers and stores;
 * their first implementations:
   * the Postgres connector, the Notion API source and `defineApiSource` for
     other REST APIs (read-only, through a constrained HTTP client);
@@ -96,11 +96,11 @@ const slime = await createSlime(new SlimeConfig({
 ## Subdirectories & System Boundaries
 
 - [src/](./src/README.md): the package sources, grouped by what the system
-  is made of. Its README is the map: the four ports (`connectors/`,
+  is made of. Its README is the map: the four ports (`sources/`,
   `models/`, `stores/`, `sandbox/`, each a `types.ts` contract plus
   implementations), the engine (`engine/`, `request/`, `dictionary/`),
   `config/`, `shared/`, and the tooling (`crystallize/`, `testing/`).
-  - [src/connectors/](./src/connectors/README.md) and
+  - [src/sources/sql/](./src/sources/sql/README.md) and
     [src/models/](./src/models/README.md) say how to add a connector or a
     model provider.
 - `scripts/check-pack.mjs`: guards what `npm pack` ships; its required files

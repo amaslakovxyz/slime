@@ -3,7 +3,7 @@
 // request, or silently return wrong data (MS14).
 import { isApiStep } from '../models/artifact.js';
 import { SlimeError } from '../shared/errors.js';
-import type { ApiSchema } from '../sources/types.js';
+import type { ApiSchema } from '../sources/api/types.js';
 import { lintSteps } from './checks/steps.js';
 import type { HandlerRecord } from './types.js';
 

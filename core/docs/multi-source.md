@@ -118,7 +118,7 @@ Key facts about core today (main @ 441c84b):
 
 | Part | Today | File |
 |---|---|---|
-| Source | One `Connector`: `describe()`, `check(sql)`, `run(sql)`, `safetyCheck()`, `close()` | `core/src/connectors/types.ts` |
+| Source | One `Connector`: `describe()`, `check(sql)`, `run(sql)`, `safetyCheck()`, `close()` | `core/src/sources/sql/types.ts` |
 | Handler | `Artifact = { unsatisfiable, sql, params, shapeJs, assumptions }` | `core/src/models/types.ts` |
 | Dictionary | Tables, columns, keys, enum values, comments, glossary and rules, rendered as text; `schemaHash = sha256(schema)` | `core/src/dictionary/dictionary.ts` |
 | Execution | `connector.run(sql)`, then `shape(rows, input)` in QuickJS, then output validation | `core/src/engine/execute.ts` |
@@ -529,7 +529,7 @@ where §5's transport rules are enforced once, for every adapter:
 - It turns failures into `SourceError`s whose messages are redacted. Every
   header value it sends is added to the source's secrets automatically.
 
-The retry helper is new and small (`core/src/sources/api/retry.ts`), with one
+The retry helper is new and small (`core/src/sources/api/http/retry.ts`), with one
 deadline for all attempts. The Groq client keeps its own retry logic: it
 reports provider wait time and classifies retries from the response body,
 which a shared helper would change. An adapter that needs more (custom auth, a
@@ -761,9 +761,9 @@ known so far.
 
 | Area | Change | Files |
 |---|---|---|
-| Ports | `ApiSource`, `OperationInfo`, `ParamInfo`, `SourceCallOptions`, `CallOptions`, `SourceError`; optional `kind` on `Connector` | `core/src/sources/types.ts`, `core/src/connectors/types.ts` |
+| Ports | `ApiSource`, `OperationInfo`, `ParamInfo`, `SourceCallOptions`, `CallOptions`, `SourceError`; optional `kind` on `Connector` | `core/src/sources/api/types.ts`, `core/src/sources/sql/types.ts` |
 | Config | `sources` (exactly one SQL source), `maxSteps`, `apiTimeoutMs`; `connector` as shorthand; validation of source names | `core/src/config/*` |
-| Startup | `describe()` and `safetyCheck()` over every source through the redacting wrapper; locked-mode check of saved v2 handlers | `core/src/create-slime.ts`, `core/src/sources/call-source.ts` |
+| Startup | `describe()` and `safetyCheck()` over every source through the redacting wrapper; locked-mode check of saved v2 handlers | `core/src/create-slime.ts`, `core/src/sources/api/call-source.ts` |
 | Dictionary | Render API sources; `schemaHash` over every source; per-source hashes in provenance | `core/src/dictionary/dictionary.ts`, `core/src/request/key.ts` |
 | Handler | `Artifact` v2 with steps; single-SQL-step normalization; saved-handler lint on load | `core/src/models/types.ts`, `core/src/engine/types.ts`, `core/src/engine/handler-cache.ts` |
 | Errors | `SOURCE_ERROR`, `QUERY_TOO_LARGE`; `FINAL_CODES`; value-free v2 repair messages | `core/src/shared/errors.ts`, `core/src/engine/generate.ts`, `core/src/request/shape.ts` |
@@ -773,7 +773,7 @@ known so far.
 | Models | Generation and review prompts for steps (in a new file); JSON reply format and schema; offline generator accepts v2 | `core/src/models/prompts-multi-source.ts`, `roles.ts`, `schemas.ts`, `offline/` |
 | Crystal | Skip handlers with API steps, with a `skipped` outcome | `core/src/crystallize/crystallize.ts` |
 | HTTP | New deadline retry helper; constrained client. `groq-client.ts` is not touched. | `core/src/sources/api/*` |
-| Adapters | `defineApiSource`; `notion/` subpath and its export | `core/src/sources/api/*`, `core/src/sources/notion/*`, `core/package.json` |
+| Adapters | `defineApiSource`; `notion/` subpath and its export | `core/src/sources/api/*`, `core/src/sources/api/notion/*`, `core/package.json` |
 | Testing | `fakeApiSource`, `apiSourceContract`, fixture stub, fixtures | `core/src/testing/*`, `core/test/**`, `core/test/package.test.ts` (new export) |
 | CI | Job for `examples/multi-source` | `.github/workflows/ci.yml` |
 | Example | `examples/multi-source` with the Ghibli source and seed script | new |

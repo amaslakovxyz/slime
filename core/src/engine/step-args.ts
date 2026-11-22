@@ -4,7 +4,7 @@ import type { ApiStep } from '../models/artifact.js';
 import type { InputValues } from '../request/parse.js';
 import { matchesLeaf } from '../request/shape.js';
 import { SlimeError } from '../shared/errors.js';
-import type { OperationInfo } from '../sources/types.js';
+import type { OperationInfo } from '../sources/api/types.js';
 
 export function resolveArgs(step: ApiStep, operation: OperationInfo, input: InputValues): Record<string, unknown> {
   const args: Record<string, unknown> = {};

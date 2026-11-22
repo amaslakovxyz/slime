@@ -10,9 +10,8 @@ The folders say what the system is made of:
 
 | Kind | Folder | What it is |
 |---|---|---|
-| **Port** | [connectors/](./connectors/README.md) | Where data comes from. `types.ts` + `postgres/`. |
 | **Port** | [models/](./models/README.md) | Generator, Reviewer, Optimizer. `types.ts`, `ModelClient` + `claude/`, `groq/`, `offline/`. |
-| **Port** | `sources/` | Read-only API sources beside the SQL connector (MS1–MS17). `types.ts` (`ApiSource`), `lifecycle.ts` (start and close every source), `call-source.ts` (timeout, redaction), `api/` (`defineApiSource`, the constrained HTTP client) and `notion/`. |
+| **Port** | [sources/](./sources/README.md) | Where data comes from: one SQL source (`sql/`, `Connector` + `postgres/`) and any number of API sources (`api/`, `ApiSource` + `defineApiSource`, `notion/`). `lifecycle.ts` starts and closes them all. |
 | **Port** | [stores/](./stores/README.md) | Slime's own key-value state. `types.ts` + file and memory stores. |
 | **Port** | [sandbox/](./sandbox/README.md) | Where generated shaping code runs. `types.ts` + `quickjs/`. |
 | Engine | [engine/](./engine/README.md) | The Slime instance: handler cache, generation, review, promotion; `crystal/` serves Crystal handlers, `checks/` guards generated SQL. |
@@ -35,8 +34,8 @@ the API:
 | Subpath | Source |
 |---|---|
 | `.` | `index.ts`: `createSlime`, `SlimeConfig`, `DEFAULT_TIERS`, `DEFAULT_LIMITS`, `SlimeError`, `SlimeConfigError`, `fileStore`, `memoryStore`, `DEFAULT_STORE_DIR`, `handlerKeyFor`, `changedProvenance`, `QuickJSRunner`, and every port type. |
-| `./postgres` | `connectors/postgres/index.ts` |
-| `./notion` | `sources/notion/index.ts` |
+| `./postgres` | `sources/sql/postgres/index.ts` |
+| `./notion` | `sources/api/notion/index.ts` |
 | `./models` | `models/index.ts`: `modelRoles`, `parseJsonReply`, `ModelClient` types |
 | `./claude`, `./groq`, `./offline` | `models/<name>/index.ts` |
 | `./crystallize` | `crystallize/index.ts` (and the `slime-crystal` bin) |

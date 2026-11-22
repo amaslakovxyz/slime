@@ -9,7 +9,7 @@ import type { HandlerProvenance } from './request/key.js';
 import { QuickJSRunner } from './sandbox/quickjs/quickjs-runner.js';
 import type { SandboxRunner } from './sandbox/types.js';
 import { startSources } from './sources/lifecycle.js';
-import type { ApiSchema } from './sources/types.js';
+import type { ApiSchema } from './sources/api/types.js';
 import { savedHandlerProblem } from './engine/saved-handler-check.js';
 import { fileStore } from './stores/file-store.js';
 import type { SlimeStore } from './stores/types.js';

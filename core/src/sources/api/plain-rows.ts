@@ -1,7 +1,7 @@
 // API rows cross into the sandbox as JSON text; anything JSON can't carry is an
 // adapter bug, refused before it can throw inside JSON.stringify (S4). SQL rows
 // keep today's handling: pg Date values become ISO strings there.
-import { SlimeError } from '../shared/errors.js';
+import { SlimeError } from '../../shared/errors.js';
 
 const NOT_PLAIN_TYPES = new Set(['bigint', 'function', 'symbol', 'undefined']);
 

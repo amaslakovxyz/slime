@@ -10,7 +10,7 @@ import { HANDLERS_NS, recordFromStore } from '../engine/handler-cache.js';
 import type { HandlerRecord } from '../engine/types.js';
 import { changedProvenance, type HandlerProvenance } from '../request/key.js';
 import { paramTypesForModel } from '../request/params.js';
-import type { Connector } from '../connectors/types.js';
+import type { Connector } from '../sources/sql/types.js';
 import type { Optimizer } from '../models/types.js';
 import { QuickJSRunner } from '../sandbox/quickjs/quickjs-runner.js';
 import type { SandboxRunner } from '../sandbox/types.js';

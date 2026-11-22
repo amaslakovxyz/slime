@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, describe, test } from 'node:test';
 import { SlimeConfig, type SlimeOptions } from '../../src/config/slime-config.js';
-import { postgresConnector } from '../../src/connectors/postgres/index.js';
+import { postgresConnector } from '../../src/sources/sql/postgres/index.js';
 import { createSlime } from '../../src/create-slime.js';
 import { changedProvenance } from '../../src/request/key.js';
 import { crystallize } from '../../src/crystallize/index.js';

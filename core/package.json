@@ -23,8 +23,8 @@
       "default": "./dist/models/offline/index.js"
     },
     "./postgres": {
-      "types": "./dist/connectors/postgres/index.d.ts",
-      "default": "./dist/connectors/postgres/index.js"
+      "types": "./dist/sources/sql/postgres/index.d.ts",
+      "default": "./dist/sources/sql/postgres/index.js"
     },
     "./claude": {
       "types": "./dist/models/claude/index.d.ts",
@@ -35,8 +35,8 @@
       "default": "./dist/models/groq/index.js"
     },
     "./notion": {
-      "types": "./dist/sources/notion/index.d.ts",
-      "default": "./dist/sources/notion/index.js"
+      "types": "./dist/sources/api/notion/index.d.ts",
+      "default": "./dist/sources/api/notion/index.js"
     },
     "./crystallize": {
       "types": "./dist/crystallize/index.d.ts",

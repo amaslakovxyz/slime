@@ -2,7 +2,7 @@
 // It never assumes a dialect: the connector's own test supplies the SQL.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import type { Connector, QueryLimits } from '../connectors/types.js';
+import type { Connector, QueryLimits } from '../sources/sql/types.js';
 import { SlimeError, type ErrorCode } from '../shared/errors.js';
 
 export type ConnectorFactory = () => Connector | Promise<Connector>;

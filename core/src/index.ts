@@ -38,17 +38,8 @@ export {
   type WarningEvent,
 } from './config/slime-config.js';
 export { SlimeConfigError, SlimeError, type ErrorCode, type SlimeErrorBody, type SlimeErrorOptions } from './shared/errors.js';
-export type {
-  ColumnInfo,
-  Connector,
-  ForeignKey,
-  QueryLimits,
-  QueryPlan,
-  RunResult,
-  SafetyReport,
-  SchemaInfo,
-  TableInfo,
-} from './connectors/types.js';
+export type { ColumnInfo, RunResult, SafetyReport, Source } from './sources/types.js';
+export type { Connector, ForeignKey, QueryLimits, QueryPlan, SchemaInfo, TableInfo } from './sources/sql/types.js';
 export type { ApiArg, ApiStep, Artifact, LegacyArtifact, SqlStep, Step } from './models/artifact.js';
 export type {
   GenerationRequest,
@@ -69,9 +60,9 @@ export { QuickJSRunner } from './sandbox/quickjs/quickjs-runner.js';
 export type { InputScalar, InputValue, InputValues, SlimeRequest } from './request/parse.js';
 export type { ParamType, ParamTypesForModel } from './request/params.js';
 export type { LeafType, ObjectShape, Shape } from './request/shape.js';
-export { SourceError, type SourceErrorOptions } from './sources/source-error.js';
+export { SourceError, type SourceErrorOptions } from './sources/api/source-error.js';
 export { defineApiSource } from './sources/api/define-api-source.js';
 export type { ApiColumnDeclaration, ApiOperationDeclaration, ApiParamDeclaration, ApiRow, ApiRunContext, ApiSourceDeclaration } from './sources/api/declaration.js';
-export type { HttpClient, HttpRequestOptions } from './sources/api/http-client.js';
-export type { ApiSchema, ApiSource, CallOptions, OperationInfo, ParamInfo, Source, SourceCallOptions } from './sources/types.js';
+export type { HttpClient, HttpRequestOptions } from './sources/api/http/http-client.js';
+export type { ApiSchema, ApiSource, CallOptions, OperationInfo, ParamInfo, SourceCallOptions } from './sources/api/types.js';
 export type { SlimeStore, StoreEntry } from './stores/types.js';

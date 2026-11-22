@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { assertPlainRows } from '../../src/sources/plain-rows.js';
+import { assertPlainRows } from '../../../src/sources/api/plain-rows.js';
 
 const ORIGIN = { stepName: 'feedback', sourceName: 'notion' };
 

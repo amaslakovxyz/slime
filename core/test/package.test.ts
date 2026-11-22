@@ -42,16 +42,16 @@ test('the public entry exports createSlime, the config, the stores, the sandbox 
 
 test('adapters have their own subpaths, so the main entry never loads them (C7)', async () => {
   assert.deepEqual(pkg.exports['./offline'], { types: './dist/models/offline/index.d.ts', default: './dist/models/offline/index.js' });
-  assert.deepEqual(pkg.exports['./postgres'], { types: './dist/connectors/postgres/index.d.ts', default: './dist/connectors/postgres/index.js' });
+  assert.deepEqual(pkg.exports['./postgres'], { types: './dist/sources/sql/postgres/index.d.ts', default: './dist/sources/sql/postgres/index.js' });
   assert.deepEqual(Object.keys(await import('../src/models/offline/index.js')), ['offlineGenerator']);
-  assert.deepEqual(Object.keys(await import('../src/connectors/postgres/index.js')), ['postgresConnector']);
+  assert.deepEqual(Object.keys(await import('../src/sources/sql/postgres/index.js')), ['postgresConnector']);
   for (const provider of ['claude', 'groq'] as const) {
     assert.deepEqual(pkg.exports[`./${provider}`], { types: `./dist/models/${provider}/index.d.ts`, default: `./dist/models/${provider}/index.js` });
   }
   assert.deepEqual(Object.keys(await import('../src/models/claude/index.js')).sort(), ['claude']);
   assert.deepEqual(Object.keys(await import('../src/models/groq/index.js')).sort(), ['groq']);
-  assert.deepEqual(pkg.exports['./notion'], { types: './dist/sources/notion/index.d.ts', default: './dist/sources/notion/index.js' });
-  assert.deepEqual(Object.keys(await import('../src/sources/notion/index.js')).sort(), ['NOTION_VERSION', 'notionSource']);
+  assert.deepEqual(pkg.exports['./notion'], { types: './dist/sources/api/notion/index.d.ts', default: './dist/sources/api/notion/index.js' });
+  assert.deepEqual(Object.keys(await import('../src/sources/api/notion/index.js')).sort(), ['NOTION_VERSION', 'notionSource']);
   assert.deepEqual(pkg.exports['./models'], { types: './dist/models/index.d.ts', default: './dist/models/index.js' });
   assert.deepEqual(Object.keys(await import('../src/models/index.js')).sort(), ['modelRoles', 'parseJsonReply', 'providerRoles']);
   assert.deepEqual(pkg.exports['./crystallize'], { types: './dist/crystallize/index.d.ts', default: './dist/crystallize/index.js' });

@@ -1,9 +1,10 @@
 import type { Artifact } from '../models/artifact.js';
 import { lintSteps } from './checks/steps.js';
-import type { ApiSchema, Source } from '../sources/types.js';
+import type { ApiSchema } from '../sources/api/types.js';
+import type { Source } from '../sources/types.js';
 import type { LimitOptions } from '../config/options.js';
 import { SlimeError } from '../shared/errors.js';
-import type { Connector } from '../connectors/types.js';
+import type { Connector } from '../sources/sql/types.js';
 import type { Generator, ModelUsage } from '../models/types.js';
 import type { SandboxRunner } from '../sandbox/types.js';
 import type { HandlerProvenance } from '../request/key.js';

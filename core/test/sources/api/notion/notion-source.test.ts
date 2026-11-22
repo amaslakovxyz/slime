@@ -1,15 +1,15 @@
 // The Notion adapter over hand-written fixtures (P5.4); recorded ones come in P5.5.
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { SlimeConfigError } from '../../../src/shared/errors.js';
-import { notionSource, type NotionSourceOptions } from '../../../src/sources/notion/notion-source.js';
-import type { FetchFunction } from '../../../src/sources/api/retry.js';
-import { describeApiSourceContract } from '../../../src/testing/api-source-contract.js';
-import { fixtureFetch } from '../../../src/testing/fixture-fetch.js';
+import { SlimeConfigError } from '../../../../src/shared/errors.js';
+import { notionSource, type NotionSourceOptions } from '../../../../src/sources/api/notion/notion-source.js';
+import type { FetchFunction } from '../../../../src/sources/api/http/retry.js';
+import { describeApiSourceContract } from '../../../../src/testing/api-source-contract.js';
+import { fixtureFetch } from '../../../../src/testing/fixture-fetch.js';
 
 const DATA_SOURCE = '1f2e3d4c-5b6a-4789-8abc-def012345678';
 const TOKEN = 'ntn_test_token_123';
-const fixtures = fixtureFetch(new URL('../../fixtures/notion-handwritten/', import.meta.url));
+const fixtures = fixtureFetch(new URL('../../../fixtures/notion-handwritten/', import.meta.url));
 const options = (overrides: Partial<{ rowCap: number }> = {}) => ({ timeoutMs: 2_000, rowCap: 100, signal: new AbortController().signal, ...overrides });
 
 function source(overrides: Partial<NotionSourceOptions> = {}) {

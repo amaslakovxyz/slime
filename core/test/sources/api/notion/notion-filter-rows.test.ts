@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { filterFromArgs } from '../../../src/sources/notion/notion-filter.js';
-import { rowFromPage } from '../../../src/sources/notion/notion-rows.js';
-import { operationFromDataSource } from '../../../src/sources/notion/notion-schema.js';
+import { filterFromArgs } from '../../../../src/sources/api/notion/notion-filter.js';
+import { rowFromPage } from '../../../../src/sources/api/notion/notion-rows.js';
+import { operationFromDataSource } from '../../../../src/sources/api/notion/notion-schema.js';
 import { FEEDBACK_SCHEMA } from './notion-schema.test.js';
 
 const { properties } = operationFromDataSource('feedback', FEEDBACK_SCHEMA);

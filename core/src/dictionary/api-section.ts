@@ -1,5 +1,5 @@
 // One section per API source, in the same line format as tables (D2, design §3.4).
-import type { ApiSchema, OperationInfo, ParamInfo } from '../sources/types.js';
+import type { ApiSchema, OperationInfo, ParamInfo } from '../sources/api/types.js';
 import { INDENT, renderColumn, withComment } from './columns.js';
 
 const PARAMS_HEADING = `${INDENT}params (all optional; null = not given):`;

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { operationFromDataSource } from '../../../src/sources/notion/notion-schema.js';
-import type { NotionDataSource } from '../../../src/sources/notion/notion-types.js';
+import { operationFromDataSource } from '../../../../src/sources/api/notion/notion-schema.js';
+import type { NotionDataSource } from '../../../../src/sources/api/notion/notion-types.js';
 
 export const FEEDBACK_SCHEMA: NotionDataSource = {
   id: '1f2e3d4c-5b6a-4789-8abc-def012345678',

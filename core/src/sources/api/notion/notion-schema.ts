@@ -1,7 +1,7 @@
 // A Notion data source becomes one operation, `<alias>.query`, built from its
 // schema at startup with no person involved (MS12, design §4.2).
-import type { ColumnInfo } from '../../connectors/types.js';
-import type { LeafType } from '../../request/shape.js';
+import type { ColumnInfo } from '../../types.js';
+import type { LeafType } from '../../../request/shape.js';
 import type { OperationInfo, ParamInfo } from '../types.js';
 import { columnName } from './column-names.js';
 import type { NotionDataSource, NotionPropertySchema } from './notion-types.js';

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { SourceCallError, callSource } from '../../src/sources/call-source.js';
-import { redactSecrets } from '../../src/sources/redact.js';
+import { SourceCallError, callSource } from '../../../src/sources/api/call-source.js';
+import { redactSecrets } from '../../../src/sources/api/redact.js';
 
 const SECRET = 'secret-token-123';
 const base = { sourceName: 'notion', method: 'call' as const, secrets: [SECRET], timeoutMs: 1_000 };

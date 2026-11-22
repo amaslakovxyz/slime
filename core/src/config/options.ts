@@ -1,5 +1,5 @@
 import type { CrystalRegistry } from '../engine/crystal/types.js';
-import type { Connector } from '../connectors/types.js';
+import type { Connector } from '../sources/sql/types.js';
 import type { Source } from '../sources/types.js';
 import type { Step } from '../models/artifact.js';
 import type { Generator, Reviewer } from '../models/types.js';

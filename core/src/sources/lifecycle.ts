@@ -2,10 +2,11 @@
 // callSource, so each call is time-limited and its message redacted (MS16); the
 // SQL source keeps its own calls and errors, with no extra deadline (MS3).
 import { SlimeConfigError } from '../shared/errors.js';
-import type { Connector, SchemaInfo } from '../connectors/types.js';
-import { callSource } from './call-source.js';
-import { redactSecrets } from './redact.js';
-import { isApiSource, type ApiSchema, type ApiSource, type Source } from './types.js';
+import type { Connector, SchemaInfo } from './sql/types.js';
+import { callSource } from './api/call-source.js';
+import { redactSecrets } from './api/redact.js';
+import type { ApiSchema, ApiSource } from './api/types.js';
+import { isApiSource, type Source } from './types.js';
 
 export interface SourceSetup {
   sources: Readonly<Record<string, Source>>;

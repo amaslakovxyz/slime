@@ -3,7 +3,7 @@
 import { isApiStep, type ApiArg, type ApiStep, type Artifact, type SqlStep } from '../../models/artifact.js';
 import { matchesLeaf } from '../../request/shape.js';
 import { SlimeError } from '../../shared/errors.js';
-import type { ApiSchema, OperationInfo, ParamInfo } from '../../sources/types.js';
+import type { ApiSchema, OperationInfo, ParamInfo } from '../../sources/api/types.js';
 import { MIN_HARDCODED_LENGTH, lintArtifact } from './sql.js';
 
 export interface StepLintContext {

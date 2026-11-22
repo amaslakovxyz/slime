@@ -11,7 +11,7 @@ import { requestKey, type HandlerProvenance } from '../request/key.js';
 import { parseRequest, type InputValues, type ParsedRequest, type SlimeRequest } from '../request/parse.js';
 import { checkParamTypes } from '../request/params.js';
 import type { SlimeStore } from '../stores/types.js';
-import type { ApiSchema } from '../sources/types.js';
+import type { ApiSchema } from '../sources/api/types.js';
 import { closeSources } from '../sources/lifecycle.js';
 import { BackgroundTasks } from './background.js';
 import { Coalescer } from './coalescer.js';

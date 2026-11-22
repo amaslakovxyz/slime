@@ -61,7 +61,7 @@ imports this folder.
 
 ## Verification
 
-- `test/connectors/postgres.test.ts` runs the Connector contract, then the
+- `test/sources/sql/postgres.test.ts` runs the Connector contract, then the
   Postgres-specific cases, against the demo database from
   `examples/express/db/init.sql` (`npm run db:up` in that folder
   locally; a service in CI). URLs come from `DATABASE_URL` and

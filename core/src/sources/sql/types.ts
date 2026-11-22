@@ -1,13 +1,6 @@
-// The Connector port: where the app's data comes from. Implementations live
-// in sibling folders (postgres/).
-export interface ColumnInfo {
-  name: string;
-  type: string;
-  nullable: boolean;
-  comment?: string;
-  /** Read from the catalog (enum types, CHECK … IN), never from rows (D1). */
-  values?: string[];
-}
+// The SQL source port (a Connector): one database the model writes SQL for.
+// Implementations live in sibling folders (postgres/).
+import type { ColumnInfo, RunResult, SafetyReport } from '../types.js';
 
 export interface ForeignKey {
   column: string;
@@ -43,19 +36,6 @@ export interface QueryPlan {
    */
   cost: number | null;
   ms: number;
-}
-
-export interface RunResult {
-  rows: Record<string, unknown>[];
-  /** More rows existed than rowCap. */
-  truncated: boolean;
-  ms: number;
-}
-
-export interface SafetyReport {
-  ok: boolean;
-  user: string;
-  problems: string[];
 }
 
 export interface Connector {

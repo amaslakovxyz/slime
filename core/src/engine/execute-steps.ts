@@ -1,15 +1,16 @@
 // Runs a handler (design §3.5): every step in parallel under one deadline,
 // any failure aborts the API steps, then shape(data, input) in the sandbox.
 import type { LimitOptions } from '../config/options.js';
-import type { Connector } from '../connectors/types.js';
+import type { Connector } from '../sources/sql/types.js';
 import { isApiStep, type ApiStep, type Artifact, type SqlStep, type Step } from '../models/artifact.js';
 import type { InputValues } from '../request/parse.js';
 import type { Shape } from '../request/shape.js';
 import type { SandboxRunner } from '../sandbox/types.js';
 import { SlimeError } from '../shared/errors.js';
-import { SourceCallError, callSource } from '../sources/call-source.js';
-import { assertPlainRows } from '../sources/plain-rows.js';
-import { isApiSource, type ApiSchema, type Source } from '../sources/types.js';
+import { SourceCallError, callSource } from '../sources/api/call-source.js';
+import { assertPlainRows } from '../sources/api/plain-rows.js';
+import { type ApiSchema } from '../sources/api/types.js';
+import { isApiSource, type Source } from '../sources/types.js';
 import { resolveArgs } from './step-args.js';
 
 export interface StepsDeps {

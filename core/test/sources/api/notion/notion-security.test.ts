@@ -2,19 +2,19 @@
 // and that Notion row text never reaches a prompt, repairs included.
 import assert from 'node:assert/strict';
 import { after, describe, test } from 'node:test';
-import { SlimeConfig } from '../../../src/config/slime-config.js';
-import { createSlime } from '../../../src/create-slime.js';
-import type { Slime } from '../../../src/engine/types.js';
-import type { Artifact } from '../../../src/models/artifact.js';
-import type { GenerationRequest } from '../../../src/models/types.js';
-import { notionSource } from '../../../src/sources/notion/notion-source.js';
-import { memoryStore } from '../../../src/stores/memory-store.js';
-import { fixtureFetch } from '../../../src/testing/fixture-fetch.js';
-import { fakeConnector, stubGenerator } from '../../../src/testing/fakes.js';
+import { SlimeConfig } from '../../../../src/config/slime-config.js';
+import { createSlime } from '../../../../src/create-slime.js';
+import type { Slime } from '../../../../src/engine/types.js';
+import type { Artifact } from '../../../../src/models/artifact.js';
+import type { GenerationRequest } from '../../../../src/models/types.js';
+import { notionSource } from '../../../../src/sources/api/notion/notion-source.js';
+import { memoryStore } from '../../../../src/stores/memory-store.js';
+import { fixtureFetch } from '../../../../src/testing/fixture-fetch.js';
+import { fakeConnector, stubGenerator } from '../../../../src/testing/fakes.js';
 
 const DATA_SOURCE = '1f2e3d4c-5b6a-4789-8abc-def012345678';
 const SEEDED_TEXT = ['Export is slow', 'Love the dashboard', 'Sync fails', 'Globex'];
-const fixtures = fixtureFetch(new URL('../../fixtures/notion-handwritten/', import.meta.url));
+const fixtures = fixtureFetch(new URL('../../../fixtures/notion-handwritten/', import.meta.url));
 const notion = () => notionSource({ token: 'ntn_secret', dataSources: { feedback: DATA_SOURCE }, exclude: { feedback: ['Internal notes'] }, fetchImpl: fixtures });
 
 const instances: Slime[] = [];

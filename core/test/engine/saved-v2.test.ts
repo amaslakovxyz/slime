@@ -8,7 +8,8 @@ import type { Slime } from '../../src/engine/types.js';
 import type { Artifact } from '../../src/models/artifact.js';
 import { memoryStore } from '../../src/stores/memory-store.js';
 import type { SlimeStore } from '../../src/stores/types.js';
-import type { ParamInfo, Source } from '../../src/sources/types.js';
+import type { ParamInfo } from '../../src/sources/api/types.js';
+import type { Source } from '../../src/sources/types.js';
 import { fakeApiSource } from '../../src/testing/fake-api-source.js';
 import { artifact, fakeConnector, stubGenerator } from '../../src/testing/fakes.js';
 

@@ -178,7 +178,7 @@ multi-source". If P0 changes one, update the steps that cite it.
   later P1–P3 commit keeps them unchanged.
 
 ### P1.1 Leaf types and source types (3 h)
-- **Files:** `core/src/request/shape.ts`; new `core/src/sources/types.ts`; `core/src/connectors/types.ts`.
+- **Files:** `core/src/request/shape.ts`; new `core/src/sources/api/types.ts`; `core/src/sources/sql/types.ts`.
 - **Change:**
   - Refactor `LEAF_CHECKS` (`shape.ts:20`) so its keys are an `as const` array
     `LEAF_TYPES`, and derive `type LeafType`. Behaviour is unchanged.
@@ -226,7 +226,7 @@ multi-source". If P0 changes one, update the steps that cite it.
   typecheck passes.
 
 ### P1.3 Redacting source wrapper (3 h)
-- **Files:** new `core/src/sources/call-source.ts`, new `core/src/sources/redact.ts`.
+- **Files:** new `core/src/sources/api/call-source.ts`, new `core/src/sources/api/redact.ts`.
 - **Change:**
   - `redactSecrets(text, secrets)` replaces every non-empty secret with
     `[redacted]`.
@@ -407,7 +407,7 @@ multi-source". If P0 changes one, update the steps that cite it.
 - **Done when:** every rule has a test.
 
 ### P2.6 Sandbox: step data and the API row check (2 h)
-- **Files:** `core/src/sandbox/types.ts`, `core/src/sandbox/quickjs/quickjs-runner.ts`, new `core/src/sources/plain-rows.ts`.
+- **Files:** `core/src/sandbox/types.ts`, `core/src/sandbox/quickjs/quickjs-runner.ts`, new `core/src/sources/api/plain-rows.ts`.
 - **Change:**
   - Widen `ShapeJob.rows` to `ShapeInput = Row[] | Record<string, Row[]>`. The
     program text is unchanged (`shape(<first>, <input>)`), so there is no
@@ -650,7 +650,7 @@ multi-source". If P0 changes one, update the steps that cite it.
 ## 6. Phase P4: generic API source (3 d)
 
 ### P4.1 Deadline retry helper (2 h)
-- **Files:** new `core/src/sources/api/retry.ts`. `groq-client.ts` is **not** changed.
+- **Files:** new `core/src/sources/api/http/retry.ts`. `groq-client.ts` is **not** changed.
 - **Change:** `fetchWithDeadline(request: DeadlineFetch): Promise<FetchOutcome>`.
   - It takes `url`, `init`, `deadlineSignal`, `maxRetryWaitMs` and
     `fetchImpl?`.
@@ -664,13 +664,13 @@ multi-source". If P0 changes one, update the steps that cite it.
 - **Done when:** tests pass; `groq.test.ts` is untouched and passes.
 
 ### P4.2 `SourceError` (1 h)
-- **Files:** new `core/src/sources/source-error.ts`; export from `core/src/index.ts`; `core/test/package.test.ts` (it checks runtime export names).
+- **Files:** new `core/src/sources/api/source-error.ts`; export from `core/src/index.ts`; `core/test/package.test.ts` (it checks runtime export names).
 - **Change:** `class SourceError extends Error { status: number | null; isRetryable: boolean; attempts: number }`.
   Its message never holds headers or response bodies.
 - **Tests:** `package.test.ts` lists the new export.
 
 ### P4.3 Constrained client: URL and transport rules (4 h)
-- **Files:** new `core/src/sources/api/http-client.ts`, new `core/src/sources/api/safe-url.ts`.
+- **Files:** new `core/src/sources/api/http/http-client.ts`, new `core/src/sources/api/http/safe-url.ts`.
 - **Change:**
   - `createHttpClient(options: HttpClientOptions): HttpClient`, with named
     interfaces `HttpClient` and `HttpRequestOptions`. Options are
@@ -695,7 +695,7 @@ multi-source". If P0 changes one, update the steps that cite it.
 - **Done when:** the S1 and S2 tests pass.
 
 ### P4.4 Constrained client: redirects and size cap (3 h)
-- **Files:** `core/src/sources/api/http-client.ts`, new `core/src/sources/api/read-capped.ts`.
+- **Files:** `core/src/sources/api/http/http-client.ts`, new `core/src/sources/api/http/read-capped.ts`.
 - **Change:**
   - **Redirects:** use `redirect: 'manual'`. Node's undici returns the real
     3xx status with a `Location` header. Follow at most 3 same-origin
@@ -796,12 +796,12 @@ answer in the P5 pull request:
 - **Done when:** a second person can repeat it from the README.
 
 ### P5.1 Package entry (1 h)
-- **Files:** new `core/src/sources/notion/index.ts`; `core/package.json` (export `"./notion"`); `core/test/package.test.ts`.
+- **Files:** new `core/src/sources/api/notion/index.ts`; `core/package.json` (export `"./notion"`); `core/test/package.test.ts`.
 - **Change:** export `notionSource` and its option types.
 - **Done when:** the package test passes.
 
 ### P5.2 Schema mapping, names and sanitizing (5 h)
-- **Files:** new `core/src/sources/notion/notion-schema.ts`, new `core/src/sources/notion/column-names.ts`, new `core/src/sources/notion/sanitize.ts`.
+- **Files:** new `core/src/sources/api/notion/notion-schema.ts`, new `core/src/sources/api/notion/column-names.ts`, new `core/src/sources/api/notion/sanitize.ts`.
 - **Change:**
   - **`operationFromDataSource(alias, dataSource, options)`:** maps a data
     source to `OperationInfo` per design §4.2.
@@ -819,7 +819,7 @@ answer in the P5 pull request:
   - **`sanitizeMetadata(text)`:** a single line, no control characters, at most
     200 characters. Applied to property names before naming, to option labels,
     to descriptions and to the data source title (MS12).
-- **Tests:** new `test/sources/notion/notion-schema.test.ts`:
+- **Tests:** new `test/sources/api/notion/notion-schema.test.ts`:
   - every property type in the table;
   - excluded types absent;
   - each naming edge case;
@@ -828,7 +828,7 @@ answer in the P5 pull request:
 - **Done when:** tests pass.
 
 ### P5.3 Filters and rows (3 h)
-- **Files:** new `core/src/sources/notion/notion-filter.ts`, `notion-rows.ts`.
+- **Files:** new `core/src/sources/api/notion/notion-filter.ts`, `notion-rows.ts`.
 - **Change:**
   - `filterFromArgs(operation, args)` returns a Notion `{ and: [...] }`, or no
     filter when every arg is null.
@@ -840,7 +840,7 @@ answer in the P5 pull request:
 - **Tests:** unit tests per param kind and per property type.
 
 ### P5.4 `notionSource` on hand-written fixtures (5 h)
-- **Files:** new `core/src/sources/notion/notion-source.ts`, new `core/src/sources/notion/limit-concurrency.ts`, `core/test/fixtures/notion-handwritten/*.json`.
+- **Files:** new `core/src/sources/api/notion/notion-source.ts`, new `core/src/sources/api/notion/limit-concurrency.ts`, `core/test/fixtures/notion-handwritten/*.json`.
 - **Change:** `notionSource(options)`. The options are `token`,
   `notionVersion`, `dataSources`, and optionally `exclude`, `comments`,
   `useNotionDescriptions` and `fetchImpl`.
@@ -858,7 +858,7 @@ answer in the P5 pull request:
       true, or on `request_status.type === 'incomplete'`.
   - **`safetyCheck()`:** one call, `GET /v1/users/me`; `user` is the bot name.
     Startup costs N+1 calls.
-- **Tests:** new `test/sources/notion/notion-source.test.ts`, over hand-written
+- **Tests:** new `test/sources/api/notion/notion-source.test.ts`, over hand-written
   fixtures:
   - `describeApiSourceContract`;
   - pagination stops at `rowCap`;
@@ -896,7 +896,7 @@ answer in the P5 pull request:
     the pull request).
 
 ### P5.6 Security tests S6 and S8 (3 h)
-- **Files:** `core/test/sources/notion/notion-source.test.ts`, `core/test/engine/multi-source.test.ts`.
+- **Files:** `core/test/sources/api/notion/notion-source.test.ts`, `core/test/engine/multi-source.test.ts`.
 - **Change:**
   - **S6:** the dictionary snapshot for the recorded schema contains no
     `people` column and no `exclude`d property.

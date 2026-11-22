@@ -2,12 +2,12 @@
 import assert from 'node:assert/strict';
 import { after, describe, test } from 'node:test';
 import { DEFAULT_LIMITS } from '../../src/config/defaults.js';
-import type { Connector } from '../../src/connectors/types.js';
+import type { Connector } from '../../src/sources/sql/types.js';
 import { executeArtifact, type ExecutionDeps } from '../../src/engine/execute.js';
 import type { ApiStep, Artifact, SqlStep } from '../../src/models/artifact.js';
 import { QuickJSRunner } from '../../src/sandbox/quickjs/quickjs-runner.js';
 import { SlimeError } from '../../src/shared/errors.js';
-import type { ApiSchema, ApiSource } from '../../src/sources/types.js';
+import type { ApiSchema, ApiSource } from '../../src/sources/api/types.js';
 import { FAKE_SECRET, fakeApiSource, type FakeOperation } from '../../src/testing/fake-api-source.js';
 import { fakeConnector } from '../../src/testing/fakes.js';
 

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { fetchWithDeadline, type FetchFunction } from '../../../src/sources/api/retry.js';
+import { fetchWithDeadline, type FetchFunction } from '../../../../src/sources/api/http/retry.js';
 
 function scripted(responses: (() => Response)[]): { fetchImpl: FetchFunction; calls: number } {
   const state = { calls: 0 };

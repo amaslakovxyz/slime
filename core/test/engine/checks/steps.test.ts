@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { lintSteps, type StepLintContext } from '../../../src/engine/checks/steps.js';
 import type { ApiStep, Artifact, SqlStep } from '../../../src/models/artifact.js';
-import type { ApiSchema } from '../../../src/sources/types.js';
+import type { ApiSchema } from '../../../src/sources/api/types.js';
 
 const NOTION: ApiSchema = {
   service: 'Notion',

@@ -1,8 +1,8 @@
 // The dictionary (§4.4, D2): metadata, glossary and rules rendered as text, with
 // no model, so the same inputs always give the same text and hash.
-import type { SchemaInfo, TableInfo } from '../connectors/types.js';
+import type { SchemaInfo, TableInfo } from '../sources/sql/types.js';
 import { canonicalJSON, sha256 } from '../shared/hash.js';
-import type { ApiSchema } from '../sources/types.js';
+import type { ApiSchema } from '../sources/api/types.js';
 import { renderApiSource } from './api-section.js';
 import { INDENT, renderColumn, withComment } from './columns.js';
 

@@ -1,8 +1,8 @@
 // The Notion adapter (design §4.2, MS12): data sources listed in config become
 // query operations described from Notion's own schema at startup.
-import { SlimeConfigError } from '../../shared/errors.js';
-import { createHttpClient, type HttpClient } from '../api/http-client.js';
-import type { FetchFunction } from '../api/retry.js';
+import { SlimeConfigError } from '../../../shared/errors.js';
+import { createHttpClient, type HttpClient } from '../http/http-client.js';
+import type { FetchFunction } from '../http/retry.js';
 import { SourceError } from '../source-error.js';
 import type { ApiSchema, ApiSource, CallOptions, SourceCallOptions } from '../types.js';
 import { limitConcurrency } from './limit-concurrency.js';

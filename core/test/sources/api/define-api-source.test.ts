@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { defineApiSource } from '../../../src/sources/api/define-api-source.js';
 import type { ApiSourceDeclaration } from '../../../src/sources/api/declaration.js';
-import type { FetchFunction } from '../../../src/sources/api/retry.js';
+import type { FetchFunction } from '../../../src/sources/api/http/retry.js';
 import { SlimeConfigError } from '../../../src/shared/errors.js';
-import { SourceError } from '../../../src/sources/source-error.js';
+import { SourceError } from '../../../src/sources/api/source-error.js';
 
 const FILMS = [
   { id: 'a', title: 'Totoro', director: 'Hayao Miyazaki', release_date: '1988' },

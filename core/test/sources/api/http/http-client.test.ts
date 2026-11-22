@@ -1,10 +1,10 @@
 // The constrained HTTP client (MS10, S1, S2) against a scripted fetch.
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { createHttpClient, type HttpClientOptions } from '../../../src/sources/api/http-client.js';
-import type { FetchFunction } from '../../../src/sources/api/retry.js';
-import { buildUrl } from '../../../src/sources/api/safe-url.js';
-import { SourceError } from '../../../src/sources/source-error.js';
+import { createHttpClient, type HttpClientOptions } from '../../../../src/sources/api/http/http-client.js';
+import type { FetchFunction } from '../../../../src/sources/api/http/retry.js';
+import { buildUrl } from '../../../../src/sources/api/http/safe-url.js';
+import { SourceError } from '../../../../src/sources/api/source-error.js';
 
 const TOKEN = 'secret_abc123';
 
