@@ -1,4 +1,4 @@
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -11,27 +11,28 @@ interface ModuleExports {
   shape?: unknown;
 }
 
-const IMPORT_DIR = join(tmpdir(), 'slime-crystal');
+const IMPORT_PREFIX = join(tmpdir(), 'slime-crystal-');
 
 /**
  * Checks a module's text, then imports exactly those bytes, as an app that imports
  * `index.mjs` will: a module that fails the allowlist or the read-only lint never
  * loads, and one whose exports differ from its parsed source is refused. Importing
- * runs no shape code (the module only declares it). The temporary copy is named by
- * its hash, so a changed module never hits Node's import cache.
+ * runs no shape code (the module only declares it). Each import gets its own
+ * temporary folder: a fresh URL never hits Node's import cache, and two jobs
+ * importing the same module at once can't delete each other's copy.
  */
 export async function importCheckedModule(text: string): Promise<CrystalCode> {
   const code = parseModule(text);
   assertReadOnlySql(code.sql);
-  await mkdir(IMPORT_DIR, { recursive: true });
-  const file = join(IMPORT_DIR, `${sha256(text)}.mjs`);
+  const dir = await mkdtemp(IMPORT_PREFIX);
+  const file = join(dir, `${sha256(text)}.mjs`);
   await writeFile(file, text);
   try {
     const exports = (await import(pathToFileURL(file).href)) as ModuleExports;
     assertExportsMatch(exports, code);
     return code;
   } finally {
-    await rm(file, { force: true });
+    await rm(dir, { recursive: true, force: true });
   }
 }
 
