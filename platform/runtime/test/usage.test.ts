@@ -3,7 +3,7 @@
 import './setup.js';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { USAGE_ATTRIBUTES, UsageMeter, type UsageClient } from '../src/usage.js';
 
 class RecordingClient implements UsageClient {
@@ -66,4 +66,31 @@ test('a failing write is logged, not thrown', async () => {
     console.error = original;
   }
   assert.deepEqual(errors, [JSON.stringify({ usage: 'flush_failed', message: 'throttled' })]);
+});
+
+test('total sums every day item of this endpoint across pages, plus requests not yet flushed', async () => {
+  const pages = [
+    { Items: [{ requests: 40 }, { requests: 2 }], LastEvaluatedKey: { pk: 'USAGE#ep-x', sk: '2026-11-21' } },
+    { Items: [{ requests: 7 }, {}] },
+  ];
+  const queries: QueryCommand[] = [];
+  const client: UsageClient = { send: async (cmd) => (cmd instanceof QueryCommand ? (queries.push(cmd), pages[queries.length - 1]) : {}) };
+  const meter = new UsageMeter('slime-control', 'ep-x', snapshot, client);
+  meter.record({ cache: 'hit', tier: 'liquid', timingsMs: timings(3) });
+  assert.equal(await meter.total(), 50);
+  assert.deepEqual(queries[0]?.input.ExpressionAttributeValues, { ':pk': 'USAGE#ep-x' }, 'only this endpoint, which the USAGE#* IAM fence allows');
+  assert.equal(queries[1]?.input.ExclusiveStartKey?.sk, '2026-11-21');
+});
+
+test('an unreadable total is undefined and logged, never thrown', async () => {
+  const errors: string[] = [];
+  const original = console.error;
+  console.error = (line: string) => errors.push(line);
+  try {
+    const meter = new UsageMeter('slime-control', 'ep-x', snapshot, { send: async () => { throw new Error('AccessDenied'); } });
+    assert.equal(await meter.total(), undefined);
+  } finally {
+    console.error = original;
+  }
+  assert.deepEqual(errors, [JSON.stringify({ usage: 'total_failed', message: 'AccessDenied' })]);
 });

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { memoryStore, type CrystalRegistry, type QueryMeta, type Slime } from '@slime-cloud/core';
 import { createApp, mergeHandlers } from '../src/app.js';
-import { RecentRequests } from '../src/events.js';
+import { RecentRequests, StoredRequests } from '../src/events.js';
 import { toSavedHandler } from '../src/endpoint-runtime.js';
 import { LiveRunsSync, syncLiveRuns } from '../src/live-runs.js';
 
@@ -35,6 +35,57 @@ describe('RecentRequests', () => {
     assert.equal(total, 3);
     assert.deepEqual(list.map((e) => e.handlerKey), ['c', 'b']);
     assert.equal(list[0]?.route, 'crystal');
+  });
+});
+
+describe('StoredRequests (the feed shared by every instance of an endpoint)', () => {
+  test('two instances over one store show the same log: what one answered, the other lists', async () => {
+    const store = memoryStore();
+    const a = new StoredRequests({ store });
+    const b = new StoredRequests({ store });
+    a.record(meta('a', 'gas'));
+    await a.flush();
+    // Two instances' events in one millisecond have no defined order; these are a few ms apart.
+    await new Promise((done) => setTimeout(done, 5));
+    b.record(meta('b', 'liquid'), 'crystal');
+    await b.flush();
+    const [fromA, fromB] = [await a.list(), await b.list()];
+    assert.deepEqual(fromA, fromB);
+    assert.deepEqual(fromA.events.map((e) => e.handlerKey), ['b', 'a'], 'newest first');
+    assert.equal(fromA.events[0]?.route, 'crystal');
+    assert.equal(fromA.total, 2, 'without a usage total, the stored events are counted');
+    assert.deepEqual(await new StoredRequests({ store }).list(), fromA, 'a fresh (cold) instance is not empty');
+  });
+
+  test('the total is the endpoint-wide usage count when there is one', async () => {
+    const store = memoryStore();
+    const feed = new StoredRequests({ store, total: async () => 1234 });
+    feed.record(meta('a', 'gas'));
+    await feed.flush();
+    assert.equal((await feed.list()).total, 1234);
+    const unknown = new StoredRequests({ store, total: async () => undefined });
+    assert.equal((await unknown.list()).total, 1, 'an unreadable usage total falls back to the stored count');
+  });
+
+  test('lists at most the cap and prunes the oldest from the store', async () => {
+    const store = memoryStore();
+    const feed = new StoredRequests({ store, cap: 3, pruneEvery: 2 });
+    for (const key of ['a', 'b', 'c', 'd', 'e', 'f']) {
+      feed.record(meta(key, 'gas'));
+      await feed.flush();
+    }
+    assert.deepEqual((await feed.list()).events.map((e) => e.handlerKey), ['f', 'e', 'd']);
+    assert.ok((await store.list('events')).length <= 3 + 2, 'the store keeps the cap plus at most one prune interval');
+  });
+
+  test('a store that fails never fails the request: record and flush swallow, list falls back to nothing', async () => {
+    const broken = { get: async () => undefined, put: async () => { throw new Error('throttled'); }, list: async () => { throw new Error('down'); }, delete: async () => {} } as never;
+    const errors: string[] = [];
+    const feed = new StoredRequests({ store: broken, log: (line) => errors.push(JSON.stringify(line)) });
+    feed.record(meta('a', 'gas'));
+    await feed.flush();
+    assert.deepEqual(await feed.list(), { total: 0, events: [] });
+    assert.equal(errors.length, 2);
   });
 });
 
@@ -77,7 +128,7 @@ describe('endpoint routes', () => {
     const res = await app.request('/v0/e/k1', { method: 'POST', body: JSON.stringify({ input: { limit: 5 } }) });
     assert.equal(res.status, 200);
     assert.deepEqual(queries[0], { intent: 'accounts per plan', input: { limit: 5 }, output: [{ plan: 'string' }] });
-    assert.equal(events.list().events[0]?.route, 'crystal');
+    assert.equal((await events.list()).events[0]?.route, 'crystal');
   });
 
   test('a Crystal call without one of its inputs is a 400 that names them', async () => {

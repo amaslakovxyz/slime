@@ -2,8 +2,8 @@
 
 // Every request that came through the dispatch endpoint, as handlers keyed by
 // hash. A proven Liquid row has its own Crystallize button; a Crystal row opens
-// its own endpoint (URL, token, curl) right under it. In the cloud the feed is
-// the answering Lambda instance's, so it is labelled as such.
+// its own endpoint (URL, token, curl) right under it. The feed is the endpoint's,
+// shared by every runtime instance through its store.
 import { Fragment, useState, useTransition } from 'react';
 import { crystallizeAction, type CrystallizeResult } from '@/app/actions';
 import type { HandlerRow, RuntimeEvent } from '@/lib/lifecycle';
@@ -18,7 +18,6 @@ export function LifecycleBoard({
   events,
   restarting,
   cloud,
-  instance,
   tokenHints,
 }: {
   endpointId: string;
@@ -27,7 +26,6 @@ export function LifecycleBoard({
   events: RuntimeEvent[];
   restarting: boolean;
   cloud: boolean;
-  instance: boolean;
   tokenHints: Record<string, string>;
 }) {
   const [result, setResult] = useState<CrystallizeResult | null>(null);
@@ -123,9 +121,8 @@ export function LifecycleBoard({
           </table>
         </div>
       )}
-      {events.length > 0 && instance && <p className="muted small">Recent requests · this instance</p>}
       {events.length > 0 && (
-        <div className="lc-feed" aria-label={instance ? 'Recent requests on this instance' : 'Recent requests'}>
+        <div className="lc-feed" aria-label="Recent requests">
           {events.slice(0, 6).map((e, i) => (
             <div key={`${e.at}-${i}`}>
               <span>{time(e.at)}</span>

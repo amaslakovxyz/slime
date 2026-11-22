@@ -19,7 +19,8 @@ export default async function LifecyclePage({ params }: { params: Promise<{ id: 
   const total = data.ok ? data.total : 0;
   const stages = stagesOf(ep.status, handlers, total, data.ok ? data.thresholds : undefined);
   const rows = data.ok ? handlers.map((h) => toRow(h, data.thresholds)) : [];
-  const firstAt = data.ok && data.events.length ? data.events[data.events.length - 1]?.at : undefined;
+  // The total counts every request the endpoint answered; "since" is only true while the feed still lists them all.
+  const firstAt = data.ok && data.events.length && data.events.length >= data.total ? data.events[data.events.length - 1]?.at : undefined;
 
   return (
     <>
@@ -70,7 +71,7 @@ export default async function LifecyclePage({ params }: { params: Promise<{ id: 
               ? `${total} request${total === 1 ? '' : 's'}${firstAt ? ` since ${new Date(firstAt).toLocaleTimeString('en-GB')}` : ''}`
               : handlers.length > 0
                 ? cloud
-                  ? 'No recent requests on this instance'
+                  ? 'No recent requests'
                   : 'Restarted · same URL'
                 : 'Waiting for requests…'}
           </span>
@@ -85,7 +86,6 @@ export default async function LifecyclePage({ params }: { params: Promise<{ id: 
           events={data.events}
           restarting={ep.status === 'updating'}
           cloud={cloud}
-          instance={data.instance}
           tokenHints={tokenHints}
         />
       )}

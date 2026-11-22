@@ -10,7 +10,7 @@ import { createApp, type CrystallizeOutcome, type SavedHandler } from './app.js'
 import { parseCrystalTokens } from './auth.js';
 import { missingProviderKey, slimeConfigFromEnv, type Env } from './config.js';
 import { CrystallizeConflictError, crystalsFromFolder, type CrystalLoad, type CrystalStore } from './crystal-store.js';
-import { RecentRequests } from './events.js';
+import { RecentRequests, StoredRequests } from './events.js';
 import { DEFAULT_RUNS_SYNC_MS, LiveRunsSync, syncLiveRuns } from './live-runs.js';
 import type { DocClient } from './store-dynamodb.js';
 import { UsageMeter } from './usage.js';
@@ -126,6 +126,9 @@ export async function endpointRuntime(env: Env, deps: EndpointDeps = {}): Promis
   // Keeps Liquid run counts in the store current, so Crystallize can see them (see live-runs.ts).
   const runs = store ? new LiveRunsSync(store, () => slime.handlers(), Number(env.SLIME_RUNS_SYNC_MS || DEFAULT_RUNS_SYNC_MS)) : undefined;
   const crystalRuns = config.tiers.crystalReadyRuns;
+  // The feed lives in the store, so every warm instance serves the same one; its total is the
+  // endpoint's usage count, which every instance adds to atomically.
+  const events = store ? new StoredRequests({ store, ...(meter ? { total: () => meter!.total() } : {}), log }) : new RecentRequests();
 
   const crystallizeKeys = async (keys?: string[]): Promise<CrystallizeOutcome[]> => {
     if (!store || !crystalStore) return [];
@@ -164,7 +167,7 @@ export async function endpointRuntime(env: Env, deps: EndpointDeps = {}): Promis
     slime,
     connector: config.connector,
     crystal: config.crystal,
-    events: new RecentRequests(),
+    events,
     onQuery: (meta) => meter?.record(meta),
     log,
     thresholds: { liquidRuns: config.tiers.gasToLiquidRuns, crystalRuns },
@@ -179,7 +182,7 @@ export async function endpointRuntime(env: Env, deps: EndpointDeps = {}): Promis
   });
 
   const flush = async () => {
-    await Promise.all([slime.flush(), meter?.flush()]);
+    await Promise.all([slime.flush(), meter?.flush(), events instanceof StoredRequests ? events.flush() : undefined]);
     await runs?.maybeSync();
   };
 
@@ -188,7 +191,7 @@ export async function endpointRuntime(env: Env, deps: EndpointDeps = {}): Promis
     slime,
     flush,
     close: async () => {
-      await Promise.all([slime.flush(), meter?.flush()]);
+      await Promise.all([slime.flush(), meter?.flush(), events instanceof StoredRequests ? events.flush() : undefined]);
       // The core saves a handler's runs only when it turns Liquid: save the live counts, or a
       // restart or eviction sets Liquid progress back.
       if (store) await syncLiveRuns(store, slime.handlers());

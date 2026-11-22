@@ -42,6 +42,8 @@ export async function isDatabaseAvailable(): Promise<boolean> {
 export interface HarnessOptions {
   maxEntries?: number;
   ttlMs?: number;
+  /** Share one table between harnesses: two harnesses are then two Lambda instances of one deployment. */
+  dynamo?: FakeDynamo;
 }
 
 export interface CallOptions {
@@ -60,6 +62,8 @@ export interface Reply {
     reports?: { key: string; outcome: string; reasons: string[] }[];
     handlers?: { key: string; tier: string; runs: number }[];
     instance?: boolean;
+    events?: { handlerKey: string }[];
+    total?: number;
   };
 }
 
@@ -83,10 +87,9 @@ export interface Harness {
 }
 
 /** One Lambda instance's router over fakes; call close() in `after`. */
-export async function harness({ maxEntries = 8, ttlMs = 30_000 }: HarnessOptions = {}): Promise<Harness> {
+export async function harness({ maxEntries = 8, ttlMs = 30_000, dynamo = new FakeDynamo() }: HarnessOptions = {}): Promise<Harness> {
   const ssm = new FakeSsm();
   const s3 = new FakeS3();
-  const dynamo = new FakeDynamo();
   const runner = new QuickJSRunner();
   const workRoot = await mkdtemp(join(tmpdir(), 'slime-tenants-test-'));
   const clock = { now: 1_000_000 };
