@@ -44,8 +44,11 @@ Backend -- Slime runtime:
 - [examples/hono/](./examples/hono/README.md) - the smallest app around
   the core: one Hono file with `/health` and `POST /slime`.
 - [examples/multi-source/](./examples/multi-source/README.md) - one instance
-  over Postgres, Notion and a public films API; replays recorded API
-  responses, so its tests run in CI without accounts.
+  over Postgres, Notion and two public APIs (films, euro rates); replays
+  recorded API responses, so its tests run in CI without accounts.
+- [examples/customer-site/](./examples/customer-site/README.md) - a customer's
+  site with no data backend: three panels answered by a Slime Cloud endpoint
+  (one through its Crystal) and the multi-source example; the customer demo.
 - [examples/shop/](./examples/shop/README.md) - a demo online-shop database
   (12 tables, deterministic) loaded into the cloud test RDS as database `shop`,
   with 10 demo use cases that run through the bench (`BENCH_CASES`).

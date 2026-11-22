@@ -93,6 +93,27 @@ describe('the multi-source example', { skip: !isDatabaseUp && 'Postgres is not r
     assert.ok(body.data.every((film, index, films) => index === 0 || films[index - 1].rtScore >= film.rtScore));
   });
 
+  test('customer 360: Postgres + Notion + euro rates, revenue converted at the recorded rate', async () => {
+    const converted = await ask({
+      intent: 'accounts on a given plan with their total paid revenue converted into a given currency and their number of open negative feedback items, most open items first',
+      input: { plan: 'Enterprise', currency: 'USD' },
+      output: [{ name: 'string', paidRevenue: 'number', openNegative: 'integer' }],
+    });
+    assert.equal(converted.status, 200, JSON.stringify(converted.body));
+    assert.deepEqual(converted.body.meta.steps.map((step) => step.source), ['db', 'notion', 'rates']);
+    const euros = await ask({
+      intent: 'accounts on a given plan with their total paid revenue in cents and their number of open negative feedback items, most open items first',
+      input: { plan: 'Enterprise' },
+      output: [{ name: 'string', paidCents: 'integer', openNegative: 'integer' }],
+    });
+    const usdPerEur = JSON.parse(readFileSync(new URL('./fixtures/frankfurter/rates-usd.json', import.meta.url), 'utf8')).response.body.rates.USD;
+    // The two answers sort differently, so compare the sorted amounts.
+    const byNumber = (a, b) => a - b;
+    const expected = euros.body.data.map((row) => Math.round(row.paidCents * usdPerEur) / 100).sort(byNumber);
+    assert.ok(expected.length > 0 && expected.some((amount) => amount > 0));
+    assert.deepEqual(converted.body.data.map((row) => row.paidRevenue).sort(byNumber), expected);
+  });
+
   test('a malformed JSON body is a 400 that is not retryable', async () => {
     const response = await app.request('/slime', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{intent:' });
     assert.equal(response.status, 400);
