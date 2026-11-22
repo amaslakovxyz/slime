@@ -28,6 +28,7 @@ export {
   type WarningEvent,
 } from './config/slime-config.js';
 export { SlimeConfigError, SlimeError, type ErrorCode, type SlimeErrorBody, type SlimeErrorOptions } from './shared/errors.js';
+export { LAYER_IDS, type LayerId, type LayerSpan, type LayerStatus } from './shared/trace.js';
 export type { ColumnInfo, RunResult, SafetyReport, Source } from './sources/types.js';
 export type { Connector, ForeignKey, QueryLimits, QueryPlan, SchemaInfo, TableInfo } from './sources/sql/types.js';
 export type { ApiArg, ApiStep, Artifact, LegacyArtifact, SqlStep, Step } from './artifact/artifact.js';

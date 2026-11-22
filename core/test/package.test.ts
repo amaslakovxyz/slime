@@ -26,6 +26,7 @@ test('the public entry exports createSlime, the config, the stores, the sandbox 
     'DEFAULT_LIMITS',
     'DEFAULT_STORE_DIR',
     'DEFAULT_TIERS',
+    'LAYER_IDS',
     'QuickJSRunner',
     'SlimeConfig',
     'SlimeConfigError',
