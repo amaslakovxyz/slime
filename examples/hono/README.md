@@ -18,5 +18,5 @@ curl localhost:3000/slime -H 'content-type: application/json' -d '{
 ```
 
 `DATABASE_URL` and `PORT` override the defaults. Generated handlers are saved
-in `.slime/`. For locked mode, Crystal, offline handlers and tests, see
+in `.slime/`. For Crystal and tests with canned handlers, see
 [examples/express](../express/README.md).

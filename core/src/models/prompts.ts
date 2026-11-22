@@ -1,6 +1,6 @@
 // The prompts every model adapter shares, so a bench compares models, not prompts.
 // They are the cached prompt prefix, and their hash is each handler's promptHash:
-// editing them regenerates handlers in explore mode (§4.7).
+// editing them regenerates saved handlers (§4.7).
 import { isApiStep, type Step } from '../artifact/artifact.js';
 import type { GenerationRequest, OptimizeRequest, ReviewRequest } from './types.js';
 import { sha256 } from '../shared/hash.js';
@@ -130,7 +130,7 @@ export function optimizeMessage({ sql, params, shapeJs, output, paramTypes }: Op
   ].join('\n');
 }
 
-/** A provider's prompt text, hashed: editing it regenerates handlers in explore mode (§4.7). */
+/** A provider's prompt text, hashed: editing it regenerates saved handlers (§4.7). */
 export function promptHash(provider: string, ...texts: string[]): string {
   return sha256([provider, ...texts].join('\n')).slice(0, 16);
 }

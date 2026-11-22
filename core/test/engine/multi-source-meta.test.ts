@@ -45,7 +45,7 @@ async function start(options: Record<string, unknown>, store: SlimeStore): Promi
 }
 
 describe('multi-source generation and meta', () => {
-  test('explore mode runs the steps and shows them in meta and events', async () => {
+  test('a new request runs the steps and shows them in meta and events', async () => {
     const requests: GenerationRequest[] = [];
     const events: SlimeEvent[] = [];
     const generator = stubGenerator((request) => (requests.push(request), ARTIFACT));
