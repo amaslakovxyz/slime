@@ -89,6 +89,21 @@ describe('engine trace: answered requests', () => {
     const { meta } = await slime.query(REQUEST);
     assert.ok(!JSON.stringify(meta.trace).includes('DE-SECRET'));
   });
+
+  test('a Crystal answers without generating', async () => {
+    const key = requestKey(parseRequest(REQUEST));
+    const crystal: CrystalRegistry = { [key]: { sql: 'SELECT name FROM accounts WHERE country = $1', params: ['country'], shape: null, intent: REQUEST.intent, output: REQUEST.output, paramTypes: { country: 'string' }, schemaHash: 'schema', review: 'approved' } };
+    const slime = await createSlime(new SlimeConfig({ connector: fakeConnector({ rows: ROWS }), store: memoryStore(), generator: stubGenerator(() => GOOD), crystal }));
+    open.push(slime);
+    const { meta } = await slime.query(REQUEST);
+    assert.equal(meta.tier, 'crystal');
+    assert.deepEqual(pairs(meta.trace), ['key:pass', 'route:pass', 'limits:skip', 'generate:skip', 'lint:skip', 'cost:skip', 'execute:pass', 'shape:skip', 'output:pass', 'cache:skip', 'review:pass']);
+    const notes = Object.fromEntries(meta.trace!.map((s) => [s.layer, s.note]));
+    assert.equal(notes['route'], `Crystal ${key.slice(0, 12)}`);
+    assert.equal(notes['generate'], 'frozen code');
+    assert.equal(notes['cache'], 'Crystal: nothing to promote');
+    assert.equal(notes['review'], 'approved');
+  });
 });
 
 describe('engine trace: refused requests', () => {
