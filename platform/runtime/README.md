@@ -58,10 +58,11 @@ endpoint's engine cannot start, for example an unreachable database or no
 
 Both entries: a body above 16 KB on `POST /v0/query` or `POST /v0/e/<key>` is
 413 `INVALID_REQUEST`; an unexpected error is 500 `INTERNAL`; core errors keep
-their status (`core/docs/request-format.md`). A path the endpoint does not
-serve (for example `/ep/<id>//v0/query` from a URL joined with an extra `/`)
-is Hono's plain-text `404 Not Found`, not the JSON error shape. The endpoint
-URL the admin stores ends in `/`, so join it as `<url>v0/query`.
+their status (`core/docs/request-format.md`). A path or method the endpoint
+does not serve (for example `/ep/<id>//v0/query` from a URL joined with an
+extra `/`, or `GET /v0/query`) is 404 `NOT_FOUND`, whose message names the
+method and path. The endpoint URL the admin stores ends in `/`, so join it as
+`<url>v0/query`.
 
 ## Commands
 

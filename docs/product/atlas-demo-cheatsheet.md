@@ -96,7 +96,7 @@ sequenceDiagram
 
 ```bash
 # SLIME_URL: the endpoint URL the admin shows (https://<runtime host>/ep/<id>/) without its trailing "/",
-# as in examples/customer-site/.env.example; /ep/<id>//v0/query answers 404.
+# as in examples/customer-site/.env.example; /ep/<id>//v0/query answers 404 NOT_FOUND.
 # Step 4-5: any request, with the endpoint key
 curl -s "$SLIME_URL/v0/query" -H "x-api-key: $SLIME_API_KEY" -H 'content-type: application/json' -d '{
   "intent": "past-due accounts in a given country with their plan, unpaid invoice total in cents and last activity date, largest unpaid total first",
@@ -126,6 +126,7 @@ curl -s "$SLIME_URL/v0/e/$CRYSTAL_KEY" -H "x-api-key: $CRYSTAL_TOKEN" -H 'conten
 | A wrong answer | The model misread the intent | Reword the intent: a new wording is a new handler. Read `meta.assumptions` first |
 | `GENERATION_RATE_LIMITED` (429) | Hourly generation limit | Retry later; Liquid and Crystal calls are not limited by it |
 | `UNAUTHORIZED` (401) | Wrong key, or an `slc_` token on another route | Check which key the route needs (table above) |
+| `NOT_FOUND` (404) | Wrong path or method, often a double slash from joining the URL | Call `POST $SLIME_URL/v0/query`; the message names what was sent |
 | Empty `data` | Nothing matches | Often correct: DE has no past-due accounts in the demo data |
 
 ## Talking points at the table
