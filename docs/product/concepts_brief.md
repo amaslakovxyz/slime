@@ -343,7 +343,7 @@ SQL."*
   * Generator: speed first. Groq `gpt-oss-120b` works today on the free tier.
     Claude `claude-haiku-5-5` is supported but untested until there is a key.
   * Reviewer: a stronger pass (`gpt-oss-120b` at high effort, or
-    `claude-opus-5-5`).
+    `claude-sonnet-5-5`).
 * **Request format:** `{ intent, input, output }`.
   * Output-shape notation: type names (`"string"`, `"integer|null"`, ...),
     `[X]` for a list of `X`, an object for exactly those keys.

@@ -19,7 +19,7 @@ const NOTION_HOST = 'api.notion.com';
 const RATES_HOST = 'api.frankfurter.dev';
 const GROQ_MODEL = 'openai/gpt-oss-120b';
 const CLAUDE_GENERATOR_MODEL = 'claude-haiku-5-5';
-const CLAUDE_REVIEW_MODEL = 'claude-opus-5-5';
+const CLAUDE_REVIEW_MODEL = 'claude-sonnet-5-5';
 
 /** Join hints across sources are column comments (MS13). */
 const NOTION_COMMENTS = {
