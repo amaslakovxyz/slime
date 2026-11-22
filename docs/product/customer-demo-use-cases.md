@@ -1,6 +1,6 @@
 # Customer demo: three use cases from the customer's agent
 
-* **Status:** Current. Cases 1 and 2 run live on Slime Cloud on 2026-11-22; case 3 run through the same site with canned handlers, not a live model (see [Measured](#measured-2026-11-22)).
+* **Status:** Current. All three cases run live on 2026-11-22: cases 1 and 2 on Slime Cloud, case 3 on the self-hosted instance with a real model and replayed Notion and FX responses (see [Measured](#measured-2026-11-22)).
 * **Code:** [examples/customer-site](../../examples/customer-site/README.md) (the customer's site), [examples/multi-source](../../examples/multi-source/README.md) (the self-hosted case).
 * **Vocabulary:** Gas → Liquid → Crystal and Crystallize as in [product_frame_v0_2.md](product_frame_v0_2.md).
 * **Positioning:** concrete runs of the "Now" use cases in [the marketing playbook](../brand/slime_marketing_positioning_tone_of_voice_use_cases.md) §3: case 1 is Use Case 1 (a backend for AI-built UIs), case 2 is Use Case 2 (a database-guarded API for agents), case 3 is Use Case 3 (one API over existing systems instead of glue middleware). Its "Claims We Don't Make" apply: only measured numbers, no tenancy claims.
@@ -112,7 +112,10 @@ Prerequisites:
   that, run `aws rds start-db-instance --db-instance-identifier slime-test-db`.
 - The 1Password vault `Slime Hackathon` holds `Slime — Atlas demo endpoint` (URL, `slm_`
   key) and `Slime — Atlas demo Crystal (plan revenue)` (Crystal key, `slc_` token).
-- For live generation in case 3, a Groq or Anthropic key.
+- For case 3, the model key: `Slime — Anthropic API key (shared runtime)` in the same
+  vault. Without a key the self-hosted instance cannot start; then show the Gas beat on
+  the cloud instead, by sending a new intent to `atlas-demo` `POST /v0/query` with the
+  `slm_` key (the snippet on the Lifecycle tab).
 - Cases 1 and 2 are already warm on `atlas-demo` (Crystal and Liquid; Liquid is saved and
   survives restarts). The Gas beat is case 3: before the demo, delete
   `examples/multi-source/.slime` (its file store) so its handler is generated live.
@@ -146,12 +149,12 @@ against `slime-test-db`, through the customer site:
 |---|---|
 | 1 | 13 calls on `/v0/query`: Liquid with review `approved` at about 6 ms engine time. Crystallize in the admin, then `route: crystal`, `tier: crystal`, 4 rows that match the database. Eight direct Crystal calls: 51 ms engine time on the first (a cold database pool, all in `timingsMs.run`), then 3.5-4 ms |
 | 2 | First call Gas, generation 5.6 s. Calls 2-3 Gas at about 7 ms (cached code, review pending). From call 4 Liquid, `approved`, 6-8 ms. FR returns 6 rows. DE returns none, which is correct: the data has no past-due accounts in DE |
-| 3 | Through the proxy with canned handlers (no model key was available): 48 Enterprise rows from `db + notion + rates`. Tests check the converted amounts against the recorded USD rate |
+| 3 | Self-hosted, Claude (`claude-haiku-5-5` generates, `claude-opus-5-5` reviews), Notion and FX replayed (`FETCH_FIXTURES=1`), through the customer site. First call Gas, generation 14.4 s, steps `db + notion + rates`, 48 rows. Calls 2-4 Gas at 90-145 ms, review pending. From call 5 Liquid, `approved`. After a restart it is still Liquid (file store); GBP, CHF and JPY answer without a new generation at 115-180 ms. Spot check: the model's top row equals the hand-written handler's (Lunar Logistics 37, 614,098 paid cents = $6,748.94 at 1.099). `npm run live` with the same key: the other three demo intents reach Liquid; one review was rejected (a null plan returned no rows) and the revision was approved |
 
 ## Limits
 
-- **Case 3 is not on Slime Cloud** and is not yet verified with a live model. It needs a
-  model key, plus real Notion tokens or `FETCH_FIXTURES=1`.
+- **Case 3 is not on Slime Cloud.** In the measured run Notion and the FX API were
+  replayed from fixtures; live Notion needs its tokens (`examples/multi-source/.env`).
 - **Customer 360 joins Notion to Postgres by account name.** Names are unique in the demo
   data (they end in the account id); real data needs a shared key.
 - **A Crystal runs in the runtime's process without the QuickJS sandbox**
