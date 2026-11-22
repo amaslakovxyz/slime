@@ -1,0 +1,642 @@
+openapi: 3.1.0
+info:
+  title: Slime Agent API
+  version: 1.0.0-draft
+  description: >
+    Minimal headless surface for autonomous coding agents. One `slm_` token
+    carries the whole lifecycle: query, observe, crystallize. Approvals are
+    delegated to the agent by default (`policy.crystallize: auto`); the gate
+    is mechanical (run count + replay check), not human judgment.
+
+
+    Status: Design. Every operation carries `x-status`: `shipped` (on main
+    today, answered by platform/runtime/src/app.ts and the Lambda router) or
+    `proposed` (this design). Inside shipped operations, fields and codes
+    marked "PROPOSED" in their description do not exist on main yet.
+    The admin has no HTTP API today, so the `/v1/*` control-plane routes are
+    all proposed. Companion design note: docs/product/agent_api_v1.md.
+
+servers:
+  - url: https://{runtimeHost}/ep/{endpointId}
+    description: >
+      Data plane, Slime Cloud (shipped): one shared runtime, each endpoint
+      under /ep/<endpointId>/. The admin shows this URL with a trailing `/`.
+    variables:
+      runtimeHost:
+        default: runtime.example.com
+        description: the slime-runtime Lambda Function URL host
+      endpointId:
+        default: ep-0123456789
+        description: "endpoint id, pattern ^ep-[0-9a-f]{10}$"
+  - url: http://localhost:{port}
+    description: Data plane, local (shipped) — one process per endpoint, ports from 8700
+    variables:
+      port:
+        default: "8704"
+
+components:
+  securitySchemes:
+    accountKey:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: PROPOSED — sla_ account key (control plane). Does not exist on main.
+    endpointToken:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: >
+        slm_ endpoint key (shipped): opens every route of its endpoint. Issued
+        by the admin at endpoint creation ("Reveal token").
+    crystalToken:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: >
+        slc_ Crystal token (shipped): opens exactly one POST /v0/e/{handlerKey}
+        route; 401 elsewhere. Issued by the admin after Crystallize.
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, retryable]
+          additionalProperties: true
+          description: >
+            Shipped envelope (core SlimeError.toJSON and the runtime). Core
+            already spreads per-code details into it (e.g. enforcedBy on
+            WRITE_REFUSED; source, operation, status, attempts on SOURCE_ERROR;
+            step on QUERY_TOO_LARGE).
+          properties:
+            code:
+              type: string
+              description: >
+                Shipped codes: core (core/src/shared/errors.ts) INVALID_REQUEST
+                400, WRITE_REFUSED 403, ACCESS_DENIED 403, HANDLER_NOT_FOUND 404,
+                INTENT_UNSATISFIABLE 422, QUERY_TOO_LARGE 422,
+                GENERATION_RATE_LIMITED 429, SHAPE_MISMATCH 500, SANDBOX_ERROR
+                500, QUERY_ERROR 500, QUERY_TOO_EXPENSIVE 500, INVALID_HANDLER
+                500, GENERATION_FAILED 502, SOURCE_ERROR 502, GENERATION_TIMEOUT
+                504, EXECUTION_TIMEOUT 504; runtime UNAUTHORIZED 401,
+                ENDPOINT_NOT_FOUND 404, NOT_FOUND 404 (path or method the
+                endpoint does not serve; since PR #59), INTERNAL 500, NOT_READY
+                503 (engine cannot start), INVALID_REQUEST 413 (body above 16 KB).
+                PROPOSED: CRYSTAL_NOT_READY 409, REVIEW_REQUIRED 409,
+                ACCOUNT_EXISTS 409. The first draft's INVALID_INPUT maps onto
+                INVALID_REQUEST (+ expected/missing), PROVIDER_ERROR onto
+                GENERATION_FAILED.
+              enum:
+                # shipped — core
+                - INVALID_REQUEST
+                - WRITE_REFUSED
+                - ACCESS_DENIED
+                - HANDLER_NOT_FOUND
+                - INTENT_UNSATISFIABLE
+                - QUERY_TOO_LARGE
+                - GENERATION_RATE_LIMITED
+                - SHAPE_MISMATCH
+                - SANDBOX_ERROR
+                - QUERY_ERROR
+                - QUERY_TOO_EXPENSIVE
+                - INVALID_HANDLER
+                - GENERATION_FAILED
+                - SOURCE_ERROR
+                - GENERATION_TIMEOUT
+                - EXECUTION_TIMEOUT
+                # shipped — runtime and Lambda router
+                - UNAUTHORIZED
+                - ENDPOINT_NOT_FOUND
+                - NOT_FOUND
+                - NOT_READY
+                - INTERNAL
+                # proposed
+                - CRYSTAL_NOT_READY
+                - REVIEW_REQUIRED
+                - ACCOUNT_EXISTS
+            message: { type: string }
+            retryable: { type: boolean }
+            expected:
+              type: object
+              additionalProperties: { type: [string, "null"] }
+              description: >
+                PROPOSED — input name -> type, on a 400 INVALID_REQUEST for a
+                missing or unknown input. Today the names are only in message.
+            missing:
+              type: array
+              items: { type: string }
+              description: PROPOSED — missing input names, on 400 INVALID_REQUEST
+            nearest:
+              type: array
+              items: { type: string }
+              description: PROPOSED — closest existing intents, on 422 INTENT_UNSATISFIABLE
+            enforcedBy:
+              type: string
+              enum: [lint, model]
+              description: shipped — who refused, on WRITE_REFUSED and INTENT_UNSATISFIABLE
+
+    Policy:
+      type: object
+      description: PROPOSED — does not exist on main.
+      properties:
+        crystallize:
+          type: string
+          enum: [auto, manual]
+          default: auto
+          description: >
+            auto — the agent may call the crystallize route itself;
+            manual — only a human in the UI may. The mechanical criteria
+            (liquid tier, runs >= crystalRuns, replay check) apply in both
+            modes.
+
+    EndpointStatus:
+      type: string
+      description: >
+        The admin's endpoint statuses (platform/admin/lib/endpoints.ts,
+        STATUSES; Contract 3 of the cloud MVP design). Stored in the admin's
+        control table; no runtime route returns them today.
+      enum: [pending, provisioning, ready, failed, updating, deleting]
+
+    Thresholds:
+      type: object
+      description: shipped in GET /v0/lifecycle (GAS_TO_LIQUID_HITS, CRYSTAL_MIN_RUNS)
+      required: [liquidRuns, crystalRuns]
+      properties:
+        liquidRuns: { type: integer, default: 3 }
+        crystalRuns: { type: integer, default: 10 }
+
+    Meta:
+      type: object
+      required: [handlerKey, tier, cache, truncated, timingsMs, warnings, review]
+      description: >
+        Shipped fields per core/docs/request-format.md and
+        core/src/engine/types.ts (QueryMeta). runs, thresholds and
+        readyToCrystallize are PROPOSED additions.
+      properties:
+        handlerKey: { type: string }
+        tier: { type: string, enum: [gas, liquid, crystal] }
+        cache:
+          type: string
+          enum: [miss, hit, coalesced]
+          description: coalesced = shared a generation with a concurrent request
+        truncated: { type: boolean }
+        timingsMs:
+          type: object
+          properties:
+            total: { type: number }
+            run: { type: number }
+            shape: { type: number }
+            generate: { type: number, description: on a miss }
+        warnings:
+          type: array
+          items: { type: string }
+        review:
+          type: string
+          enum: [none, pending, approved, rejected]
+        sql: { type: string }
+        shapeJs: { type: string }
+        assumptions:
+          type: array
+          items: { type: string }
+        steps:
+          type: array
+          items: { type: object }
+          description: multi-source handlers only
+        runs:
+          type: integer
+          description: PROPOSED — the handler's run count
+        thresholds:
+          allOf: [{ $ref: "#/components/schemas/Thresholds" }]
+          description: PROPOSED in meta (shipped in GET /v0/lifecycle)
+        readyToCrystallize:
+          type: boolean
+          description: >
+            PROPOSED — the admin's existing rule (lib/lifecycle.ts toRow):
+            tier liquid, not stale, runs >= crystalRuns.
+
+    Handler:
+      type: object
+      required: [key, intent, tier, runs]
+      description: >
+        Shipped row of GET /v0/lifecycle (LifecycleHandler in
+        platform/runtime/src/app.ts, RuntimeHandler in
+        platform/admin/lib/lifecycle.ts). readyToCrystallize and route are
+        PROPOSED.
+      properties:
+        key: { type: string }
+        intent: { type: string }
+        tier: { type: string, enum: [gas, liquid, crystal] }
+        runs: { type: integer }
+        review: { type: string }
+        fixtures: { type: integer }
+        createdAt: { type: string, format: date-time }
+        inputs:
+          type: object
+          additionalProperties: { type: [string, "null"] }
+          description: Crystal only — the input names (and types, when known) its route takes
+        stale:
+          type: boolean
+          description: saved with another schema, dictionary, prompt or model; regenerates on next request
+        readyToCrystallize:
+          type: boolean
+          description: PROPOSED
+        route:
+          type: string
+          description: PROPOSED — /v0/e/<key>, present once tier is crystal
+
+    CrystallizeReport:
+      type: object
+      required: [key, intent, outcome, reasons]
+      description: shipped (crystal/src/crystallize.ts CrystalReport)
+      properties:
+        key: { type: string }
+        intent: { type: string }
+        outcome:
+          type: string
+          enum: [crystallized, already, not-ready, skipped, failed]
+        isOptimized: { type: boolean }
+        reasons:
+          type: array
+          items: { type: string }
+
+paths:
+  /v1/accounts:
+    servers:
+      - url: http://localhost:3100
+        description: PROPOSED control plane (the admin; it has no HTTP API today)
+    post:
+      operationId: createAccount
+      x-status: proposed
+      summary: PROPOSED — bootstrap an account (local/dev deployments only)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+      responses:
+        "201":
+          description: account created; key is shown exactly once
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accountId, key]
+                properties:
+                  accountId: { type: string }
+                  key: { type: string, description: "sla_… (shown once)" }
+        "409":
+          description: ACCOUNT_EXISTS (proposed code)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /v1/endpoints:
+    servers:
+      - url: http://localhost:3100
+        description: PROPOSED control plane (the admin; it has no HTTP API today)
+    post:
+      operationId: createEndpoint
+      x-status: proposed
+      summary: PROPOSED — create an endpoint; the slm_ token is returned exactly once
+      security: [{ accountKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, provider, databaseUrl]
+              properties:
+                name: { type: string }
+                provider:
+                  type: string
+                  enum: [claude, groq]
+                  description: main's providers (platform/runtime/src/config.ts)
+                databaseUrl: { type: string }
+                policy: { $ref: "#/components/schemas/Policy" }
+      responses:
+        "201":
+          description: >
+            endpoint created, provisioning async (provisioning in the cloud,
+            pending locally, then ready or failed); poll GET <url>healthz or
+            GET <url>v0/lifecycle
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [endpointId, url, token, status, policy]
+                properties:
+                  endpointId: { type: string, pattern: "^ep-[0-9a-f]{10}$" }
+                  url:
+                    type: string
+                    description: >
+                      endpoint base URL with a trailing `/`:
+                      https://<runtime host>/ep/<endpointId>/ or
+                      http://localhost:87xx/; routes join onto it (<url>v0/query)
+                  token: { type: string, description: "slm_… (shown once)" }
+                  status: { $ref: "#/components/schemas/EndpointStatus" }
+                  policy: { $ref: "#/components/schemas/Policy" }
+        "401":
+          description: UNAUTHORIZED
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /v0/query:
+    post:
+      operationId: query
+      x-status: shipped
+      summary: Dispatch — ask for data in words (shipped; meta additions proposed)
+      security: [{ endpointToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [intent, output]
+              additionalProperties: false
+              properties:
+                intent:
+                  type: string
+                  maxLength: 500
+                  description: values never go here
+                input:
+                  type: object
+                  maxProperties: 20
+                  description: >
+                    optional; all values go here. Input names are part of the
+                    handler key: leaving a name out is a different request.
+                output: { description: JSON shape wanted back }
+      responses:
+        "200":
+          description: data + meta
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data: {}
+                  meta: { $ref: "#/components/schemas/Meta" }
+        "400":
+          description: >
+            INVALID_REQUEST (shipped) — bad JSON, unknown fields, or an input
+            value that breaks the request rules. PROPOSED: also when a handler
+            with the same intent and output takes other input names, with
+            expected + missing, instead of generating a near-duplicate. Today
+            such a request is generated as a new handler, and ends in
+            500 INVALID_HANDLER if the generated code still maps the absent
+            name after the repair.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401":
+          description: UNAUTHORIZED (shipped; slc_ tokens are rejected here)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "403":
+          description: WRITE_REFUSED (shipped) — the intent asks to modify data, or the SQL tried to
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "413":
+          description: INVALID_REQUEST (shipped) — body larger than 16 KB
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: >
+            INTENT_UNSATISFIABLE (shipped) — the database can't answer this
+            request. PROPOSED: carries nearest existing intents so the agent
+            reuses a handler.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: >
+            INTERNAL or a core 500 code (shipped), e.g. INVALID_HANDLER,
+            SHAPE_MISMATCH, QUERY_ERROR
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "503":
+          description: NOT_READY (shipped, Lambda router) — the endpoint's engine cannot start
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /v0/lifecycle:
+    get:
+      operationId: getLifecycle
+      x-status: shipped
+      summary: Machine-readable handler state (shipped; endpoint-level fields proposed)
+      security: [{ endpointToken: [] }]
+      responses:
+        "200":
+          description: >
+            Shipped body: handlers, stats, thresholds, warnings, and
+            instance: true on Lambda (Gas rows are that instance's only).
+            endpointId, status and policy are PROPOSED additions.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [handlers, stats, warnings]
+                properties:
+                  handlers:
+                    type: array
+                    items: { $ref: "#/components/schemas/Handler" }
+                  stats:
+                    type: object
+                    properties:
+                      handlers:
+                        type: object
+                        properties:
+                          gas: { type: integer }
+                          liquid: { type: integer }
+                      generationsThisHour: { type: integer }
+                      generationsInFlight: { type: integer }
+                  thresholds: { $ref: "#/components/schemas/Thresholds" }
+                  warnings:
+                    type: array
+                    items: { type: string }
+                  instance:
+                    type: boolean
+                    description: Lambda only
+                  endpointId:
+                    type: string
+                    pattern: "^ep-[0-9a-f]{10}$"
+                    description: PROPOSED
+                  status:
+                    allOf: [{ $ref: "#/components/schemas/EndpointStatus" }]
+                    description: PROPOSED — today only in the admin's control table
+                  policy:
+                    allOf: [{ $ref: "#/components/schemas/Policy" }]
+                    description: PROPOSED
+        "401":
+          description: UNAUTHORIZED (slc_ tokens are rejected here)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /v0/crystallize:
+    post:
+      operationId: crystallizeBatch
+      x-status: shipped
+      summary: Crystallize saved handlers (shipped; what the admin's Crystallize button calls)
+      description: >
+        Mounted whenever the endpoint has a Crystal store (always on Lambda,
+        locally with SLIME_CRYSTAL_DIR); otherwise the path is a plain-text
+        404. Runs the Crystallize job on the picked keys (all saved handlers
+        when keys is absent). Issues no tokens: the admin issues one slc_
+        token per crystallized key and delivers it (POST /v0/reload in the
+        cloud, a restart through `updating` locally).
+      security: [{ endpointToken: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                keys:
+                  type: array
+                  items: { type: string }
+      responses:
+        "200":
+          description: one report per handler considered
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [reports]
+                properties:
+                  reports:
+                    type: array
+                    items: { $ref: "#/components/schemas/CrystallizeReport" }
+        "401":
+          description: UNAUTHORIZED
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /v0/handlers/{handlerKey}/crystallize:
+    post:
+      operationId: crystallize
+      x-status: proposed
+      summary: PROPOSED — promote one proven handler to its own route (delegated approval)
+      description: >
+        Wraps the shipped POST /v0/crystallize job for one key and moves
+        slc_ token issuing from the admin into the runtime. Hard criteria
+        enforced regardless of policy: tier liquid, runs >= crystalRuns,
+        replay check passes. policy.crystallize only decides who may trigger
+        it. Delivery as shipped: on Lambda the instance swaps its engine at
+        once; locally the endpoint restarts on the same port/URL (status
+        updating -> ready).
+      security: [{ endpointToken: [] }]
+      parameters:
+        - name: handlerKey
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "201":
+          description: crystallized; slc_ token shown exactly once
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [handlerKey, route, token, exampleBody]
+                properties:
+                  handlerKey: { type: string }
+                  route: { type: string }
+                  token: { type: string, description: "slc_… (shown once)" }
+                  exampleBody: { type: object }
+        "200":
+          description: already crystal (idempotent repeat; no token in body)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [handlerKey, route]
+                properties:
+                  handlerKey: { type: string }
+                  route: { type: string }
+        "409":
+          description: >
+            CRYSTAL_NOT_READY (carries runs/required) or REVIEW_REQUIRED
+            (policy is manual). Not NOT_READY, which is the router's 503.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401":
+          description: UNAUTHORIZED
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /v0/e/{handlerKey}:
+    post:
+      operationId: callCrystal
+      x-status: shipped
+      summary: Crystal route — the proven request as its own endpoint (shipped)
+      security: [{ crystalToken: [] }, { endpointToken: [] }]
+      parameters:
+        - name: handlerKey
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                input:
+                  type: object
+                  description: exactly the Crystal's input names; null means "not given"
+      responses:
+        "200":
+          description: data + meta (tier crystal)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data: {}
+                  meta: { $ref: "#/components/schemas/Meta" }
+        "400":
+          description: >
+            INVALID_REQUEST (shipped) — a missing or unknown input name; the
+            names are only in message ("This endpoint takes input: limit
+            (number). Missing: limit."). PROPOSED: expected + missing fields.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401":
+          description: UNAUTHORIZED — slc_ opens only its own route
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: HANDLER_NOT_FOUND — no Crystal with this key on this endpoint
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "413":
+          description: INVALID_REQUEST — body larger than 16 KB
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
