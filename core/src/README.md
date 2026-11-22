@@ -12,7 +12,7 @@ The folders say what the system is made of:
 |---|---|---|
 | **Port** | [connectors/](./connectors/README.md) | Where data comes from. `types.ts` + `postgres/`. |
 | **Port** | [models/](./models/README.md) | Generator, Reviewer, Optimizer. `types.ts`, `ModelClient` + `claude/`, `groq/`, `offline/`. |
-| **Port** | `sources/` | Read-only API sources beside the SQL connector (MS1–MS17). `types.ts` (`ApiSource`) + `call-source.ts` (timeout, redaction), `api/` (`defineApiSource`, the constrained HTTP client) and `notion/`. |
+| **Port** | `sources/` | Read-only API sources beside the SQL connector (MS1–MS17). `types.ts` (`ApiSource`), `lifecycle.ts` (start and close every source), `call-source.ts` (timeout, redaction), `api/` (`defineApiSource`, the constrained HTTP client) and `notion/`. |
 | **Port** | [stores/](./stores/README.md) | Slime's own key-value state. `types.ts` + file and memory stores. |
 | **Port** | [sandbox/](./sandbox/README.md) | Where generated shaping code runs. `types.ts` + `quickjs/`. |
 | Engine | [engine/](./engine/README.md) | The Slime instance: handler cache, generation, review, promotion; `crystal/` serves Crystal handlers, `checks/` guards generated SQL. |
@@ -45,9 +45,10 @@ the API:
 
 `test/package.test.ts` pins every entry's value exports.
 
-**`create-slime.ts`**: `createSlime(config, { runner }?)`. Startup order: the
-connector's safety check (an unsafe user throws `SlimeConfigError`),
-`store.init()`, `describe()` and the dictionary. In locked mode it emits one
+**`create-slime.ts`**: `createSlime(config, { runner }?)`. Startup order
+(`sources/lifecycle.ts`): every source's safety check (an unsafe database
+user throws `SlimeConfigError`), every source's `describe()`, then
+`store.init()` and the dictionary. In locked mode it emits one
 `warning` event when saved handlers were made against another schema. A
 `runner` the host passes is shared: the engine uses it and `close()` leaves it
 running. Without one, the engine builds its own `QuickJSRunner` and closes it.

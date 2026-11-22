@@ -4,7 +4,7 @@ import type { SlimeEvent } from '../config/options.js';
 import type { Dictionary } from '../dictionary/dictionary.js';
 import { SlimeError } from '../shared/errors.js';
 import { answerFromCrystal } from './crystal-answer.js';
-import { executionDeps, generationDeps } from './engine-deps.js';
+import { executionDeps, generationDeps, sourceSetup } from './engine-deps.js';
 import type { Generator } from '../models/types.js';
 import type { SandboxRunner } from '../sandbox/types.js';
 import { requestKey, type HandlerProvenance } from '../request/key.js';
@@ -12,7 +12,7 @@ import { parseRequest, type InputValues, type ParsedRequest, type SlimeRequest }
 import { checkParamTypes } from '../request/params.js';
 import type { SlimeStore } from '../stores/types.js';
 import type { ApiSchema } from '../sources/types.js';
-import { closeApiSources } from '../sources/close-sources.js';
+import { closeSources } from '../sources/lifecycle.js';
 import { BackgroundTasks } from './background.js';
 import { Coalescer } from './coalescer.js';
 import { emitSafely, errorEvent, generatedEvent } from './events.js';
@@ -103,12 +103,13 @@ export class SlimeEngine implements Slime {
     return this.#background.settled();
   }
 
+  /** Closes everything it owns, even when one close fails; then rejects with the first failure. */
   async close(): Promise<void> {
     await this.flush();
-    if (this.#parts.ownsRunner) await this.#parts.runner.close();
-    await this.#parts.store.close?.();
-    await this.#parts.config.connector.close();
-    await closeApiSources(this.#parts.config);
+    const { runner, ownsRunner, store, config } = this.#parts;
+    const closed = await Promise.allSettled([ownsRunner ? runner.close() : undefined, store.close?.(), closeSources(sourceSetup(config))]);
+    const failed = closed.find((result): result is PromiseRejectedResult => result.status === 'rejected');
+    if (failed) throw failed.reason;
   }
 
   async #answer(raw: unknown): Promise<QueryResult> {

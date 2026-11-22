@@ -57,3 +57,15 @@ describe('startup with API sources (MS8)', () => {
     assert.deepEqual(problems, ['the user can INSERT into accounts']);
   });
 });
+
+describe('close()', () => {
+  test('closes every source even when the store fails to close, then reports that failure', async () => {
+    const closed: string[] = [];
+    const tracked = <T extends Source>(name: string, source: T): T => ({ ...source, close: async () => void closed.push(name) });
+    const store = { ...memoryStore(), close: async () => Promise.reject(new Error('store is gone')) };
+    const config = new SlimeConfig({ sources: { db: tracked('db', fakeConnector()), notion: tracked('notion', fakeApiSource({ operations: {} })) }, store } as unknown as SlimeOptions);
+    const slime = await createSlime(config);
+    await assert.rejects(slime.close(), /store is gone/);
+    assert.deepEqual(closed.sort(), ['db', 'notion']);
+  });
+});

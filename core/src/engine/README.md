@@ -69,7 +69,9 @@ classes and functions here are internal.
   marked `rejected`. A failed review call is retried after the next run.
 - **`flush()`.** It waits for running reviews and store writes, including
   ones they start (C15).
-- **`close()`.** It closes the shaping sandbox, the store and the connector.
+- **`close()`.** It closes the shaping sandbox (when it owns it), the store
+  and every source. One failing close doesn't stop the others; it then rejects
+  with the first failure.
 
 ## Side Effects
 
