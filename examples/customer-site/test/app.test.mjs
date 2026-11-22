@@ -1,8 +1,10 @@
 // The proxy decides what reaches Slime: which route, which key, which body.
 // A fake upstream records each call; no network.
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
 import { test } from 'node:test';
 import { createApp } from '../src/app.mjs';
+import { PANELS } from '../src/panels.mjs';
 
 const CLOUD = { SLIME_URL: 'https://runtime.example/ep/ep-1/', SLIME_API_KEY: 'slm_endpoint' };
 const CRYSTAL = { CRYSTAL_PLAN_REVENUE_KEY: 'abc123', CRYSTAL_PLAN_REVENUE_TOKEN: 'slc_plan' };
@@ -91,4 +93,11 @@ test("Slime's errors keep their status; an unreachable Slime is a 502", async ()
   const unreachable = await post(down, 'churn-risk', { country: 'FR' });
   assert.equal(unreachable.status, 502);
   assert.equal((await unreachable.json()).error.code, 'UPSTREAM_UNREACHABLE');
+});
+
+test('every currency the Customer 360 panel offers has a recorded rate, so the fixture-replay demo never fails', () => {
+  const { currency } = PANELS.find((panel) => panel.id === 'customer-360').inputs;
+  for (const code of currency.options) {
+    assert.ok(existsSync(new URL(`../../multi-source/test/fixtures/frankfurter/rates-${code.toLowerCase()}.json`, import.meta.url)), code);
+  }
 });

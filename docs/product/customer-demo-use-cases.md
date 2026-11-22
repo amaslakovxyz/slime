@@ -124,7 +124,11 @@ Prerequisites:
    one key, a read-only role.
 2. **Self-hosted instance:** in `examples/multi-source`, run
    `op run --env-file=<refs> -- npm start` with `DATABASE_URL` (the reader) and a model
-   key. Add `FETCH_FIXTURES=1` to replay the recorded Notion and FX responses.
+   key. Add `FETCH_FIXTURES=1` to replay the recorded Notion and FX responses. Replay
+   matches exact requests: the recorded Notion queries are "no filter" and "Status Open
+   and Sentiment negative". A freshly generated handler that filters Notion another way
+   fails with `No fixture for …`. That is a gap in the recording, not a Slime error: run
+   again after deleting `.slime`, or use real Notion tokens.
 3. **Customer site:** in `examples/customer-site`, run
    `op run --env-file=<refs> -- npm start` and open <http://localhost:4000>.
 4. **Case 3, the Gas beat:** pick a plan and a currency and press Run. The badge reads
