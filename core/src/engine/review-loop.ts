@@ -1,7 +1,8 @@
 import type { SlimeEvent } from '../config/options.js';
 import type { ModelUsage, ReviewRequest, Reviewer } from '../models/types.js';
 import { generatedEvent } from './events.js';
-import { forModel, generateHandler, type GenerationDeps } from './generate.js';
+import { paramTypesForModel } from '../request/params.js';
+import { generateHandler, type GenerationDeps } from './generate.js';
 import type { GenerationLimits } from './generation-limits.js';
 import type { HandlerRecord } from './types.js';
 
@@ -28,7 +29,7 @@ export async function reviewUntilSettled(deps: ReviewDeps, record: HandlerRecord
 }
 
 function reviewRequest({ generation }: ReviewDeps, { intent, paramTypes, output, artifact }: HandlerRecord): ReviewRequest {
-  return { context: generation.dictionaryText, intent, params: forModel(paramTypes), output, artifact };
+  return { context: generation.dictionaryText, intent, params: paramTypesForModel(paramTypes), output, artifact };
 }
 
 /** The revision replaces the code only after it passed the same checks on a recorded input; runs start over. */

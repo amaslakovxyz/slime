@@ -4,11 +4,11 @@ import type { ApiSchema, Source } from '../sources/types.js';
 import type { LimitOptions } from '../config/options.js';
 import { SlimeError } from '../shared/errors.js';
 import type { Connector } from '../connectors/types.js';
-import type { Generator, ModelUsage, ParamTypesForModel } from '../models/types.js';
+import type { Generator, ModelUsage } from '../models/types.js';
 import type { SandboxRunner } from '../sandbox/types.js';
 import type { HandlerProvenance } from '../request/key.js';
 import type { ParsedRequest } from '../request/parse.js';
-import { checkParamTypes, type ParamTypes } from '../request/params.js';
+import { checkParamTypes, paramTypesForModel, type ParamTypes } from '../request/params.js';
 import { bindParams, executeArtifact, queryLimits, type Execution } from './execute.js';
 import { repairMessage } from './repair-message.js';
 import type { HandlerRecord } from './types.js';
@@ -60,7 +60,7 @@ export async function generateHandler(deps: GenerationDeps, { key, request, prev
 
   for (let attempt = 0; attempt <= deps.limits.maxRepairs && deadline - Date.now() >= MIN_ATTEMPT_MS; attempt++) {
     const generation = await deps.generator.generate(
-      { context: deps.dictionaryText, intent: request.intent, params: forModel(paramTypes), output: request.output, ...(previous ? { previous } : {}) },
+      { context: deps.dictionaryText, intent: request.intent, params: paramTypesForModel(paramTypes), output: request.output, ...(previous ? { previous } : {}) },
       { timeoutMs: deadline - Date.now() },
     );
     addUsage(usage, generation);
@@ -126,9 +126,6 @@ function newRecord({ deps, key, request, artifact, paramTypes }: NewRecordParts)
   };
 }
 
-export function forModel(paramTypes: ParamTypes): ParamTypesForModel {
-  return Object.fromEntries(Object.entries(paramTypes).map(([name, type]) => [name, type ?? 'unknown']));
-}
 
 function addUsage(total: ModelUsage, added: ModelUsage): void {
   total.ms += added.ms;

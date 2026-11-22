@@ -9,6 +9,13 @@ export type ParamType = 'string' | 'number' | 'boolean' | 'list';
 /** null while only null has been seen. */
 export type ParamTypes = Record<string, ParamType | null>;
 
+/** What a model sees: 'unknown' while only null has been seen. Never values. */
+export type ParamTypesForModel = Record<string, ParamType | 'unknown'>;
+
+export function paramTypesForModel(paramTypes: Readonly<ParamTypes>): ParamTypesForModel {
+  return Object.fromEntries(Object.entries(paramTypes).map(([name, type]) => [name, type ?? 'unknown']));
+}
+
 export function coarseType(value: InputValue): ParamType | null {
   if (value === null) return null;
   if (Array.isArray(value)) return 'list';
