@@ -34,7 +34,7 @@
     },
     "3d6d0442112bc8c9cb9b9d594f10d2faebdbdec4736b7ceb262ea013b3b71eaf": {
       "file": "3d6d0442112bc8c9cb9b9d594f10d2faebdbdec4736b7ceb262ea013b3b71eaf.mjs",
-      "sha256": "87024305fcabf8e6c374e3da345cce5eef58f1114f5d62ec5e05dbe11ae26fec",
+      "sha256": "4710db29d405b326f4bae6235a3e797429d5edee360b5eb71dafc815b359728c",
       "intent": "plans that have accounts in a given country, each with the list of those account names",
       "output": [
         {
@@ -51,7 +51,7 @@
       },
       "schemaHash": "e7cc09cf02ab05a06deda1b045eacc201577c47e37b014bf38f957ae14d3d0bb",
       "review": "none",
-      "isOptimized": false,
+      "isOptimized": true,
       "notes": [],
       "provenance": {
         "schemaHash": "e7cc09cf02ab05a06deda1b045eacc201577c47e37b014bf38f957ae14d3d0bb",
