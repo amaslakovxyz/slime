@@ -1,5 +1,5 @@
 // Just enough DynamoDB for the store and the migration: one table keyed by
-// tenantId + artifactKey, Query with an optional begins_with, and pages of `pageSize`.
+// tenantId + artifactKey, Query with begins_with or BETWEEN, either order, Limit, and pages of `pageSize`.
 import { DeleteCommand, GetCommand, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import type { DocClient } from '../src/store-dynamodb.js';
 
@@ -32,13 +32,17 @@ export class FakeDynamo implements DocClient {
 
   #query(input: Item): Item {
     const values = input.ExpressionAttributeValues;
-    const prefix: string = values[':prefix'] ?? '';
+    const inRange = String(input.KeyConditionExpression ?? '').includes('BETWEEN')
+      ? (key: string) => key >= values[':lo'] && key <= values[':hi']
+      : (key: string) => key.startsWith(values[':prefix'] ?? '');
     const matching = [...this.items.values()]
-      .filter((item) => item.tenantId === values[':tenant'] && String(item.artifactKey).startsWith(prefix))
-      .sort((a, b) => String(a.artifactKey).localeCompare(String(b.artifactKey)));
+      .filter((item) => item.tenantId === values[':tenant'] && inRange(String(item.artifactKey)))
+      .sort((a, b) => (String(a.artifactKey) < String(b.artifactKey) ? -1 : String(a.artifactKey) > String(b.artifactKey) ? 1 : 0)); // byte order, as DynamoDB
+    if (input.ScanIndexForward === false) matching.reverse();
     const start = input.ExclusiveStartKey ? matching.findIndex((item) => item.artifactKey === input.ExclusiveStartKey.artifactKey) + 1 : 0;
-    const page = matching.slice(start, start + this.#pageSize);
-    const hasMore = start + this.#pageSize < matching.length;
+    const size = Math.min(this.#pageSize, input.Limit ?? Infinity);
+    const page = matching.slice(start, start + size);
+    const hasMore = start + size < matching.length;
     return { Items: page.map((item) => structuredClone(item)), LastEvaluatedKey: hasMore ? { tenantId: values[':tenant'], artifactKey: page.at(-1)!.artifactKey } : undefined };
   }
 }

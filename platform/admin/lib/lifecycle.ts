@@ -25,6 +25,8 @@ export interface RuntimeHandler {
 }
 
 export interface RuntimeEvent {
+  /** The cursor for the Requests log's pages; set by runtimes that page their feed. */
+  id?: string;
   at: string;
   handlerKey: string;
   tier: Tier;
@@ -227,6 +229,63 @@ export async function readLifecycle(ep: Endpoint): Promise<LifecycleData> {
   } catch {
     if (cloud) return { ok: false, reason: 'Endpoint runtime did not answer.' };
     return localMiss(ep, 'Endpoint is not running. Is `npm run local` up?');
+  }
+}
+
+/** Rows per page in the Requests log; the runtime keeps the newest 500 requests (RETAINED_EVENTS). */
+export const REQUESTS_PAGE_SIZE = 25;
+export const RETAINED_REQUESTS = 500;
+/** The runtime's event ids (ISO time, counter, suffix); anything else in the URL reads the first page. */
+const CURSOR = /^[0-9A-Za-z:.-]{1,64}$/;
+
+export type RequestsPage =
+  | { ok: true; total: number; events: RuntimeEvent[]; hasOlder: boolean; hasNewer: boolean }
+  | { ok: false; reason: string };
+
+/** Local only: the last page per endpoint and cursor, for polls that land while the runtime restarts or is busy. */
+const lastPage = new Map<string, Extract<RequestsPage, { ok: true }>>();
+const missedPage = new Map<string, number>();
+
+/**
+ * Server only: one page of the Requests log, newest first. `before` is the id of the oldest row on
+ * the page the operator came from (Older), `after` the newest row's (Newer). Cursors, not page numbers:
+ * new requests land on top while the operator reads an older page, and an offset would shift its rows.
+ */
+export async function readRequests(ep: Endpoint, { before, after }: { before?: string; after?: string }): Promise<RequestsPage> {
+  if (ep.status === 'failed') return { ok: false, reason: ep.error ? `Endpoint failed: ${ep.error}` : 'Endpoint failed.' };
+  if (!ep.url || (ep.status !== 'ready' && ep.status !== 'updating')) return { ok: false, reason: `Endpoint is ${ep.status}.` };
+  const token = await secretStore().get(ep.endpointId, 'SLIME_API_KEY');
+  if (!token) return { ok: false, reason: 'Token not found in the secret store.' };
+  const params = new URLSearchParams({ limit: String(REQUESTS_PAGE_SIZE) });
+  if (before && CURSOR.test(before)) params.set('before', before);
+  else if (after && CURSOR.test(after)) params.set('after', after);
+  const cacheKey = `${ep.endpointId}?${params}`;
+  const cloud = isCloud();
+  const miss = (reason: string): RequestsPage => {
+    const last = lastPage.get(cacheKey);
+    const n = (missedPage.get(cacheKey) ?? 0) + 1;
+    if (!cloud && last && (ep.status === 'updating' || n <= READ_MISS_GRACE)) {
+      missedPage.set(cacheKey, n);
+      return last;
+    }
+    missedPage.delete(cacheKey);
+    lastPage.delete(cacheKey);
+    return { ok: false, reason };
+  };
+  try {
+    const res = await fetch(new URL(`v0/events?${params}`, ep.url), {
+      headers: { 'x-api-key': token },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(cloud ? 8000 : 3000),
+    });
+    if (!res.ok) return miss(`Runtime answered ${res.status}.`);
+    const f = (await res.json()) as { total: number; events: RuntimeEvent[]; hasOlder?: boolean; hasNewer?: boolean };
+    const page = { ok: true as const, total: f.total, events: f.events, hasOlder: f.hasOlder === true, hasNewer: f.hasNewer === true };
+    if (!cloud) lastPage.set(cacheKey, page);
+    missedPage.delete(cacheKey);
+    return page;
+  } catch {
+    return miss(cloud ? 'Endpoint runtime did not answer.' : 'Endpoint is not running. Is `npm run local` up?');
   }
 }
 

@@ -26,7 +26,7 @@ replace the `file:` path with a version; nothing else changes.
 | [src/config.ts](src/config.ts) | `SlimeConfig` from one endpoint's env, with the same variable names the sandbox runtime read; no `DATABASE_URL` is a `SlimeConfigError`, never a fallback database |
 | [src/app.ts](src/app.ts) | One endpoint's HTTP routes on the core's `Slime` API (table below); the Crystal route refuses missing and unknown input names |
 | [src/local.ts](src/local.ts) | Local entry: one endpoint as a Node HTTP server on `PORT`; same auth; `POST /v0/reload` is a 204 no-op (the runner restarts the process); flushes before each non-GET response; saves live run counts on SIGTERM; prints `{"fatal": …}` as its last stderr line when it cannot start |
-| [src/events.ts](src/events.ts) | The last 50 answered requests (handler, tier, cache, ms): `StoredRequests` keeps them in the endpoint's store (`events#…` items), shared by every instance, with the usage count as the total; `RecentRequests` is the in-memory version |
+| [src/events.ts](src/events.ts) | The answered requests (handler, tier, cache, ms), paged by event id: `StoredRequests` keeps the newest 500 in the endpoint's store (`events#…` items), shared by every instance, with the usage count as the total; on DynamoDB a page is one key-range Query. `RecentRequests` is the in-memory version (50) |
 | [src/auth.ts](src/auth.ts) | `keyMatches` and `isAuthorized`, shared by both entries: the endpoint key opens every route; a Crystal's own token (`CRYSTAL_TOKENS`, JSON `{key: token}`) opens only `POST /v0/e/<its key>` |
 | [src/live-runs.ts](src/live-runs.ts) | Copies live Liquid run counts to the store (the core saves a handler only when it turns Liquid): before Crystallize, when an engine closes (shutdown, eviction, replacement), and at most every `SLIME_RUNS_SYNC_MS` (default 60 s) on flush |
 | [src/store-dynamodb.ts](src/store-dynamodb.ts) | The core's `SlimeStore` Port on the existing table; one partition per endpoint |
@@ -46,7 +46,7 @@ Paths are the endpoint's own; the Lambda serves them under `/ep/<id>/`.
 | `GET /healthz` | `slm_` | `{ok, database, …stats}`; 503 when the database safety check fails. `?fresh=1` (Lambda): re-read the endpoint's settings first, in the same call |
 | `GET /v0/handlers`, `DELETE /v0/handlers/<key>` | `slm_` | live handlers and Crystals; evict one |
 | `GET /v0/lifecycle` | `slm_` | saved, live and Crystal rows, thresholds, warnings; `instance: true` on Lambda, where Gas rows are this instance's only |
-| `GET /v0/events` | `slm_` | `{ total, events }`: the last 50 requests from the store, the same on every instance; `total` is the endpoint's usage count |
+| `GET /v0/events?limit=&before=&after=` | `slm_` | `{ total, events, hasOlder, hasNewer }`, newest first, the same on every instance: `limit` 1-100 (default 50), `before`/`after` an event's `id` for the older or newer page (not both; anything else is 400); `total` is the endpoint's usage count |
 | `POST /v0/crystallize` `{keys}` | `slm_` | crystallize reports; on Lambda the Crystals go to S3 and this instance swaps its engine at once, other instances within the TTL |
 | `POST /v0/reload` | `slm_` | 204; on Lambda this instance forgets the endpoint's settings and engine, locally a no-op |
 

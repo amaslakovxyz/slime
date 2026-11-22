@@ -28,6 +28,23 @@ describe('DynamoSlimeStore on the existing table', () => {
     assert.ok(client.items.has('tenant-a|abc123'));
   });
 
+  test('page() reads one namespace of one tenant by key range, one item per page included', async () => {
+    const client = new FakeDynamo(1);
+    const store = new DynamoSlimeStore({ table: TABLE, tenantId: 'tenant-a', client });
+    for (const key of ['2026-01-01', '2026-01-02', '2026-01-03', '2026-01-04']) await store.put('events', key, { key });
+    await store.put('handlers', 'zzz', 'not an event');
+    await store.put('crystal', '2026-01-05', 'not an event either');
+    await new DynamoSlimeStore({ table: TABLE, tenantId: 'tenant-b', client }).put('events', '2026-01-09', 'another tenant');
+    const keys = (page: { entries: { key: string }[] }) => page.entries.map(({ key }) => key);
+
+    const first = await store.page('events', { limit: 2 });
+    assert.deepEqual([keys(first), first.hasOlder, first.hasNewer], [['2026-01-04', '2026-01-03'], true, false]);
+    const older = await store.page('events', { limit: 2, before: '2026-01-03' });
+    assert.deepEqual([keys(older), older.hasOlder, older.hasNewer], [['2026-01-02', '2026-01-01'], false, true]);
+    const newer = await store.page('events', { limit: 2, after: '2026-01-02' });
+    assert.deepEqual([keys(newer), newer.hasOlder, newer.hasNewer], [['2026-01-04', '2026-01-03'], true, false]);
+  });
+
   test('requires a table and a tenant', () => {
     assert.throws(() => new DynamoSlimeStore({ table: '', tenantId: 't', client: new FakeDynamo() }), /table name/);
     assert.throws(() => new DynamoSlimeStore({ table: TABLE, tenantId: '', client: new FakeDynamo() }), /tenant id/);

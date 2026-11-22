@@ -2023,3 +2023,7 @@ code.inline {
 .lc-row-crystal td { border-bottom: 0; }
 .lc-sub .lc-route { margin: 0 0 4px; }
 .lc-stage { padding-top: 30px; }
+
+/* Requests log pages: Newest / Newer on the left, Older on the right. */
+.pager { display: flex; justify-content: space-between; gap: 12px; margin-top: 16px; }
+.pager > div { display: flex; gap: 8px; }

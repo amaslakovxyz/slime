@@ -9,6 +9,7 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DeleteCommand, DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import type { SlimeStore, StoreEntry } from '@slime-cloud/core';
+import type { FeedPage, PagedStore, PageQuery } from './events.js';
 
 /** The slice of DynamoDBDocumentClient the store uses; tests pass a fake. */
 export interface DocClient {
@@ -23,7 +24,7 @@ export interface DynamoStoreOptions {
 
 const KEY_SEPARATOR = '#';
 
-export class DynamoSlimeStore implements SlimeStore {
+export class DynamoSlimeStore implements SlimeStore, PagedStore {
   readonly #table: string;
   readonly #tenantId: string;
   readonly #client: DocClient;
@@ -64,6 +65,50 @@ export class DynamoSlimeStore implements SlimeStore {
       ExclusiveStartKey = page.LastEvaluatedKey;
     } while (ExclusiveStartKey);
     return entries;
+  }
+
+  /**
+   * One page of a namespace, newest (highest key) first, read by key range: no read of the whole
+   * namespace. `before`/`after` are exclusive; BETWEEN is inclusive, so the cursor itself is dropped.
+   * `hasNewer` after `before` (and `hasOlder` after `after`) is true: the cursor came from a listed entry.
+   */
+  async page(ns: string, { limit, before, after }: Required<Pick<PageQuery, 'limit'>> & Omit<PageQuery, 'limit'>): Promise<FeedPage> {
+    const prefix = `${ns}${KEY_SEPARATOR}`;
+    const isForward = after !== undefined;
+    const range =
+      after !== undefined
+        ? { KeyConditionExpression: 'tenantId = :tenant AND artifactKey BETWEEN :lo AND :hi', values: { ':lo': `${prefix}${after}`, ':hi': `${prefix}\uffff` } }
+        : before !== undefined
+          ? { KeyConditionExpression: 'tenantId = :tenant AND artifactKey BETWEEN :lo AND :hi', values: { ':lo': prefix, ':hi': `${prefix}${before}` } }
+          : { KeyConditionExpression: 'tenantId = :tenant AND begins_with(artifactKey, :prefix)', values: { ':prefix': prefix } };
+    const cursor = after ?? before;
+    // One more than the page tells whether there is another; one more again for the inclusive cursor.
+    const wanted = limit + 2;
+    const items: { artifactKey: string; value: string }[] = [];
+    let ExclusiveStartKey: Record<string, unknown> | undefined;
+    do {
+      const page = await this.#client.send(
+        new QueryCommand({
+          TableName: this.#table,
+          KeyConditionExpression: range.KeyConditionExpression,
+          ExpressionAttributeValues: { ':tenant': this.#tenantId, ...range.values },
+          ScanIndexForward: isForward,
+          Limit: wanted - items.length,
+          ConsistentRead: true,
+          ExclusiveStartKey,
+        }),
+      );
+      items.push(...(page.Items ?? []));
+      ExclusiveStartKey = page.LastEvaluatedKey;
+    } while (ExclusiveStartKey && items.length < wanted);
+    const entries = items
+      .map((item) => ({ key: item.artifactKey.slice(prefix.length), value: JSON.parse(item.value) }))
+      .filter(({ key }) => key !== cursor);
+    const hasMore = entries.length > limit;
+    const pageEntries = entries.slice(0, limit);
+    return isForward
+      ? { entries: pageEntries.reverse(), hasNewer: hasMore, hasOlder: true }
+      : { entries: pageEntries, hasOlder: hasMore, hasNewer: before !== undefined };
   }
 
   async delete(ns: string, key: string): Promise<void> {
