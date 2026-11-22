@@ -11,14 +11,7 @@ import {
   promptHash,
   reviewMessage,
 } from './prompts.js';
-import { ArtifactSchema, ArtifactV2Schema, OptimizedCodeSchema, ReviewVerdictSchema } from './schemas.js';
-import { isArtifactV2, type AnyArtifact } from './artifact-v2.js';
-import {
-  MULTI_SOURCE_ARTIFACT_JSON_FORMAT,
-  MULTI_SOURCE_GENERATION_INSTRUCTIONS,
-  MULTI_SOURCE_REVIEW_INSTRUCTIONS,
-  multiSourceReviewMessage,
-} from './prompts-multi-source.js';
+import { ArtifactSchema, OptimizedCodeSchema, ReviewVerdictSchema } from './schemas.js';
 import type { Generator, ModelCallOptions, Optimizer, Reviewer } from './types.js';
 
 export interface ModelRoles {
@@ -36,8 +29,6 @@ interface RolePrompt {
 const GENERATION: RolePrompt = { instructions: GENERATION_INSTRUCTIONS, jsonFormat: ARTIFACT_JSON_FORMAT };
 const REVIEW: RolePrompt = { instructions: REVIEW_INSTRUCTIONS, jsonFormat: REVIEW_JSON_FORMAT };
 const OPTIMIZE: RolePrompt = { instructions: OPTIMIZE_INSTRUCTIONS, jsonFormat: OPTIMIZED_JSON_FORMAT };
-const MULTI_SOURCE_GENERATION: RolePrompt = { instructions: MULTI_SOURCE_GENERATION_INSTRUCTIONS, jsonFormat: MULTI_SOURCE_ARTIFACT_JSON_FORMAT };
-const MULTI_SOURCE_REVIEW: RolePrompt = { instructions: MULTI_SOURCE_REVIEW_INSTRUCTIONS, jsonFormat: REVIEW_JSON_FORMAT };
 const PART_SEPARATOR = '\n\n';
 
 /** A provider's public entry: each role built from the same client options. */
@@ -64,14 +55,12 @@ function generatorFor(client: ModelClient): Generator {
   return {
     model: client.model,
     promptHash: promptHash(client.provider, ...instructionParts(client, GENERATION)),
-    multiSourcePromptHash: promptHash(client.provider, ...instructionParts(client, MULTI_SOURCE_GENERATION)),
     async generate(request, options) {
-      const isMultiSource = request.format === 'v2';
-      const reply = await client.call<AnyArtifact>({
-        ...callBasics(client, isMultiSource ? MULTI_SOURCE_GENERATION : GENERATION, options),
+      const reply = await client.call({
+        ...callBasics(client, GENERATION, options),
         context: request.context,
         message: generationMessage(request),
-        schema: isMultiSource ? ArtifactV2Schema : ArtifactSchema,
+        schema: ArtifactSchema,
         label: 'generation',
       });
       return { artifact: reply.value, ...reply.usage };
@@ -83,11 +72,10 @@ function reviewerFor(client: ModelClient): Reviewer {
   return {
     model: client.model,
     async review(request, options) {
-      const isMultiSource = isArtifactV2(request.artifact);
       const reply = await client.call({
-        ...callBasics(client, isMultiSource ? MULTI_SOURCE_REVIEW : REVIEW, options),
+        ...callBasics(client, REVIEW, options),
         context: request.context,
-        message: isMultiSource ? multiSourceReviewMessage(request) : reviewMessage(request),
+        message: reviewMessage(request),
         schema: ReviewVerdictSchema,
         label: 'review',
       });

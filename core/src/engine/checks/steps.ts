@@ -1,6 +1,6 @@
-// Model-free checks of a v2 handler's steps (design §3.5). Pure, and needs only
+// Model-free checks of a handler's steps (design §3.5). Pure, and needs only
 // input names, so it also runs when a saved handler is loaded (MS14).
-import { isApiStep, type ApiArg, type ApiStep, type ArtifactV2, type SqlStep } from '../../models/artifact-v2.js';
+import { isApiStep, type ApiArg, type ApiStep, type Artifact, type SqlStep } from '../../models/artifact.js';
 import { matchesLeaf } from '../../request/shape.js';
 import { SlimeError } from '../../shared/errors.js';
 import type { ApiSchema, OperationInfo, ParamInfo } from '../../sources/types.js';
@@ -16,7 +16,7 @@ export interface StepLintContext {
 
 const STEP_NAME = /^[a-z][A-Za-z0-9]*$/;
 
-export function lintSteps(artifact: ArtifactV2, context: StepLintContext): void {
+export function lintSteps(artifact: Artifact, context: StepLintContext): void {
   const { steps } = artifact;
   if (steps.length < 1 || steps.length > context.maxSteps) throw invalidHandler(`A handler has 1 to ${context.maxSteps} steps; this one has ${steps.length}.`);
   const names = new Set<string>();
@@ -30,7 +30,7 @@ export function lintSteps(artifact: ArtifactV2, context: StepLintContext): void 
   if (steps.length > 1 && !artifact.shapeJs) throw invalidHandler('A handler with more than one step needs shapeJs to combine them.');
 }
 
-function lintSqlStep(step: SqlStep, { shapeJs }: ArtifactV2, context: StepLintContext): void {
+function lintSqlStep(step: SqlStep, { shapeJs }: Artifact, context: StepLintContext): void {
   if (step.source !== context.sqlSourceName) {
     const isApi = step.source in context.apiSchemas;
     throw invalidHandler(isApi ? `Step "${step.name}" is SQL but "${step.source}" is an API source.` : `Step "${step.name}" names an unknown source "${step.source}".`);

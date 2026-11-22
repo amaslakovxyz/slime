@@ -10,39 +10,36 @@ export interface DictionarySources {
   schema: SchemaInfo;
   glossary: Readonly<Record<string, string>>;
   rules: readonly string[];
-  /** API sources by name; none keeps the text and hashes exactly as before multi-source (MS3). */
+  /** API sources by name. */
   apiSchemas?: Readonly<Record<string, ApiSchema>>;
-  /** Named in the database heading when API sources are present. */
-  sqlSourceName?: string;
+  sqlSourceName: string;
 }
 
 export interface Dictionary {
   text: string;
   hash: string;
   schemaHash: string;
-  /** One hash per source, present only with API sources (MS17). */
-  sourceHashes?: Readonly<Record<string, string>>;
+  /** One hash per source (MS17). */
+  sourceHashes: Readonly<Record<string, string>>;
 }
 
-const DEFAULT_SQL_SOURCE_NAME = 'db';
-
-export function buildDictionary({ schema, glossary, rules, apiSchemas = {}, sqlSourceName = DEFAULT_SQL_SOURCE_NAME }: DictionarySources): Dictionary {
+export function buildDictionary({ schema, glossary, rules, apiSchemas = {}, sqlSourceName }: DictionarySources): Dictionary {
   const apiEntries = Object.entries(apiSchemas);
-  const hasApiSources = apiEntries.length > 0;
-  // With API sources the model must know the database's source name. Quoted: unquoted, a model took the whole
-  // heading ("db: postgresql 16.15 (Debian ...)") as the name (P0.3, P3.4).
-  const databaseHeading = hasApiSources ? `Database source "${sqlSourceName}": ${schema.dialect}` : `Database: ${schema.dialect}`;
+  // Every step names its source, so the model needs the database's name. Quoted: unquoted, a model took the
+  // whole heading ("db: postgresql 16.15 (Debian ...)") as the name (P0.3, P3.4).
   const sections = [
-    databaseHeading,
+    `Database source "${sqlSourceName}": ${schema.dialect}`,
     ...schema.tables.map(renderTable),
     ...apiEntries.map(([name, apiSchema]) => renderApiSource(name, apiSchema)),
     renderGlossary(glossary),
     renderRules(rules),
   ].filter((section) => section.length > 0);
   const text = sections.join('\n\n');
-  if (!hasApiSources) return { text, hash: sha256(text), schemaHash: sha256(canonicalJSON(schema)) };
-  const sourceHashes = Object.fromEntries([[sqlSourceName, sha256(canonicalJSON(schema))], ...apiEntries.map(([name, apiSchema]) => [name, sha256(canonicalJSON(apiSchema))])]);
-  return { text, hash: sha256(text), schemaHash: sha256(canonicalJSON({ sql: schema, api: apiSchemas })), sourceHashes };
+  const sqlSchemaHash = sha256(canonicalJSON(schema));
+  const sourceHashes = Object.fromEntries([[sqlSourceName, sqlSchemaHash], ...apiEntries.map(([name, apiSchema]) => [name, sha256(canonicalJSON(apiSchema))])]);
+  // A database alone keeps the database's hash, so saved handlers and Crystal made before API sources still match (C10).
+  const schemaHash = apiEntries.length === 0 ? sqlSchemaHash : sha256(canonicalJSON({ sql: schema, api: apiSchemas }));
+  return { text, hash: sha256(text), schemaHash, sourceHashes };
 }
 
 function renderTable(table: TableInfo): string {

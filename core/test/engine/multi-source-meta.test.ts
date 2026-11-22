@@ -1,18 +1,18 @@
-// v2 generation through the engine and its meta (MS3, R9), with the P1.2 guard bypassed.
+// Multi-source generation through the engine and its meta (R9).
 import assert from 'node:assert/strict';
 import { after, describe, test } from 'node:test';
 import { SlimeConfig, type SlimeOptions } from '../../src/config/slime-config.js';
 import type { SlimeEvent } from '../../src/config/options.js';
 import { createSlime } from '../../src/create-slime.js';
 import type { Slime } from '../../src/engine/types.js';
-import type { ArtifactV2 } from '../../src/models/artifact-v2.js';
+import type { Artifact } from '../../src/models/artifact.js';
 import type { GenerationRequest } from '../../src/models/types.js';
 import { memoryStore } from '../../src/stores/memory-store.js';
 import type { SlimeStore } from '../../src/stores/types.js';
 import { fakeApiSource } from '../../src/testing/fake-api-source.js';
 import { fakeConnector, stubGenerator } from '../../src/testing/fakes.js';
 
-const ARTIFACT: ArtifactV2 = {
+const ARTIFACT: Artifact = {
   version: 2,
   unsatisfiable: null,
   steps: [
@@ -45,14 +45,13 @@ async function start(options: Record<string, unknown>, store: SlimeStore): Promi
 }
 
 describe('multi-source generation and meta', () => {
-  test('explore mode asks for v2, runs the steps and shows them in meta and events', async () => {
+  test('explore mode runs the steps and shows them in meta and events', async () => {
     const requests: GenerationRequest[] = [];
     const events: SlimeEvent[] = [];
     const generator = stubGenerator((request) => (requests.push(request), ARTIFACT));
     const slime = await start({ generator, onEvent: (event: SlimeEvent) => events.push(event) }, memoryStore());
     const { data, meta } = await slime.query(REQUEST);
     assert.deepEqual(data, [{ name: 'Acme', open: 1 }, { name: 'Globex', open: 0 }]);
-    assert.equal(requests[0]?.format, 'v2');
     assert.ok(requests[0]?.context.startsWith('Database source "db": '));
     assert.deepEqual(meta.steps?.map(({ name, source, rows, operation }) => ({ name, source, rows, operation })), [
       { name: 'accounts', source: 'db', rows: 2, operation: undefined },
@@ -63,13 +62,13 @@ describe('multi-source generation and meta', () => {
     assert.deepEqual(generated?.type === 'generated' ? generated.steps : undefined, ARTIFACT.steps);
   });
 
-  test('a saved v2 handler records the multi-source prompt hash and per-source hashes (MS3, MS17)', async () => {
+  test('a saved handler records the prompt hash and per-source hashes (MS17)', async () => {
     const store = memoryStore();
     const slime = await start({ generator: stubGenerator(() => ARTIFACT) }, store);
     const { meta } = await slime.query(REQUEST);
     await slime.flush();
     const saved = (await store.get('handlers', meta.handlerKey)) as { provenance: { promptHash: string; sourceHashes?: Record<string, string> } };
-    assert.equal(saved.provenance.promptHash, 'stub-multi-source-prompt');
+    assert.equal(saved.provenance.promptHash, 'stub-prompt');
     assert.deepEqual(Object.keys(saved.provenance.sourceHashes ?? {}), ['db', 'notion']);
   });
 

@@ -8,9 +8,10 @@ run without an API key.
 
 ## Interface
 
-- `offlineGenerator(handlers: OfflineHandlers): Generator`
+- `offlineGenerator(handlers: OfflineHandlers, { sqlSourceName? }): Generator`
   (`offline-generator.ts`), where `OfflineHandlers` maps an intent to an
-  `Artifact`.
+  `Artifact`, or to the single-query form `{ sql, params, shapeJs }`, read as
+  one SQL step on `sqlSourceName` (default `db`).
   - `model` is `'offline'`;
   - `promptHash` is a hash of the handlers, so editing them regenerates
     handlers in explore mode.

@@ -1,5 +1,5 @@
 // Gas → Liquid and the review loop (PLAN.md §7, M4 promotion rule), with stub models.
-import { sqlOf } from '../../src/models/artifact-v2.js';
+import { sqlOf } from '../../src/models/artifact.js';
 import assert from 'node:assert/strict';
 import { after, describe, test } from 'node:test';
 import { SlimeConfig, type SlimeOptions } from '../../src/config/slime-config.js';

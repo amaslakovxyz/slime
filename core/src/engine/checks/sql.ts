@@ -1,11 +1,14 @@
 // Defence in depth only: the read-only database user is the real boundary.
 import { SlimeError } from '../../shared/errors.js';
-import type { Artifact } from '../../models/types.js';
 
 type Inputs = Readonly<Record<string, unknown>>;
 
-/** The parts of a handler the SQL lint reads: a v1 artifact, or one SQL step with the handler's shapeJs. */
-export type SqlCode = Pick<Artifact, 'sql' | 'params' | 'shapeJs'>;
+/** What the SQL lint reads: one SQL step with the handler's shapeJs. */
+export interface SqlCode {
+  sql: string;
+  params: readonly string[];
+  shapeJs: string | null;
+}
 
 const WRITE_SQL =
   /\b(insert|update|delete|merge|drop|alter|create|grant|revoke|truncate|copy|vacuum|set_config|pg_sleep|pg_read_file|lo_import|dblink)\b/i;

@@ -1,11 +1,12 @@
 // The crystallize job: turns proven Liquid handlers into Crystal modules in the
 // app's own code (C10). The app runs it from its own script with its own config.
-import { asV1, isArtifactV2 } from '../models/artifact-v2.js';
+import { asSingleQuery, type SingleQuery } from '../models/artifact.js';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { DEFAULT_LIMITS } from '../config/defaults.js';
 import type { LimitOptions } from '../config/options.js';
-import { HANDLERS_NS } from '../engine/handler-cache.js';
+import { SQL_SOURCE_DEFAULT_NAME } from '../config/source-rules.js';
+import { HANDLERS_NS, recordFromStore } from '../engine/handler-cache.js';
 import { forModel } from '../engine/generate.js';
 import type { HandlerRecord } from '../engine/types.js';
 import { changedProvenance, type HandlerProvenance } from '../request/key.js';
@@ -67,7 +68,7 @@ interface JobContext {
 export const DEFAULT_MIN_RUNS = 10;
 const DEFAULT_OPTIMIZE_TIMEOUT_MS = 120_000;
 const REVIEWS_ALLOWED = new Set(['approved', 'none']);
-const SKIPPED_API_STEPS = 'has API steps, which Crystal does not support yet';
+const SKIPPED_NOT_ONE_QUERY = 'has API steps or several steps; Crystal runs one SQL query';
 
 export async function crystallize(options: CrystallizeOptions): Promise<CrystalReport[]> {
   const runner = options.runner ?? new QuickJSRunner();
@@ -81,7 +82,8 @@ export async function crystallize(options: CrystallizeOptions): Promise<CrystalR
   try {
     const saved = await options.store.list(HANDLERS_NS);
     const reports: CrystalReport[] = [];
-    for (const { value } of saved) reports.push(await crystallizeOne(context, value as HandlerRecord));
+    // Crystal is SQL only, so the SQL source's name doesn't matter here.
+    for (const { value } of saved) reports.push(await crystallizeOne(context, recordFromStore(value, SQL_SOURCE_DEFAULT_NAME)));
     const hasNewCrystal = reports.some(({ outcome }) => outcome === 'crystallized');
     if (hasNewCrystal && !options.isDryRun) await writeManifestAndIndex(options.dir, context.manifest);
     return reports;
@@ -93,13 +95,13 @@ export async function crystallize(options: CrystallizeOptions): Promise<CrystalR
 async function crystallizeOne(context: JobContext, record: HandlerRecord): Promise<CrystalReport> {
   const report: CrystalReport = { key: record.key, intent: record.intent, outcome: 'not-ready', reasons: [] };
   if (context.manifest.entries[record.key]) return { ...report, outcome: 'already' };
-  // MS9: every stored v2 handler has an API step (single-SQL ones were stored as v1).
-  if (isArtifactV2(record.artifact)) return { ...report, outcome: 'skipped', reasons: [SKIPPED_API_STEPS] };
+  const query = asSingleQuery(record.artifact);
+  if (!query) return { ...report, outcome: 'skipped', reasons: [SKIPPED_NOT_ONE_QUERY] }; // MS9
   const notReadyReason = readinessProblem(record, context.minRuns, context.provenance);
   if (notReadyReason) return { ...report, reasons: [notReadyReason] };
 
   report.outcome = 'failed';
-  for (const candidate of await candidatesFor(context, record, report)) {
+  for (const candidate of await candidatesFor(context, record, query, report)) {
     try {
       const text = await verifyCandidate(context.deps, record, candidate.code);
       if (!context.options.isDryRun) await saveCrystal(context, record, candidate, text);
@@ -126,8 +128,7 @@ function readinessProblem(
 }
 
 /** The optimized version first, when there is an optimizer; the unchanged Liquid code always. */
-async function candidatesFor({ options }: JobContext, record: HandlerRecord, report: CrystalReport): Promise<Candidate[]> {
-  const { sql, params, shapeJs } = asV1(record.artifact, 'crystallize'); // v2 records were skipped in crystallizeOne
+async function candidatesFor({ options }: JobContext, record: HandlerRecord, { sql, params, shapeJs }: SingleQuery, report: CrystalReport): Promise<Candidate[]> {
   const unchanged: Candidate = { code: { sql, params, shape: shapeJs }, isOptimized: false, notes: [] };
   if (!options.optimizer) return [unchanged];
   try {

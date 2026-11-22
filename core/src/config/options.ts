@@ -1,7 +1,7 @@
 import type { CrystalRegistry } from '../engine/crystal/types.js';
 import type { Connector } from '../connectors/types.js';
 import type { Source } from '../sources/types.js';
-import type { Step } from '../models/artifact-v2.js';
+import type { Step } from '../models/artifact.js';
 import type { Generator, Reviewer } from '../models/types.js';
 import type { SlimeStore } from '../stores/types.js';
 
@@ -47,8 +47,8 @@ export interface GeneratedEvent {
   handlerKey: string;
   sql: string;
   shapeJs?: string;
-  /** v2 only: the handler's steps; `sql` holds its SQL steps joined. */
-  steps?: Step[];
+  /** `sql` holds the SQL steps joined. */
+  steps: Step[];
   assumptions: string[];
   tokens: number;
   ms: number;

@@ -6,7 +6,7 @@ import { after, describe, test } from 'node:test';
 import { SlimeConfig } from '../../src/config/slime-config.js';
 import { createSlime } from '../../src/create-slime.js';
 import type { Slime } from '../../src/engine/types.js';
-import type { ArtifactV2 } from '../../src/models/artifact-v2.js';
+import type { Artifact } from '../../src/models/artifact.js';
 import type { FetchFunction } from '../../src/sources/api/retry.js';
 import { notionSource } from '../../src/sources/notion/notion-source.js';
 import { memoryStore } from '../../src/stores/memory-store.js';
@@ -18,7 +18,7 @@ const DATA_SOURCE = '1f2e3d4c-5b6a-4789-8abc-def012345678';
 const FIXTURES = new URL('../fixtures/notion-handwritten/', import.meta.url);
 const replay = fixtureFetch(FIXTURES);
 const SCHEMA = JSON.parse(readFileSync(new URL('retrieve-feedback.json', FIXTURES), 'utf8')).response.body;
-const HANDLER: ArtifactV2 = {
+const HANDLER: Artifact = {
   version: 2,
   unsatisfiable: null,
   steps: [

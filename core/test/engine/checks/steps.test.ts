@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { lintSteps, type StepLintContext } from '../../../src/engine/checks/steps.js';
-import type { ApiStep, ArtifactV2, SqlStep } from '../../../src/models/artifact-v2.js';
+import type { ApiStep, Artifact, SqlStep } from '../../../src/models/artifact.js';
 import type { ApiSchema } from '../../../src/sources/types.js';
 
 const NOTION: ApiSchema = {
@@ -29,17 +29,17 @@ const API_STEP: ApiStep = {
     { param: 'createdFrom', input: 'since', value: null },
   ],
 };
-const VALID: ArtifactV2 = { version: 2, unsatisfiable: null, steps: [SQL_STEP, API_STEP], shapeJs: 'function shape(data) { return data.accounts; }', assumptions: [] };
+const VALID: Artifact = { version: 2, unsatisfiable: null, steps: [SQL_STEP, API_STEP], shapeJs: 'function shape(data) { return data.accounts; }', assumptions: [] };
 
-function withSteps(steps: ArtifactV2['steps'], overrides: Partial<ArtifactV2> = {}): ArtifactV2 {
+function withSteps(steps: Artifact['steps'], overrides: Partial<Artifact> = {}): Artifact {
   return { ...VALID, steps, ...overrides };
 }
 
-function withArgs(args: ApiStep['args']): ArtifactV2 {
+function withArgs(args: ApiStep['args']): Artifact {
   return withSteps([SQL_STEP, { ...API_STEP, args }]);
 }
 
-function refusal(artifact: ArtifactV2, pattern: RegExp, code = 'INVALID_HANDLER'): void {
+function refusal(artifact: Artifact, pattern: RegExp, code = 'INVALID_HANDLER'): void {
   assert.throws(() => lintSteps(artifact, CONTEXT), (error: { code?: string; message?: string }) => error.code === code && pattern.test(error.message ?? ''));
 }
 

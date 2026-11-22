@@ -6,7 +6,10 @@ The model ports and everything providers share, so a bench compares models,
 not prompts.
 
 - `types.ts`: the ports the engine calls: `Generator`, `Reviewer` and
-  `Optimizer`, with `Artifact` and the request and result types.
+  `Optimizer`, with the request and result types.
+- `artifact.ts`: `Artifact`, the handler a model writes (steps plus
+  `shapeJs`); `fromStoredArtifact` reads the older single-query form from
+  stored records, and `asSingleQuery` gives Crystal its one-query form (MS3).
 - `model-client.ts`: `ModelClient`, the one interface a provider implements.
 - `roles.ts`: `modelRoles(client)` builds the Generator, Reviewer and
   Optimizer from a client, with the shared prompts, schemas and prompt hash;
@@ -66,6 +69,7 @@ A provider outside core does the same against `@slime-cloud/core/models` and
   - `date` and `datetime` leaves;
   - a top-level object is one row, and `shapeJs` returns it or `null`;
   - the dictionary's rules win over the model's own judgment.
+- **One set of prompts** for every instance, with or without API sources.
 - **Byte-stable.** `promptHash(provider, ...parts)` (16 hex characters) is
   recorded in every handler; editing a prompt, or how `roles.ts` assembles
   it, regenerates handlers in explore mode. `test/models/prompt-hash.test.ts`

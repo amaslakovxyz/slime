@@ -49,8 +49,8 @@ export type {
   SchemaInfo,
   TableInfo,
 } from './connectors/types.js';
+export type { ApiArg, ApiStep, Artifact, LegacyArtifact, SqlStep, Step } from './models/artifact.js';
 export type {
-  Artifact,
   GenerationRequest,
   GenerationResult,
   Generator,

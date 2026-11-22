@@ -6,11 +6,11 @@ export interface SandboxLimits {
   memoryBytes: number;
 }
 
-/** v1: the rows; v2: { [stepName]: rows } (MS3). Both are embedded the same way. */
+/** Crystal: the rows; a handler: { [stepName]: rows } (MS3). Both are embedded the same way. */
 export type ShapeInput = unknown[] | Readonly<Record<string, unknown[]>>;
 
 export interface ShapeJob {
-  /** Source of `function shape(rows, input)` or, for v2, `function shape(data, input)`; it runs with no I/O. */
+  /** Source of `function shape(data, input)`, or `function shape(rows, input)` for Crystal; it runs with no I/O. */
   code: string;
   rows: ShapeInput;
   input: Record<string, unknown>;

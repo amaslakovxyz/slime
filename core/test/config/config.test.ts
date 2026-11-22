@@ -147,7 +147,6 @@ describe('sources (MS1)', () => {
     assert.equal(config.connector, connector);
     assert.deepEqual(Object.keys(config.sources), ['db']);
     assert.equal(config.sqlSourceName, 'db');
-    assert.equal(config.hasApiSources, false);
   });
 
   test('sources may name the SQL source anything', () => {
@@ -160,16 +159,9 @@ describe('sources (MS1)', () => {
   test('API sources are listed beside the SQL source', () => {
     const config = new SlimeConfig({ sources: { db: fakeConnector(), notion: apiSource(), films: apiSource() } });
     assert.deepEqual(config.apiSourceNames, ['notion', 'films']);
-    assert.equal(config.hasApiSources, true);
-    assert.equal(config.with({ rules: ['x'] }).hasApiSources, true);
+    assert.deepEqual(config.with({ rules: ['x'] }).apiSourceNames, ['notion', 'films']);
   });
 
-  test('a generator without a multi-source prompt hash is refused beside API sources', () => {
-    const { multiSourcePromptHash: _hash, ...v1Only } = fakeGenerator();
-    const found = problems({ sources: { db: fakeConnector(), notion: apiSource() }, generator: v1Only });
-    assert.deepEqual(found, ['generator has no multiSourcePromptHash, so it cannot write handlers for API sources; use a built-in generator or add it']);
-    assert.doesNotThrow(() => new SlimeConfig({ connector: fakeConnector(), generator: v1Only }));
-  });
 
   test('each source problem is reported', () => {
     const found = problems({ connector: fakeConnector(), sources: { db: fakeConnector() } });

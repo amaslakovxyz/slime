@@ -5,14 +5,14 @@ import { SlimeConfig, type SlimeOptions } from '../../src/config/slime-config.js
 import type { SlimeEvent } from '../../src/config/options.js';
 import { createSlime } from '../../src/create-slime.js';
 import type { Slime } from '../../src/engine/types.js';
-import type { ArtifactV2 } from '../../src/models/artifact-v2.js';
+import type { Artifact } from '../../src/models/artifact.js';
 import { memoryStore } from '../../src/stores/memory-store.js';
 import type { SlimeStore } from '../../src/stores/types.js';
 import type { ParamInfo, Source } from '../../src/sources/types.js';
 import { fakeApiSource } from '../../src/testing/fake-api-source.js';
 import { artifact, fakeConnector, stubGenerator } from '../../src/testing/fakes.js';
 
-const V2: ArtifactV2 = {
+const V2: Artifact = {
   version: 2,
   unsatisfiable: null,
   steps: [
@@ -76,6 +76,6 @@ describe('saved v2 handlers against changed sources (MS14)', () => {
     await explore.flush();
     const warnings: string[] = [];
     await start({ db: fakeConnector() }, otherStore, { onEvent: (event: SlimeEvent) => event.type === 'warning' && warnings.push(event.message) });
-    assert.ok(warnings.some((message) => /^1 saved multi-source handler\(s\) no longer fit the configured sources and are not served: [0-9a-f]{12}: .*unknown source "notion"/.test(message)), warnings.join('\n'));
+    assert.ok(warnings.some((message) => /^1 saved handler\(s\) no longer fit the configured sources and are not served: [0-9a-f]{12}: .*unknown source "notion"/.test(message)), warnings.join('\n'));
   });
 });

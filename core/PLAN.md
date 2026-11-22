@@ -92,14 +92,14 @@ Implemented in core and merged to `main` (PR #26) as an experimental layer:
 `platform/runtime` and the admin do not configure API sources yet. The
 decisions stay Proposed until they are confirmed against
 [product frame v0.2](../docs/product/product_frame_v0_2.md) (handler shape,
-Crystal for API steps). With no API source configured, Slime stays
-byte-identical to before (MS3).
+Crystal for API steps). Since 2026-11-22 every handler has steps, with or
+without API sources (MS3).
 
 | # | Decision | Status |
 |---|---|---|
 | MS1 | `sources` config: a map of named sources with exactly one SQL source and any number of API sources. `connector: x` means `sources: { db: x }`, and `config.connector` stays a required `Connector`. | Proposed |
 | MS2 | API source port: `describe({ timeoutMs, signal })`, `call(operation, args, { timeoutMs, rowCap, signal })`, `safetyCheck({ timeoutMs, signal })`, `close()`, `secrets`. Rows are flat plain JSON in output-notation leaf types, nullable where declared, with no list columns. | Proposed |
-| MS3 | v2 artifact `{ version: 2, unsatisfiable, steps, shapeJs, assumptions }`, produced only when an API source is configured. A v2 artifact whose only step is SQL is converted to v1 before its first run by nesting the model's `shape` inside a v1 `shape(rows, input)`. | Proposed |
+| MS3 | One artifact format, `{ version: 2, unsatisfiable, steps, shapeJs, assumptions }`, for every instance; one set of prompts and one prompt hash. The earlier single-query form (`{ sql, params, shapeJs(rows, input) }`) is only read from stored records and offline handlers, converted to one SQL step when loaded (`fromStoredArtifact`). Crystal runs one SQL query, so a one-SQL-step handler is turned back into that form for it (`asSingleQuery`). Changed 2026-11-22: it replaced a v1/v2 split that kept setups without API sources byte-identical; the cost was two prompts, two executors and a format flag. Existing handlers regenerate once in explore mode; `schemaHash` is unchanged for a database alone, so locked mode and Crystal keep matching. | Proposed |
 | MS4 | An API step's `args` is a list of `{ param, input, value }` with exactly one of `input` and `value` set (a list, because model structured output accepts only closed objects). Constants are checked against the parameter's type and `values`. | Proposed |
 | MS5 | New limits: `maxSteps` (default 4) and `apiTimeoutMs` (default 10 000). SQL steps keep `statementTimeoutMs`; every step keeps `rowCap`. | Proposed |
 | MS6 | A truncated step in a handler with more than one step fails the run with `QUERY_TOO_LARGE` (422). During generation it is repairable. | Proposed |

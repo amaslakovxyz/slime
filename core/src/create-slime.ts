@@ -1,9 +1,9 @@
 import type { SlimeConfig } from './config/slime-config.js';
 import { buildDictionary, type Dictionary } from './dictionary/dictionary.js';
 import { emitSafely } from './engine/events.js';
-import { HANDLERS_NS } from './engine/handler-cache.js';
+import { HANDLERS_NS, recordFromStore } from './engine/handler-cache.js';
 import { SlimeEngine } from './engine/slime-engine.js';
-import type { HandlerRecord, Slime } from './engine/types.js';
+import type { Slime } from './engine/types.js';
 import { SlimeConfigError } from './shared/errors.js';
 import type { Connector } from './connectors/types.js';
 import type { HandlerProvenance } from './request/key.js';
@@ -42,7 +42,7 @@ export async function createSlime(config: SlimeConfig, options: CreateSlimeOptio
   if (config.mode === 'locked') await warnAboutOtherSchemas(config, store, provenance.schemaHash);
   if (config.mode === 'locked') await warnAboutUnfitHandlers(config, store, apiSchemas);
   // Crystal is SQL only, so an API source's change must not flag it (MS17).
-  warnAboutOtherSchemaCrystals(config, dictionary.sourceHashes?.[config.sqlSourceName] ?? dictionary.schemaHash);
+  warnAboutOtherSchemaCrystals(config, dictionary.sourceHashes[config.sqlSourceName] ?? dictionary.schemaHash);
   const runner = options.runner ?? new QuickJSRunner();
   return new SlimeEngine({ config, store, runner, ownsRunner: !options.runner, dictionary, provenance, apiSchemas });
 }
@@ -58,16 +58,16 @@ function currentProvenance(config: SlimeConfig, dictionary: Dictionary): Handler
   return {
     schemaHash: dictionary.schemaHash,
     dictionaryHash: dictionary.hash,
-    promptHash: (config.hasApiSources ? generator?.multiSourcePromptHash : generator?.promptHash) ?? LOCKED_MARKER,
+    promptHash: generator?.promptHash ?? LOCKED_MARKER,
     model: generator?.model ?? LOCKED_MARKER,
-    ...(dictionary.sourceHashes ? { sourceHashes: dictionary.sourceHashes } : {}),
+    sourceHashes: dictionary.sourceHashes,
   };
 }
 
 /** Locked mode serves handlers made against another schema; it says so once, at startup (§4.7). */
 async function warnAboutOtherSchemas(config: SlimeConfig, store: SlimeStore, schemaHash: string): Promise<void> {
   const saved = await store.list(HANDLERS_NS);
-  const otherSchemaCount = saved.filter(({ value }) => (value as HandlerRecord).provenance.schemaHash !== schemaHash).length;
+  const otherSchemaCount = saved.filter(({ value }) => recordFromStore(value, config.sqlSourceName).provenance.schemaHash !== schemaHash).length;
   if (otherSchemaCount === 0) return;
   emitSafely(config.onEvent, {
     type: 'warning',
@@ -75,16 +75,16 @@ async function warnAboutOtherSchemas(config: SlimeConfig, store: SlimeStore, sch
   });
 }
 
-/** Locked mode won't serve saved v2 handlers that no longer fit the sources; it lists them once, at startup (MS14). */
+/** Locked mode won't serve saved handlers that no longer fit the sources; it lists them once, at startup (MS14). */
 async function warnAboutUnfitHandlers(config: SlimeConfig, store: SlimeStore, apiSchemas: Readonly<Record<string, ApiSchema>>): Promise<void> {
   const context = { sqlSourceName: config.sqlSourceName, apiSchemas, maxSteps: config.limits.maxSteps };
   const unfit = (await store.list(HANDLERS_NS))
-    .map(({ value }) => value as HandlerRecord)
+    .map(({ value }) => recordFromStore(value, config.sqlSourceName))
     .map((record) => ({ key: record.key, problem: savedHandlerProblem(record, context) }))
     .filter((entry): entry is { key: string; problem: string } => entry.problem !== undefined);
   if (unfit.length === 0) return;
   const list = unfit.map(({ key, problem }) => `${key.slice(0, HANDLER_KEY_PREFIX)}: ${problem}`).join('; ');
-  emitSafely(config.onEvent, { type: 'warning', message: `${unfit.length} saved multi-source handler(s) no longer fit the configured sources and are not served: ${list}` });
+  emitSafely(config.onEvent, { type: 'warning', message: `${unfit.length} saved handler(s) no longer fit the configured sources and are not served: ${list}` });
 }
 
 /** Crystal ships with the app and is served as it is; a schema change is reported once, at startup (C10). */

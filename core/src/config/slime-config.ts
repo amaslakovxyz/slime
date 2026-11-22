@@ -35,7 +35,6 @@ export class SlimeConfig {
   readonly sources: Readonly<Record<string, Source>>;
   readonly sqlSourceName: string;
   readonly apiSourceNames: readonly string[];
-  readonly hasApiSources: boolean;
   readonly generator: Generator | undefined;
   readonly reviewer: Reviewer | undefined;
   /** undefined: createSlime() builds the default file store. */
@@ -62,7 +61,6 @@ export class SlimeConfig {
     this.sqlSourceName = sqlSourceNameOf(sources);
     this.connector = sources[this.sqlSourceName] as Connector;
     this.apiSourceNames = Object.freeze(Object.keys(sources).filter((name) => isApiSource(sources[name] as Source)));
-    this.hasApiSources = this.apiSourceNames.length > 0;
     this.generator = options.generator;
     this.reviewer = options.reviewer;
     // Not copied: a store has behavior and state.

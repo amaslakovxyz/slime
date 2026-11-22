@@ -11,7 +11,7 @@ import { createSlime } from '../../src/create-slime.js';
 import { changedProvenance } from '../../src/request/key.js';
 import { crystallize } from '../../src/crystallize/index.js';
 import type { Slime } from '../../src/engine/types.js';
-import type { ArtifactV2, SqlStep } from '../../src/models/artifact-v2.js';
+import type { Artifact, SqlStep } from '../../src/models/artifact.js';
 import { memoryStore } from '../../src/stores/memory-store.js';
 import type { SlimeStore } from '../../src/stores/types.js';
 import type { Source } from '../../src/sources/types.js';
@@ -20,7 +20,7 @@ import { fakeConnector, stubGenerator, stubReviewer } from '../../src/testing/fa
 import { READER_URL, isDatabaseAvailable } from '../support/database.js';
 
 const ACCOUNTS: SqlStep = { name: 'accounts', source: 'db', sql: 'SELECT name FROM accounts', params: [] };
-const COMBINED: ArtifactV2 = {
+const COMBINED: Artifact = {
   version: 2,
   unsatisfiable: null,
   steps: [ACCOUNTS, { name: 'feedback', source: 'notion', operation: 'feedback.query', args: [{ param: 'sentiment', input: null, value: 'negative' }] }],
@@ -76,7 +76,7 @@ describe('multi-source handlers in the engine', () => {
   });
 
   test('QUERY_TOO_LARGE during generation is repaired with a narrower handler', async () => {
-    const narrowed: ArtifactV2 = { ...COMBINED, steps: [ACCOUNTS] , shapeJs: 'function shape(data) { return data.accounts.map((a) => ({ name: a.name, open: 0 })); }' };
+    const narrowed: Artifact = { ...COMBINED, steps: [ACCOUNTS] , shapeJs: 'function shape(data) { return data.accounts.map((a) => ({ name: a.name, open: 0 })); }' };
     const generator = stubGenerator((request) => (request.previous ? narrowed : COMBINED));
     const many = Array.from({ length: 5 }, () => ({ account: 'Acme' }));
     const notion = fakeApiSource({ operations: { 'feedback.query': feedback({ rows: many }) } });
@@ -90,7 +90,7 @@ describe('multi-source handlers in the engine', () => {
     after(() => Promise.all(dirs.map((dir) => rm(dir, { recursive: true, force: true }))));
 
     // With main's provenance check (M.2): the job compares against the instance's current provenance.
-    async function crystalOutcome(artifact: ArtifactV2): Promise<string | undefined> {
+    async function crystalOutcome(artifact: Artifact): Promise<string | undefined> {
       const store = memoryStore();
       const slime = await start({ generator: stubGenerator(() => artifact), store, tiers: { gasToLiquidRuns: 1 } });
       await slime.query(REQUEST);
@@ -102,7 +102,7 @@ describe('multi-source handlers in the engine', () => {
     }
 
     test('a single-SQL-step handler, stored as v1, crystallizes', async () => {
-      const singleSql: ArtifactV2 = { ...COMBINED, steps: [ACCOUNTS], shapeJs: 'function shape(data) { return data.accounts.map((a) => ({ name: a.name, open: 0 })); }' };
+      const singleSql: Artifact = { ...COMBINED, steps: [ACCOUNTS], shapeJs: 'function shape(data) { return data.accounts.map((a) => ({ name: a.name, open: 0 })); }' };
       assert.equal(await crystalOutcome(singleSql), 'crystallized');
     });
 
@@ -111,10 +111,10 @@ describe('multi-source handlers in the engine', () => {
     });
   });
 
-  test('provenance() carries the multi-source prompt hash and per-source hashes (M.2)', async () => {
+  test('provenance() carries the prompt hash and per-source hashes (M.2)', async () => {
     const slime = await start({ generator: stubGenerator(() => COMBINED) });
     const provenance = slime.provenance();
-    assert.equal(provenance.promptHash, 'stub-multi-source-prompt');
+    assert.equal(provenance.promptHash, 'stub-prompt');
     assert.deepEqual(Object.keys(provenance.sourceHashes ?? {}), ['db', 'notion']);
     assert.deepEqual(changedProvenance({ ...provenance, sourceHashes: { db: 'other' } }, provenance), [], 'sourceHashes alone never make a handler stale');
   });
@@ -122,7 +122,7 @@ describe('multi-source handlers in the engine', () => {
   test('against the demo database: SQL step on Postgres, API step on a fake source', async (context) => {
     if (!(await isDatabaseAvailable())) return context.skip('Postgres is not running');
     const plans: SqlStep = { name: 'plans', source: 'db', sql: 'SELECT p.name, count(a.id)::int AS "accounts" FROM plans p JOIN accounts a ON a.plan_id = p.id GROUP BY p.name ORDER BY p.name', params: [] };
-    const artifact: ArtifactV2 = {
+    const artifact: Artifact = {
       ...COMBINED,
       steps: [plans, COMBINED.steps[1]!],
       shapeJs: 'function shape(data) { return data.plans.map((p) => ({ plan: p.name, accounts: p.accounts, notes: data.feedback.length })); }',

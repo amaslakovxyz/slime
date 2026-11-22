@@ -4,7 +4,7 @@ import { after, describe, test } from 'node:test';
 import { DEFAULT_LIMITS } from '../../src/config/defaults.js';
 import type { Connector } from '../../src/connectors/types.js';
 import { executeArtifact, type ExecutionDeps } from '../../src/engine/execute.js';
-import type { ApiStep, ArtifactV2, SqlStep } from '../../src/models/artifact-v2.js';
+import type { ApiStep, Artifact, SqlStep } from '../../src/models/artifact.js';
 import { QuickJSRunner } from '../../src/sandbox/quickjs/quickjs-runner.js';
 import { SlimeError } from '../../src/shared/errors.js';
 import type { ApiSchema, ApiSource } from '../../src/sources/types.js';
@@ -39,7 +39,7 @@ const API_STEP: ApiStep = {
   ],
 };
 const SHAPE = 'function shape(data, input) { const open = new Map(); for (const f of data.feedback) open.set(f.account, (open.get(f.account) ?? 0) + 1); return data.accounts.map((a) => ({ name: a.name, open: open.get(a.name) ?? 0 })); }';
-const ARTIFACT: ArtifactV2 = { version: 2, unsatisfiable: null, steps: [SQL_STEP, API_STEP], shapeJs: SHAPE, assumptions: [] };
+const ARTIFACT: Artifact = { version: 2, unsatisfiable: null, steps: [SQL_STEP, API_STEP], shapeJs: SHAPE, assumptions: [] };
 const OUTPUT = [{ name: 'string', open: 'integer' }];
 const INPUT = { plan: 'pro', since: null };
 
@@ -80,7 +80,7 @@ describe('the step executor', () => {
     const first = fakeApiSource({ operations: { 'feedback.query': feedbackOperation({ gate: firstGate }) } });
     // The second source only runs if the first is still waiting, and it is what lets the first finish.
     const second = fakeApiSource({ operations: { 'feedback.query': feedbackOperation({ rows: () => (releaseFirst(), []) }) } });
-    const artifact: ArtifactV2 = { ...ARTIFACT, steps: [API_STEP, { ...API_STEP, name: 'more', source: 'jira' }], shapeJs: 'function shape(data) { return []; }' };
+    const artifact: Artifact = { ...ARTIFACT, steps: [API_STEP, { ...API_STEP, name: 'more', source: 'jira' }], shapeJs: 'function shape(data) { return []; }' };
     const execution = await executeArtifact(await deps({ notion: first, jira: second }), { artifact, output: OUTPUT, input: INPUT });
     assert.deepEqual(execution.data, []);
   });
@@ -91,7 +91,7 @@ describe('the step executor', () => {
     const sibling = fakeApiSource({ operations: { 'feedback.query': feedbackOperation({ gate: new Promise(() => {}) }) } });
     const originalCall = sibling.call.bind(sibling);
     sibling.call = (operation, args, options) => ((siblingSignal = options.signal), originalCall(operation, args, options));
-    const artifact: ArtifactV2 = { ...ARTIFACT, steps: [{ ...API_STEP, name: 'other', source: 'jira' }, API_STEP] };
+    const artifact: Artifact = { ...ARTIFACT, steps: [{ ...API_STEP, name: 'other', source: 'jira' }, API_STEP] };
     await assert.rejects(executeArtifact(await deps({ notion: failing, jira: sibling }), { artifact, output: OUTPUT, input: INPUT }), (error: SlimeError) => {
       assert.equal(error.code, 'SOURCE_ERROR');
       assert.equal(error.retryable, true);
@@ -134,7 +134,7 @@ describe('the step executor', () => {
 
   test('a single step without shapeJs returns its rows, cut and flagged as today', async () => {
     const notion = fakeApiSource({ operations: { 'feedback.query': feedbackOperation() } });
-    const artifact: ArtifactV2 = { ...ARTIFACT, steps: [API_STEP], shapeJs: null };
+    const artifact: Artifact = { ...ARTIFACT, steps: [API_STEP], shapeJs: null };
     const execution = await executeArtifact(await deps({ notion }, fakeConnector(), { rowCap: 2 }), { artifact, output: [{ account: 'string|null', sentiment: 'string|null' }], input: INPUT });
     assert.deepEqual(execution.data, FEEDBACK_ROWS.slice(0, 2));
     assert.equal(execution.truncated, true);

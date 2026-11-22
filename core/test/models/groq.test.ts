@@ -10,7 +10,7 @@ import type { GenerationRequest } from '../../src/models/types.js';
 
 const OPTIONS = { apiKey: 'test-key', model: 'openai/gpt-oss-120b', reasoningEffort: 'low' as const };
 const REQUEST: GenerationRequest = { context: 'Database: postgresql 16', intent: 'all plans', params: {}, output: [{ name: 'string' }] };
-const ARTIFACT = { unsatisfiable: null, sql: 'SELECT name FROM plans', params: [], shapeJs: null, assumptions: [] };
+const ARTIFACT = { version: 2 as const, unsatisfiable: null, steps: [{ name: 'plans', source: 'db', sql: 'SELECT name FROM plans', params: [] }], shapeJs: null, assumptions: [] };
 const CALL = { timeoutMs: 5_000 };
 const realFetch = globalThis.fetch;
 

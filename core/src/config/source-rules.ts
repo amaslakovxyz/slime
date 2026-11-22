@@ -9,12 +9,10 @@ const API_SOURCE_METHODS = ['describe', 'call', 'safetyCheck', 'close'];
 const CONNECTOR_REQUIRED = 'connector is required: it tells Slime where the data comes from (or pass sources)';
 const BOTH_GIVEN = 'connector and sources are both set: pass the database connector as one of sources, or use connector alone';
 const SOURCES_NOT_OBJECT = 'sources must be an object of { name: source }, for example { db: postgresConnector(...) }';
-const GENERATOR_NOT_MULTI_SOURCE = 'generator has no multiSourcePromptHash, so it cannot write handlers for API sources; use a built-in generator or add it';
 const ONE_SQL_SOURCE = 'sources must contain exactly one SQL source (a connector); API sources go beside it';
 export interface SourceOptions {
   connector?: unknown;
   sources?: unknown;
-  generator?: unknown;
 }
 
 export function sourceProblems(options: SourceOptions): string[] {
@@ -23,7 +21,7 @@ export function sourceProblems(options: SourceOptions): string[] {
   if (connector !== undefined && sources !== undefined) return [BOTH_GIVEN];
   if (connector !== undefined) return missingMethods('connector', connector, CONNECTOR_METHODS);
   if (!isPlainObject(sources) || Object.keys(sources).length === 0) return [SOURCES_NOT_OBJECT];
-  return [...namedSourceProblems(sources), ...sourceCountProblems(sources), ...generatorProblems(sources, options.generator)];
+  return [...namedSourceProblems(sources), ...sourceCountProblems(sources)];
 }
 
 function isApiSourceShape(source: unknown): boolean {
@@ -46,12 +44,6 @@ function sourceCountProblems(sources: Record<string, unknown>): string[] {
   return sqlCount === 1 ? [] : [ONE_SQL_SOURCE];
 }
 
-// The generator's multi-source prompt hash is what v2 handlers record (MS3).
-function generatorProblems(sources: Record<string, unknown>, generator: unknown): string[] {
-  if (!generator || typeof generator !== 'object' || !Object.values(sources).some(isApiSourceShape)) return [];
-  const hash = (generator as { multiSourcePromptHash?: unknown }).multiSourcePromptHash;
-  return typeof hash === 'string' && hash.length > 0 ? [] : [GENERATOR_NOT_MULTI_SOURCE];
-}
 
 export function missingMethods(optionName: string, value: unknown, methods: readonly string[]): string[] {
   if (!value || typeof value !== 'object') return [`${optionName} must be an object with ${methods.join(', ')}`];
