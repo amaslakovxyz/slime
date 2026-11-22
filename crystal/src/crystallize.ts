@@ -29,6 +29,8 @@ export interface CrystallizeOptions {
   optimizeTimeoutMs?: number;
   /** Check everything, write nothing. */
   isDryRun?: boolean;
+  /** Only these request keys; omit for every saved handler. */
+  keys?: readonly string[];
 }
 
 export type CrystalOutcome = 'crystallized' | 'already' | 'not-ready' | 'skipped' | 'failed';
@@ -70,7 +72,8 @@ export async function crystallize(options: CrystallizeOptions): Promise<CrystalR
     provenance: options.provenance,
   };
   try {
-    const saved = await options.store.list(HANDLERS_NS);
+    const picked = options.keys ? new Set(options.keys) : undefined;
+    const saved = (await options.store.list(HANDLERS_NS)).filter(({ key }) => !picked || picked.has(key));
     const reports: CrystalReport[] = [];
     // Crystal is SQL only, so the SQL source's name doesn't matter here.
     for (const { value } of saved) reports.push(await crystallizeOne(context, recordFromStore(value, SQL_SOURCE_DEFAULT_NAME)));

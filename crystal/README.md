@@ -23,9 +23,27 @@ exact core version.
 npm install --save-dev @slime-cloud/crystal   # beside @slime-cloud/core
 ```
 
+From a running instance, nothing is configured twice:
+
+```js
+import { Crystallizer } from '@slime-cloud/crystal';
+
+const crystallizer = new Crystallizer(slime, { dir: './slime-crystal' });
+await crystallizer.run();              // ready Liquid handlers → Crystal; equivalence checked before writing
+await crystallizer.run({ keys });      // only these request keys
+await crystallizer.verify();           // the folder against this instance's database
+```
+
+It uses the instance's connector, store, sandbox, limits and provenance, and
+its **live** run counts: after promotion a handler's runs and fixtures grow in
+memory only, so a job that reads the store alone sees too few runs. The
+standalone `crystallize({ connector, store, dir })` is for hosts that keep the
+store's counts current themselves (Slime Cloud syncs them).
+
 Source layout (`src/`):
 
 - `crystallize.ts`: the job.
+- `crystallizer.ts`: `Crystallizer`, the job from a running instance.
 - `equivalence.ts`: the equivalence test a candidate must pass.
 - `allowlist-rules.ts` and `allowlist.ts`: what a shape function may use.
 - `module-format.ts`: render a module, and parse one back.
@@ -137,4 +155,5 @@ runs against core's `dist/`. Then `npm test -w @slime-cloud/crystal`.
 - `test/verify.test.ts`: `pin` and `verify`, with fakes and against the demo
   Postgres.
 - `test/engine.test.ts`: the job with a real engine (a shared sandbox, MS9).
+- `test/crystallizer.test.ts`: `Crystallizer` with live run counts and keys.
 - `test/boundary.test.ts`: core is reached only through its package entries.
