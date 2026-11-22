@@ -6,6 +6,7 @@ import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { SlimeError, type Connector, type CrystalRegistry, type LayerSpan, type QueryMeta, type Slime } from '@slime-cloud/core';
 import { MAX_PAGE_LIMIT, type PageQuery, type RequestFailure, type RequestFeed } from './events.js';
+import type { HandlerCode } from './handler-code.js';
 
 /** A handler as the admin's Lifecycle tab sees it. */
 export interface LifecycleHandler {
@@ -47,6 +48,8 @@ export interface RuntimeParts {
   savedHandlers?: () => Promise<SavedHandler[]>;
   /** `POST /v0/crystallize`. Absent means the route does not exist. */
   crystallize?: (keys?: string[]) => Promise<CrystallizeOutcome[]>;
+  /** `GET /v0/handlers/:key/code`, for the Requests log's trace drawer. Absent means the route does not exist. */
+  handlerCode?: (key: string) => Promise<HandlerCode | undefined>;
   /** Runs needed for Gas → Liquid and for Crystal readiness, shown as progress. */
   thresholds?: { liquidRuns: number; crystalRuns: number };
   /** Startup and engine warnings, shown in the Lifecycle tab. */
@@ -115,7 +118,7 @@ function failureOf(error: unknown, ms: number, edge: LayerSpan): RequestFailure 
   return { status: error.status, code: error.code, ms, trace: [edge, ...trace], ...(error.handlerKey ? { handlerKey: error.handlerKey } : {}) };
 }
 
-export function createApp({ slime, connector, crystal, onQuery, log, events, savedHandlers, crystallize, thresholds, warnings, isPerInstance }: RuntimeParts): Hono {
+export function createApp({ slime, connector, crystal, onQuery, log, events, savedHandlers, crystallize, handlerCode, thresholds, warnings, isPerInstance }: RuntimeParts): Hono {
   const app = new Hono();
   const logLine = log ?? ((line: Record<string, unknown>) => console.log(JSON.stringify(line)));
 
@@ -173,6 +176,13 @@ export function createApp({ slime, connector, crystal, onQuery, log, events, sav
   app.delete('/v0/handlers/:key', async (c) =>
     (await slime.evict(c.req.param('key'))) ? c.json({ evicted: true }) : c.json({ evicted: false }, 404),
   );
+  if (handlerCode) {
+    app.get('/v0/handlers/:key/code', async (c) => {
+      const code = await handlerCode(c.req.param('key'));
+      if (!code) throw new SlimeError('HANDLER_NOT_FOUND', 'No handler with this key on this instance or in the store.');
+      return c.json(code);
+    });
+  }
 
   // A Crystal is its own endpoint: intent and output are fixed, the body carries only `input`.
   // The handler key hashes the input names, so the exact name set is required: a missing or

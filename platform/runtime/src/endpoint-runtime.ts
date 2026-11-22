@@ -4,6 +4,7 @@
 // with that endpoint's own env object. It reads only the env it is given, never
 // process.env, so one endpoint's settings cannot reach another's.
 import { changedProvenance, createSlime, type Generator, type HandlerProvenance, type SandboxRunner, type Slime } from '@slime-cloud/core';
+import { slimeInternals } from '@slime-cloud/core/tooling';
 import { Crystallizer } from '@slime-cloud/crystal';
 import type { Hono } from 'hono';
 import { createApp, type CrystallizeOutcome, type SavedHandler } from './app.js';
@@ -11,6 +12,7 @@ import { parseCrystalTokens } from './auth.js';
 import { missingProviderKey, slimeConfigFromEnv, type Env } from './config.js';
 import { CrystallizeConflictError, crystalsFromFolder, type CrystalLoad, type CrystalStore } from './crystal-store.js';
 import { RecentRequests, StoredRequests } from './events.js';
+import { codeOfCrystal, codeOfRecord } from './handler-code.js';
 import { DEFAULT_RUNS_SYNC_MS, LiveRunsSync, syncLiveRuns } from './live-runs.js';
 import type { DocClient } from './store-dynamodb.js';
 import { UsageMeter } from './usage.js';
@@ -179,6 +181,14 @@ export async function endpointRuntime(env: Env, deps: EndpointDeps = {}): Promis
       return store ? (await store.list(HANDLERS_NS)).map(({ value }) => toSavedHandler(value, current)) : [];
     },
     ...(store && crystalStore ? { crystallize: crystallizeKeys } : {}),
+    handlerCode: async (key) => {
+      const crystalHandler = config.crystal && Object.hasOwn(config.crystal, key) ? config.crystal[key] : undefined;
+      if (crystalHandler) return codeOfCrystal(key, crystalHandler);
+      const live = slimeInternals(slime).liveRecords().find((r) => r.key === key);
+      if (live) return codeOfRecord(live as never);
+      const saved = store ? ((await store.get(HANDLERS_NS, key)) as Parameters<typeof codeOfRecord>[0] | undefined) : undefined;
+      return saved ? codeOfRecord(saved) : undefined;
+    },
   });
 
   const flush = async () => {
