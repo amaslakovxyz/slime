@@ -291,7 +291,7 @@ import { crystals } from './slime-crystal/index.mjs';
 const config = new SlimeConfig({
   connector: postgresConnector({ url: process.env.READER_URL! }), // required; createSlime() refuses database users that can write
   store: fileStore('./.slime'),                                    // the default (§4.7)
-  generator: claude.generator({ apiKey: process.env.ANTHROPIC_API_KEY!, model: 'claude-haiku-5-5' }), // omit = locked mode
+  generator: claude.generator({ apiKey: process.env.ANTHROPIC_API_KEY!, model: 'claude-sonnet-5-5', effort: 'low' }), // omit = locked mode
   reviewer: claude.reviewer({ apiKey: process.env.ANTHROPIC_API_KEY!, model: 'claude-sonnet-5-5' }),  // omit = no review
   crystal: crystals,                                               // omit = off
   glossary: { revenue: 'sum of paid invoices, in cents' },        // optional; meaning of the app's words (§4.4)
