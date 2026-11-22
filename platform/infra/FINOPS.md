@@ -13,6 +13,7 @@ Free Tier API.
 | S3 (state, other buckets) | cents | partly |
 | **slime** (Lambda, CloudFront, logs, S3 state) | **$0.001 this month** | Always Free |
 | RDS `slime-test-db` (db.t4g.micro, 20 GB gp3, public IPv4), test + demo shop DB | ≈ $20/month (since 2026-11-22) | never |
+| Lambda `slime-atlas` (Atlas demo customer site, public Function URL) | ≈ $0: pay per request, inside the free tier at demo traffic | Always Free |
 
 Baseline was ~$2/month; the always-on RDS raises it to ≈ $22/month (renewal
 months ≈ $40-43). WAF cost $7-8/month in

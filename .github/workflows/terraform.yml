@@ -20,7 +20,8 @@ name: Terraform AWS
 # Every stack is planned/applied on every run; unchanged stacks are no-ops.
 #
 # Trigger paths = every input of a deployed artifact: platform/build.sh also
-# builds crystal/ and installs from the root package.json/package-lock.json.
+# builds crystal/ and installs from the root package.json/package-lock.json;
+# atlas/build.sh bundles examples/customer-site/.
 # Keep DEPLOY_PATHS in the apply job's "Skip if superseded" step in sync.
 
 on:
@@ -31,6 +32,7 @@ on:
       - crystal/**
       - package.json
       - package-lock.json
+      - examples/customer-site/**
       - .github/workflows/terraform.yml
   push:
     branches: [main]
@@ -40,6 +42,7 @@ on:
       - crystal/**
       - package.json
       - package-lock.json
+      - examples/customer-site/**
       - .github/workflows/terraform.yml
   workflow_dispatch:
     inputs:
@@ -209,7 +212,7 @@ jobs:
       - name: Skip if superseded
         id: fresh
         run: |
-          DEPLOY_PATHS=(platform core crystal package.json package-lock.json .github/workflows/terraform.yml)
+          DEPLOY_PATHS=(platform core crystal package.json package-lock.json examples/customer-site .github/workflows/terraform.yml)
           git fetch --no-tags --depth=1 origin main
           main=$(git rev-parse FETCH_HEAD)
           set +e

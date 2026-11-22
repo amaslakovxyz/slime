@@ -2,6 +2,7 @@
 
 * **Status:** Current (matches `examples/customer-site`, `platform/runtime` and `platform/admin` on main, 2026-11-22).
 * **Use it for:** explaining the Atlas demo at the table, and onboarding someone who wants to try Slime on their own database.
+* **Try it:** <https://g2a4gnm6afgghto6jah6qdxrpu0ycxbq.lambda-url.eu-central-1.on.aws/> (the Atlas site, live).
 * **Context:** [atlas-demo.md](atlas-demo.md) (who Atlas is), [customer-demo-use-cases.md](customer-demo-use-cases.md) (cases, script, measurements), [core/docs/request-format.md](../../core/docs/request-format.md) (the request contract).
 
 ## Who is who
@@ -10,7 +11,7 @@
 |---|---|---|
 | **Visitor** | Someone at the hackathon on the Atlas page | Buttons and dropdowns. Never a key, never an intent. |
 | **Atlas's agent** | Claude Code in Atlas's repo | Writes `panels.mjs`: one `{intent, input, output}` per panel. No SQL. |
-| **Atlas's server** | `examples/customer-site/src/app.mjs` | Holds the `slm_` key, forwards panel id + picked values to Slime. |
+| **Atlas's server** | `examples/customer-site/src/app.mjs`, live on Lambda `slime-atlas` | Holds the `slm_` key, forwards panel id + picked values to Slime. |
 | **Operator** | Whoever owns the endpoint in the admin | Creates the endpoint, watches the Lifecycle tab, presses Crystallize. |
 | **Slime runtime** | One Lambda (`slime-runtime`) for all endpoints | Generates, checks, runs, reviews and saves handlers. |
 | **Atlas's database** | RDS Postgres, role `slime_reader` | Answers read-only SQL; hides `accounts.password_hash`. |

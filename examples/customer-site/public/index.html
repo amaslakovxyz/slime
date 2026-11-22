@@ -84,9 +84,10 @@
       box.replaceChildren();
       const { meta = {}, route, roundTripMs } = result;
       if (meta.tier) box.append(text('span', meta.tier, `badge tier ${meta.tier}`));
-      box.append(text('span', ROUTE_LABEL[route] ?? route, 'badge'));
+      // The site's own errors (NOT_CONFIGURED) never reached Slime: no route, no round trip.
+      box.append(text('span', ROUTE_LABEL[route ?? null] ?? route, 'badge'));
       if (meta.timingsMs) box.append(text('span', `engine ${meta.timingsMs.total} ms`, 'badge'));
-      box.append(text('span', `round trip ${roundTripMs} ms`, 'badge'));
+      if (roundTripMs !== undefined) box.append(text('span', `round trip ${roundTripMs} ms`, 'badge'));
       if (meta.timingsMs?.generate) box.append(text('span', `generated in ${meta.timingsMs.generate} ms`, 'badge'));
       if (meta.review && meta.review !== 'none') box.append(text('span', `review ${meta.review}`, 'badge'));
       if (meta.steps) box.append(text('span', `sources: ${[...new Set(meta.steps.map((step) => step.source))].join(' + ')}`, 'badge'));

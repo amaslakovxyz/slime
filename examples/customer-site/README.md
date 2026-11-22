@@ -6,7 +6,7 @@ instead of SQL, endpoints and a data layer. The use cases and the demo script ar
 [docs/product/customer-demo-use-cases.md](../../docs/product/customer-demo-use-cases.md).
 For the hackathon audience: [atlas-demo.md](../../docs/product/atlas-demo.md) (one page)
 and [atlas-demo-cheatsheet.md](../../docs/product/atlas-demo-cheatsheet.md) (who does what,
-with diagrams). Public deploy plan:
+with diagrams). How the public site was deployed:
 [2026-11-22-atlas-public-site-plan.md](../../docs/product/2026-11-22-atlas-public-site-plan.md).
 
 | File | What |
@@ -14,6 +14,7 @@ with diagrams). Public deploy plan:
 | `src/panels.mjs` | The three panel specs: intent, output, offered input values, upstream, Crystal env names |
 | `src/app.mjs` | Hono: serves the page and `POST /api/panels/:id`, which forwards to Slime with the key |
 | `src/server.mjs` | Node entry (`PORT`, default 4000) |
+| `src/lambda.mjs` | Lambda entry for the public site: settings from SSM `/slime/atlas/`, then `hono/aws-lambda` |
 | `public/index.html` | The page: one card per panel, the answering tier, timings and the code that answered |
 | `test/app.test.mjs` | Routing, keys and input checks against a fake Slime |
 
@@ -35,6 +36,15 @@ with diagrams). Public deploy plan:
 
 With 1Password, keep `op://` references in the env file instead of values:
 `op run --env-file=.env -- npm start`.
+
+## Public site
+
+Live at <https://g2a4gnm6afgghto6jah6qdxrpu0ycxbq.lambda-url.eu-central-1.on.aws/>
+(Lambda `slime-atlas`, stack [platform/infra/atlas](../../platform/infra/atlas/README.md)).
+Revenue by plan answers from its Crystal, Churn risk from the Liquid handler on the
+`atlas-demo` endpoint. Customer 360 needs the self-hosted server, so the public site sets
+`MULTI_SOURCE_URL=off` and the card says "not configured". A merge to `main` that
+touches this folder redeploys it.
 
 ## Boundaries
 
