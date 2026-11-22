@@ -85,7 +85,7 @@ sequenceDiagram
 | # | You do | You see | Slime does |
 |---|---|---|---|
 | 1 | Create a read-only role: `CREATE ROLE slime_reader LOGIN PASSWORD '…'`, `GRANT SELECT` on what Slime may read (column grants hide the rest) | Nothing yet | At startup refuses a role that can write, create roles or databases |
-| 2 | In the admin, create an endpoint with that database URL | Endpoint URL `https://<runtime host>/ep/<id>` and an `slm_` key | Stores the settings (SSM), health-checks the endpoint |
+| 2 | In the admin, create an endpoint with that database URL | Endpoint URL `https://<runtime host>/ep/<id>/` (with the trailing slash) and an `slm_` key | Stores the settings (SSM), health-checks the endpoint |
 | 3 | Let your agent write a request: `intent` in plain English, `input` names, `output` shape | A file like [`panels.mjs`](../../examples/customer-site/src/panels.mjs) | Nothing yet |
 | 4 | Send it once from your server (curl below) | Data + `tier: gas`, `cache: miss`, the generated `sql` | Generates, checks and runs the handler |
 | 5 | Keep calling it (any input values) | `review: pending`, then `approved`, then `tier: liquid` | Reviews the handler in the background, saves it |
@@ -95,15 +95,17 @@ sequenceDiagram
 ### Calls to copy
 
 ```bash
+# SLIME_URL: the endpoint URL; the admin shows it with a trailing "/", examples/customer-site and the
+# Atlas SSM value have none. ${SLIME_URL%/} works with both (a doubled "/" answers 404).
 # Step 4-5: any request, with the endpoint key
-curl -s "$SLIME_URL/v0/query" -H "x-api-key: $SLIME_API_KEY" -H 'content-type: application/json' -d '{
+curl -s "${SLIME_URL%/}/v0/query" -H "x-api-key: $SLIME_API_KEY" -H 'content-type: application/json' -d '{
   "intent": "past-due accounts in a given country with their plan, unpaid invoice total in cents and last activity date, largest unpaid total first",
   "input": { "country": "FR" },
   "output": [{ "name": "string", "plan": "string", "unpaidCents": "integer", "lastActivity": "date|null" }]
 }' | jq '{rows: (.data | length), tier: .meta.tier, cache: .meta.cache, review: .meta.review}'
 
 # Step 7: the Crystal, with its own token; only its input names are accepted
-curl -s "$SLIME_URL/v0/e/$CRYSTAL_KEY" -H "x-api-key: $CRYSTAL_TOKEN" -H 'content-type: application/json' -d '{"input": {}}'
+curl -s "${SLIME_URL%/}/v0/e/$CRYSTAL_KEY" -H "x-api-key: $CRYSTAL_TOKEN" -H 'content-type: application/json' -d '{"input": {}}'
 ```
 
 ## Keys

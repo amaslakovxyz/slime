@@ -37,12 +37,12 @@ In:
 * a **local runner** that turns a `pending` endpoint into a running runtime
   process on localhost, in place of the AWS provisioner (since removed: in
   the cloud the admin provisions endpoints itself);
-* runtime additions: a Node server entry, a recent-requests feed, a local-only
-  crystallize route;
+* runtime additions: a Node server entry, a recent-requests feed, a
+  crystallize route (local first; the cloud MVP mounts it on Lambda too, L20);
 * the admin **Lifecycle** tab, wired to a real endpoint.
 
 Out (later): a GitHub PR for Crystal, an MCP endpoint (`/mcp`), multi-user
-concurrency, persistence of the feed. AWS deployment of this flow is the cloud
+concurrency, persistence of the feed (since added, L23). AWS deployment of this flow is the cloud
 MVP design (L20–L23).
 
 ## 3. Decisions
@@ -51,7 +51,7 @@ MVP design (L20–L23).
 |---|---|---|
 | L1 | Crystallize writes modules into the endpoint's own folder and restarts it. No PR. | The whole cycle is visible without GitHub; a PR is the next step. |
 | L2 | A separate `local-runner` process supervises runtimes; admin and runner talk only through `slime-control`, like the AWS provisioner. | Next.js dev reloads must not kill or orphan child processes. Same state machine as AWS (`pending → ready`, `updating → ready`). |
-| L3 | Crystallize runs inside the endpoint's runtime (`POST /v0/crystallize`, only in the local entry `src/local.ts` when `SLIME_CRYSTAL_DIR` is set; the Lambda entry never mounts it). Local entry; cloud: see L20/L22. | The runtime already holds the store and connector that `crystallize()` needs. |
+| L3 | Crystallize runs inside the endpoint's runtime (`POST /v0/crystallize`, mounted only when the endpoint has a Crystal store: locally `SLIME_CRYSTAL_DIR`, on Lambda the S3 store since the cloud MVP, L20). | The runtime already holds the store and connector that `crystallize()` needs. |
 | L4 | After crystallizing, the admin sets `status=updating`; the runner restarts the runtime, which loads the new `index.mjs`. Local entry; cloud: see L20/L22. | Reuses the existing reconfigure flow; Crystal is read at startup. |
 | L5 | The tab polls the runtime every 2 s through server code (token from the secret store). | No token in the browser; same polling pattern as `StatusPoller`. |
 | L6 | Snippet tabs v1: **Prompt** and **HTTP** only. The MCP tab returns when `/mcp` exists. | Never show a command that does not work. |
@@ -84,10 +84,12 @@ MVP design (L20–L23).
   capped by `SLIME_FLUSH_LIMIT_MS` (a running review can take tens of seconds;
   the tab polls with a 3 s timeout). GETs skip the wait. Crystallize itself
   waits for every write, so `runs` and fixtures are current when it reads them.
-* **Recent requests:** a ring buffer of the last 50 answered queries
-  (`{at, handlerKey, tier, cache, ms}`), fed by the existing `onQuery` hook.
-  `GET /v0/events` returns it. Memory only.
-* **`POST /v0/crystallize`** `{ keys?: string[] }` (local entry only, when `SLIME_CRYSTAL_DIR` is set):
+* **Recent requests:** answered queries (`{id, at, handlerKey, tier, cache, ms}`,
+  plus `route: 'crystal'` for a call on a Crystal's route), fed by the existing
+  `onQuery` hook. `GET /v0/events?limit=&before=&after=` returns one page,
+  newest first. First a 50-entry memory buffer; since 2026-11-22 the
+  endpoint's store keeps the newest 500 (L23).
+* **`POST /v0/crystallize`** `{ keys?: string[] }` (mounted only with a Crystal store: locally `SLIME_CRYSTAL_DIR`, on Lambda S3, L20):
   runs `crystallize({ connector, store, dir: SLIME_CRYSTAL_DIR, minRuns, provenance })`
   without an optimizer (the unchanged Liquid code is the candidate). `keys`
   limits the job through a read-only store view whose `list()` returns only
@@ -101,7 +103,7 @@ MVP design (L20–L23).
   no handler ever reaches `minRuns` from live traffic (`syncLiveRuns`).
 * **`GET /v0/lifecycle`** merges saved, live and Crystal handlers (one row per
   key, most mature tier wins; a stale saved row ranks below live Gas, L18) and
-  returns the thresholds (`gasToLiquidRuns`, `CRYSTAL_MIN_RUNS`) and the
+  returns the thresholds (`{liquidRuns, crystalRuns}`, from `gasToLiquidRuns` and `CRYSTAL_MIN_RUNS`) and the
   engine's startup warnings (L19).
 * **`POST /v0/e/<crystal key>`**: a Crystal's own route (L8); refuses missing
   and unknown input names (L17).
@@ -188,7 +190,7 @@ sequenceDiagram
 
 ## 7. Testing
 
-* Runtime: events buffer (cap, order), crystallize route off by default and
+* Runtime: events buffer (cap, order), crystallize route mounted only with a Crystal store and
   limited to `keys`.
 * Runner: start/updating/deleting against fake spawn and fake table;
   failed health check → `failed` with stderr.

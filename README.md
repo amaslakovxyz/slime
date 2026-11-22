@@ -42,7 +42,7 @@ Backend -- Slime runtime:
   whose endpoints are answered by `@slime-cloud/core`; its own lockfile. It
   also holds the demo database (`db/init.sql`) that core's tests and CI use.
 - [examples/hono/](./examples/hono/README.md) - the smallest app around
-  the core: one Hono file with `/health` and `POST /slime`.
+  the core: one Hono file with `POST /slime`, `POST /crystallize` and `GET /health`.
 - [examples/multi-source/](./examples/multi-source/README.md) - one instance
   over Postgres, Notion and two public APIs (films, euro rates); replays
   recorded API responses, so its tests run in CI without accounts.
