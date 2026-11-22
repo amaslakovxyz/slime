@@ -27,6 +27,7 @@ Project-wide docs. Code-local docs live next to their code and are listed at the
 - [../examples/multi-source/README.md](../examples/multi-source/README.md) (Current, multi-source example)
 - [../examples/customer-site/README.md](../examples/customer-site/README.md) (Current, customer demo site)
 - [../examples/express/README.md](../examples/express/README.md) (Current, example app and demo database)
+- [../examples/shop/README.md](../examples/shop/README.md) (Current, demo shop database and 10 use cases)
 - [../platform/runtime/README.md](../platform/runtime/README.md) (Current)
 - [../platform/infra/README.md](../platform/infra/README.md) and [../platform/infra/FINOPS.md](../platform/infra/FINOPS.md) (Current)
 - [../platform/docs/reviews/2026-11-20-infra-review.md](../platform/docs/reviews/2026-11-20-infra-review.md) (Record)

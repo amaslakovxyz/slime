@@ -59,13 +59,13 @@ variable "anomaly_alert_usd" {
 variable "project_budget_limit_usd" {
   description = "Monthly project budget in USD. At 100% actual spend the freeze action blocks new paid resources (finops.tf)."
   type        = number
-  default     = 15
+  default     = 30
 }
 
 variable "project_budget_alert_usd" {
   description = "Early-warning alert on actual project spend, in USD."
   type        = number
-  default     = 10.5
+  default     = 21
 
   validation {
     condition     = var.project_budget_alert_usd < var.project_budget_limit_usd

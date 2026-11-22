@@ -114,7 +114,8 @@ contract test it must pass.
 - `bench/`: `npm run bench`. `cases.mjs` holds 8 cases with reference
   queries; `run.mjs` runs them through the built package against the demo
   database, with Groq or Claude (it needs `GROQ_API_KEY` or
-  `ANTHROPIC_API_KEY`).
+  `ANTHROPIC_API_KEY`). `BENCH_CASES=examples/shop/bench-cases.mjs` runs the
+  shop cases ([examples/shop](../examples/shop/README.md)) instead.
 - `test/`: `node:test` suites run through `tsx`, mirroring `src/`;
   `test/support/` holds the database helpers.
 - `docs/`: [request-format.md](./docs/request-format.md) is the request

@@ -49,6 +49,9 @@ Backend -- Slime runtime:
 - [examples/customer-site/](./examples/customer-site/README.md) - a customer's
   site with no data backend: three panels answered by a Slime Cloud endpoint
   (one through its Crystal) and the multi-source example; the customer demo.
+- [examples/shop/](./examples/shop/README.md) - a demo online-shop database
+  (12 tables, deterministic) loaded into the cloud test RDS as database `shop`,
+  with 10 demo use cases that run through the bench (`BENCH_CASES`).
 - **`platform/` — hosted Slime Cloud**
   - [platform/landing/](./platform/landing/README.md) - Static marketing page
     (one `index.html`, no build step). Preview with `just landing`.

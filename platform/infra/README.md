@@ -15,10 +15,26 @@ stack with a `build.sh` gets it run before plan/apply (platform builds the
 runtime bundle and the admin). Apply refuses plans with pure deletes; replacements pass.
 Run it by hand with `allow_destroy` when a delete is intended.
 
-Once a stack is applied by CI, do not apply it from a branch: the next push to
-`main` would plan your branch-only resources away (the delete guard stops it).
-The one planned exception is the cloud MVP cutover below, applied from its
-branch so that the CI apply after merge shows no changes.
+A push to `main` deploys when it touches any input of a deployed artifact:
+`platform/**`, `core/**`, `crystal/**`, the root `package.json` or
+`package-lock.json`, or the workflow itself. Docs- and examples-only merges do
+not deploy. Before apply, a run checks that `main` has not changed those inputs
+since its own commit; if it has, the run skips apply (a notice says so) and
+leaves it to the newer run. So a **Re-run** of an old run never rolls prod
+back. To redeploy the current `main`, use **Run workflow**.
+
+Once a stack is applied by CI, change it only through a pull request:
+
+- do not `terraform apply` it from a laptop or a branch: the next push to
+  `main` would plan your branch-only resources away (the delete guard stops it);
+- do not edit its resources with `aws` CLI or the console (for example
+  `aws lambda update-function-configuration`): the next apply reverts managed
+  attributes, and until then prod differs from `main`.
+
+The one planned exception was the cloud MVP cutover below, applied from its
+branch so that the CI apply after merge shows no changes. Resources that are
+deliberately outside Terraform are listed where they are used: the SSM secrets
+(below) and the temporary test database.
 
 ```mermaid
 flowchart LR
@@ -137,27 +153,36 @@ from `feat/cloud-mvp`; step 7 runs on merge.
    code. The next CI plan shows no changes. Build branch applies in Linux
    (`node:22`) to avoid it; admin (input-hash trigger) and landing already match.
 
-### Temporary test database (`slime-test-db`, not in Terraform)
+### Test and demo database (`slime-test-db`, not in Terraform)
 
-A throwaway RDS for the cloud end-to-end run, created by hand on 2026-11-22:
-PostgreSQL 16, `db.t4g.micro`, 20 GB gp3, one AZ, no backups, encrypted, public
-(the runtime Lambda has no VPC and no fixed IPs; security group `slime-test-db`
-opens 5432, SSL is forced, passwords are random). It holds the demo schema from
-`examples/express/db/init.sql`.
+An RDS created by hand on 2026-11-22: PostgreSQL 16, `db.t4g.micro`, 20 GB gp3,
+one AZ, no backups, encrypted, public (the runtime Lambda has no VPC and no
+fixed IPs; security group `slime-test-db` opens 5432, SSL is forced, passwords
+are random). It holds two databases:
 
-- URLs: SSM `/slime/test-db/READER_URL` (the read-only `slime_reader`, use this
-  for endpoints) and `/slime/test-db/MASTER_URL`. Both end in
+- `slime`: the SaaS demo schema from `examples/express/db/init.sql`, used by the
+  cloud smoke. Read-only `slime_reader`: SSM `/slime/test-db/READER_URL`.
+- `shop`: the demo online shop from `examples/shop/db/shop.sql`
+  ([examples/shop](../../examples/shop/README.md)). Read-only `shop_reader`:
+  SSM `/slime/test-db/SHOP_READER_URL`. Reload with
+  `examples/shop/scripts/load-rds.sh` (drops and recreates `shop` and rotates
+  the reader password).
+
+Access and lifecycle:
+
+- URLs: the two reader URLs above (use these for endpoints) and
+  `/slime/test-db/MASTER_URL`. All end in
   `?sslmode=require&uselibpqcompat=true`: `pg` 8.x treats plain `sslmode=require`
   as verify-full, and the RDS CA is not in Node's trust store.
 - Full cloud lifecycle: `SMOKE_DB_URL=$(aws ssm get-parameter --with-decryption
   --name /slime/test-db/READER_URL --query Parameter.Value --output text) npm run
   e2e:cloud` in `platform/admin` (with `SMOKE_EMAIL`/`SMOKE_PASSWORD`).
-- Stops on Monday 2026-11-23 20:00 Europe/Berlin (EventBridge Scheduler
-  `slime-test-db-stop-monday`, role `slime-test-db-scheduler`). A stopped RDS
-  starts again by itself after 7 days. Remove it for good with
+- Runs permanently since 2026-11-22 (the stop schedule and its role are
+  deleted), ≈ $20/month; budget `slime-monthly` was raised to $30 for it
+  (`bootstrap/variables.tf`). Remove it for good with
   `aws rds delete-db-instance --db-instance-identifier slime-test-db
-  --skip-final-snapshot`, then delete the security group, the schedule, the role
-  and `/slime/test-db/*`.
+  --skip-final-snapshot`, then delete the security group and `/slime/test-db/*`
+  (three parameters).
 
 ## Rules for `platform/`
 

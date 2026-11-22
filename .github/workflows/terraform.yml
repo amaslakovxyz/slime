@@ -18,18 +18,28 @@ name: Terraform AWS
 # repo root, so Terraform can zip its artifact (platform builds the runtime and
 # the admin).
 # Every stack is planned/applied on every run; unchanged stacks are no-ops.
+#
+# Trigger paths = every input of a deployed artifact: platform/build.sh also
+# builds crystal/ and installs from the root package.json/package-lock.json.
+# Keep DEPLOY_PATHS in the apply job's "Skip if superseded" step in sync.
 
 on:
   pull_request:
     paths:
       - platform/**
       - core/**
+      - crystal/**
+      - package.json
+      - package-lock.json
       - .github/workflows/terraform.yml
   push:
     branches: [main]
     paths:
       - platform/**
       - core/**
+      - crystal/**
+      - package.json
+      - package-lock.json
       - .github/workflows/terraform.yml
   workflow_dispatch:
     inputs:
@@ -189,11 +199,36 @@ jobs:
         run: terraform -chdir="$STACK_DIR" init
       - name: Plan
         run: terraform -chdir="$STACK_DIR" plan -lock-timeout=5m -no-color -out=tfplan
+      # Concurrency only serializes applies; it does not order them. A re-run of
+      # an old run, or an old run whose apply starts after a newer one's, would
+      # deploy stale code over newer. Checked here, after this job holds the
+      # concurrency slot: if main has since changed a deploy input, the run for
+      # that newer commit applies it, so this one stops before touching AWS.
+      # A newer commit outside DEPLOY_PATHS (docs, examples) has no run of its
+      # own, so this run still applies: its deployed inputs equal main's.
+      - name: Skip if superseded
+        id: fresh
+        run: |
+          DEPLOY_PATHS=(platform core crystal package.json package-lock.json .github/workflows/terraform.yml)
+          git fetch --no-tags --depth=1 origin main
+          main=$(git rev-parse FETCH_HEAD)
+          set +e
+          git diff --quiet "$GITHUB_SHA" "$main" -- "${DEPLOY_PATHS[@]}"
+          code=$?
+          set -e
+          case "$code" in
+            0) echo "current=true" >> "$GITHUB_OUTPUT" ;;
+            1)
+              echo "::notice::Apply skipped: main is at ${main:0:7}, which changes deploy inputs after ${GITHUB_SHA:0:7}; the run for main deploys them. To redeploy main, use Run workflow, not Re-run."
+              echo "current=false" >> "$GITHUB_OUTPUT"
+              ;;
+            *) exit "$code" ;;
+          esac
       # Without branch protection, main can receive a stack that lost resources
       # someone applied by hand from a branch. Replacements are fine; pure
       # deletes need a manual run with allow_destroy.
       - name: Refuse pure deletes
-        if: ${{ !inputs.allow_destroy }}
+        if: ${{ steps.fresh.outputs.current == 'true' && !inputs.allow_destroy }}
         run: |
           deletes=$(terraform -chdir="$STACK_DIR" show -json tfplan \
             | jq -r '[.resource_changes[]? | select(.change.actions == ["delete"]) | .address] | join(", ")')
@@ -202,11 +237,14 @@ jobs:
             exit 1
           fi
       - name: Apply
+        if: steps.fresh.outputs.current == 'true'
         run: terraform -chdir="$STACK_DIR" apply -lock-timeout=5m -no-color tfplan
       - name: Verify convergence
+        if: steps.fresh.outputs.current == 'true'
         run: terraform -chdir="$STACK_DIR" plan -lock-timeout=5m -no-color -detailed-exitcode
       # Post-deploy steps keyed on stack outputs, so any stack can opt in.
       - name: Post-deploy
+        if: steps.fresh.outputs.current == 'true'
         run: |
           outputs=$(terraform -chdir="$STACK_DIR" output -json)
           # HTTP status of a request, retried while a fresh distribution, DNS
@@ -259,7 +297,7 @@ jobs:
       # create -> failed (no cloud database), keyless 401, unknown id 404,
       # delete. Runs without the AWS credentials: it only talks HTTPS.
       - name: Admin cloud smoke
-        if: matrix.stack == 'platform'
+        if: steps.fresh.outputs.current == 'true' && matrix.stack == 'platform'
         working-directory: platform/admin
         env:
           SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}
