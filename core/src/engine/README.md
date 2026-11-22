@@ -61,6 +61,12 @@ classes and functions here are internal.
 
 - **Crystal first.** A request whose key is in `config.crystal` is answered
   by that Crystal handler (`./crystal/`), before the cache or generation.
+- **A Crystal that no longer fits falls back.** When a Crystal fails with
+  `QUERY_ERROR`, `SHAPE_MISMATCH`, `INVALID_HANDLER` or `SANDBOX_ERROR` (not a
+  shape timeout), the request is answered by the Liquid handler or a new
+  generation, `meta.warnings` says so, and one `warning` event goes out per key
+  and instance. A bad input (`INVALID_REQUEST`) or a timeout is returned as it
+  is: the fallback would fail the same way, or double the load.
 - **Keys.** A handler's key is the request key (`request/key.ts`); its
   provenance is stored inside it (§4.7).
 - **Saved handlers.** A saved handler whose provenance changed, or that no
