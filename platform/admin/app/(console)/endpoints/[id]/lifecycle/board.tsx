@@ -30,12 +30,15 @@ export function LifecycleBoard({
   const [pending, startTransition] = useTransition();
   const busy = pending || restarting;
 
-  const crystallize = (key: string) =>
+  const crystallize = (key: string) => {
+    // Outside the transition: state set inside an async transition renders only when it ends,
+    // so the button would never say "Crystallizing…".
+    setWorking(key);
     startTransition(async () => {
-      setWorking(key);
       setResult(await crystallizeAction(endpointId, [key]));
       setWorking(null);
     });
+  };
 
   return (
     <section className="card lc-card">
