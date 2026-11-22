@@ -22,6 +22,7 @@ import { GenerationLimits } from './generation/limits.js';
 import { HandlerCache } from './handler-cache.js';
 import { savedHandlerProblem } from '../handler/fits-sources.js';
 import { HandlerPromotion } from './promotion.js';
+import { registerInternals } from './internals.js';
 import { queryMeta } from './meta.js';
 import { reviewUntilSettled, type ReviewOutcome } from './generation/review-loop.js';
 import type { CacheOutcome, HandlerSummary, QueryResult, Slime, SlimeStats } from './types.js';
@@ -71,6 +72,8 @@ export class SlimeEngine implements Slime {
       review: this.#reviewFunction(),
       emit: (event) => this.#emit(event),
     });
+    const { connector, limits, tiers } = config;
+    registerInternals(this, { connector, store, runner: parts.runner, limits, tiers, liveRecords: () => this.#cache.records() });
   }
 
   async query(request: SlimeRequest): Promise<QueryResult> {

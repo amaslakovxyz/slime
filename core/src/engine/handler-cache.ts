@@ -60,6 +60,11 @@ export class HandlerCache {
     return this.#liveRecords().map(({ key, intent, tier, runs, createdAt, review }) => ({ key, intent, tier, runs, createdAt, review }));
   }
 
+  /** The live records themselves (not copies): runs and fixtures as they are now. */
+  records(): HandlerRecord[] {
+    return this.#liveRecords();
+  }
+
   countByTier(): Record<StoredTier, number> {
     const counts: Record<StoredTier, number> = { gas: 0, liquid: 0 };
     for (const record of this.#liveRecords()) counts[record.tier]++;

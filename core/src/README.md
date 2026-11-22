@@ -39,7 +39,7 @@ the API:
 | `./notion` | `sources/api/notion/index.ts` |
 | `./models` | `models/index.ts`: `modelRoles`, `parseJsonReply`, `ModelClient` types |
 | `./claude`, `./groq` | `models/<name>/index.ts` |
-| `./tooling` | `tooling.ts`: the engine internals `@slime-cloud/crystal` uses (`executeArtifact`, `runCrystal`, `assertReadOnlySql`, `recordFromStore`, ...); not for apps |
+| `./tooling` | `tooling.ts`: the engine internals `@slime-cloud/crystal` uses (`executeArtifact`, `runCrystal`, `assertReadOnlySql`, `recordFromStore`, `slimeInternals`, ...); not for apps |
 | `./testing` | `testing/index.ts`: `describeStoreContract`, `describeConnectorContract`, `describeApiSourceContract`, `describeModelClientContract`, `cannedGenerator`, fakes |
 | `./shape-worker` | `sandbox/quickjs/shape-worker.ts`, for bundlers that copy the worker |
 

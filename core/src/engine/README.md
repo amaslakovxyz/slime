@@ -19,6 +19,10 @@ Orchestration, at the top:
   `flush()` waits for it.
 - `engine-deps.ts`: the dependency bundles handed to generation, execution and
   the source lifecycle.
+- `internals.ts`: `slimeInternals(slime)` for build-time tools (through
+  `core/tooling`): the connector, store, runner, limits and tiers, and the
+  live records, whose runs and fixtures are newer than the store's (the store
+  is written at promotion).
 - `events.ts`: `emitSafely` (a throwing `onEvent` never fails a query) and
   the `generated` and `error` event builders.
 - `meta.ts`: builds `meta` for every tier.
