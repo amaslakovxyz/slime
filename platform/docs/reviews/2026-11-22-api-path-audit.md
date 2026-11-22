@@ -69,8 +69,9 @@ The spec predates the cloud MVP. Where it calls a route "unchanged" or
 | crystallize: `POST /v0/handlers/{handlerKey}/crystallize` | `POST /v0/crystallize {keys?}`; tokens are issued by the admin, not the runtime |
 
 The new routes (`/v1/accounts`, `/v1/endpoints`, per-handler crystallize) are
-proposals and are not listed as drift. PR #30 needs a rebase onto these
-contracts before it can serve as a spec; not changed here.
+proposals and are not listed as drift. PR #60 (`docs/agent-api-v1-main`) carries
+PR #30's commits rebased onto main and marks each route and field shipped or
+proposed against these contracts.
 
 ## Matches (no change needed)
 
