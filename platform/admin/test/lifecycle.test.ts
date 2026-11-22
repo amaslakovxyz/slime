@@ -1,7 +1,14 @@
 // What the Lifecycle tab shows for a handler and for the stage rail.
 import assert from 'node:assert/strict';
+import { mkdtempSync } from 'node:fs';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, test } from 'node:test';
-import { stagesOf, toRow, type RuntimeHandler } from '../lib/lifecycle';
+import type { Endpoint } from '../lib/endpoints';
+import { readLifecycle, stagesOf, toRow, type RuntimeHandler } from '../lib/lifecycle';
+import { secretStore } from '../lib/secrets';
 
 const t = { liquidRuns: 3, crystalRuns: 10 };
 const h = (over: Partial<RuntimeHandler>): RuntimeHandler => ({ key: 'abcdef123456', intent: 'accounts per plan', tier: 'gas', runs: 1, ...over });
@@ -63,5 +70,31 @@ describe('stagesOf', () => {
     const all = stagesOf('ready', [h({ tier: 'crystal', runs: 12 })], 12);
     assert.deepEqual(states(all), ['done', 'done', 'done', 'done']);
     assert.equal(all[1]!.note, '1 handler · 12 requests');
+  });
+});
+
+describe('readLifecycle', () => {
+  test('while the endpoint restarts, the last answer stands in for the unreachable runtime', async () => {
+    process.env.SESSION_SECRET = 'x'.repeat(32);
+    process.env.SLIME_SECRETS = 'file';
+    process.env.SLIME_SECRETS_FILE = join(mkdtempSync(join(tmpdir(), 'slime-lc-')), 'secrets.json');
+    await secretStore().put('ep-restart', 'SLIME_API_KEY', 'slm_test');
+    const handler = h({ tier: 'liquid', runs: 12 });
+    const server = createServer((req, res) => {
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify(req.url === '/v0/events' ? { total: 12, events: [] } : { handlers: [handler], thresholds: t, warnings: [] }));
+    });
+    await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
+    const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/`;
+    const ep = (status: string) => ({ endpointId: 'ep-restart', url, status }) as Endpoint;
+
+    const live = await readLifecycle(ep('ready'));
+    assert.equal(live.ok, true);
+    await new Promise((done) => server.close(done));
+
+    const restarting = await readLifecycle(ep('updating'));
+    assert.deepEqual(restarting, live, 'the tab keeps its rows instead of collapsing to a notice');
+    const down = await readLifecycle(ep('ready'));
+    assert.equal(down.ok, false, 'outside a restart an unreachable runtime is reported');
   });
 });

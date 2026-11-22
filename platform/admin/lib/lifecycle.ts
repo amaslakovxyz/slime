@@ -143,9 +143,15 @@ export function stagesOf(status: Endpoint['status'], handlers: RuntimeHandler[],
   ];
 }
 
-export type LifecycleData =
-  | { ok: true; handlers: RuntimeHandler[]; events: RuntimeEvent[]; total: number; thresholds: Thresholds; warnings: string[] }
-  | { ok: false; reason: string };
+export type LifecycleData = LiveLifecycle | { ok: false; reason: string };
+type LiveLifecycle = { ok: true; handlers: RuntimeHandler[]; events: RuntimeEvent[]; total: number; thresholds: Thresholds; warnings: string[] };
+
+/**
+ * Last answer per endpoint, shown while a restart (after Crystallize or a settings change) takes the
+ * runtime down for a moment. Without it the tab polls into the gap, drops its rows for a notice and
+ * back, and the board loses its Crystallize report. Per server process; a cold one shows the notice.
+ */
+const lastRead = new Map<string, LiveLifecycle>();
 
 /** Server only: reads the endpoint's runtime with its own token. */
 export async function readLifecycle(ep: Endpoint): Promise<LifecycleData> {
@@ -159,7 +165,7 @@ export async function readLifecycle(ep: Endpoint): Promise<LifecycleData> {
     if (!life.ok || !feed.ok) return { ok: false, reason: `Runtime answered ${life.status}/${feed.status}.` };
     const l = (await life.json()) as { handlers: RuntimeHandler[]; thresholds?: Thresholds; warnings?: string[] };
     const f = (await feed.json()) as { total: number; events: RuntimeEvent[] };
-    return {
+    const data: LiveLifecycle = {
       ok: true,
       handlers: l.handlers,
       events: f.events,
@@ -167,8 +173,12 @@ export async function readLifecycle(ep: Endpoint): Promise<LifecycleData> {
       thresholds: l.thresholds ?? DEFAULT_THRESHOLDS,
       warnings: l.warnings ?? [],
     };
+    lastRead.set(ep.endpointId, data);
+    return data;
   } catch {
-    if (ep.status === 'updating') return { ok: false, reason: 'Restarting the endpoint to load the new Crystal…' };
+    const last = lastRead.get(ep.endpointId);
+    if (ep.status === 'updating') return last ?? { ok: false, reason: 'Restarting the endpoint to load the new Crystal…' };
+    lastRead.delete(ep.endpointId);
     return { ok: false, reason: 'Endpoint is not running. Is `npm run local` up?' };
   }
 }
