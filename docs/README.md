@@ -34,3 +34,4 @@ Project-wide docs. Code-local docs live next to their code and are listed at the
 - [../platform/runtime/README.md](../platform/runtime/README.md) (Current)
 - [../platform/infra/README.md](../platform/infra/README.md) and [../platform/infra/FINOPS.md](../platform/infra/FINOPS.md) (Current)
 - [../platform/docs/reviews/2026-11-20-infra-review.md](../platform/docs/reviews/2026-11-20-infra-review.md) (Record)
+- [../platform/docs/reviews/2026-11-22-api-path-audit.md](../platform/docs/reviews/2026-11-22-api-path-audit.md) (Record, runtime and admin API paths against docs and specs)
