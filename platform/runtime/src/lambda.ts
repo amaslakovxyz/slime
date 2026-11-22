@@ -110,7 +110,8 @@ async function serveEndpoint(
     return refuse(c, 503, 'NOT_READY', `Endpoint is not ready: ${startupErrorMessage(err)}`, true);
   }
   const hasBody = method !== 'GET' && method !== 'HEAD';
-  const forwarded = new Request(new URL(`${route}${url.search}`, url.origin), {
+  // Concatenated, not resolved: new URL('//v0/query', origin) would read a doubled slash as a host.
+  const forwarded = new Request(`${url.origin}${route}${url.search}`, {
     method,
     headers: c.req.raw.headers,
     ...(hasBody ? { body: await c.req.raw.arrayBuffer() } : {}),
