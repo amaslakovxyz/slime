@@ -5,7 +5,6 @@ import type { Connector } from '../../sources/sql/types.js';
 import { isApiStep, type ApiStep, type Artifact, type SqlStep, type Step } from '../../artifact/artifact.js';
 import type { InputValues } from '../../request/parse.js';
 import type { Shape } from '../../request/shape.js';
-import type { SandboxRunner } from '../../sandbox/types.js';
 import { SlimeError } from '../../shared/errors.js';
 import { SourceCallError, callSource } from '../../sources/api/call-source.js';
 import { assertPlainRows } from '../../sources/api/plain-rows.js';
@@ -13,9 +12,9 @@ import { type ApiSchema } from '../../sources/api/types.js';
 import { isApiSource, type Source } from '../../sources/types.js';
 import { resolveArgs } from './step-args.js';
 
+/** No sandbox: the caller's shaper decides where shape runs (Liquid in the sandbox, Crystal in-process or there). */
 export interface StepsDeps {
   connector: Connector;
-  runner: SandboxRunner;
   limits: Readonly<LimitOptions>;
   sources: Readonly<Record<string, Source>>;
   apiSchemas: Readonly<Record<string, ApiSchema>>;

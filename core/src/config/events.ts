@@ -38,4 +38,11 @@ export interface ErrorEvent {
   message: string;
 }
 
-export type SlimeEvent = GeneratedEvent | ReviewedEvent | PromotedEvent | WarningEvent | ErrorEvent;
+/** A Liquid handler reached `tiers.crystalReadyRuns` with an approved (or no) review; once per handler per instance. */
+export interface CrystalReadyEvent {
+  type: 'crystalReady';
+  handlerKey: string;
+  runs: number;
+}
+
+export type SlimeEvent = GeneratedEvent | ReviewedEvent | PromotedEvent | CrystalReadyEvent | WarningEvent | ErrorEvent;

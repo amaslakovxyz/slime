@@ -70,7 +70,7 @@ multi-source". If P0 changes one, update the steps that cite it.
 | MS6 | A truncated step in a multi-step handler fails with `QUERY_TOO_LARGE` (422). It is repairable during generation. | §3.5 |
 | MS7 | `SOURCE_ERROR` (502): retryable for 429, 5xx and timeouts, not retryable for other 4xx; final during generation; redacted | §3.5, S2 |
 | MS8 | Startup fails if any source fails `describe()` or `safetyCheck()`, in explore and locked mode | Q6 |
-| MS9 | No Crystal for handlers with an API step | §3.6, Q7 |
+| MS9 | No Crystal for handlers with an API step. Replaced on 2026-11-22: they become steps modules (multi-source.md §3.6) | §3.6, Q7 |
 | MS10 | API adapters reach the network only through the constrained client: origin check, no `//` or `..`, same-origin redirects only, 10 MB cap | §4.1, Q8, S1 |
 | MS11 | New code lives in `core/src/sources/` | Q9 |
 | MS12 | Notion: schema discovered at startup; generated equality and range params; metadata sanitized; descriptions opt-in; at most 2 requests in flight; `people`, `relation`, `files`, `formula`, `rollup` excluded | §4.2, Q5, Q11, Q13 |

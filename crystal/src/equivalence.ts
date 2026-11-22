@@ -1,13 +1,16 @@
 import { checkShapeSource } from './allowlist.js';
 import { importCheckedModule } from './import-module.js';
-import { renderModule, type CrystalCode } from './module-format.js';
-import type { Connector, CrystalHandler, HandlerRecord, InputValues, LimitOptions, SandboxRunner } from '@slime-cloud/core';
+import { inputNamesOf, isStepsCode, renderModule, type CrystalCode } from './module-format.js';
+import type { ApiSchema, Connector, CrystalHandler, HandlerRecord, InputValues, LimitOptions, SandboxRunner, Source } from '@slime-cloud/core';
 import { canonicalJSON, executeArtifact, runCrystal } from '@slime-cloud/core/tooling';
 
 export interface EquivalenceDeps {
   connector: Connector;
   runner: SandboxRunner;
   limits: Readonly<LimitOptions>;
+  /** The app's sources and their schemas: API steps run through them. Without them, only SQL steps can run. */
+  sources?: Readonly<Record<string, Source>>;
+  apiSchemas?: Readonly<Record<string, ApiSchema>>;
 }
 
 // Float noise from a reordered SQL sum is not a difference.
@@ -24,8 +27,8 @@ const SIGNIFICANT_DIGITS = 9;
  */
 export async function verifyCandidate(deps: EquivalenceDeps, record: HandlerRecord, code: CrystalCode): Promise<string> {
   if (code.shape) checkShapeSource(code.shape);
-  const unknownParam = code.params.find((name) => !(name in record.paramTypes));
-  if (unknownParam) throw new Error(`param "${unknownParam}" is not an input of this request`);
+  const unknownInput = inputNamesOf(code).find((name) => !(name in record.paramTypes));
+  if (unknownInput) throw new Error(`input "${unknownInput}" is not an input of this request`);
   const text = renderModule(code);
   const candidate = asCrystal(record, await importCheckedModule(text));
 
@@ -46,7 +49,7 @@ const NOT_COMPARABLE = Symbol('not comparable');
 /** Liquid exactly as it runs today; an input it no longer answers has nothing to compare against. */
 async function liquidOutput(deps: EquivalenceDeps, { artifact, output }: HandlerRecord, input: InputValues): Promise<unknown> {
   try {
-    return (await executeArtifact({ ...deps, sources: {}, apiSchemas: {} }, { artifact, output, input })).data;
+    return (await executeArtifact({ ...deps, sources: deps.sources ?? {}, apiSchemas: deps.apiSchemas ?? {} }, { artifact, output, input })).data;
   } catch {
     return NOT_COMPARABLE;
   }
@@ -54,7 +57,8 @@ async function liquidOutput(deps: EquivalenceDeps, { artifact, output }: Handler
 
 function asCrystal(record: HandlerRecord, code: CrystalCode): CrystalHandler {
   const { intent, output, paramTypes, provenance, review } = record;
-  return { sql: code.sql, params: code.params, shape: code.shape, intent, output, paramTypes, schemaHash: provenance.schemaHash, review };
+  const metadata = { intent, output, paramTypes, schemaHash: provenance.schemaHash, review };
+  return isStepsCode(code) ? { steps: code.steps, shape: code.shape, ...metadata } : { sql: code.sql, params: code.params, shape: code.shape, ...metadata };
 }
 
 function normalized(value: unknown): string {

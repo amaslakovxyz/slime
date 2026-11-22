@@ -22,6 +22,7 @@ import { GenerationLimits } from './generation/limits.js';
 import { HandlerCache } from './handler-cache.js';
 import { savedHandlerProblem } from '../handler/fits-sources.js';
 import { HandlerPromotion } from './promotion.js';
+import { registerInternals } from './internals.js';
 import { queryMeta } from './meta.js';
 import { reviewUntilSettled, type ReviewOutcome } from './generation/review-loop.js';
 import type { CacheOutcome, HandlerSummary, QueryResult, Slime, SlimeStats } from './types.js';
@@ -47,6 +48,15 @@ interface ResolvedHandler {
   generateMs?: number;
 }
 
+// Errors that mean the Crystal no longer fits the data (a migration, a changed column); the
+// Liquid handler or a new generation can still answer. A bad input or a timeout would fail there too.
+const CRYSTAL_DRIFT_CODES = new Set(['QUERY_ERROR', 'SHAPE_MISMATCH', 'INVALID_HANDLER', 'SANDBOX_ERROR']);
+const CRYSTAL_KEY_PREFIX = 12;
+
+function isCrystalDrift(error: unknown): error is SlimeError {
+  return error instanceof SlimeError && CRYSTAL_DRIFT_CODES.has(error.code) && error.details?.['isTimeout'] !== true;
+}
+
 export class SlimeEngine implements Slime {
   readonly #parts: EngineParts;
   readonly #cache: HandlerCache;
@@ -54,6 +64,8 @@ export class SlimeEngine implements Slime {
   readonly #background: BackgroundTasks;
   readonly #promotion: HandlerPromotion;
   readonly #generations = new Coalescer<GenerationOutcome>();
+  // A broken Crystal is reported once per key and instance, not on every request it falls back.
+  readonly #reportedCrystals = new Set<string>();
 
   constructor(parts: EngineParts) {
     const { config, store, provenance } = parts;
@@ -68,9 +80,13 @@ export class SlimeEngine implements Slime {
       background: this.#background,
       gasToLiquidRuns: config.tiers.gasToLiquidRuns,
       fixturesPerHandler: config.tiers.fixturesPerHandler,
+      crystalReadyRuns: config.tiers.crystalReadyRuns,
       review: this.#reviewFunction(),
       emit: (event) => this.#emit(event),
     });
+    const { connector, sources, sqlSourceName, limits, tiers } = config;
+    const { apiSchemas } = parts;
+    registerInternals(this, { connector, sources, sqlSourceName, apiSchemas, store, runner: parts.runner, limits, tiers, liveRecords: () => this.#cache.records() });
   }
 
   async query(request: SlimeRequest): Promise<QueryResult> {
@@ -116,13 +132,32 @@ export class SlimeEngine implements Slime {
     const request = parseRequest(raw);
     const key = requestKey(request);
     const crystal = this.#parts.config.crystal ? this.#parts.config.crystal[key] : undefined;
-    if (crystal) return answerFromCrystal(this.#parts, { key, crystal, request, startedAt });
+    let fallbackWarning: string | undefined;
+    if (crystal) {
+      try {
+        return await answerFromCrystal(this.#parts, { key, crystal, request, startedAt });
+      } catch (error) {
+        if (!isCrystalDrift(error)) throw error;
+        fallbackWarning = this.#crystalFailed(key, error);
+      }
+    }
 
     const { record, cache, firstRun, generateMs } = await this.#resolve(key, request);
     const execution = firstRun ?? (await this.#runSaved(record, request.input));
     const { tier, review, artifact, intent } = record;
     const meta = queryMeta({ handlerKey: key, tier, cache, review, execution, code: { sql: sqlOf(artifact), shapeJs: artifact.shapeJs, assumptions: artifact.assumptions }, intent, totalMs: performance.now() - startedAt, ...(generateMs === undefined ? {} : { generateMs }) });
+    if (fallbackWarning) meta.warnings.push(fallbackWarning);
     return { data: execution.data, meta };
+  }
+
+  /** The note for meta.warnings; the warning event goes out once per key. */
+  #crystalFailed(key: string, error: SlimeError): string {
+    const note = `The Crystal handler failed (${error.code}), so this answer came from Liquid or a new handler; crystallize it again after a schema change.`;
+    if (!this.#reportedCrystals.has(key)) {
+      this.#reportedCrystals.add(key);
+      this.#emit({ type: 'warning', message: `Crystal ${key.slice(0, CRYSTAL_KEY_PREFIX)} failed and falls back: ${error.code}: ${error.message}` });
+    }
+    return note;
   }
 
 

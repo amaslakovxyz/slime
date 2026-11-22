@@ -1,6 +1,7 @@
 // The Crystal folder's service methods: one typed function per Crystal, generated
-// from manifest.json, that the app calls directly as (connector, input) => data (C10).
-// Only the module (sql, params, shape) is model-written; this file is not.
+// from manifest.json, that the app calls directly as (connector, input) => data, or
+// (sources, input) => data for a Crystal that calls API sources (C10). Only the module
+// (its SQL or steps, and shape) is model-written; this file is not.
 import type { Manifest } from './manifest.js';
 import type { ParamType, ParamTypes, Shape } from '@slime-cloud/core';
 
@@ -53,10 +54,12 @@ export function renderServices(manifest: Manifest): string {
 export function renderServiceTypes(manifest: Manifest): string {
   const names = serviceNames(manifest);
   const declarations = [...names].map(([key, name]) => {
-    const { intent, output, paramTypes } = manifest.entries[key]!;
-    return `${docComment(intent)}export declare function ${name}(connector: Connector, input${inputIsOptional(paramTypes) ? '?' : ''}: ${inputType(paramTypes)}, options?: CrystalServiceOptions): Promise<${outputType(output)}>;`;
+    const { intent, output, paramTypes, sources } = manifest.entries[key]!;
+    const first = sources?.length ? `sources: Readonly<Record<string, Source>>` : 'connector: Connector';
+    return `${docComment(sourcesNote(intent, sources))}export declare function ${name}(${first}, input${inputIsOptional(paramTypes) ? '?' : ''}: ${inputType(paramTypes)}, options?: CrystalServiceOptions): Promise<${outputType(output)}>;`;
   });
-  return `${HEADER}import type { Connector, CrystalServiceOptions } from '@slime-cloud/core';\n\n${declarations.join('\n\n')}\n`;
+  const usesSources = Object.values(manifest.entries).some(({ sources }) => sources?.length);
+  return `${HEADER}import type { Connector, CrystalServiceOptions${usesSources ? ', Source' : ''} } from '@slime-cloud/core';\n\n${declarations.join('\n\n')}\n`;
 }
 
 // null means "not given" (R5), so every input is optional and nullable.
@@ -84,6 +87,11 @@ function shapeType(shape: Shape): string {
   if (Array.isArray(shape)) return `Array<${shapeType((shape as readonly Shape[])[0]!)}>`;
   const fields = Object.entries(shape).map(([name, child]) => `${JSON.stringify(name)}: ${shapeType(child as Shape)}`);
   return `{ ${fields.join('; ')} }`;
+}
+
+/** The app's sources map must hold these API sources, by these names. */
+function sourcesNote(intent: string, sources: readonly string[] | undefined): string {
+  return sources?.length ? `${intent}. Calls ${sources.join(', ')}: pass the app's sources (as in SlimeConfig).` : intent;
 }
 
 function docComment(intent: string): string {

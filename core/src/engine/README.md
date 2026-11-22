@@ -19,6 +19,10 @@ Orchestration, at the top:
   `flush()` waits for it.
 - `engine-deps.ts`: the dependency bundles handed to generation, execution and
   the source lifecycle.
+- `internals.ts`: `slimeInternals(slime)` for build-time tools (through
+  `core/tooling`): the connector, store, runner, limits and tiers, and the
+  live records, whose runs and fixtures are newer than the store's (the store
+  is written at promotion).
 - `events.ts`: `emitSafely` (a throwing `onEvent` never fails a query) and
   the `generated` and `error` event builders.
 - `meta.ts`: builds `meta` for every tier.
@@ -57,6 +61,12 @@ classes and functions here are internal.
 
 - **Crystal first.** A request whose key is in `config.crystal` is answered
   by that Crystal handler (`./crystal/`), before the cache or generation.
+- **A Crystal that no longer fits falls back.** When a Crystal fails with
+  `QUERY_ERROR`, `SHAPE_MISMATCH`, `INVALID_HANDLER` or `SANDBOX_ERROR` (not a
+  shape timeout), the request is answered by the Liquid handler or a new
+  generation, `meta.warnings` says so, and one `warning` event goes out per key
+  and instance. A bad input (`INVALID_REQUEST`) or a timeout is returned as it
+  is: the fallback would fail the same way, or double the load.
 - **Keys.** A handler's key is the request key (`request/key.ts`); its
   provenance is stored inside it (§4.7).
 - **Saved handlers.** A saved handler whose provenance changed, or that no
@@ -77,7 +87,9 @@ classes and functions here are internal.
 - **`meta`.** `meta.sql`, `shapeJs`, `assumptions` and `steps` show the code
   that answered (R9). Literals in the intent become `meta.warnings` (R7).
 - **Events.** `onEvent` gets `generated` for each generation and revision,
-  `reviewed` for each review, `promoted` for each promotion, and `error` for
+  `reviewed` for each review, `promoted` for each promotion, `crystalReady`
+  once per handler when a Liquid handler with an approved (or no) review
+  reaches `tiers.crystalReadyRuns` (the crystallize job's own readiness), and `error` for
   each failed query or background task.
 - **Promotion (M4 rule).** After `gasToLiquidRuns` successful runs, a Gas
   handler is reviewed (one review at a time) and, once approved, promoted to

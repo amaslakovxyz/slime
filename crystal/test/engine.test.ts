@@ -1,5 +1,5 @@
 // The crystallize job against a real engine: a sandbox the host shares, and which
-// multi-source handlers can become Crystal (MS9).
+// multi-source handlers become Crystal (MS9).
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -8,6 +8,7 @@ import { after, describe, test } from 'node:test';
 import { QuickJSRunner, SlimeConfig, createSlime, handlerKeyFor, memoryStore, type Artifact, type SandboxRunner, type Slime, type SlimeOptions, type SqlStep } from '@slime-cloud/core';
 import { artifact, fakeApiSource, fakeConnector, stubGenerator } from '@slime-cloud/core/testing';
 import { crystallize } from '../src/crystallize.js';
+import { Crystallizer } from '../src/crystallizer.js';
 import { readManifest } from '../src/manifest.js';
 
 const dirs: string[] = [];
@@ -86,14 +87,19 @@ describe('multi-source handlers and Crystal (MS9)', () => {
       },
     });
 
-  // The job compares against the instance's current provenance (M.2).
-  async function crystalOutcome(handler: Artifact): Promise<string | undefined> {
+  async function grown(handler: Artifact): Promise<{ slime: Slime; store: ReturnType<typeof memoryStore> }> {
     const store = memoryStore();
     const config = new SlimeConfig({ sources: { db: fakeConnector({ rows: ROWS }), notion: notion() }, store, generator: stubGenerator(() => handler), tiers: { gasToLiquidRuns: 1 } } as unknown as SlimeOptions);
     const slime = await createSlime(config);
     instances.push(slime);
     await slime.query(REQUEST);
     await slime.flush();
+    return { slime, store };
+  }
+
+  // The job compares against the instance's current provenance (M.2).
+  async function crystalOutcome(handler: Artifact): Promise<string | undefined> {
+    const { slime, store } = await grown(handler);
     const [report] = await crystallize({ connector: fakeConnector({ rows: ROWS }), store, dir: await crystalDir(), minRuns: 1, isDryRun: true, provenance: slime.provenance() });
     return report?.outcome;
   }
@@ -103,7 +109,13 @@ describe('multi-source handlers and Crystal (MS9)', () => {
     assert.equal(await crystalOutcome(singleSql), 'crystallized');
   });
 
-  test('a handler with an API step is skipped', async () => {
-    assert.equal(await crystalOutcome(COMBINED), 'skipped');
+  test('a handler with an API step crystallizes on the instance, which has the sources', async () => {
+    const { slime } = await grown(COMBINED);
+    const [report] = await new Crystallizer(slime, { dir: await crystalDir(), minRuns: 1 }).run({ isDryRun: true });
+    assert.equal(report?.outcome, 'crystallized', report?.reasons.join());
+  });
+
+  test('without the sources it can\'t be compared with Liquid, so it fails', async () => {
+    assert.equal(await crystalOutcome(COMBINED), 'failed');
   });
 });

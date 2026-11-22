@@ -12,7 +12,7 @@ import { isApiSource, type Source } from '../sources/types.js';
 
 export { DEFAULT_LIMITS, DEFAULT_TIERS } from './defaults.js';
 export type { CrystalRegistry, LimitOptions, SlimeOptions, TierOptions } from './options.js';
-export type { ErrorEvent, GeneratedEvent, PromotedEvent, ReviewedEvent, SlimeEvent, WarningEvent } from './events.js';
+export type { CrystalReadyEvent, ErrorEvent, GeneratedEvent, PromotedEvent, ReviewedEvent, SlimeEvent, WarningEvent } from './events.js';
 
 /** Setting an option to undefined removes it. */
 export type SlimeOptionOverrides = { [Key in keyof SlimeOptions]?: SlimeOptions[Key] | undefined };

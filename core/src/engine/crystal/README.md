@@ -9,20 +9,30 @@ its shapes are functions. A host that stores the modules elsewhere (Slime
 Cloud: S3) parses them with `parseModule` from `@slime-cloud/crystal`
 and passes handlers whose shapes are the source strings.
 
-- The types (`CrystalHandler`, `CrystalRegistry`, `ShapeFunction`) are in
-  `../../handler/crystal.ts`.
+- The types (`CrystalHandler` = `QueryCrystal | StepsCrystal`, `CrystalRegistry`,
+  `ShapeFunction`, `StepsShapeFunction`) are in `../../handler/crystal.ts`.
 - `run-crystal.ts`: `runCrystal(deps, crystal, input)`.
 - `answer.ts`: `answerFromCrystal`, the engine's Crystal path with its `meta`.
+- `service.ts`: `crystalService(crystal)`, a Crystal as a function the app calls.
 
 ## Interface
 
 - `CrystalRegistry` is `Readonly<Record<requestKey, CrystalHandler>>`.
-- `CrystalHandler`: `sql`, `params`, `shape` (a function, the source of
-  `function shape(rows, input)`, or `null`), `intent`, `output`, `paramTypes`,
-  `schemaHash` and `review`.
-- `runCrystal({ connector, runner?, limits }, crystal, input)` runs the SQL
-  through the connector with the usual limits, then the shape, then the output
-  and R6 checks. A string shape needs the `runner`; the engine passes its own.
+- `CrystalHandler` has `intent`, `output`, `paramTypes`, `schemaHash` and
+  `review`, and its code in one of two forms:
+  - `QueryCrystal`: `sql`, `params` and `shape` (a function, the source of
+    `function shape(rows, input)`, or `null`);
+  - `StepsCrystal`: `steps` (SQL and API steps, as in an `Artifact`) and `shape`
+    (`function shape(data, input)`, `data` holding each step's rows by name; or
+    `null` with a single step).
+- `runCrystal({ connector, runner?, limits, sources?, apiSchemas? }, crystal, input)`
+  runs the SQL, or the steps in parallel under one deadline as Liquid runs them
+  (`../execution/steps.ts`), then the shape, then the output and R6 checks. A
+  string shape needs the `runner`; API steps need `sources` and `apiSchemas`.
+  The engine passes its own.
+- `crystalService(crystal)(sources, input?, { limits? })`: `sources` is the
+  connector, or the app's sources map (as in `SlimeConfig`), which a Crystal
+  that calls API sources needs. Each API source is described once per service.
 
 ## Invariants
 
@@ -39,16 +49,22 @@ and passes handlers whose shapes are the source strings.
   imported or evaluated in the host's process.
 - **Another schema is reported once.** A handler made against another schema
   is served as it is, and `createSlime()` emits one warning.
+- **API steps are the same calls Liquid makes.** They go through `callSource`
+  with `apiTimeoutMs`, redaction and `SOURCE_ERROR` (MS7, MS16). An operation
+  that is gone is `INVALID_HANDLER`, so the engine falls back to Liquid.
 - **Never imports the job.** Core never imports `@slime-cloud/crystal`, so a
   serving process never loads `acorn`.
 
 ## Side Effects
 
-- Runs SQL through the connector, and the shape in the app's process
-  (function) or in the sandbox (string).
+- Runs SQL through the connector, API steps through their sources, and the
+  shape in the app's process (function) or in the sandbox (string).
 
 ## Verification
 
 - `test/crystallize/crystallize.test.ts` serves a crystallized handler.
 - `test/engine/crystal.test.ts`: string shapes give the function form's data
   and stop at the shape time limit; an injected runner outlives `close()`.
+- `test/engine/crystal-steps.test.ts`: a steps Crystal (SQL and API) through
+  the engine with a function or a string shape, its fallback when an operation
+  is gone, and as a service with the app's sources.

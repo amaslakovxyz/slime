@@ -80,9 +80,10 @@ export async function crystalsFromManifest(manifest: Manifest, readModule: (file
         return undefined;
       }
       try {
-        const { sql, params, shape } = parseModule(source);
+        // One query (sql, params, shape) or steps (steps, shape): either way the code is the module's.
+        const code = parseModule(source);
         const { intent, output, paramTypes, schemaHash, review } = entry;
-        return [key, { sql, params, shape, intent, output, paramTypes, schemaHash, review }];
+        return [key, { ...code, intent, output, paramTypes, schemaHash, review }];
       } catch (error) {
         warnings.push(`Crystal ${key}: ${file} failed the module check (${(error as Error).message}); dropped.`);
         return undefined;

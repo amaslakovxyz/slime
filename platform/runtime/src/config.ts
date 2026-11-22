@@ -47,6 +47,8 @@ const TIER_VARIABLES: Readonly<Partial<Record<keyof TierOptions, string>>> = {
   gasWindowMs: 'GAS_WINDOW_MS',
   maxReviews: 'MAX_REVIEWS',
   fixturesPerHandler: 'FIXTURES_PER_HANDLER',
+  // The engine's crystalReady threshold and Crystallize's minimum are the same number.
+  crystalReadyRuns: 'CRYSTAL_MIN_RUNS',
 };
 
 /** What an endpoint's config needs besides env settings. */

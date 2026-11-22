@@ -33,7 +33,7 @@ export async function startSources(setup: SourceSetup): Promise<StartedSources> 
   const apiSources = apiSourcesOf(setup);
   await assertSafeCredentials(sql);
   throwIfAny(await Promise.all(apiSources.map(({ name, source }) => safetyProblems(name, source, setup.apiTimeoutMs))));
-  const [schema, ...described] = await Promise.allSettled([sql.describe(), ...apiSources.map((entry) => describeApi(entry, setup.apiTimeoutMs))]);
+  const [schema, ...described] = await Promise.allSettled([sql.describe(), ...apiSources.map(({ name, source }) => describeApiSource(name, source, setup.apiTimeoutMs))]);
   if (schema?.status === 'rejected') throw schema.reason;
   throwIfAny(described.map((result) => (result.status === 'rejected' ? [String((result.reason as Error).message)] : [])));
   const apiSchemas = Object.fromEntries(apiSources.map(({ name }, index) => [name, (described[index] as PromiseFulfilledResult<ApiSchema>).value]));
@@ -78,7 +78,8 @@ async function safetyProblems(name: string, source: ApiSource, timeoutMs: number
   }
 }
 
-function describeApi({ name, source }: NamedApiSource, timeoutMs: number): Promise<ApiSchema> {
+/** One API source's schema, time-limited and redacted like every call (MS16). */
+export function describeApiSource(name: string, source: ApiSource, timeoutMs: number): Promise<ApiSchema> {
   return callSource({ sourceName: name, method: 'describe', secrets: source.secrets, timeoutMs, run: (options) => source.describe(options) });
 }
 

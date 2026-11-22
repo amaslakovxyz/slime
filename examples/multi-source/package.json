@@ -14,11 +14,13 @@
     "notion:check": "node --env-file=.env scripts/check-notion.mjs",
     "notion:seed": "node --env-file=.env scripts/seed-notion.mjs",
     "notion:record": "node --env-file=.env scripts/record-notion-fixtures.mjs",
-    "live": "node --env-file=.env scripts/live-run.mjs"
+    "live": "node --env-file=.env scripts/live-run.mjs",
+    "check:crystal": "slime-crystal check slime-crystal"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.11",
     "@slime-cloud/core": "file:../../core",
+    "@slime-cloud/crystal": "file:../../crystal",
     "hono": "^4.13.19",
     "pg": "^8.23.1"
   }
