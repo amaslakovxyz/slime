@@ -56,6 +56,9 @@ describe('Crystal allowlist: refused', () => {
     refuses('try { return rows.x.y } catch ({ constructor: c }) { return c }', /constructor/);
     refuses('const k = "constructor"; const { [k]: c } = rows; return c', /variable key/);
     refuses('const { ["constructor"]: c } = rows; return c', /variable key/);
+    refuses('const { a: { constructor: F } } = rows; return F', /constructor/);
+    refuses('let F = null; ({ constructor: F } = rows); return F', /constructor/);
+    refuses('const out = []; for (const { constructor: F } of rows) out.push(F); return out', /constructor/);
     accepts('const { id, name: label, ...rest } = rows[0]; return { id, label, rest }');
   });
 
