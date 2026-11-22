@@ -7,6 +7,7 @@ const TABS = [
   { slug: '/lifecycle', label: 'Lifecycle' },
   { slug: '/usage', label: 'Usage' },
   { slug: '/settings', label: 'Settings' },
+  { slug: '/requests', label: 'Requests log' },
 ];
 
 export function Tabs({ endpointId }: { endpointId: string }) {
