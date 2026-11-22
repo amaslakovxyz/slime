@@ -1,8 +1,8 @@
 // The bench (M6): the built package against the demo database. Correctness of
 // each case, cache hits for repeats and other values, and timings.
 //   GROQ_API_KEY=... npm run bench -w @slime-cloud/core          (openai/gpt-oss-120b)
-//   ANTHROPIC_API_KEY=... npm run bench -w @slime-cloud/core     (claude-haiku-5-5 + claude-sonnet-5-5 review)
-// Claude models and effort, named as in platform/runtime: SLIME_MODEL (claude-haiku-5-5), SLIME_EFFORT (unset),
+//   ANTHROPIC_API_KEY=... npm run bench -w @slime-cloud/core     (claude-sonnet-5-5 at low effort generates and reviews)
+// Claude models and effort, named as in platform/runtime: SLIME_MODEL (claude-sonnet-5-5), SLIME_EFFORT (low),
 // SLIME_REVIEW_MODEL (claude-sonnet-5-5), SLIME_REVIEW_EFFORT (low).
 // Optional: DATABASE_URL, BENCH_CASES (another case file, e.g. examples/shop/bench-cases.mjs), and case names to run only those.
 import { resolve } from 'node:path';
@@ -97,7 +97,7 @@ async function chooseModels() {
   if (process.env.ANTHROPIC_API_KEY) {
     const { claude } = await import('@slime-cloud/core/claude');
     const apiKey = process.env.ANTHROPIC_API_KEY;
-    const { SLIME_MODEL: model = 'claude-haiku-5-5', SLIME_EFFORT: effort, SLIME_REVIEW_MODEL: reviewModel = 'claude-sonnet-5-5', SLIME_REVIEW_EFFORT: reviewEffort = 'low' } = process.env;
+    const { SLIME_MODEL: model = 'claude-sonnet-5-5', SLIME_EFFORT: effort = 'low', SLIME_REVIEW_MODEL: reviewModel = 'claude-sonnet-5-5', SLIME_REVIEW_EFFORT: reviewEffort = 'low' } = process.env;
     return {
       label: `${model}${effort ? ` (${effort})` : ''}, reviewed by ${reviewModel} (${reviewEffort})`,
       generator: claude.generator({ apiKey, model, ...(effort ? { effort } : {}) }),

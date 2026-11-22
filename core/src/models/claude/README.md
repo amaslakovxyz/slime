@@ -15,7 +15,7 @@ dependency `@anthropic-ai/sdk`.
 - `claude.generator({ apiKey, model, effort?, maxRetries? })`,
   `claude.reviewer({ ... })` and `claude.optimizer({ ... })`. The optimizer
   sends no dictionary: it sees only code. The plan's example uses
-  `claude-haiku-5-5` to generate and `claude-sonnet-5-5` to review.
+  `claude-sonnet-5-5` at `effort: 'low'` to generate and to review.
 
 ## Invariants
 

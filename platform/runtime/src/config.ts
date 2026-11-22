@@ -25,7 +25,8 @@ interface Models {
 
 const MEBIBYTE = 1024 * 1024;
 const DEFAULT_MODELS = {
-  claude: { generator: 'claude-haiku-5-5', reviewer: 'claude-sonnet-5-5' },
+  // Sonnet at low effort (SLIME_EFFORT's default) builds a handler in about 3.9 s against Haiku's 8.3 s (shop bench, 2026-11-22).
+  claude: { generator: 'claude-sonnet-5-5', reviewer: 'claude-sonnet-5-5' },
   groq: { generator: 'openai/gpt-oss-120b', reviewer: 'openai/gpt-oss-120b' },
 } as const;
 

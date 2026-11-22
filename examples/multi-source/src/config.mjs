@@ -18,10 +18,10 @@ const FIXTURE_TOKEN = 'fixture-token';
 const NOTION_HOST = 'api.notion.com';
 const RATES_HOST = 'api.frankfurter.dev';
 const GROQ_MODEL = 'openai/gpt-oss-120b';
-const CLAUDE_GENERATOR_MODEL = 'claude-haiku-5-5';
+const CLAUDE_GENERATOR_MODEL = 'claude-sonnet-5-5';
 const CLAUDE_REVIEW_MODEL = 'claude-sonnet-5-5';
-/** Sonnet at low effort reviews about twice as fast. */
-const CLAUDE_REVIEW_EFFORT = 'low';
+/** Sonnet at low effort generates and reviews about twice as fast. */
+const CLAUDE_EFFORT = 'low';
 
 /** Join hints across sources are column comments (MS13). */
 const NOTION_COMMENTS = {
@@ -74,7 +74,7 @@ async function chooseModels(env) {
   if (env.ANTHROPIC_API_KEY) {
     const { claude } = await import('@slime-cloud/core/claude');
     const apiKey = env.ANTHROPIC_API_KEY;
-    return { generator: claude.generator({ apiKey, model: CLAUDE_GENERATOR_MODEL }), reviewer: claude.reviewer({ apiKey, model: CLAUDE_REVIEW_MODEL, effort: CLAUDE_REVIEW_EFFORT }) };
+    return { generator: claude.generator({ apiKey, model: CLAUDE_GENERATOR_MODEL, effort: CLAUDE_EFFORT }), reviewer: claude.reviewer({ apiKey, model: CLAUDE_REVIEW_MODEL, effort: CLAUDE_EFFORT }) };
   }
   throw new Error('Set GROQ_API_KEY or ANTHROPIC_API_KEY: Slime generates a handler for each new request with that model.');
 }

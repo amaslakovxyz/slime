@@ -341,7 +341,7 @@ SQL."*
     contract. Postgres today; a key-value store is the Slime Cloud target.
 * **Models:**
   * Generator: speed first. Groq `gpt-oss-120b` works today on the free tier.
-    Claude `claude-haiku-5-5` is supported but untested until there is a key.
+    Claude `claude-sonnet-5-5` at low effort is the default (about 3.9 s per handler on the shop bench).
   * Reviewer: a stronger pass (`gpt-oss-120b` at high effort, or
     `claude-sonnet-5-5`).
 * **Request format:** `{ intent, input, output }`.
