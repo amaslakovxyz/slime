@@ -95,17 +95,17 @@ sequenceDiagram
 ### Calls to copy
 
 ```bash
-# SLIME_URL: the endpoint URL the admin shows (https://<runtime host>/ep/<id>/) without its trailing "/",
-# as in examples/customer-site/.env.example; /ep/<id>//v0/query answers 404 NOT_FOUND.
+# SLIME_URL: the endpoint URL; the admin shows it with a trailing "/", examples/customer-site and the
+# Atlas SSM value have none. ${SLIME_URL%/} works with both (a doubled "/" answers 404 NOT_FOUND).
 # Step 4-5: any request, with the endpoint key
-curl -s "$SLIME_URL/v0/query" -H "x-api-key: $SLIME_API_KEY" -H 'content-type: application/json' -d '{
+curl -s "${SLIME_URL%/}/v0/query" -H "x-api-key: $SLIME_API_KEY" -H 'content-type: application/json' -d '{
   "intent": "past-due accounts in a given country with their plan, unpaid invoice total in cents and last activity date, largest unpaid total first",
   "input": { "country": "FR" },
   "output": [{ "name": "string", "plan": "string", "unpaidCents": "integer", "lastActivity": "date|null" }]
 }' | jq '{rows: (.data | length), tier: .meta.tier, cache: .meta.cache, review: .meta.review}'
 
 # Step 7: the Crystal, with its own token; only its input names are accepted
-curl -s "$SLIME_URL/v0/e/$CRYSTAL_KEY" -H "x-api-key: $CRYSTAL_TOKEN" -H 'content-type: application/json' -d '{"input": {}}'
+curl -s "${SLIME_URL%/}/v0/e/$CRYSTAL_KEY" -H "x-api-key: $CRYSTAL_TOKEN" -H 'content-type: application/json' -d '{"input": {}}'
 ```
 
 ## Keys
