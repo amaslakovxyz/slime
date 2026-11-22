@@ -55,6 +55,15 @@ describe('Crystallizer', () => {
     assert.deepEqual(await crystallizer.verify(), []);
   });
 
+  test('never lowers a count another instance already saved', async () => {
+    const { slime, store } = await grownSlime();
+    const key = handlerKeyFor({ ...EUROS, input: { country: 'DE' } });
+    const saved = (await store.get('handlers', key)) as { runs: number };
+    await store.put('handlers', key, { ...saved, runs: 40 });
+    const reports = await new Crystallizer(slime, { dir: await crystalDir(), minRuns: 30 }).run({ keys: [key], isDryRun: true });
+    assert.deepEqual(reports.map(({ outcome }) => outcome), ['crystallized'], 'the busier saved count wins over this instance\'s 10');
+  });
+
   test('crystallizes only the given keys', async () => {
     const { slime } = await grownSlime();
     const dir = await crystalDir();

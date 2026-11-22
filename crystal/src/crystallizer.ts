@@ -96,20 +96,29 @@ export class Crystallizer {
   }
 }
 
-// The store with the in-memory records laid over it: after promotion, runs and fixtures grow only in memory.
+// The store with the in-memory records laid over it: after promotion, runs and fixtures grow only
+// in memory. Of the two, the one with more runs wins: on a host with several instances, the
+// store may hold a busier instance's count, synced there, and this instance must not lower it.
 function withLiveRecords({ store, liveRecords }: SlimeInternals): SlimeStore {
   const live = (): Map<string, HandlerRecord> => new Map(liveRecords().map((record) => [record.key, record]));
   return {
     async get(ns, key) {
-      return (ns === HANDLERS_NS ? live().get(key) : undefined) ?? (await store.get(ns, key));
+      const saved = await store.get(ns, key);
+      return ns === HANDLERS_NS ? busier(live().get(key), saved) : saved;
     },
     async list(ns, prefix) {
       const saved = await store.list(ns, prefix);
       if (ns !== HANDLERS_NS) return saved;
       const records = live();
-      return saved.map(({ key, value }): StoreEntry => ({ key, value: records.get(key) ?? value }));
+      return saved.map(({ key, value }): StoreEntry => ({ key, value: busier(records.get(key), value) }));
     },
     put: async () => Promise.reject(new Error(READ_ONLY_VIEW)),
     delete: async () => Promise.reject(new Error(READ_ONLY_VIEW)),
   };
+}
+
+function busier(live: HandlerRecord | undefined, saved: unknown): unknown {
+  if (!live) return saved;
+  const savedRuns = (saved as { runs?: unknown } | undefined)?.runs;
+  return typeof savedRuns === 'number' && savedRuns > live.runs ? saved : live;
 }
