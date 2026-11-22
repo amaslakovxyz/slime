@@ -3,6 +3,7 @@ import { SlimeError } from '../shared/errors.js';
 import { layerOfError, type LayerId, type LayerSpan, type LayerStatus } from '../shared/trace.js';
 import type { Execution } from './execution/execute.js';
 import { repairMessage } from './generation/repair-message.js';
+import type { ReviewStatus } from '../handler/record.js';
 
 const NOTE_MAX = 200;
 const MS_PRECISION = 100;
@@ -78,4 +79,12 @@ export class Trace {
 
 function stopNote(error: unknown): string {
   return error instanceof SlimeError ? repairMessage(error) : 'unexpected error';
+}
+
+/** The review span, from the record's review status (or a Crystal's). */
+export function traceReview(trace: Trace, review: ReviewStatus, hasReviewer: boolean, gasToLiquidRuns: number): void {
+  if (review === 'approved') trace.add('review', 'pass', { note: 'approved' });
+  else if (review === 'rejected') trace.add('review', 'skip', { note: 'rejected — stays Gas' });
+  else if (review === 'pending') trace.add('review', 'pending', { note: 'review running in the background' });
+  else trace.add('review', 'skip', { note: hasReviewer ? `review starts at ${gasToLiquidRuns} runs` : 'no reviewer configured' });
 }

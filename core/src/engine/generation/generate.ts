@@ -1,4 +1,4 @@
-import type { Artifact } from '../../artifact/artifact.js';
+import type { Artifact, SqlStep } from '../../artifact/artifact.js';
 import { lintSteps } from '../../artifact/checks/steps.js';
 import type { ApiSchema } from '../../sources/api/types.js';
 import type { Source } from '../../sources/types.js';
@@ -13,6 +13,7 @@ import { checkParamTypes, paramTypesForModel, type ParamTypes } from '../../requ
 import { bindParams, executeArtifact, queryLimits, type Execution } from '../execution/execute.js';
 import { repairMessage } from './repair-message.js';
 import type { HandlerRecord } from '../../handler/record.js';
+import { Trace } from '../trace.js';
 
 export interface GenerationDeps {
   generator: Generator;
@@ -31,6 +32,8 @@ export interface GenerationJob {
   request: ParsedRequest;
   /** A revision starts from the rejected handler and the reviewer's notes. */
   previous?: PreviousAttempt;
+  /** Set by the engine on a new request; a revision from the review loop passes none. */
+  trace?: Trace;
 }
 
 export interface GenerationOutcome {
@@ -52,7 +55,8 @@ const WRITE_LIKE_REASON = /\b(writ|delet|updat|insert|modif|chang|remov|creat)/i
 const FINAL_CODES = new Set(['WRITE_REFUSED', 'ACCESS_DENIED', 'SOURCE_ERROR']);
 
 /** Generates, checks and runs a handler, repairing up to limits.maxRepairs times within the time budget. */
-export async function generateHandler(deps: GenerationDeps, { key, request, previous: startingPoint }: GenerationJob): Promise<GenerationOutcome> {
+export async function generateHandler(deps: GenerationDeps, { key, request, previous: startingPoint, trace: jobTrace }: GenerationJob): Promise<GenerationOutcome> {
+  const trace = jobTrace ?? new Trace();
   const paramTypes = checkParamTypes({}, request.input);
   const usage: ModelUsage = { ms: 0, waitMs: 0, inputTokens: 0, outputTokens: 0 };
   let deadline = Date.now() + deps.limits.generationBudgetMs;
@@ -60,16 +64,24 @@ export async function generateHandler(deps: GenerationDeps, { key, request, prev
   let lastError: SlimeError | undefined;
 
   for (let attempt = 0; attempt <= deps.limits.maxRepairs && deadline - Date.now() >= MIN_ATTEMPT_MS; attempt++) {
-    const generation = await deps.generator.generate(
-      { context: deps.dictionaryText, intent: request.intent, params: paramTypesForModel(paramTypes), output: request.output, ...(previous ? { previous } : {}) },
-      { timeoutMs: deadline - Date.now() },
+    const attemptNo = attempt + 1;
+    const generation = await trace.time(
+      'generate',
+      async () => {
+        const result = await deps.generator.generate(
+          { context: deps.dictionaryText, intent: request.intent, params: paramTypesForModel(paramTypes), output: request.output, ...(previous ? { previous } : {}) },
+          { timeoutMs: deadline - Date.now() },
+        );
+        addUsage(usage, result);
+        deadline += result.waitMs; // provider rate-limit waits don't count against the budget
+        assertSatisfiable(result.artifact);
+        return result;
+      },
+      { attempt: attemptNo, note: (g) => `${g.inputTokens + g.outputTokens} tokens` },
     );
-    addUsage(usage, generation);
-    deadline += generation.waitMs; // provider rate-limit waits don't count against the budget
-    assertSatisfiable(generation.artifact);
     const { artifact } = generation;
     try {
-      const execution = await tryArtifact(deps, artifact, request);
+      const execution = await tryArtifact(deps, artifact, request, trace, attemptNo);
       return { record: newRecord({ deps, key, request, artifact, paramTypes }), execution, usage };
     } catch (error) {
       lastError = asSlimeError(error);
@@ -80,21 +92,42 @@ export async function generateHandler(deps: GenerationDeps, { key, request, prev
   throw lastError ?? new SlimeError('GENERATION_TIMEOUT', 'Ran out of generation time budget.', { retryable: true });
 }
 
-async function tryArtifact(deps: GenerationDeps, artifact: Artifact, request: ParsedRequest): Promise<Execution> {
+async function tryArtifact(deps: GenerationDeps, artifact: Artifact, request: ParsedRequest, trace: Trace, attempt: number): Promise<Execution> {
   const { sqlSourceName, apiSchemas } = deps;
-  lintSteps(artifact, { sqlSourceName, apiSchemas, input: request.input, maxSteps: deps.limits.maxSteps });
-  for (const step of artifact.steps) {
-    if (!('sql' in step)) continue;
-    await assertAffordable(deps, step.sql, bindParams(step.params, request.input));
+  const stepCount = artifact.steps.length;
+  await trace.time('lint', () => lintSteps(artifact, { sqlSourceName, apiSchemas, input: request.input, maxSteps: deps.limits.maxSteps }), {
+    attempt,
+    note: () => `read-only · params mapped · ${stepCount} step${stepCount === 1 ? '' : 's'}`,
+  });
+  const sqlSteps = artifact.steps.filter((step): step is SqlStep => 'sql' in step);
+  if (sqlSteps.length === 0) trace.add('cost', 'skip', { note: 'no SQL steps', attempt });
+  else {
+    await trace.time(
+      'cost',
+      async () => {
+        const costs: (number | null)[] = [];
+        for (const step of sqlSteps) costs.push(await assertAffordable(deps, step.sql, bindParams(step.params, request.input)));
+        return costs;
+      },
+      { attempt, note: (all) => `cost ${Math.max(0, ...all.map((c) => c ?? 0))} of ${deps.limits.maxQueryCost}` },
+    );
   }
-  return executeArtifact(deps, { artifact, output: request.output, input: request.input });
+  try {
+    const execution = await executeArtifact(deps, { artifact, output: request.output, input: request.input });
+    trace.addExecution(execution, attempt);
+    return execution;
+  } catch (error) {
+    trace.fail(error, attempt);
+    throw error;
+  }
 }
 
-async function assertAffordable(deps: GenerationDeps, sql: string, params: unknown[]): Promise<void> {
+async function assertAffordable(deps: GenerationDeps, sql: string, params: unknown[]): Promise<number | null> {
   const plan = await deps.connector.check(sql, params, queryLimits(deps.limits));
   if (plan.cost !== null && plan.cost > deps.limits.maxQueryCost) {
     throw new SlimeError('QUERY_TOO_EXPENSIVE', `Query cost ${plan.cost} is above the limit of ${deps.limits.maxQueryCost}.`);
   }
+  return plan.cost;
 }
 
 function assertSatisfiable({ unsatisfiable }: Artifact): void {

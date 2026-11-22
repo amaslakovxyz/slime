@@ -3,6 +3,7 @@ import type { StepTiming } from './execution/steps.js';
 import type { HandlerProvenance } from '../request/key.js';
 import type { SlimeRequest } from '../request/parse.js';
 import type { ReviewStatus, StoredTier, Tier } from '../handler/record.js';
+import type { LayerSpan } from '../shared/trace.js';
 
 export type CacheOutcome = 'hit' | 'miss' | 'coalesced';
 
@@ -29,6 +30,8 @@ export interface QueryMeta {
   sql?: string;
   shapeJs?: string;
   assumptions?: string[];
+  /** Which harness layers answered this request, in order (request trace design). */
+  trace?: LayerSpan[];
 }
 
 export interface QueryResult {
