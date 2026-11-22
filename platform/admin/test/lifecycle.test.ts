@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import type { Endpoint } from '../lib/endpoints';
-import { readLifecycle, stagesOf, toRow, type RuntimeHandler } from '../lib/lifecycle';
+import { readLifecycle, stagesOf, toRow, type LifecycleData, type RuntimeHandler } from '../lib/lifecycle';
 import { secretStore } from '../lib/secrets';
 
 const t = { liquidRuns: 3, crystalRuns: 10 };
@@ -109,7 +109,12 @@ describe('readLifecycle across a local restart', () => {
     await new Promise((done) => server.close(done));
 
     assert.deepEqual(await readLifecycle(ep('updating')), live, 'the tab keeps its rows instead of collapsing to a notice');
-    const down = await readLifecycle(ep('ready'));
-    assert.equal(down.ok, false, 'outside a restart an unreachable runtime is reported');
+    // A ready endpoint under load misses the occasional poll (busy serving the request we polled
+    // about); the board stands for a few polls so it does not flicker away on every request.
+    assert.deepEqual(await readLifecycle(ep('ready')), live, 'a single missed poll keeps the board');
+    // But a runtime that stays unreachable eventually collapses to the notice.
+    let down: LifecycleData = live;
+    for (let i = 0; i < 5; i++) down = await readLifecycle(ep('ready'));
+    assert.equal(down.ok, false, 'a persistently unreachable runtime is reported');
   });
 });
