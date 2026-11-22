@@ -56,7 +56,16 @@ post-deploy CI check fails if the served page loses that link.
   and re-forms the slime. If WebGL or the CDN is unavailable, a CSS blob stays
   in its place and the menu still works (no burst).
 
-- The "How it works" demo is a scripted animation, not a live call to the
-  server. Its timings (about 2.8 s for a new request, 14 ms cached) are kept in
-  the range the sandbox prototype shows, so the page matches the live demo.
-- Crystal is shown as "coming next" because it isn't built yet.
+- The "How it works" demo is a scripted animation, not a live call. It shows
+  the real request (`POST <endpoint>/v0/query`, header `x-api-key`, body
+  `{intent, input, output}`; the same example as the console's "Connect your
+  agent" snippet), SQL and rows from the demo billing database
+  (`examples/express/db/init.sql`), and the tier steps of the defaults: Gas on
+  the first call, Liquid after 3 successful runs and the review. It shows no
+  timings; the only numbers on the page are the measured Slime Cloud run in
+  [docs/product/customer-demo-use-cases.md](../../docs/product/customer-demo-use-cases.md#measured-2026-11-22).
+- Copy rules: claim only what `main` does. Slime Cloud connects Postgres only
+  (`platform/admin/lib/connectors.ts`); Notion and REST APIs are labelled
+  self-hosted (core multi-source); everything else is "next". Crystal is the
+  console's Crystallize (its own route `POST /v0/e/<key>` with an `slc_` token)
+  or, self-hosted, the `slime-crystal` folder in the repo.

@@ -173,6 +173,8 @@
       padding: 7px 0; background: none; border: 0; cursor: pointer; text-align: left; color: var(--text-pure); font: inherit;
     }
     .dish-name { font-size: 13.5px; font-weight: 600; transition: color .2s ease; white-space: nowrap; }
+    /* Where each source runs today: Slime Cloud, self-hosted core, or next. */
+    .dish-name small { margin-left: 6px; font-family: var(--font-mono); font-size: 9px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: var(--wireframe-grey); }
     .dish-ic { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; color: var(--plasma-highlight); background: rgba(255,20,118,.1); border: 1px solid rgba(255,20,118,.28); transition: transform .2s ease; }
     .dish-ic svg { width: 14px; height: 14px; }
     .dish:hover .dish-ic { transform: scale(1.08) rotate(-4deg); }
@@ -489,6 +491,11 @@
     #how .checks { margin-top: 16px; padding-top: 14px; gap: 9px; }
     .inline-code { font-family: var(--font-mono); font-size: .92em; color: var(--gas-accent); background: var(--gas-bg); padding: 1px 7px; border-radius: 6px; }
     .endpoint-note { font-family: var(--font-mono); font-size: 11.5px; letter-spacing: .08em; color: var(--wireframe-grey); }
+    /* The demo's tier readout, coloured by matter state. */
+    .demo-panel[data-state="gas"] .timer { color: var(--gas-accent); }
+    .demo-panel[data-state="liquid"] .timer { color: var(--plasma-highlight); }
+    .measured { margin-top: 18px; font-family: var(--font-mono); font-size: 12.5px; color: var(--text-muted); }
+    #how .steps { margin-top: 22px; }
 
     /* ---------- Matter states: image cards ---------- */
     .state-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
@@ -541,7 +548,7 @@
     .an-bar { height: 4px; border-radius: 4px; background: rgba(255,255,255,.08); overflow: hidden; }
     .an-bar i { display: block; height: 100%; width: 0; border-radius: 4px; background: linear-gradient(90deg, var(--crystal-glow), #2F64E0); animation: fill 6s ease-in infinite; }
     .an-commit { left: 14px; bottom: 14px; color: var(--crystal-accent); border-color: var(--crystal-border); animation: commit 6s ease infinite; }
-    @keyframes count { 0% { --calls: 0; } 60%, 100% { --calls: 10000; } }
+    @keyframes count { 0% { --calls: 0; } 60%, 100% { --calls: 10; } }
     @keyframes fill { 0% { width: 0; } 60%, 100% { width: 100%; } }
     @keyframes commit { 0%, 62% { opacity: 0; translate: 0 8px; } 70%, 94% { opacity: 1; translate: 0 0; } 100% { opacity: 0; } }
     .st-gas .st-media { background: radial-gradient(70% 70% at 50% 55%, rgba(56,248,184,.16), transparent 70%), #0f0c12; }
@@ -705,10 +712,10 @@
               <span class="menu-kicker">menu</span>
             </div>
             <ul class="menu-list" id="menu-list">
-                <li><button class="dish" type="button"><span class="dish-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg></span><span class="dish-name">Databases</span><span class="dish-leader" aria-hidden="true"></span><span class="dish-count" aria-label="fed 0 times">0</span></button></li>
-                <li><button class="dish" type="button"><span class="dish-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3H7a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1M16 3h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-1"/></svg></span><span class="dish-name">REST APIs</span><span class="dish-leader" aria-hidden="true"></span><span class="dish-count" aria-label="fed 0 times">0</span></button></li>
-                <li><button class="dish" type="button"><span class="dish-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M13 4l-2 16"/></svg></span><span class="dish-name">SOAP</span><span class="dish-leader" aria-hidden="true"></span><span class="dish-count" aria-label="fed 0 times">0</span></button></li>
-                <li><button class="dish" type="button"><span class="dish-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M8 13h8M8 17h5"/></svg></span><span class="dish-name">CSVs &amp; files</span><span class="dish-leader" aria-hidden="true"></span><span class="dish-count" aria-label="fed 0 times">0</span></button></li>
+                <li><button class="dish" type="button"><span class="dish-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg></span><span class="dish-name">Postgres<small>cloud</small></span><span class="dish-leader" aria-hidden="true"></span><span class="dish-count" aria-label="fed 0 times">0</span></button></li>
+                <li><button class="dish" type="button"><span class="dish-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3H7a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1M16 3h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-1"/></svg></span><span class="dish-name">REST APIs<small>self-hosted</small></span><span class="dish-leader" aria-hidden="true"></span><span class="dish-count" aria-label="fed 0 times">0</span></button></li>
+                <li><button class="dish" type="button"><span class="dish-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 16V8l6 8V8"/></svg></span><span class="dish-name">Notion<small>self-hosted</small></span><span class="dish-leader" aria-hidden="true"></span><span class="dish-count" aria-label="fed 0 times">0</span></button></li>
+                <li><button class="dish" type="button"><span class="dish-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span><span class="dish-name">More sources<small>next</small></span><span class="dish-leader" aria-hidden="true"></span><span class="dish-count" aria-label="fed 0 times">0</span></button></li>
             </ul>
           </div>
         </div>
@@ -724,48 +731,59 @@
             <p class="sec-label"><span class="ic gas" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></span>How it works</p>
             <h2>Make a wish.<br><span class="muted-line">Slime builds it.</span></h2>
           </div>
-          <p class="sec-lead">Describe the data you want in one GET to <code class="inline-code">/slurp</code>. The first wish builds the endpoint in a few seconds; every repeat comes from memory in milliseconds.</p>
+          <p class="sec-lead">Send one POST to your endpoint's <code class="inline-code">/v0/query</code>: what you want in words, the values, and the JSON shape you want back. The first call writes the handler; repeats run the saved code with no model call.</p>
         </div>
 
         <div class="showcase reveal">
         <div class="demo-panel" id="demo" data-state="idle">
           <div class="demo-bar">
-            <span class="endpoint"><b>GET</b>/slurp</span>
-            <span class="endpoint-note">one endpoint · any shape</span>
+            <span class="endpoint"><b>POST</b>/ep/&lt;id&gt;/v0/query</span>
+            <span class="endpoint-note">one route · any shape</span>
           </div>
           <div class="demo-body">
             <div class="demo-col">
-              <div class="label"><span>Request · from your UI</span></div>
-<pre class="code" aria-label="Example request"><span class="kw">GET</span> /slurp
-  <span class="p">?</span><span class="k">want</span><span class="p">=</span><span class="s">top N accounts by total paid
-         invoices, highest first</span>
-  <span class="p">&amp;</span><span class="k">limit</span><span class="p">=</span><span class="n">3</span>
-  <span class="p">&amp;</span><span class="k">shape</span><span class="p">=</span><span class="s">[{ name: string,
-            totalPaidCents: integer }]</span></pre>
+              <div class="label"><span>Request · from your server or agent</span></div>
+<pre class="code" aria-label="Example request">curl -X POST https://…/ep/&lt;id&gt;/v0/query \
+  -H <span class="s">"x-api-key: slm_…"</span> \
+  -H <span class="s">"content-type: application/json"</span> \
+  -d <span class="p">'{</span>
+    <span class="k">"intent"</span><span class="p">:</span> <span class="s">"number of accounts on each plan"</span><span class="p">,</span>
+    <span class="k">"input"</span><span class="p">:</span>  <span class="p">{},</span>
+    <span class="k">"output"</span><span class="p">:</span> <span class="p">[{</span> <span class="k">"plan"</span><span class="p">:</span> <span class="s">"string"</span><span class="p">,</span>
+                 <span class="k">"accounts"</span><span class="p">:</span> <span class="s">"integer"</span> <span class="p">}]</span>
+  <span class="p">}'</span></pre>
               <div class="send-row">
                 <button class="btn btn-primary" id="demo-btn" type="button">Send request</button>
-                <span class="send-hint" id="demo-hint">No backend route exists for this yet.</span>
+                <span class="send-hint" id="demo-hint">The console's own example, on the demo billing data.</span>
               </div>
               <ul class="checks" id="demo-checks" aria-label="Safety checks">
-                <li>Read-only access</li>
-                <li>Logic runs in a sandbox</li>
-                <li>Result matches your shape</li>
+                <li>Read-only role, READ ONLY transaction</li>
+                <li>Shaping code runs in a QuickJS sandbox</li>
+                <li>Result checked against your output</li>
               </ul>
             </div>
 
             <div class="demo-col">
               <div class="label"><span id="sql-label">Handler · not generated yet</span></div>
-              <pre class="code sql-box" id="demo-sql" aria-label="Generated SQL"><span class="placeholder">-- Slime will synthesize a safe, read-only
+              <pre class="code sql-box" id="demo-sql" aria-label="Generated SQL"><span class="placeholder">-- Slime will write a read-only
 -- query here on the first request.</span></pre>
 
               <div class="timer-row">
-                <span class="timer" id="demo-timer">0<small>ms</small></span>
+                <span class="timer" id="demo-tier">—</span>
                 <span class="meta-line" id="demo-meta">waiting for a request</span>
               </div>
               <pre class="code response" id="demo-res" aria-label="Response"><span class="p">// response appears here</span></pre>
             </div>
           </div>
         </div>
+        </div>
+
+        <p class="measured reveal">Measured on Slime Cloud, 2026-11-22: a new request took 5.6 s to generate; its repeats ran in 6–8 ms inside the engine, plus the network round trip. The panel above is an illustration.</p>
+
+        <div class="steps reveal">
+          <div class="step"><span class="i">1</span><div><b>Connect Postgres</b><span>Create an endpoint in the console with a read-only database user.</span></div></div>
+          <div class="step"><span class="i">2</span><div><b>Copy the snippet</b><span>Lifecycle → Connect your agent shows your URL and your <code class="inline-code">slm_</code> key.</span></div></div>
+          <div class="step"><span class="i">3</span><div><b>Ask for data</b><span>Keep the intent text fixed and send values in <code class="inline-code">input</code>: new values reuse the same handler.</span></div></div>
         </div>
 
       </div>
@@ -779,45 +797,45 @@
             <p class="sec-label"><span class="ic crystal" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 12L2 9z"/><path d="M2 9h20"/></svg></span>Matter states</p>
             <h2>It grows its own API.<br><span class="muted-line">Gas, Liquid, Crystal.</span></h2>
           </div>
-          <p class="sec-lead">Every endpoint starts as a first guess and hardens into permanent code, shaped only by what your product actually asks for.</p>
+          <p class="sec-lead">Every handler starts as a first draft and hardens as it proves itself, shaped only by what your product actually asks for.</p>
         </div>
 
         <div class="state-grid">
           <article class="st st-gas reveal">
             <div class="st-media" aria-hidden="true">
               <img src="assets/state-gas.webp" width="960" height="720" loading="lazy" alt="">
-              <span class="an an-req mono"><b>MISS</b> GET /slurp?want=churn by plan</span>
-              <div class="an an-write mono"><span class="an-type">SELECT plan, count(*) FROM accounts…</span><span class="an-ok">✓ checked · 1.1 s</span></div>
+              <span class="an an-req mono"><b>MISS</b> POST /v0/query · accounts per plan</span>
+              <div class="an an-write mono"><span class="an-type">SELECT p.name, count(a.id) FROM plans p…</span><span class="an-ok">✓ checked</span></div>
             </div>
             <div class="st-body">
               <span class="tag gas"><span class="dot"></span>First request</span>
               <h3>Gas</h3>
-              <p>The first time Slime sees a request, an agent writes its endpoint on the spot and checks it. Unused ones evaporate.</p>
+              <p>The first time Slime sees a request, a model writes a read-only handler on the spot. Slime checks it, runs it and keeps it in memory. A Gas handler that isn't used enough within an hour evaporates.</p>
             </div>
           </article>
           <article class="st st-liquid reveal">
             <div class="st-media" aria-hidden="true">
               <img src="assets/state-liquid.webp" width="960" height="720" loading="lazy" alt="">
-              <span class="an an-hash mono">want=churn by plan → <b>#a91f3c</b></span>
+              <span class="an an-hash mono">intent · input names · output → <b>#a91f3c</b></span>
               <div class="an an-mem mono"><span>#07be21</span><span class="hit">#a91f3c</span><span>#5d0c9e</span></div>
-              <span class="an an-fast mono">⚡ 4 ms · no AI</span>
+              <span class="an an-fast mono">⚡ saved code · no model call</span>
             </div>
             <div class="st-body">
-              <span class="tag liquid"><span class="dot"></span>Every repeat</span>
+              <span class="tag liquid"><span class="dot"></span>Proven repeats</span>
               <h3>Liquid</h3>
-              <p>Seen it before? Slime finds the endpoint by its hash and serves it from memory, no AI involved. A second model reviews it before it's kept.</p>
+              <p>Repeats find the handler by its hash and run the saved code, no model call. After 3 successful runs and a second model's review, it's saved as Liquid and survives restarts.</p>
             </div>
           </article>
           <article class="st st-crystal reveal">
             <div class="st-media" aria-hidden="true">
               <img src="assets/state-crystal.webp" width="960" height="720" loading="lazy" alt="">
-              <div class="an an-heat mono"><span class="an-heat-label">hot path · <span class="an-count"></span> calls</span><span class="an-bar"><i></i></span></div>
-              <span class="an an-commit mono">✓ crystallized → src/slime/churn.ts</span>
+              <div class="an an-heat mono"><span class="an-heat-label">liquid runs · <span class="an-count"></span> / 10</span><span class="an-bar"><i></i></span></div>
+              <span class="an an-commit mono">✓ crystallized → POST /v0/e/&lt;key&gt;</span>
             </div>
             <div class="st-body">
-              <span class="tag crystal">Hot paths</span>
+              <span class="tag crystal">Crystallize</span>
               <h3>Crystal</h3>
-              <p>Endpoints that run hot crystallize: an agent optimizes them into ordinary code, committed to your repo.</p>
+              <p>After 10 runs, press Crystallize in the console: the proven handler becomes its own route, <code class="inline-code">/v0/e/&lt;key&gt;</code>, opened by its own <code class="inline-code">slc_</code> token, and it never calls a model. Self-hosted, Crystallize writes it into your repo as code that the <code class="inline-code">slime-crystal</code> CLI verifies in CI.</p>
             </div>
           </article>
         </div>
@@ -841,54 +859,53 @@
               <div class="mock win">
                 <div class="win-dots"><i></i><i></i><i></i></div>
                 <span class="win-title">Revenue dashboard</span>
-                <span class="win-sub">vibecoded in 10 minutes</span>
+                <span class="win-sub">built by your coding agent</span>
                 <div class="bars"><i style="height:82%"></i><i style="height:64%"></i><i style="height:55%"></i><i style="height:38%"></i><i style="height:26%"></i></div>
-                <div class="win-rows"><span>Plumtree Studio <b>$12,845</b></span><span>Kelp &amp; Co <b>$9,732</b></span></div>
+                <div class="win-rows"><span>Silver Labs 79 <b>€10,718.77</b></span><span>Blue Retail 126 <b>€10,702.95</b></span></div>
               </div>
               <div class="mock req mono">
-                <span><span class="verb">GET</span> /slurp</span>
-                <span class="req-row"><small>want</small><span>"top accounts by revenue"</span></span>
-                <span class="req-row"><small>shape</small><span>[{ name, total }]</span></span>
+                <span><span class="verb">POST</span> /v0/query</span>
+                <span class="req-row"><small>intent</small><span>"top N accounts by total paid…"</span></span>
+                <span class="req-row"><small>output</small><span>[{ name, totalPaidCents }]</span></span>
               </div>
-              <span class="tag liquid req-tag"><span class="dot"></span>Liquid · 14 ms</span>
+              <span class="tag liquid req-tag"><span class="dot"></span>Liquid · saved</span>
             </div></div>
             <div class="uc-bar"><i></i></div>
             <h3>Vibecoded UIs</h3>
             <p class="summary">Vibecode the UI. Let Slime build the backend.</p>
-            <p class="detail">Point your generated UI at Slime. Every new widget gets its endpoint the moment it asks.</p>
+            <p class="detail">Point your generated UI's server at Slime. Every new widget gets its handler the first time it asks.</p>
           </article>
 
           <article class="uc reveal" tabindex="0" role="button" aria-pressed="false">
             <div class="uc-media m-berry" aria-hidden="true"><div class="scene">
               <div class="mock chat">
                 <span class="bubble"><small>agent</small>delete inactive accounts</span>
-                <span class="reply no">WRITE_REFUSED</span>
-                <span class="bubble"><small>agent</small>churn risk by plan</span>
-                <span class="reply ok">✓ 3 rows · 11 ms</span>
+                <span class="reply no">403 WRITE_REFUSED</span>
+                <span class="bubble"><small>agent</small>past-due accounts in FR</span>
+                <span class="reply ok">✓ 6 rows</span>
               </div>
               <div class="mock ask"><span>Ask Slime…</span><span>↵</span></div>
             </div></div>
             <div class="uc-bar"><i></i></div>
             <h3>AI agents</h3>
             <p class="summary">Unleash your agents. Keep your database untouchable.</p>
-            <p class="detail">Agents ask for the data they need and Slime builds the tool on the spot: read-only, reviewed, guarded by your database.</p>
+            <p class="detail">Agents ask for the data they need and Slime builds the handler on the spot: read-only, reviewed, guarded by your database's own permissions.</p>
           </article>
 
           <article class="uc reveal" tabindex="0" role="button" aria-pressed="false">
             <div class="uc-media m-mint" aria-hidden="true"><div class="scene">
-              <div class="mock xml mono">&lt;soap:Envelope&gt;
- &lt;GetInvoices&gt;
-  &lt;status&gt;unpaid&lt;/status&gt;
- &lt;/GetInvoices&gt;
-&lt;/soap:Envelope&gt;</div>
-              <span class="digest"><span class="ico-blob"></span>digesting…</span>
-              <div class="mock json mono">[{ "invoice": 1042,
-   "due": "2026-11-30" }]</div>
+              <div class="mock xml mono">steps:
+ db      SELECT … paid invoices
+ notion  open negative feedback
+ rates   rates.latest (ECB)</div>
+              <span class="digest"><span class="ico-blob"></span>joining…</span>
+              <div class="mock json mono">[{ "name": "Lunar Logistics 37",
+   "paidRevenue": 6748.94 }]</div>
             </div></div>
             <div class="uc-bar"><i></i></div>
-            <h3>Legacy systems</h3>
+            <h3>Existing systems <span class="soon">Self-hosted</span></h3>
             <p class="summary">Don't rewrite legacy. Let Slime digest it.</p>
-            <p class="detail">Slime sits in front of old databases and services and grows a modern API on top, one request at a time.</p>
+            <p class="detail">Self-hosted, one handler reads Postgres, Notion and REST APIs in a single request. Slime Cloud connects Postgres today; more connectors are next.</p>
           </article>
 
           <article class="uc reveal" tabindex="0" role="button" aria-pressed="false">
@@ -941,9 +958,9 @@
     <section class="cta">
       <div class="container reveal">
         <p class="wordmark"><span class="slime-text">Stop writing endpoints.</span><span class="cta-answer">Slime writes them.</span></p>
-        <p>Point your UI or agent at Slime. The backend builds itself.</p>
+        <p>Point your app's server or your agent at Slime. The backend builds itself.</p>
         <div class="hero-ctas">
-          <a href="#top" class="btn btn-primary">Feed the Slime</a>
+          <a href="https://admin.amaslakov.com/" class="btn btn-primary">Open the console</a>
           <a href="#how" class="btn btn-soft">See it work <span class="arrow" aria-hidden="true">→</span></a>
         </div>
       </div>
@@ -1067,34 +1084,32 @@
       });
 
       /* ---------- Scripted demo ----------
-         This is an illustration, not a live call. Timings are in the range the
-         sandbox prototype shows: seconds for a new (Gas) request, tens of ms for
-         a cached (Liquid) one. Keep them realistic so the live demo matches. */
-      var GAS_MS = 2840;
-      var LIQUID_MS = 14;
+         An illustration, not a live call. The request is the console's own
+         example ("Connect your agent" snippet); SQL and rows are what the demo
+         billing database (examples/express/db/init.sql) returns. No timings are
+         shown: ANIM_MS only paces the typing. Tier steps follow the defaults:
+         Gas on the first call, Liquid after 3 successful runs and the review. */
+      var ANIM_MS = 2400;
       var SQL = [
-        'SELECT a.name,',
-        '       SUM(i.amount_cents)::int AS total_paid_cents',
-        'FROM accounts a',
-        'JOIN invoices i ON i.account_id = a.id',
-        "WHERE i.status = 'paid'",
-        'GROUP BY a.id, a.name',
-        'ORDER BY total_paid_cents DESC',
-        'LIMIT $1;'
+        'SELECT p.name AS "plan",',
+        '       count(a.id)::int AS "accounts"',
+        'FROM plans p',
+        'JOIN accounts a ON a.plan_id = p.id',
+        'GROUP BY p.id, p.name'
       ].join('\n');
       var DATA = [
-        { name: 'Plumtree Studio', totalPaidCents: 1284500 },
-        { name: 'Kelp & Co', totalPaidCents: 973200 },
-        { name: 'Orbital Pantry', totalPaidCents: 811950 }
+        { plan: 'Free', accounts: 56 },
+        { plan: 'Starter', accounts: 48 },
+        { plan: 'Growth', accounts: 48 },
+        { plan: 'Enterprise', accounts: 48 }
       ];
 
       var panel = document.getElementById('demo');
       var btn = document.getElementById('demo-btn');
       var hint = document.getElementById('demo-hint');
-      var statusEl = document.getElementById('demo-status');
       var sqlEl = document.getElementById('demo-sql');
       var sqlLabel = document.getElementById('sql-label');
-      var timerEl = document.getElementById('demo-timer');
+      var tierEl = document.getElementById('demo-tier');
       var metaEl = document.getElementById('demo-meta');
       var resEl = document.getElementById('demo-res');
       var checks = document.querySelectorAll('#demo-checks li');
@@ -1109,35 +1124,27 @@
       function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
       function hlSql(s) {
         return esc(s)
-          .replace(/\$\d+/g, '<span class="prm">$&</span>')
-          .replace(/'[^']*'/g, '<span class="s">$&</span>')
-          .replace(/\b(SELECT|SUM|AS|FROM|JOIN|ON|WHERE|GROUP BY|ORDER BY|DESC|LIMIT|int)\b/g, '<span class="kw">$1</span>');
+          .replace(/\b(SELECT|AS|FROM|JOIN|ON|GROUP BY|int)\b/g, '<span class="kw">$1</span>');
       }
-      function hlJson(rows) {
-        // One row per line keeps the response short enough to fit the screen.
-        var text = '[\n' + rows.map(function (o) {
-          return '  { ' + Object.keys(o).map(function (k) { return JSON.stringify(k) + ': ' + JSON.stringify(o[k]); }).join(', ') + ' }';
-        }).join(',\n') + '\n]';
+      // Values first: once a key is wrapped, its colon sits inside a span.
+      function hlJson(text) {
         return esc(text)
-          .replace(/"([^"]+)":/g, '<span class="k">"$1"</span><span class="p">:</span>')
           .replace(/: "([^"]*)"/g, ': <span class="s">"$1"</span>')
-          .replace(/: (\d+)/g, ': <span class="n">$1</span>');
+          .replace(/: (\d+)/g, ': <span class="n">$1</span>')
+          .replace(/"([^"]+)":/g, '<span class="k">"$1"</span><span class="p">:</span>');
       }
-      function fmt(n) { return Math.round(n).toLocaleString('en-US'); }
-      function setTimer(ms) { timerEl.innerHTML = fmt(ms) + '<small>ms</small>'; }
-      function setStatus(cls, text) {
-        if (!statusEl) return; // the status tag was removed for a calmer demo bar
-        statusEl.className = 'tag' + (cls ? ' ' + cls : '');
-        statusEl.innerHTML = '<span class="dot"></span>' + text;
+      // The runtime's answer is { data, meta }; one row per line keeps it on screen.
+      function responseText(meta) {
+        var rows = DATA.map(function (o) {
+          return '    { ' + Object.keys(o).map(function (k) { return JSON.stringify(k) + ': ' + JSON.stringify(o[k]); }).join(', ') + ' }';
+        }).join(',\n');
+        return '{ "data": [\n' + rows + '\n  ],\n' +
+          '  "meta": { "tier": "' + meta.tier + '", "cache": "' + meta.cache + '",\n' +
+          '            "review": "' + meta.review + '" } }';
       }
-      function countTo(target, duration, done) {
-        if (reduceMotion || duration <= 0) { setTimer(target); done(); return; }
-        var start = performance.now();
-        (function tick(now) {
-          var t = Math.min(1, (now - start) / duration);
-          setTimer(target * t);
-          if (t < 1) requestAnimationFrame(tick); else done();
-        })(start);
+      function showResponse(meta) {
+        resEl.innerHTML = hlJson(responseText(meta));
+        resEl.classList.remove('flash'); void resEl.offsetWidth; resEl.classList.add('flash');
       }
       function typeSql(duration, done) {
         if (reduceMotion) { sqlEl.innerHTML = hlSql(SQL); done(); return; }
@@ -1149,65 +1156,64 @@
           if (t < 1) requestAnimationFrame(tick); else done();
         })(start);
       }
-      function showResponse(meta) {
-        resEl.innerHTML = '<span class="p">// data · ' + meta + '</span>\n' + hlJson(DATA);
-        resEl.classList.remove('flash'); void resEl.offsetWidth; resEl.classList.add('flash');
-      }
 
       function runGas() {
         state = 'busy'; btn.disabled = true;
         panel.dataset.state = 'gas';
-        setStatus('gas', 'Gas · synthesizing');
-        sqlLabel.textContent = 'Handler · writing now';
-        hint.textContent = 'First time Slime sees this. Writing the logic…';
+        tierEl.textContent = 'gas';
+        sqlLabel.textContent = 'Handler · a model is writing it';
+        hint.textContent = 'First time Slime sees this request. A model writes the handler…';
         metaEl.textContent = 'cache: miss';
-        resEl.innerHTML = '<span class="p">// checking the result matches your shape…</span>';
-        var left = 2;
-        function finished() {
-          if (--left) return;
-          setStatus('gas', 'Gas · generated');
-          sqlLabel.textContent = 'Handler · read-only, saved';
-          metaEl.textContent = 'cache: miss · tier: gas · ' + fmt(GAS_MS) + ' ms';
-          showResponse('shape verified');
+        resEl.innerHTML = '<span class="p">// checking the result against your output…</span>';
+        tickChecks(ANIM_MS);
+        typeSql(ANIM_MS, function () {
+          sqlLabel.textContent = 'Handler · read-only SQL, checked';
+          metaEl.textContent = 'tier: gas · cache: miss · generated now';
+          showResponse({ tier: 'gas', cache: 'miss', review: 'none' });
           hint.textContent = 'Now send the exact same request again.';
           btn.textContent = 'Send it again';
           btn.disabled = false; state = 'gas';
-        }
-        tickChecks(GAS_MS);
-        typeSql(GAS_MS * 0.75, finished);
-        countTo(GAS_MS, GAS_MS, finished);
+        });
+      }
+
+      function runRepeat() {
+        panel.dataset.state = 'gas';
+        tierEl.textContent = 'gas';
+        sqlLabel.textContent = 'Handler · cached code, no model call';
+        metaEl.textContent = 'tier: gas · cache: hit · no model call';
+        showResponse({ tier: 'gas', cache: 'hit', review: 'none' });
+        hint.textContent = 'Same handler, no model call. After 3 successful runs a second model reviews it.';
+        btn.textContent = 'Run it a few more times';
+        state = 'repeat';
       }
 
       function runLiquid() {
-        state = 'busy'; btn.disabled = true;
         panel.dataset.state = 'liquid';
-        setStatus('liquid', 'Liquid · cache hit');
-        sqlLabel.textContent = 'Handler · from memory, no AI call';
-        countTo(LIQUID_MS, 160, function () {
-          metaEl.textContent = 'cache: hit · tier: liquid · ' + LIQUID_MS + ' ms · no AI call';
-          showResponse('served from memory');
-          hint.textContent = 'Same answer, about 200× faster. No model involved.';
-          btn.textContent = 'Replay';
-          btn.disabled = false; state = 'liquid';
-        });
+        tierEl.textContent = 'liquid';
+        sqlLabel.textContent = 'Handler · reviewed and saved';
+        metaEl.textContent = 'tier: liquid · cache: hit · review approved';
+        showResponse({ tier: 'liquid', cache: 'hit', review: 'approved' });
+        hint.textContent = 'Reviewed and saved as Liquid: it survives restarts. After 10 runs it can crystallize.';
+        btn.textContent = 'Replay';
+        state = 'liquid';
       }
 
       function reset() {
         state = 'idle'; panel.dataset.state = 'idle';
-        setStatus('', 'Ready');
+        tierEl.textContent = '—';
         sqlLabel.textContent = 'Handler · not generated yet';
-        sqlEl.innerHTML = '<span class="placeholder">-- Slime will synthesize a safe, read-only\n-- query here on the first request.</span>';
-        setTimer(0);
+        sqlEl.innerHTML = '<span class="placeholder">-- Slime will write a read-only\n-- query here on the first request.</span>';
         metaEl.textContent = 'waiting for a request';
         resEl.innerHTML = '<span class="p">// response appears here</span>';
-        hint.textContent = 'No backend route exists for this yet.';
+        hint.textContent = "The console's own example, on the demo billing data.";
         btn.textContent = 'Send request';
         checks.forEach(function (li) { li.classList.remove('ok'); });
       }
 
       btn.addEventListener('click', function () {
         if (state === 'idle') runGas();
-        else if (state === 'gas') runLiquid();
+        else if (state === 'gas') runRepeat();
+        else if (state === 'repeat') runLiquid();
         else if (state === 'liquid') reset();
       });
 
