@@ -60,6 +60,15 @@ describe('toRow', () => {
     assert.equal(stages[2]!.count, 1);
   });
 
+  test('a compact progress mark for icon-led lists', () => {
+    assert.equal(toRow(h({ runs: 5 }), t).progressShort, '3/3');
+    assert.equal(toRow(h({ runs: 1 }), t).progressShort, '1/3');
+    assert.equal(toRow(h({ tier: 'liquid', runs: 7 }), t).progressShort, '7/10');
+    assert.equal(toRow(h({ tier: 'liquid', runs: 10 }), t).progressShort, 'ready');
+    assert.equal(toRow(h({ tier: 'liquid', runs: 12, stale: true }), t).progressShort, 'stale');
+    assert.equal(toRow(h({ tier: 'crystal', runs: 12 }), t).progressShort, 'live');
+  });
+
   test('a Crystal is its own endpoint and is never picked again', () => {
     const row = toRow(h({ tier: 'crystal', runs: 12, inputs: { limit: 'number', country: null } }), t);
     assert.equal(row.exampleBody, '{"input":{"limit":5,"country":null}}');
@@ -125,6 +134,7 @@ describe('transitionsOf', () => {
     assert.match(toLiquid!.rule, /3 successful runs/);
     assert.match(toCrystal!.rule, /10 runs/);
     assert.deepEqual([toGas!.short, toLiquid!.short, toCrystal!.short], ['first request', '3 runs + review', '10 runs + Crystallize']);
+    assert.deepEqual([toGas!.runs, toLiquid!.runs, toCrystal!.runs], [undefined, 3, 10]);
     // Gas: both are counting; one reached the run threshold and waits for the review.
     assert.deepEqual([toLiquid!.onTheWay, toLiquid!.ready], [2, 1]);
     // Liquid: the stale row is neither on the way nor pickable.

@@ -50,6 +50,8 @@ export interface HandlerRow {
   runs: number;
   progressPct: number;
   progressLabel: string;
+  /** The same, as a mark for compact lists: "1/3", "7/10", "ready", "stale", "live". */
+  progressShort: string;
   review: { label: string; tone: 'ok' | 'run' | 'none' };
   canCrystallize: boolean;
   /** Saved with another schema, dictionary, prompt or model: regenerates on the next request, so it crosses to no next stage. */
@@ -79,6 +81,8 @@ export interface Transition {
   actor: 'agent' | 'automatic' | 'operator';
   /** The arrow's label, e.g. "3 runs + review". */
   short: string;
+  /** The run threshold to cross, when there is one. */
+  runs?: number;
   rule: string;
   /** Handlers in `from` that can still cross (stale saved rows cannot). */
   onTheWay: number;
@@ -94,18 +98,23 @@ export function toRow(h: RuntimeHandler, t: Thresholds = DEFAULT_THRESHOLDS): Ha
   const canCrystallize = h.tier === 'liquid' && !h.stale && h.runs >= t.crystalRuns;
   let progressPct: number;
   let progressLabel: string;
+  let progressShort: string;
   if (h.stale) {
     progressPct = 0;
     progressLabel = 'stale · regenerates on next request';
+    progressShort = 'stale';
   } else if (h.tier === 'gas') {
     progressPct = Math.min(100, (h.runs / t.liquidRuns) * 100);
-    progressLabel = `${Math.min(h.runs, t.liquidRuns)}/${t.liquidRuns} to Liquid`;
+    progressShort = `${Math.min(h.runs, t.liquidRuns)}/${t.liquidRuns}`;
+    progressLabel = `${progressShort} to Liquid`;
   } else if (h.tier === 'liquid') {
     progressPct = Math.min(100, (h.runs / t.crystalRuns) * 100);
-    progressLabel = canCrystallize ? 'ready to crystallize' : `${h.runs}/${t.crystalRuns} to Crystal`;
+    progressShort = canCrystallize ? 'ready' : `${h.runs}/${t.crystalRuns}`;
+    progressLabel = canCrystallize ? 'ready to crystallize' : `${progressShort} to Crystal`;
   } else {
     progressPct = 100;
     progressLabel = 'own endpoint';
+    progressShort = 'live';
   }
   return {
     key: h.key,
@@ -115,6 +124,7 @@ export function toRow(h: RuntimeHandler, t: Thresholds = DEFAULT_THRESHOLDS): Ha
     runs: h.runs,
     progressPct,
     progressLabel,
+    progressShort,
     review: reviewOf(h),
     canCrystallize,
     stale: h.stale === true,
@@ -199,6 +209,7 @@ export function transitionsOf(handlers: RuntimeHandler[], total: number, t: Thre
       to: 'liquid',
       actor: 'automatic',
       short: `${t.liquidRuns} runs + review`,
+      runs: t.liquidRuns,
       rule: `${t.liquidRuns} successful runs inside the Gas window (1 h by default), then a second model reviews the code.`,
       onTheWay: gas.length,
       ready: gas.filter((h) => h.runs >= t.liquidRuns).length,
@@ -210,6 +221,7 @@ export function transitionsOf(handlers: RuntimeHandler[], total: number, t: Thre
       to: 'crystal',
       actor: 'operator',
       short: `${t.crystalRuns} runs + Crystallize`,
+      runs: t.crystalRuns,
       rule: `At least ${t.crystalRuns} runs, then you press Crystallize.`,
       onTheWay: liquid.length,
       ready: liquid.filter((h) => h.runs >= t.crystalRuns).length,

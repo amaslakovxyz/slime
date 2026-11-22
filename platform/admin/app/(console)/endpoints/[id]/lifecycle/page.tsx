@@ -60,9 +60,6 @@ export default async function LifecyclePage({ params }: { params: Promise<{ id: 
         rows={rows}
         stats={stats}
         recent={events.length}
-        total={total}
-        firstAt={firstAt}
-        status={ep.status}
         cloud={cloud}
       />
 

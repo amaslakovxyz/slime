@@ -123,7 +123,7 @@ export async function lifecycleJourney(
     await crystal.click();
     await expect(crystal).toHaveAttribute('aria-pressed', 'true');
     const panel = page.getByTestId('lifecycle-panel');
-    await expect(panel).toContainText('Its own endpoint');
+    await expect(panel).toContainText('Own route');
     // The page refreshes every 2 s; the selection is client state and must survive it.
     await page.waitForTimeout(4_500);
     await expect(crystal).toHaveAttribute('aria-pressed', 'true');
