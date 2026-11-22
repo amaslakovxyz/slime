@@ -73,4 +73,11 @@ describe('the multi-source example', { skip: !isDatabaseUp && 'Postgres is not r
     assert.ok(body.data.length > 0);
     assert.ok(body.data.every((film, index, films) => index === 0 || films[index - 1].rtScore >= film.rtScore));
   });
+
+  test('a malformed JSON body is a 400 that is not retryable', async () => {
+    const response = await app.request('/slime', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{intent:' });
+    assert.equal(response.status, 400);
+    const { error } = await response.json();
+    assert.deepEqual([error.code, error.retryable], ['INVALID_REQUEST', false]);
+  });
 });
