@@ -98,6 +98,21 @@ describe('tenant cache with live engines', { skip: !hasDatabase && 'demo Postgre
     }
   });
 
+  test('a path the endpoint does not serve is a JSON 404 naming the path as the caller sent it', async () => {
+    const h = await harness();
+    try {
+      h.addEndpoint(A);
+      // `//v0/query` must reach the endpoint intact, not be read as a protocol-relative URL (host `v0`).
+      for (const [path, named] of [[`/ep/${A}//v0/query`, 'POST //v0/query'], [`/ep/${A}`, 'POST /'], [`/ep/${A}/`, 'POST /']] as const) {
+        const { status, json } = await h.call(path, { key: keyOf(A), body: COUNT_PER_PLAN });
+        assert.deepEqual([status, json?.error?.code], [404, 'NOT_FOUND'], path);
+        assert.ok(json?.error?.message?.includes(named), `${path}: ${json?.error?.message}`);
+      }
+    } finally {
+      await h.close();
+    }
+  });
+
   test('concurrent first requests share one engine build', async () => {
     const h = await harness();
     try {

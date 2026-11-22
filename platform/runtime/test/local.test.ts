@@ -251,6 +251,18 @@ describe('endpoint routes', () => {
     assert.equal((await app.request('/v0/crystallize', { method: 'POST', body: '{}' })).status, 404);
   });
 
+  test('a path or method the endpoint does not serve is a JSON 404 that points at /v0/query', async () => {
+    const app = createApp({ slime: fakeSlime(), connector, crystal: false });
+    // `//v0/query` is what a base URL ending in `/` plus `/v0/query` produces.
+    for (const [method, path] of [['POST', '//v0/query'], ['GET', '/'], ['GET', '/v0/query'], ['POST', '/v0/nope']] as const) {
+      const res = await app.request(path, { method, ...(method === 'POST' ? { body: '{}' } : {}) });
+      assert.equal(res.status, 404, `${method} ${path}`);
+      const { error } = (await res.json()) as { error: { code: string; message: string; retryable: boolean } };
+      assert.deepEqual([error.code, error.retryable], ['NOT_FOUND', false], `${method} ${path}`);
+      assert.ok(error.message.includes(`${method} ${path}`) && error.message.includes('POST /v0/query'), error.message);
+    }
+  });
+
   test('lifecycle merges saved, live and Crystal handlers; crystallize passes keys through', async () => {
     let gotKeys: string[] | undefined;
     const app = createApp({

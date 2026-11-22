@@ -49,8 +49,8 @@ All join `new URL('<route>', ep.url)` on a URL that ends in `/`. Admin pages:
 | A7 | `docs/product/atlas-demo-cheatsheet.md` step 2 and "Calls to copy" | endpoint URL `https://<runtime host>/ep/<id>` and `curl "$SLIME_URL/v0/query"` | the admin shows and stores the URL with a trailing `/` (`lib/endpoints.ts:126`); pasted as is into `SLIME_URL`, the doc's join makes `/ep/<id>//v0/query`, which answers 404; `examples/customer-site/.env.example` and the Atlas SSM value (`platform/infra/atlas/README.md:38`) have no slash | fixed: step 2 shows the URL with `/`; the calls use `"${SLIME_URL%/}/v0/query"`, right with or without the slash (the CI idiom, `terraform.yml:273`) |
 | A8 | `platform/runtime/README.md` routes | `/v0/crystallize` listed as always present, `{keys}` required; no body limit or unknown-path answer | mounted only with a Crystal store; `keys` optional; 413 `INVALID_REQUEST` above 16 KB; 500 `INTERNAL`; unknown path is Hono's plain-text 404 | fixed |
 | A9 | root `README.md` (examples/hono) | `/health` and `POST /slime` | also `POST /crystallize` (`examples/hono/server.mjs:22`) | fixed |
-| D1 | runtime, every unknown path inside an endpoint | errors are `{error: {code, message, retryable}}` everywhere (`core/docs/request-format.md`) | `/ep/<id>/` itself, a typo or a double slash get `404 Not Found` as text; `DELETE /v0/handlers/<unknown>` gets 404 `{"evicted": false}` | decision: add a JSON `notFound` (for example `NOT_FOUND`), or keep and document (documented here and in the runtime README) |
-| D2 | self-hosted examples vs hosted runtime | product frame: "the same word everywhere … runtime `POST /v0/crystallize`" | examples (`express`, `hono`, `multi-source`) serve `POST /slime`, `POST /crystallize`, `GET /health`; the runtime serves `POST /v0/query`, `POST /v0/crystallize`, `GET /healthz`. Docs describe each side correctly | decision: align the example paths with the runtime, or keep them as the library-mount example |
+| D1 | runtime, every unknown path inside an endpoint | errors are `{error: {code, message, retryable}}` everywhere (`core/docs/request-format.md`) | `/ep/<id>/` itself, a typo or a double slash got `404 Not Found` as text; `DELETE /v0/handlers/<unknown>` gets 404 `{"evicted": false}` | decided: JSON 404 `NOT_FOUND` naming the method and path (`app.notFound`, branch `fix/runtime-json-404`); the evict answer is unchanged |
+| D2 | self-hosted examples vs hosted runtime | product frame: "the same word everywhere … runtime `POST /v0/crystallize`" | examples (`express`, `hono`, `multi-source`) serve `POST /slime`, `POST /crystallize`, `GET /health`; the runtime serves `POST /v0/query`, `POST /v0/crystallize`, `GET /healthz`. Docs describe each side correctly | decided: keep; the examples show how to mount the library |
 
 ### PR #30 (Agent API v1, open, `docs/product/agent_api_v1.openapi.yaml` at `676e070`) against main
 
@@ -69,8 +69,9 @@ The spec predates the cloud MVP. Where it calls a route "unchanged" or
 | crystallize: `POST /v0/handlers/{handlerKey}/crystallize` | `POST /v0/crystallize {keys?}`; tokens are issued by the admin, not the runtime |
 
 The new routes (`/v1/accounts`, `/v1/endpoints`, per-handler crystallize) are
-proposals and are not listed as drift. PR #30 needs a rebase onto these
-contracts before it can serve as a spec; not changed here.
+proposals and are not listed as drift. PR #60 (`docs/agent-api-v1-main`) carries
+PR #30's commits rebased onto main and marks each route and field shipped or
+proposed against these contracts.
 
 ## Matches (no change needed)
 
