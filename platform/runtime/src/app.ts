@@ -5,7 +5,7 @@
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { SlimeError, type Connector, type CrystalRegistry, type QueryMeta, type Slime } from '@slime-cloud/core';
-import type { RequestFeed } from './events.js';
+import { MAX_PAGE_LIMIT, type PageQuery, type RequestFeed } from './events.js';
 
 /** A handler as the admin's Lifecycle tab sees it. */
 export interface LifecycleHandler {
@@ -58,6 +58,17 @@ export interface RuntimeParts {
 }
 
 const TIER_RANK = { gas: 0, liquid: 1, crystal: 2 } as const;
+
+/** An event id: an ISO time, a counter and a suffix. Anything else is refused before it reaches the store. */
+const CURSOR = /^[0-9A-Za-z:.-]{1,64}$/;
+
+/** `?limit=&before=&after=` of GET /v0/events, or the reason it is refused. */
+export function pageQuery({ limit, before, after }: Record<string, string | undefined>): PageQuery | string {
+  if (before !== undefined && after !== undefined) return 'Pass before or after, not both.';
+  for (const cursor of [before, after]) if (cursor !== undefined && !CURSOR.test(cursor)) return 'before and after take an event id from this feed.';
+  if (limit !== undefined && !(/^\d+$/.test(limit) && Number(limit) >= 1 && Number(limit) <= MAX_PAGE_LIMIT)) return `limit is a whole number from 1 to ${MAX_PAGE_LIMIT}.`;
+  return { ...(limit ? { limit: Number(limit) } : {}), ...(before ? { before } : {}), ...(after ? { after } : {}) };
+}
 
 /** A stale saved row ranks below live Gas, so the live row with the same key replaces it. */
 function rank(handler: LifecycleHandler): number {
@@ -164,7 +175,13 @@ export function createApp({ slime, connector, crystal, onQuery, log, events, sav
     return c.json({ data, meta });
   });
 
-  if (events) app.get('/v0/events', async (c) => c.json(await events.list()));
+  if (events) {
+    app.get('/v0/events', async (c) => {
+      const query = pageQuery(c.req.query());
+      if (typeof query === 'string') return c.json({ error: { code: 'INVALID_REQUEST', message: query, retryable: false } }, 400);
+      return c.json(await events.list(query));
+    });
+  }
 
   if (savedHandlers) {
     app.get('/v0/lifecycle', async (c) => {

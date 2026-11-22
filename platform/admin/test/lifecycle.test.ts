@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import type { Endpoint } from '../lib/endpoints';
-import { readLifecycle, stagesOf, toRow, type LifecycleData, type RuntimeHandler } from '../lib/lifecycle';
+import { REQUESTS_PAGE_SIZE, readLifecycle, readRequests, stagesOf, toRow, type LifecycleData, type RuntimeHandler } from '../lib/lifecycle';
 import { secretStore } from '../lib/secrets';
 
 const t = { liquidRuns: 3, crystalRuns: 10 };
@@ -116,5 +116,40 @@ describe('readLifecycle across a local restart', () => {
     let down: LifecycleData = live;
     for (let i = 0; i < 5; i++) down = await readLifecycle(ep('ready'));
     assert.equal(down.ok, false, 'a persistently unreachable runtime is reported');
+  });
+});
+
+describe('readRequests (the Requests log pages)', () => {
+  test('asks the runtime for one page by cursor and passes the page flags through; a malformed cursor reads the first page', async () => {
+    process.env.SESSION_SECRET = 'x'.repeat(32);
+    process.env.SLIME_SECRETS = 'file';
+    process.env.SLIME_SECRETS_FILE = join(mkdtempSync(join(tmpdir(), 'slime-rq-')), 'secrets.json');
+    delete process.env.SLIME_RUNTIME_URL;
+    await secretStore().put('ep-pages', 'SLIME_API_KEY', 'slm_test');
+    const asked: string[] = [];
+    const event = { id: '2026-11-22T12:00:00.000Z-000001-abc123', at: '2026-11-22T12:00:00.000Z', handlerKey: 'k', tier: 'gas', cache: 'hit', ms: 3 };
+    const server = createServer((req, res) => {
+      asked.push(req.url ?? '');
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ total: 80, events: [event], hasOlder: true, hasNewer: true }));
+    });
+    await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
+    try {
+      const ep = { endpointId: 'ep-pages', url: `http://127.0.0.1:${(server.address() as AddressInfo).port}/`, status: 'ready' } as Endpoint;
+      const page = await readRequests(ep, { before: event.id });
+      assert.deepEqual(page, { ok: true, total: 80, events: [event], hasOlder: true, hasNewer: true });
+      await readRequests(ep, { after: event.id });
+      await readRequests(ep, { before: '{"$ne":1}' });
+      await readRequests(ep, {});
+      assert.deepEqual(asked, [
+        `/v0/events?limit=${REQUESTS_PAGE_SIZE}&before=${encodeURIComponent(event.id)}`,
+        `/v0/events?limit=${REQUESTS_PAGE_SIZE}&after=${encodeURIComponent(event.id)}`,
+        `/v0/events?limit=${REQUESTS_PAGE_SIZE}`,
+        `/v0/events?limit=${REQUESTS_PAGE_SIZE}`,
+      ]);
+    } finally {
+      server.closeAllConnections();
+      await new Promise((done) => server.close(done));
+    }
   });
 });

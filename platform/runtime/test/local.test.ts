@@ -5,7 +5,9 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { memoryStore, type CrystalRegistry, type QueryMeta, type Slime } from '@slime-cloud/core';
 import { createApp, mergeHandlers } from '../src/app.js';
-import { RecentRequests, StoredRequests } from '../src/events.js';
+import { RecentRequests, StoredRequests, type RequestFeed } from '../src/events.js';
+import { DynamoSlimeStore } from '../src/store-dynamodb.js';
+import { FakeDynamo } from './fake-dynamo.js';
 import { toSavedHandler } from '../src/endpoint-runtime.js';
 import { LiveRunsSync, syncLiveRuns } from '../src/live-runs.js';
 
@@ -84,8 +86,66 @@ describe('StoredRequests (the feed shared by every instance of an endpoint)', ()
     const feed = new StoredRequests({ store: broken, log: (line) => errors.push(JSON.stringify(line)) });
     feed.record(meta('a', 'gas'));
     await feed.flush();
-    assert.deepEqual(await feed.list(), { total: 0, events: [] });
+    assert.deepEqual(await feed.list(), { total: 0, events: [], hasOlder: false, hasNewer: false });
     assert.equal(errors.length, 2);
+  });
+});
+
+// The same paging contract for every feed: in memory, over any store (list + sort), and on DynamoDB (one Query).
+const feeds: [string, () => RequestFeed & { flush?: () => Promise<void> }][] = [
+  ['RecentRequests', () => new RecentRequests(500)],
+  ['StoredRequests on a memory store', () => new StoredRequests({ store: memoryStore(), cap: 500 })],
+  ['StoredRequests on DynamoDB', () => new StoredRequests({ store: new DynamoSlimeStore({ table: 't', tenantId: 'ep-a', client: new FakeDynamo(4) }), cap: 500 })],
+];
+for (const [name, make] of feeds) {
+  describe(`${name}: pages`, () => {
+    async function filled(count: number) {
+      const feed = make();
+      for (let i = 0; i < count; i++) feed.record(meta(`k${String(i).padStart(2, '0')}`, 'gas'));
+      await feed.flush?.();
+      return feed;
+    }
+    const keys = (list: { events: { handlerKey: string }[] }) => list.events.map((e) => e.handlerKey);
+
+    test('the first page is the newest, with an id per event and only older ones beyond it', async () => {
+      const feed = await filled(12);
+      const first = await feed.list({ limit: 5 });
+      assert.deepEqual(keys(first), ['k11', 'k10', 'k09', 'k08', 'k07']);
+      assert.deepEqual([first.hasNewer, first.hasOlder, first.total], [false, true, 12]);
+      assert.ok(first.events.every((e) => typeof e.id === 'string' && e.id.length > 0));
+    });
+
+    test('before walks to older pages and after walks back, without gaps or repeats', async () => {
+      const feed = await filled(12);
+      const first = await feed.list({ limit: 5 });
+      const second = await feed.list({ limit: 5, before: first.events.at(-1)!.id });
+      assert.deepEqual(keys(second), ['k06', 'k05', 'k04', 'k03', 'k02']);
+      assert.deepEqual([second.hasNewer, second.hasOlder], [true, true]);
+      const last = await feed.list({ limit: 5, before: second.events.at(-1)!.id });
+      assert.deepEqual(keys(last), ['k01', 'k00']);
+      assert.deepEqual([last.hasNewer, last.hasOlder], [true, false]);
+      const back = await feed.list({ limit: 5, after: last.events[0]!.id });
+      assert.deepEqual(keys(back), keys(second), 'after returns the page just newer, newest first');
+      assert.deepEqual([back.hasNewer, back.hasOlder], [true, true]);
+      const top = await feed.list({ limit: 5, after: back.events[0]!.id });
+      assert.deepEqual(keys(top), keys(first));
+      assert.equal(top.hasNewer, false);
+    });
+
+    test('without a limit it lists 50, as the Lifecycle board expects', async () => {
+      const feed = await filled(60);
+      assert.equal((await feed.list()).events.length, 50);
+    });
+  });
+}
+
+describe('StoredRequests retention', () => {
+  test('keeps the newest 500 by default', async () => {
+    const store = memoryStore();
+    const feed = new StoredRequests({ store, pruneEvery: 1 });
+    for (let i = 0; i < 510; i++) feed.record(meta(`k${i}`, 'gas'));
+    await feed.flush();
+    assert.equal((await store.list('events')).length, 500);
   });
 });
 
@@ -167,6 +227,21 @@ describe('endpoint routes', () => {
     const res = await app.request('/v0/e/k1', { method: 'POST', body, headers: { 'content-length': String(body.length) } });
     assert.equal(res.status, 413);
     assert.deepEqual(queries, []);
+  });
+
+  test('GET /v0/events pages with limit, before and after, and refuses bad ones', async () => {
+    const events = new RecentRequests();
+    for (const key of ['a', 'b', 'c']) events.record(meta(key, 'gas'));
+    const app = createApp({ slime: fakeSlime(), connector, crystal: false, events });
+    const first = (await (await app.request('/v0/events?limit=2')).json()) as { events: { id: string; handlerKey: string }[]; hasOlder: boolean };
+    assert.deepEqual([first.events.map((e) => e.handlerKey), first.hasOlder], [['c', 'b'], true]);
+    const older = (await (await app.request(`/v0/events?limit=2&before=${encodeURIComponent(first.events[1]!.id)}`)).json()) as { events: { handlerKey: string }[] };
+    assert.deepEqual(older.events.map((e) => e.handlerKey), ['a']);
+    for (const query of ['limit=0', 'limit=101', 'limit=x', 'before=a&after=b', 'before=%7B%22%24ne%22%7D', `before=${'x'.repeat(100)}`]) {
+      const res = await app.request(`/v0/events?${query}`);
+      assert.equal(res.status, 400, query);
+      assert.equal(((await res.json()) as { error: { code: string } }).error.code, 'INVALID_REQUEST');
+    }
   });
 
   test('optional routes do not exist unless their parts are given', async () => {
