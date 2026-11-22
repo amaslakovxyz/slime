@@ -5,7 +5,7 @@
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { SlimeError, type Connector, type CrystalRegistry, type QueryMeta, type Slime } from '@slime-cloud/core';
-import type { RecentRequests } from './events.js';
+import type { RequestFeed } from './events.js';
 
 /** A handler as the admin's Lifecycle tab sees it. */
 export interface LifecycleHandler {
@@ -41,7 +41,7 @@ export interface RuntimeParts {
   /** One JSON line per answered query; defaults to stdout. */
   log?: (line: Record<string, unknown>) => void;
   /** The live feed behind `GET /v0/events`. Absent means the route does not exist. */
-  events?: RecentRequests;
+  events?: RequestFeed;
   /** Saved handlers, so Liquid ones show before their first hit after a restart. Mounts `GET /v0/lifecycle`. */
   savedHandlers?: () => Promise<SavedHandler[]>;
   /** `POST /v0/crystallize`. Absent means the route does not exist. */
@@ -51,8 +51,8 @@ export interface RuntimeParts {
   /** Startup and engine warnings, shown in the Lifecycle tab. */
   warnings?: () => string[];
   /**
-   * The feed and Gas rows are this process's only, one of several (the shared Lambda):
-   * `/v0/lifecycle` says `instance: true` so the admin labels them.
+   * Gas rows are this process's only, one of several (the shared Lambda): `/v0/lifecycle`
+   * says `instance: true`. The feed is shared through the store (StoredRequests).
    */
   isPerInstance?: boolean;
 }
@@ -164,7 +164,7 @@ export function createApp({ slime, connector, crystal, onQuery, log, events, sav
     return c.json({ data, meta });
   });
 
-  if (events) app.get('/v0/events', (c) => c.json(events.list()));
+  if (events) app.get('/v0/events', async (c) => c.json(await events.list()));
 
   if (savedHandlers) {
     app.get('/v0/lifecycle', async (c) => {

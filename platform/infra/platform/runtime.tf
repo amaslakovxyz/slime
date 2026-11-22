@@ -127,6 +127,20 @@ data "aws_iam_policy_document" "runtime" {
     }
   }
 
+  # Reading the same counters back: the requests feed's total is the sum of an
+  # endpoint's USAGE#<id> day items, the one count every warm instance adds to.
+  statement {
+    sid       = "UsageRead"
+    actions   = ["dynamodb:Query"]
+    resources = [aws_dynamodb_table.control.arn]
+
+    condition {
+      test     = "ForAllValues:StringLike"
+      variable = "dynamodb:LeadingKeys"
+      values   = ["USAGE#*"]
+    }
+  }
+
   # GetParametersByPath is authorized on the path itself: /slime/shared/ is the
   # ARN .../parameter/slime/shared, /slime/endpoints/<id>/ is matched by
   # endpoints/*. SecureString parameters use the AWS managed key aws/ssm, whose

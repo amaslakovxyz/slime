@@ -12,7 +12,7 @@
 // condition in platform/infra/platform/runtime.tf): a new attribute here needs
 // the same name there, or every flush fails with AccessDenied.
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import type { QueryMeta, Tier } from '@slime-cloud/core';
 
 /** Every attribute a flush writes on USAGE#<id> day items, plus the key. Mirrored by Terraform's IAM condition. */
@@ -36,7 +36,7 @@ export const USAGE_ATTRIBUTES = [
 
 /** The slice of DynamoDBDocumentClient the meter uses; tests pass a fake. */
 export interface UsageClient {
-  send(command: UpdateCommand): Promise<unknown>;
+  send(command: UpdateCommand | QueryCommand): Promise<any>;
 }
 
 /** Handler counts by tier as this instance sees them (store-loaded Gas/Liquid, loaded Crystal). */
@@ -96,6 +96,35 @@ export class UsageMeter {
   /** Model tokens of one generation (the core's `generated` event; input + output). */
   recordTokens(tokens: number): void {
     this.counts.tokens += tokens;
+  }
+
+  /**
+   * Every request this endpoint has answered, across instances and days (the sum of the day
+   * items' `requests`), plus this instance's not yet flushed ones. Undefined when unreadable.
+   * Reading needs dynamodb:Query on USAGE#* (the UsageRead statement in runtime.tf).
+   */
+  async total(): Promise<number | undefined> {
+    try {
+      let sum = this.counts.requests;
+      let ExclusiveStartKey: Record<string, unknown> | undefined;
+      do {
+        const page = await this.client.send(
+          new QueryCommand({
+            TableName: this.table,
+            KeyConditionExpression: 'pk = :pk',
+            ExpressionAttributeValues: { ':pk': `USAGE#${this.tenantId}` },
+            ProjectionExpression: 'requests',
+            ExclusiveStartKey,
+          }),
+        );
+        for (const item of page.Items ?? []) sum += Number(item.requests ?? 0);
+        ExclusiveStartKey = page.LastEvaluatedKey;
+      } while (ExclusiveStartKey);
+      return sum;
+    } catch (err) {
+      console.error(JSON.stringify({ usage: 'total_failed', message: (err as Error).message }));
+      return undefined;
+    }
   }
 
   async flush(): Promise<void> {

@@ -71,7 +71,7 @@ MVP design (L20–L23).
 | L20 | In the cloud, Crystallize also runs in the shared `slime-runtime` Lambda (`POST /ep/<id>/v0/crystallize`): it works in a private `/tmp` folder, uploads the modules to S3 (`endpoints/<id>/crystal/`), then the manifest with an ETag condition, and swaps its own engine. | Lambda has no persistent disk; the condition makes a concurrent Crystallize fail with a reason instead of overwriting. |
 | L21 | Cloud Crystals run as data in the engine's QuickJS runner with Liquid's time and memory limits, after a SHA-256 check against the manifest; they are never `import()`ed. Self-hosted apps that import `index.mjs` keep running Crystal functions in-process. | One process holds every endpoint's settings: a heavy or hostile Crystal must not stall or read them. |
 | L22 | In the cloud, `POST /v0/reload` replaces the restart: after Crystallize or a settings change the admin calls it on the instance it reaches; other warm instances pick up changes within the 30 s settings TTL. Locally `/v0/reload` is a no-op (204). | There is no process to restart, and per-endpoint functions are gone. |
-| L23 | The live feed (`/v0/events`), Gas rows and live run counts are per Lambda instance in the cloud, so the cloud Lifecycle view is approximate. | Durable counters and a shared feed need a store; out of scope for the MVP. |
+| L23 | Gas rows and live run counts are per Lambda instance in the cloud, so the cloud Lifecycle view is approximate. The live feed (`/v0/events`) moved to the store on 2026-11-22 and is the same on every instance. | Durable counters and a shared feed need a store; out of scope for the MVP. |
 
 ## 4. Components
 

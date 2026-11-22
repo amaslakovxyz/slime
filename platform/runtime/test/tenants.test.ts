@@ -5,6 +5,7 @@ import './setup.js';
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import { ENDPOINTS_SSM_PREFIX } from '../src/tenants.js';
+import { FakeDynamo } from './fake-dynamo.js';
 import { harness, isDatabaseAvailable, keyOf, type Harness } from './tenant-harness.js';
 
 const A = 'ep-00000000a1';
@@ -263,7 +264,29 @@ describe('tenant cache with live engines', { skip: !hasDatabase && 'demo Postgre
     }
   });
 
-  test('the Lifecycle data says the feed is this instance only', async () => {
+  test('every instance serves the same requests feed: a cold one is not empty, two warm ones agree', async () => {
+    const dynamo = new FakeDynamo();
+    const [one, two] = [await harness({ dynamo }), await harness({ dynamo })];
+    try {
+      for (const h of [one, two]) h.addEndpoint(A);
+      // Traffic spread over both instances, as the Lambda spreads it.
+      for (const h of [one, two, one]) assert.equal((await h.call(`/ep/${A}/v0/query`, { key: keyOf(A), body: COUNT_PER_PLAN })).status, 200);
+      const feeds = await Promise.all([one, two].map(async (h) => (await h.call(`/ep/${A}/v0/events`, { key: keyOf(A) })).json));
+      assert.deepEqual(feeds[0], feeds[1], 'both instances list the same feed');
+      assert.equal(feeds[0]?.events?.length, 3);
+      const cold = await harness({ dynamo });
+      try {
+        cold.addEndpoint(A);
+        assert.deepEqual((await cold.call(`/ep/${A}/v0/events`, { key: keyOf(A) })).json, feeds[0], 'a fresh instance shows it too');
+      } finally {
+        await cold.close();
+      }
+    } finally {
+      await Promise.all([one.close(), two.close()]);
+    }
+  });
+
+  test('the Lifecycle data says its Gas rows are this instance only', async () => {
     const h = await harness();
     try {
       h.addEndpoint(A);
