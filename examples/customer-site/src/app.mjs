@@ -11,11 +11,12 @@ const DEFAULT_MULTI_SOURCE_URL = 'http://localhost:3000';
 export function createApp({ env = process.env, fetchImpl = fetch, panels = PANELS } = {}) {
   const byId = new Map(panels.map((panel) => [panel.id, panel]));
   const slimeUrl = trimSlash(env.SLIME_URL ?? '');
-  const multiUrl = trimSlash(env.MULTI_SOURCE_URL || DEFAULT_MULTI_SOURCE_URL);
+  // 'off' = no multi-source server (the public site): the Customer 360 panel is not configured.
+  const multiUrl = env.MULTI_SOURCE_URL === 'off' ? '' : trimSlash(env.MULTI_SOURCE_URL || DEFAULT_MULTI_SOURCE_URL);
 
   /** Where a panel's request goes, with its credentials; null when not configured. */
   function routeOf(panel) {
-    if (panel.upstream === 'multi') return { route: 'self-hosted', url: `${multiUrl}/slime`, headers: {}, full: true };
+    if (panel.upstream === 'multi') return multiUrl ? { route: 'self-hosted', url: `${multiUrl}/slime`, headers: {}, full: true } : null;
     if (!slimeUrl || !env.SLIME_API_KEY) return null;
     const key = panel.crystal && env[panel.crystal.keyEnv];
     const token = panel.crystal && env[panel.crystal.tokenEnv];
@@ -35,7 +36,12 @@ export function createApp({ env = process.env, fetchImpl = fetch, panels = PANEL
       const problem = inputProblem(panel, input);
       if (problem) return fail(c, 400, 'INVALID_REQUEST', problem);
       const target = routeOf(panel);
-      if (!target) return fail(c, 503, 'NOT_CONFIGURED', 'Set SLIME_URL and SLIME_API_KEY (see .env.example).');
+      if (!target) {
+        const hint = panel.upstream === 'multi'
+          ? 'Customer 360 runs on a self-hosted Slime (MULTI_SOURCE_URL); on the public site it is shown live at the demo table.'
+          : 'Set SLIME_URL and SLIME_API_KEY (see .env.example).';
+        return fail(c, 503, 'NOT_CONFIGURED', hint);
+      }
       const body = target.full ? { intent: panel.intent, input, output: panel.output } : { input };
       const started = performance.now();
       let response;

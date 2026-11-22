@@ -95,6 +95,19 @@ test("Slime's errors keep their status; an unreachable Slime is a 502", async ()
   assert.equal((await unreachable.json()).error.code, 'UPSTREAM_UNREACHABLE');
 });
 
+test('MULTI_SOURCE_URL=off turns the Customer 360 panel off instead of calling localhost', async () => {
+  const slime = fakeSlime();
+  const app = createApp({ env: { ...CLOUD, MULTI_SOURCE_URL: 'off' }, fetchImpl: slime.fetchImpl });
+  const panels = await (await app.request('/api/panels')).json();
+  assert.equal(panels.find((panel) => panel.id === 'customer-360').route, null);
+  const response = await post(app, 'customer-360', { plan: 'Enterprise', currency: 'USD' });
+  assert.equal(response.status, 503);
+  const { error } = await response.json();
+  assert.equal(error.code, 'NOT_CONFIGURED');
+  assert.match(error.message, /self-hosted/);
+  assert.equal(slime.calls.length, 0);
+});
+
 test('every currency the Customer 360 panel offers has a recorded rate, so the fixture-replay demo never fails', () => {
   const { currency } = PANELS.find((panel) => panel.id === 'customer-360').inputs;
   for (const code of currency.options) {

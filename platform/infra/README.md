@@ -8,11 +8,12 @@ Account `025772230981`, home region `eu-central-1`. All state lives in
 | [`bootstrap/`](bootstrap/README.md) | `bootstrap/terraform.tfstate` | A human, `default` (admin) profile |
 | [`platform/`](#platform-slime-cloud) | `platform/terraform.tfstate` | GitHub Actions on merge to `main` |
 | `landing/` (PR #11) | `landing/terraform.tfstate` | GitHub Actions on merge to `main` |
+| [`atlas/`](atlas/README.md) | `atlas/terraform.tfstate` | GitHub Actions on merge to `main` (first apply by hand from the branch, 2026-11-22) |
 
 [`terraform.yml`](../../.github/workflows/terraform.yml) picks up every
 directory here except `bootstrap/`: a new stack is deployed by adding it. A
 stack with a `build.sh` gets it run before plan/apply (platform builds the
-runtime bundle and the admin). Apply refuses plans with pure deletes; replacements pass.
+runtime bundle and the admin; atlas bundles `examples/customer-site`). Apply refuses plans with pure deletes; replacements pass.
 Run it by hand with `allow_destroy` when a delete is intended.
 
 A push to `main` deploys when it touches any input of a deployed artifact:
