@@ -8,6 +8,7 @@ export const DEFAULT_TIERS: Readonly<TierOptions> = Object.freeze({
   gasWindowMs: HOUR_MS,
   maxReviews: 2,
   fixturesPerHandler: 5,
+  crystalReadyRuns: 10,
 });
 
 export const DEFAULT_LIMITS: Readonly<LimitOptions> = Object.freeze({

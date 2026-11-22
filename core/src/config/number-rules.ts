@@ -13,6 +13,7 @@ const TIER_MINIMUMS: Record<keyof TierOptions, number> = {
   gasWindowMs: 1,
   maxReviews: 1,
   fixturesPerHandler: 0,
+  crystalReadyRuns: 1,
 };
 
 const LIMIT_MINIMUMS: Record<keyof LimitOptions, number> = {

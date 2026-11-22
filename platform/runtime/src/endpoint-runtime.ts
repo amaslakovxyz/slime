@@ -3,8 +3,8 @@
 // once per process with process.env, the Lambda tenant cache once per cached endpoint
 // with that endpoint's own env object. It reads only the env it is given, never
 // process.env, so one endpoint's settings cannot reach another's.
-import { changedProvenance, createSlime, type Generator, type HandlerProvenance, type SandboxRunner, type Slime, type SlimeStore } from '@slime-cloud/core';
-import { crystallize, DEFAULT_MIN_RUNS } from '@slime-cloud/crystal';
+import { changedProvenance, createSlime, type Generator, type HandlerProvenance, type SandboxRunner, type Slime } from '@slime-cloud/core';
+import { Crystallizer } from '@slime-cloud/crystal';
 import type { Hono } from 'hono';
 import { createApp, type CrystallizeOutcome, type SavedHandler } from './app.js';
 import { parseCrystalTokens } from './auth.js';
@@ -50,23 +50,6 @@ export interface EndpointRuntime {
   crystalCount: number;
 }
 
-/**
- * A read-only view whose list() returns only `keys`: crystallize() has no key
- * filter. crystallize() only reads (store.list / store.get), so the view refuses
- * writes rather than quietly letting a job mutate the real store through it.
- */
-export function storeLimitedTo(store: SlimeStore, keys: readonly string[]): SlimeStore {
-  const wanted = new Set(keys);
-  const readonly = () => {
-    throw new Error('storeLimitedTo is a read-only view');
-  };
-  return {
-    get: (ns, key) => store.get(ns, key),
-    put: readonly,
-    delete: readonly,
-    list: async (ns, prefix) => (await store.list(ns, prefix)).filter(({ key }) => ns !== HANDLERS_NS || wanted.has(key)),
-  };
-}
 
 type RecordLike = {
   key: string;
@@ -142,7 +125,7 @@ export async function endpointRuntime(env: Env, deps: EndpointDeps = {}): Promis
   const store = config.store;
   // Keeps Liquid run counts in the store current, so Crystallize can see them (see live-runs.ts).
   const runs = store ? new LiveRunsSync(store, () => slime.handlers(), Number(env.SLIME_RUNS_SYNC_MS || DEFAULT_RUNS_SYNC_MS)) : undefined;
-  const crystalRuns = Number(env.CRYSTAL_MIN_RUNS || DEFAULT_MIN_RUNS);
+  const crystalRuns = config.tiers.crystalReadyRuns;
 
   const crystallizeKeys = async (keys?: string[]): Promise<CrystallizeOutcome[]> => {
     if (!store || !crystalStore) return [];
@@ -152,14 +135,8 @@ export async function endpointRuntime(env: Env, deps: EndpointDeps = {}): Promis
     await syncLiveRuns(store, slime.handlers());
     const work = await crystalStore.prepareWork(endpointId);
     try {
-      const reports = await crystallize({
-        connector: config.connector,
-        store: keys ? storeLimitedTo(store, keys) : store,
-        dir: work.dir,
-        minRuns: crystalRuns,
-        provenance: slime.provenance(),
-        ...(deps.runner ? { runner: deps.runner } : {}),
-      });
+      // The instance's connector, sandbox, provenance and live counts; minRuns is tiers.crystalReadyRuns (CRYSTAL_MIN_RUNS).
+      const reports = await new Crystallizer(slime, { dir: work.dir }).run(keys ? { keys } : {});
       if (!reports.some(({ outcome }) => outcome === 'crystallized')) return reports;
       let etag: string | undefined;
       try {

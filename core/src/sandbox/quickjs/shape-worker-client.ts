@@ -9,7 +9,7 @@ const KILL_GRACE_MS = 100;
 const WORKER_FILE = new URL(import.meta.url.endsWith('.ts') ? './shape-worker.ts' : './shape-worker.js', import.meta.url);
 
 export function shapeTimeout(timeoutMs: number): SlimeError {
-  return new SlimeError('SANDBOX_ERROR', `Shaping function ran longer than ${timeoutMs} ms.`);
+  return new SlimeError('SANDBOX_ERROR', `Shaping function ran longer than ${timeoutMs} ms.`, { details: { isTimeout: true } });
 }
 
 export class ShapeWorker {

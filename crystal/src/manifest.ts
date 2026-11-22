@@ -22,6 +22,8 @@ export interface ManifestEntry {
   /** The reference `verify` compares it with (cases.ts), and that file's pinned hash. */
   cases?: string;
   casesSha256?: string;
+  /** The API sources a steps Crystal calls: its service then takes the app's sources, not only the connector. */
+  sources?: string[];
 }
 
 export interface Manifest {

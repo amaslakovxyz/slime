@@ -5,7 +5,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { readManifest, writeManifestAndIndex } from './manifest.js';
-import { parseModule } from './module-format.js';
+import { parseModule, sqlStatementsOf } from './module-format.js';
 import { assertReadOnlySql, sha256 } from '@slime-cloud/core/tooling';
 
 /** The keys whose module it re-pinned; throws, pinning nothing, when a changed module fails a check. */
@@ -17,7 +17,7 @@ export async function pinCrystalFolder(dir: string): Promise<string[]> {
     const hash = sha256(text);
     if (hash === entry.sha256) continue;
     try {
-      assertReadOnlySql(parseModule(text).sql);
+      for (const { sql } of sqlStatementsOf(parseModule(text))) assertReadOnlySql(sql);
     } catch (error) {
       throw new Error(`${entry.file}: ${(error as Error).message}`);
     }

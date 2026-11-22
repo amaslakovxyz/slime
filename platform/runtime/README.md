@@ -97,7 +97,7 @@ the admin), or the local process env (set by the admin's runner):
 | `SLIME_REVIEW`, `SLIME_REVIEW_MODEL`, `SLIME_REVIEW_EFFORT` | `off` skips reviews; reviewer model and effort |
 | `SLIME_CRYSTAL` | `off` serves no Crystals (kill switch) |
 | `MAX_GENERATIONS_PER_HOUR`, `ROW_CAP`, `STATEMENT_TIMEOUT_MS`, ... | limits and tiers (`src/config.ts` lists them) |
-| `CRYSTAL_MIN_RUNS` | runs a Liquid handler needs before Crystallize (default 10) |
+| `CRYSTAL_MIN_RUNS` | runs a Liquid handler needs before Crystallize (default 10); also the engine's `tiers.crystalReadyRuns`, so its `crystalReady` event fires at the same count |
 
 `SLIME_TENANT_ID` is the endpoint id: the router sets it on Lambda, the runner
 locally. Local entry only: `PORT` (listen port) and `SLIME_CRYSTAL_DIR` (the

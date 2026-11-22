@@ -1,4 +1,5 @@
 // Builds the SlimeConfig from this app's environment. Core never reads env; the app does.
+import { existsSync } from 'node:fs';
 import { SlimeConfig } from '@slime-cloud/core';
 import { notionSource } from '@slime-cloud/core/notion';
 import { postgresConnector } from '@slime-cloud/core/postgres';
@@ -6,6 +7,8 @@ import { fixtureFetch } from '@slime-cloud/core/testing';
 import { ghibliFilms } from './films.mjs';
 
 const APP_DIR = new URL('..', import.meta.url);
+/** Where Crystal modules live; the server imports them, POST /crystallize writes them. */
+export const CRYSTAL_DIR = new URL('slime-crystal', APP_DIR).pathname;
 const DEMO_DATABASE_URL = 'postgres://slime_reader:slime_reader@localhost:54329/slime';
 // The ids in test/fixtures/notion, used when FETCH_FIXTURES=1.
 const FIXTURE_FEEDBACK_ID = '0f0e0d0c-0b0a-4908-8706-050403020100';
@@ -39,8 +42,17 @@ export async function slimeConfigFromEnv(env = process.env, overrides = {}) {
     glossary: { revenue: 'sum of paid invoices, in cents' },
     rules: ['Revenue counts only invoices with status paid.'],
     ...(overrides.generator ? {} : await chooseModels(env)),
+    ...(await importCrystals()),
     ...overrides,
   });
+}
+
+/** Crystal handlers live in this app's code once POST /crystallize has written them. */
+async function importCrystals() {
+  const index = `${CRYSTAL_DIR}/index.mjs`;
+  if (!existsSync(index)) return {};
+  const { crystals } = await import(index);
+  return { crystal: crystals };
 }
 
 /** A model key picks the provider; tests pass their own `generator`. */

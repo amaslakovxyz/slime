@@ -13,6 +13,8 @@ export interface TierOptions {
   maxReviews: number;
   /** Inputs of successful runs kept for Crystal's equivalence test. */
   fixturesPerHandler: number;
+  /** Successful runs after which a Liquid handler is ready to crystallize: `crystalReady` is emitted once. */
+  crystalReadyRuns: number;
 }
 
 export interface LimitOptions {

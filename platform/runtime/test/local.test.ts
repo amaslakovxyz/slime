@@ -6,7 +6,7 @@ import { describe, test } from 'node:test';
 import { memoryStore, type CrystalRegistry, type QueryMeta, type Slime } from '@slime-cloud/core';
 import { createApp, mergeHandlers } from '../src/app.js';
 import { RecentRequests } from '../src/events.js';
-import { storeLimitedTo, toSavedHandler } from '../src/endpoint-runtime.js';
+import { toSavedHandler } from '../src/endpoint-runtime.js';
 import { LiveRunsSync, syncLiveRuns } from '../src/live-runs.js';
 
 const meta = (handlerKey: string, tier: QueryMeta['tier']): QueryMeta =>
@@ -154,20 +154,6 @@ describe('endpoint routes', () => {
 });
 
 describe('store helpers', () => {
-  test('storeLimitedTo lists only the chosen handlers', async () => {
-    const store = memoryStore();
-    await store.put('handlers', 'a', { key: 'a' });
-    await store.put('handlers', 'b', { key: 'b' });
-    const keys = (await storeLimitedTo(store, ['b']).list('handlers')).map((e) => e.key);
-    assert.deepEqual(keys, ['b']);
-  });
-
-  test('storeLimitedTo refuses writes: it is a read-only view', () => {
-    const view = storeLimitedTo(memoryStore(), ['b']);
-    assert.throws(() => view.put('handlers', 'a', { key: 'a' }), /read-only/);
-    assert.throws(() => view.delete('handlers', 'a'), /read-only/);
-  });
-
   test('syncLiveRuns raises saved runs to the live count and never lowers them', async () => {
     const store = memoryStore();
     await store.put('handlers', 'a', { key: 'a', runs: 3 });
