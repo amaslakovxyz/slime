@@ -14,7 +14,9 @@ The folders say what the system is made of:
 | **Port** | [sources/](./sources/README.md) | Where data comes from: one SQL source (`sql/`, `Connector` + `postgres/`) and any number of API sources (`api/`, `ApiSource` + `defineApiSource`, `notion/`). `lifecycle.ts` starts and closes them all. |
 | **Port** | [stores/](./stores/README.md) | Slime's own key-value state. `types.ts` + file and memory stores. |
 | **Port** | [sandbox/](./sandbox/README.md) | Where generated shaping code runs. `types.ts` + `quickjs/`. |
-| Engine | [engine/](./engine/README.md) | The Slime instance: handler cache, generation, review, promotion; `crystal/` serves Crystal handlers, `checks/` guards generated SQL. |
+| Domain | [artifact/](./artifact/README.md) | What a model writes: `Artifact` (steps + `shapeJs`) and the model-free checks on it. |
+| Domain | [handler/](./handler/README.md) | What Slime stores and serves: `HandlerRecord`, tiers, Crystal types, the fit-to-sources check. |
+| Engine | [engine/](./engine/README.md) | The Slime instance: handler cache, generation, review, promotion; `crystal/` serves Crystal handlers. |
 | Engine | [request/](./request/README.md) | Parsing `{ intent, input?, output }`, the output notation, parameter types, cache keys. |
 | Engine | [dictionary/](./dictionary/README.md) | The dictionary text and hashes shown to models. |
 | Setup | [config/](./config/README.md) | `SlimeConfig` (`slime-config.ts`), its option types, defaults and validation. |

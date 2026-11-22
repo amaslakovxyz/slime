@@ -1,7 +1,7 @@
 // modelRoles: every provider gets the same prompts and schema; only the transport differs.
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import type { Artifact } from '../../src/models/artifact.js';
+import type { Artifact } from '../../src/artifact/artifact.js';
 import type { ModelCall, ModelClient, OutputMode } from '../../src/models/model-client.js';
 import { ARTIFACT_JSON_FORMAT, GENERATION_INSTRUCTIONS, REVIEW_INSTRUCTIONS } from '../../src/models/prompts.js';
 import { modelRoles, providerRoles } from '../../src/models/roles.js';

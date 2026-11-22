@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { lintArtifact, type SqlCode } from '../../../src/engine/checks/sql.js';
+import { lintArtifact, type SqlCode } from '../../../src/artifact/checks/sql.js';
 import { SlimeError } from '../../../src/shared/errors.js';
 
 const artifact = (sql: string, params: string[] = [], shapeJs: string | null = null): SqlCode => ({ sql, params, shapeJs });

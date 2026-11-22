@@ -1,6 +1,7 @@
 // The app passes everything core needs; core never reads process.env or .env (C4).
 import { DEFAULT_LIMITS, DEFAULT_TIERS } from './defaults.js';
-import type { CrystalRegistry, LimitOptions, SlimeEvent, SlimeMode, SlimeOptions, TierOptions } from './options.js';
+import type { CrystalRegistry, LimitOptions, SlimeMode, SlimeOptions, TierOptions } from './options.js';
+import type { SlimeEvent } from './events.js';
 import { SQL_SOURCE_DEFAULT_NAME } from './source-rules.js';
 import { configProblems } from './validate.js';
 import { SlimeConfigError } from '../shared/errors.js';
@@ -10,19 +11,8 @@ import type { SlimeStore } from '../stores/types.js';
 import { isApiSource, type Source } from '../sources/types.js';
 
 export { DEFAULT_LIMITS, DEFAULT_TIERS } from './defaults.js';
-export type {
-  CrystalRegistry,
-  ErrorEvent,
-  GeneratedEvent,
-  LimitOptions,
-  PromotedEvent,
-  ReviewedEvent,
-  SlimeEvent,
-  SlimeMode,
-  SlimeOptions,
-  TierOptions,
-  WarningEvent,
-} from './options.js';
+export type { CrystalRegistry, LimitOptions, SlimeMode, SlimeOptions, TierOptions } from './options.js';
+export type { ErrorEvent, GeneratedEvent, PromotedEvent, ReviewedEvent, SlimeEvent, WarningEvent } from './events.js';
 
 /** Setting an option to undefined removes it. */
 export type SlimeOptionOverrides = { [Key in keyof SlimeOptions]?: SlimeOptions[Key] | undefined };

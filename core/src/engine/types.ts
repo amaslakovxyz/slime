@@ -1,32 +1,12 @@
 // The Slime instance API (PLAN.md §5).
 import type { SlimeMode } from '../config/options.js';
-import type { Artifact } from '../models/artifact.js';
 import type { StepTiming } from './execute-steps.js';
 import type { HandlerProvenance } from '../request/key.js';
-import type { InputValues, SlimeRequest } from '../request/parse.js';
-import type { ParamTypes } from '../request/params.js';
-import type { Shape } from '../request/shape.js';
+import type { SlimeRequest } from '../request/parse.js';
+import type { ReviewStatus, StoredTier, Tier } from '../handler/record.js';
 
-export type Tier = 'gas' | 'liquid' | 'crystal';
-export type StoredTier = Exclude<Tier, 'crystal'>;
-export type ReviewStatus = 'none' | 'pending' | 'approved' | 'rejected';
 export type CacheOutcome = 'hit' | 'miss' | 'coalesced';
 
-/** What a store keeps under `handlers` / request key (§4.7). */
-export interface HandlerRecord {
-  key: string;
-  intent: string;
-  output: Shape;
-  artifact: Artifact;
-  paramTypes: ParamTypes;
-  provenance: HandlerProvenance;
-  tier: StoredTier;
-  review: ReviewStatus;
-  runs: number;
-  /** Inputs of successful runs, for Crystal's equivalence test. */
-  fixtures: InputValues[];
-  createdAt: string;
-}
 
 export interface QueryTimings {
   total: number;

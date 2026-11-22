@@ -3,20 +3,9 @@
 export { createSlime, type CreateSlimeOptions } from './create-slime.js';
 export { DEFAULT_STORE_DIR, fileStore } from './stores/file-store.js';
 export { memoryStore } from './stores/memory-store.js';
-export type {
-  CacheOutcome,
-  HandlerRecord,
-  HandlerSummary,
-  QueryMeta,
-  QueryResult,
-  QueryTimings,
-  ReviewStatus,
-  Slime,
-  SlimeStats,
-  StoredTier,
-  Tier,
-} from './engine/types.js';
-export type { CrystalHandler, ShapeFunction } from './engine/crystal/types.js';
+export type { CacheOutcome, HandlerSummary, QueryMeta, QueryResult, QueryTimings, Slime, SlimeStats } from './engine/types.js';
+export type { HandlerRecord, ReviewStatus, StoredTier, Tier } from './handler/record.js';
+export type { CrystalHandler, ShapeFunction } from './handler/crystal.js';
 export { changedProvenance, handlerKeyFor, type HandlerProvenance } from './request/key.js';
 export type { ParamTypes } from './request/params.js';
 
@@ -40,7 +29,7 @@ export {
 export { SlimeConfigError, SlimeError, type ErrorCode, type SlimeErrorBody, type SlimeErrorOptions } from './shared/errors.js';
 export type { ColumnInfo, RunResult, SafetyReport, Source } from './sources/types.js';
 export type { Connector, ForeignKey, QueryLimits, QueryPlan, SchemaInfo, TableInfo } from './sources/sql/types.js';
-export type { ApiArg, ApiStep, Artifact, LegacyArtifact, SqlStep, Step } from './models/artifact.js';
+export type { ApiArg, ApiStep, Artifact, LegacyArtifact, SqlStep, Step } from './artifact/artifact.js';
 export type {
   GenerationRequest,
   GenerationResult,

@@ -1,6 +1,6 @@
 // An API step's arguments for one run, type-checked on every run, not only the
 // first: a handler made with null inputs learned no types (design §3.5).
-import type { ApiStep } from '../models/artifact.js';
+import type { ApiStep } from '../artifact/artifact.js';
 import type { InputValues } from '../request/parse.js';
 import { matchesLeaf } from '../request/shape.js';
 import { SlimeError } from '../shared/errors.js';

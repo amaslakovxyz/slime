@@ -1,9 +1,9 @@
-import type { CrystalRegistry } from '../engine/crystal/types.js';
+import type { CrystalRegistry } from '../handler/crystal.js';
 import type { Connector } from '../sources/sql/types.js';
 import type { Source } from '../sources/types.js';
-import type { Step } from '../models/artifact.js';
 import type { Generator, Reviewer } from '../models/types.js';
 import type { SlimeStore } from '../stores/types.js';
+import type { SlimeEvent } from './events.js';
 
 export interface TierOptions {
   /** Successful runs inside the Gas window before a handler may become Liquid. */
@@ -40,45 +40,6 @@ export interface LimitOptions {
 export type { CrystalRegistry };
 
 export type SlimeMode = 'explore' | 'locked';
-
-/** Carries the generated code so a dev setup can print it (R9). */
-export interface GeneratedEvent {
-  type: 'generated';
-  handlerKey: string;
-  sql: string;
-  shapeJs?: string;
-  /** `sql` holds the SQL steps joined. */
-  steps: Step[];
-  assumptions: string[];
-  tokens: number;
-  ms: number;
-}
-
-export interface ReviewedEvent {
-  type: 'reviewed';
-  handlerKey: string;
-  verdict: 'approved' | 'rejected';
-  notes: string;
-}
-
-export interface PromotedEvent {
-  type: 'promoted';
-  handlerKey: string;
-  tier: 'liquid';
-}
-
-export interface WarningEvent {
-  type: 'warning';
-  message: string;
-}
-
-export interface ErrorEvent {
-  type: 'error';
-  code: string;
-  message: string;
-}
-
-export type SlimeEvent = GeneratedEvent | ReviewedEvent | PromotedEvent | WarningEvent | ErrorEvent;
 
 export interface SlimeOptions {
   /** Shorthand for sources: { db: connector } (MS1). */

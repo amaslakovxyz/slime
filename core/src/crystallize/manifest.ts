@@ -1,7 +1,7 @@
 // The Crystal folder: manifest.json, one module per handler, and a generated index.
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { ReviewStatus } from '../engine/types.js';
+import type { ReviewStatus } from '../handler/record.js';
 import type { HandlerProvenance } from '../request/key.js';
 import type { ParamTypes } from '../request/params.js';
 import type { Shape } from '../request/shape.js';

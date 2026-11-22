@@ -2,10 +2,11 @@
 import assert from 'node:assert/strict';
 import { after, describe, test } from 'node:test';
 import { SlimeConfig, type SlimeOptions } from '../../src/config/slime-config.js';
-import type { SlimeEvent } from '../../src/config/options.js';
+import type { SlimeEvent } from '../../src/config/events.js';
 import { createSlime } from '../../src/create-slime.js';
 import { buildDictionary } from '../../src/dictionary/dictionary.js';
-import type { HandlerRecord, Slime } from '../../src/engine/types.js';
+import type { Slime } from '../../src/engine/types.js';
+import type { HandlerRecord } from '../../src/handler/record.js';
 import { SlimeConfigError, SlimeError, type ErrorCode } from '../../src/shared/errors.js';
 import { requestKey } from '../../src/request/key.js';
 import { parseRequest, type InputValues, type SlimeRequest } from '../../src/request/parse.js';

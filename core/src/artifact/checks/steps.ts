@@ -1,6 +1,6 @@
 // Model-free checks of a handler's steps (design §3.5). Pure, and needs only
 // input names, so it also runs when a saved handler is loaded (MS14).
-import { isApiStep, type ApiArg, type ApiStep, type Artifact, type SqlStep } from '../../models/artifact.js';
+import { isApiStep, type ApiArg, type ApiStep, type Artifact, type SqlStep } from '../artifact.js';
 import { matchesLeaf } from '../../request/shape.js';
 import { SlimeError } from '../../shared/errors.js';
 import type { ApiSchema, OperationInfo, ParamInfo } from '../../sources/api/types.js';

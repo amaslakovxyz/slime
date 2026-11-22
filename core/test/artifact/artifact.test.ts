@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { asSingleQuery, fromStoredArtifact, sqlOf, type Artifact, type LegacyArtifact } from '../../src/models/artifact.js';
+import { asSingleQuery, fromStoredArtifact, sqlOf, type Artifact, type LegacyArtifact } from '../../src/artifact/artifact.js';
 
 const LEGACY: LegacyArtifact = {
   unsatisfiable: null,

@@ -11,7 +11,7 @@ import { createSlime } from '../../src/create-slime.js';
 import { changedProvenance } from '../../src/request/key.js';
 import { crystallize } from '../../src/crystallize/index.js';
 import type { Slime } from '../../src/engine/types.js';
-import type { Artifact, SqlStep } from '../../src/models/artifact.js';
+import type { Artifact, SqlStep } from '../../src/artifact/artifact.js';
 import { memoryStore } from '../../src/stores/memory-store.js';
 import type { SlimeStore } from '../../src/stores/types.js';
 import type { Source } from '../../src/sources/types.js';

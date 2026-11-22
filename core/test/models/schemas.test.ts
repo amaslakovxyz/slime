@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { isApiStep, type Artifact } from '../../src/models/artifact.js';
+import { isApiStep, type Artifact } from '../../src/artifact/artifact.js';
 import { ArtifactSchema } from '../../src/models/schemas.js';
 
 const V2: Artifact = {

@@ -6,7 +6,7 @@ import { after, describe, test } from 'node:test';
 import { SlimeConfig } from '../../src/config/slime-config.js';
 import { createSlime } from '../../src/create-slime.js';
 import type { Slime } from '../../src/engine/types.js';
-import type { Artifact } from '../../src/models/artifact.js';
+import type { Artifact } from '../../src/artifact/artifact.js';
 import type { FetchFunction } from '../../src/sources/api/http/retry.js';
 import { notionSource } from '../../src/sources/api/notion/notion-source.js';
 import { memoryStore } from '../../src/stores/memory-store.js';

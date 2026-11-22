@@ -6,8 +6,9 @@ import { readFileSync } from 'node:fs';
 import { after, describe, test } from 'node:test';
 import { SlimeConfig } from '../../src/config/slime-config.js';
 import { createSlime } from '../../src/create-slime.js';
-import { HANDLERS_NS } from '../../src/engine/handler-cache.js';
-import type { HandlerRecord, Slime } from '../../src/engine/types.js';
+import { HANDLERS_NS } from '../../src/handler/record.js';
+import type { Slime } from '../../src/engine/types.js';
+import type { HandlerRecord } from '../../src/handler/record.js';
 import { memoryStore } from '../../src/stores/memory-store.js';
 import { fakeConnector } from '../../src/testing/fakes.js';
 

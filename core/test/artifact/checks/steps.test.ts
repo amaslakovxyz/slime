@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { lintSteps, type StepLintContext } from '../../../src/engine/checks/steps.js';
-import type { ApiStep, Artifact, SqlStep } from '../../../src/models/artifact.js';
+import { lintSteps, type StepLintContext } from '../../../src/artifact/checks/steps.js';
+import type { ApiStep, Artifact, SqlStep } from '../../../src/artifact/artifact.js';
 import type { ApiSchema } from '../../../src/sources/api/types.js';
 
 const NOTION: ApiSchema = {

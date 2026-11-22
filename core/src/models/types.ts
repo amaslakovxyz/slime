@@ -2,7 +2,7 @@
 // folders (claude/, groq/, offline/).
 import type { ParamTypesForModel } from '../request/params.js';
 import type { Shape } from '../request/shape.js';
-import type { Artifact } from './artifact.js';
+import type { Artifact } from '../artifact/artifact.js';
 
 
 export interface GenerationRequest {

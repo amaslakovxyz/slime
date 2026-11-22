@@ -50,7 +50,7 @@ needs it:
 
 - the model prompts (`../../models/prompts.ts`) ask for PostgreSQL and use `::`
   casts and `to_char`. Changing their text changes every `promptHash`;
-- the SQL guard (`../../engine/checks/sql.ts`) lists Postgres-only functions
+- the SQL guard (`../../artifact/checks/sql.ts`) lists Postgres-only functions
   such as `pg_sleep` and `dblink`; other databases have their own.
 
 ## Verification

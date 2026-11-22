@@ -2,7 +2,7 @@
 // any failure aborts the API steps, then shape(data, input) in the sandbox.
 import type { LimitOptions } from '../config/options.js';
 import type { Connector } from '../sources/sql/types.js';
-import { isApiStep, type ApiStep, type Artifact, type SqlStep, type Step } from '../models/artifact.js';
+import { isApiStep, type ApiStep, type Artifact, type SqlStep, type Step } from '../artifact/artifact.js';
 import type { InputValues } from '../request/parse.js';
 import type { Shape } from '../request/shape.js';
 import type { SandboxRunner } from '../sandbox/types.js';

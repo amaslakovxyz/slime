@@ -9,7 +9,8 @@ its shapes are functions. A host that stores the modules elsewhere (Slime
 Cloud: S3) parses them with `parseModule` from `@slime-cloud/core/crystallize`
 and passes handlers whose shapes are the source strings.
 
-- `types.ts`: `CrystalHandler`, `CrystalRegistry` and `ShapeFunction`.
+- The types (`CrystalHandler`, `CrystalRegistry`, `ShapeFunction`) are in
+  `../../handler/crystal.ts`.
 - `run-crystal.ts`: `runCrystal(deps, crystal, input)`.
 
 ## Interface

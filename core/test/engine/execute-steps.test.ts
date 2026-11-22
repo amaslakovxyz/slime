@@ -4,7 +4,7 @@ import { after, describe, test } from 'node:test';
 import { DEFAULT_LIMITS } from '../../src/config/defaults.js';
 import type { Connector } from '../../src/sources/sql/types.js';
 import { executeArtifact, type ExecutionDeps } from '../../src/engine/execute.js';
-import type { ApiStep, Artifact, SqlStep } from '../../src/models/artifact.js';
+import type { ApiStep, Artifact, SqlStep } from '../../src/artifact/artifact.js';
 import { QuickJSRunner } from '../../src/sandbox/quickjs/quickjs-runner.js';
 import { SlimeError } from '../../src/shared/errors.js';
 import type { ApiSchema, ApiSource } from '../../src/sources/api/types.js';

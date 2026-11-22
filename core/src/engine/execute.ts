@@ -2,7 +2,7 @@ import { assertWithinLimit } from './checks/limit.js';
 import type { LimitOptions } from '../config/options.js';
 import { SlimeError } from '../shared/errors.js';
 import type { Connector, QueryLimits } from '../sources/sql/types.js';
-import type { Artifact } from '../models/artifact.js';
+import type { Artifact } from '../artifact/artifact.js';
 import type { SandboxRunner, ShapeInput } from '../sandbox/types.js';
 import type { ApiSchema } from '../sources/api/types.js';
 import type { Source } from '../sources/types.js';

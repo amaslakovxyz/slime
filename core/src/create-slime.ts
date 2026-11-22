@@ -1,7 +1,7 @@
 import type { SlimeConfig } from './config/slime-config.js';
 import { buildDictionary, type Dictionary } from './dictionary/dictionary.js';
 import { emitSafely } from './engine/events.js';
-import { HANDLERS_NS, recordFromStore } from './engine/handler-cache.js';
+import { HANDLERS_NS, recordFromStore } from './handler/record.js';
 import { sourceSetup } from './engine/engine-deps.js';
 import { SlimeEngine } from './engine/slime-engine.js';
 import type { Slime } from './engine/types.js';
@@ -10,7 +10,7 @@ import { QuickJSRunner } from './sandbox/quickjs/quickjs-runner.js';
 import type { SandboxRunner } from './sandbox/types.js';
 import { startSources } from './sources/lifecycle.js';
 import type { ApiSchema } from './sources/api/types.js';
-import { savedHandlerProblem } from './engine/saved-handler-check.js';
+import { savedHandlerProblem } from './handler/fits-sources.js';
 import { fileStore } from './stores/file-store.js';
 import type { SlimeStore } from './stores/types.js';
 

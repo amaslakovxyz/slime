@@ -1,6 +1,6 @@
 import type { SlimeConfig } from '../config/slime-config.js';
-import { sqlOf } from '../models/artifact.js';
-import type { SlimeEvent } from '../config/options.js';
+import { sqlOf } from '../artifact/artifact.js';
+import type { SlimeEvent } from '../config/events.js';
 import type { Dictionary } from '../dictionary/dictionary.js';
 import { SlimeError } from '../shared/errors.js';
 import { answerFromCrystal } from './crystal-answer.js';
@@ -20,11 +20,12 @@ import { executeArtifact, type Execution } from './execute.js';
 import { generateHandler, type GenerationOutcome } from './generate.js';
 import { GenerationLimits } from './generation-limits.js';
 import { HandlerCache } from './handler-cache.js';
-import { savedHandlerProblem } from './saved-handler-check.js';
+import { savedHandlerProblem } from '../handler/fits-sources.js';
 import { HandlerLifecycle } from './lifecycle.js';
 import { queryMeta } from './meta.js';
 import { reviewUntilSettled, type ReviewOutcome } from './review-loop.js';
-import type { CacheOutcome, HandlerRecord, HandlerSummary, QueryResult, Slime, SlimeStats } from './types.js';
+import type { CacheOutcome, HandlerSummary, QueryResult, Slime, SlimeStats } from './types.js';
+import type { HandlerRecord } from '../handler/record.js';
 
 export interface EngineParts {
   config: SlimeConfig;

@@ -1,11 +1,11 @@
 // A saved handler is checked against today's sources before it is served: a
 // removed source or a renamed Notion property would otherwise fail on every
 // request, or silently return wrong data (MS14).
-import { isApiStep } from '../models/artifact.js';
+import { isApiStep } from '../artifact/artifact.js';
 import { SlimeError } from '../shared/errors.js';
 import type { ApiSchema } from '../sources/api/types.js';
-import { lintSteps } from './checks/steps.js';
-import type { HandlerRecord } from './types.js';
+import { lintSteps } from '../artifact/checks/steps.js';
+import type { HandlerRecord } from './record.js';
 
 export interface SavedHandlerContext {
   sqlSourceName: string;

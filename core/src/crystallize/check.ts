@@ -2,7 +2,7 @@
 // doesn't re-check Crystal at startup (C10).
 import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { assertReadOnlySql } from '../engine/checks/sql.js';
+import { assertReadOnlySql } from '../artifact/checks/sql.js';
 import { INDEX_FILE, INDEX_TYPES_FILE, MODULE_EXTENSION, readManifest, renderIndex, renderIndexTypes, type Manifest } from './manifest.js';
 import { sha256 } from '../shared/hash.js';
 import { parseModule } from './module-format.js';
