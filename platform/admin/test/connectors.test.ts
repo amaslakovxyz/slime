@@ -10,8 +10,6 @@ import { maskConnectionUrl } from '../lib/connectors';
 import { testConnection } from '../lib/connectors/postgres';
 
 const DEMO_URL = 'postgres://slime_reader:slime_reader@127.0.0.1:54329/slime';
-// Owns slime_meta, which slime_reader cannot read (examples/express/db/init.sql).
-const WRITER_URL = 'postgres://slime_writer:slime_writer@127.0.0.1:54329/slime';
 // Creates objects in public and other schemas (examples/express/docker-compose.yml, CI service).
 const ADMIN_URL = 'postgres://slime_admin:slime_admin@127.0.0.1:54329/slime';
 const demoUp = await new Promise<boolean>((resolve) => {
@@ -62,23 +60,23 @@ describe('testConnection', () => {
     assert.deepEqual(result.problems, []);
   });
 
-  test('counts only the tables the role can read (E2E-16)', { skip: skipDb }, async () => {
-    const hidden = `slime_meta.hidden_${randomBytes(4).toString('hex')}`;
-    const writer = new pg.Client({ connectionString: WRITER_URL });
-    await writer.connect();
-    try {
-      await writer.query(`CREATE TABLE ${hidden} (id int)`);
-      // accounts, invoices, plans, subscriptions, usage_events
-      assert.equal((await testConnection(DEMO_URL)).tables, 5);
-    } finally {
-      await writer.query(`DROP TABLE IF EXISTS ${hidden}`);
-      await writer.end();
-    }
-  });
-
   // The runtime describes only public, views included and materialized views not
   // (core/src/sources/sql/postgres/describe.ts), so the count matches what Slime can query.
   // Counts are relative to a baseline: locally the demo database is shared with other checkouts.
+  test('counts only the tables the role can SELECT from (E2E-16)', { skip: skipDb }, async () => {
+    // REFERENCES alone shows the columns in information_schema but gives no read access.
+    const table = `public.ref_${randomBytes(4).toString('hex')}`;
+    const before = (await testConnection(DEMO_URL)).tables;
+    await asAdmin(`CREATE TABLE ${table} (id int); GRANT REFERENCES ON ${table} TO slime_reader`);
+    try {
+      const result = await testConnection(DEMO_URL);
+      assert.equal(result.tables, before);
+      assert.equal(result.ok, true);
+    } finally {
+      await asAdmin(`DROP TABLE IF EXISTS ${table}`);
+    }
+  });
+
   test('counts the views in public the role can read', { skip: skipDb }, async () => {
     const view = `public.view_${randomBytes(4).toString('hex')}`;
     const before = (await testConnection(DEMO_URL)).tables!;
