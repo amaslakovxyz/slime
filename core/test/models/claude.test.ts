@@ -74,6 +74,17 @@ describe('Claude adapter', () => {
     assert.deepEqual([system[1]?.text, system[1]?.cache_control], ['Database: postgresql 16', { type: 'ephemeral' }]);
   });
 
+  test("the SDK's retry backoff is reported as waitMs, not model time", async () => {
+    const replies = [
+      () => Response.json({ type: 'error', error: { type: 'overloaded_error', message: 'overloaded' } }, { status: 529, headers: { 'retry-after-ms': '80' } }),
+      () => message(ARTIFACT),
+    ];
+    globalThis.fetch = (async () => (await new Promise((resolve) => setTimeout(resolve, 30)), replies.shift()!())) as typeof fetch;
+    const result = await claude.generator(OPTIONS).generate(REQUEST, { timeoutMs: 5_000 });
+    assert.ok(result.waitMs >= 70, `waitMs ${result.waitMs} should hold the 80 ms backoff`);
+    assert.ok(result.ms >= 55 && result.ms < 120, `ms ${result.ms} should be the two requests only`);
+  });
+
   test('a missing API key fails with a clear error and sends no request (E2E-13)', async () => {
     let calls = 0;
     globalThis.fetch = (async () => (calls++, message(ARTIFACT))) as typeof fetch;

@@ -16,8 +16,9 @@ export interface GenerationRequest {
 }
 
 export interface ModelUsage {
-  /** Model time, excluding provider rate-limit waits. */
+  /** Model time: every request to the provider, retried ones too. */
   ms: number;
+  /** Waits between retries (rate limits, the SDK's backoff); not model time. */
   waitMs: number;
   inputTokens: number;
   outputTokens: number;
