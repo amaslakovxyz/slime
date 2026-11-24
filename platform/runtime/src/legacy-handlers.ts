@@ -1,7 +1,7 @@
 // Copies Liquid handlers the sandbox engine saved into the core's format (M7).
-// Locked mode can't regenerate, so without this the switch would leave a
-// tenant with nothing to serve. The old items stay where they are, so the
-// previous runtime still works after a rollback.
+// At the M7 switch the runtime could not regenerate (locked mode, since
+// removed), so the copy kept tenants served. The old items stay where they
+// are, so the previous runtime still works after a rollback.
 import { handlerKeyFor, type HandlerRecord, type ParamTypes, type ReviewStatus } from '@slime-cloud/core';
 import { QueryCommand } from '@aws-sdk/lib-dynamodb';
 import type { DocClient, DynamoSlimeStore } from './store-dynamodb.js';

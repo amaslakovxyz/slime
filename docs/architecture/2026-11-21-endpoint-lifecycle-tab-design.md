@@ -1,6 +1,6 @@
 # Endpoint Lifecycle tab (local first test): design
 
-* **Status:** Built locally on `feat/local-admin` (2026-11-21)
+* **Status:** Built; on `main` (first built locally on `feat/local-admin`, 2026-11-21)
 * **Date:** 2026-11-21
 * **Author:** @Tony (with an agent)
 * **Base:** PR #18 (`feat/slimecloud-admin`): admin, provisioner, runtime

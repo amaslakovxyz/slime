@@ -44,8 +44,7 @@ These parts keep their current behaviour; the code that runs them changes in
 - the request key and cache;
 - the gas → liquid lifecycle;
 - the review loop;
-- output validation;
-- locked mode.
+- output validation.
 
 With no API source configured, Slime behaves exactly as today (§3.3,
 compatibility rule). Crystal for handlers that call APIs came later: steps
@@ -128,9 +127,9 @@ Key facts about core today (main @ 441c84b):
 
 **How handlers are found and refreshed.** The request key hashes only the
 normalized intent, the input names and the output shape. Each stored handler
-records `schemaHash`, `dictionaryHash` and `promptHash`. Explore mode
-regenerates a handler whose recorded hashes differ from the current ones;
-locked mode serves it anyway and warns once at startup.
+records `schemaHash`, `dictionaryHash` and `promptHash`. A handler whose
+recorded hashes differ from the current ones is generated again. Crystal is
+served as it is, and `createSlime()` warns once at startup.
 
 Decisions this touches:
 
@@ -146,7 +145,7 @@ Decisions this touches:
 | D3 (dictionary rebuilt at start) | Holds, but startup now makes network calls. |
 | R5 (null input means "not given") | Applies to API parameters too. |
 | R6 (the result has at most `input.limit` rows) | Unchanged; checked after `shape`. |
-| R8 (explore in dev, locked in prod) and R11 (server sets identity values) | Unchanged, and more important: they now also cover third-party data. |
+| R11 (server sets identity values) | Unchanged, and more important: it now also covers third-party data. R8, which kept generation to development, was superseded on 2026-11-22. |
 
 ## 3. Concept
 
@@ -311,11 +310,9 @@ source is configured.
   handler. Every stored v2 artifact therefore has at least one API step, and
   those are skipped by Crystal in v1 (§3.6).
 - **Saved handlers are checked against today's sources.** Each time a v2
-  handler is loaded, and once at startup in locked mode, the step lint (§3.5)
-  runs against the current sources and schemas. A handler that fails it (a
-  removed source, a renamed Notion property or option) is not served: explore
-  mode regenerates it, locked mode answers `HANDLER_NOT_FOUND` with the reason,
-  and startup lists such handlers in one warning.
+  handler is loaded, the step lint (§3.5) runs against the current sources
+  and schemas. A handler that fails it (a removed source, a renamed Notion
+  property or option) is not served: it is a miss and is generated again.
 - **Storage.** Handlers stay in the same store, keyed by the same request key.
   A stored v2 handler holds names, SQL text, argument bindings and code. It
   never holds credentials or row data, so `.slime/` stays safe to commit.
@@ -380,8 +377,8 @@ Rules: ...
   connector reads the catalog. The Ghibli adapter declares them in code
   (§4.1). The dictionary does not care which.
 - **Hashes.** `schemaHash` becomes a hash of every source's `describe()`
-  output. A schema change in any source changes it, so explore mode
-  regenerates handlers and locked mode warns (§2). The source's data never
+  output. A schema change in any source changes it, so saved handlers are
+  generated again and Crystal warns at startup (§2). The source's data never
   enters the hash or the request key, so a new Notion row regenerates nothing.
   Provenance also records one hash per source (`sourceHashes`, an additive
   field). Crystal's schema warning compares only the SQL source's hash, so
@@ -450,7 +447,7 @@ sandbox.
    largest data set one step may read in v1. A single-step handler keeps
    today's behaviour: rows are cut and `meta.truncated` is true.
 6. `shape` runs, then today's output validation and the R6 limit check.
-7. `timingsMs.run` is the wall time of all steps. In explore mode, `meta.steps`
+7. `timingsMs.run` is the wall time of all steps. `meta.steps`
    lists each step's name, source, operation and arguments (API steps), SQL
    (SQL steps), row count and time.
 
@@ -461,14 +458,14 @@ sandbox.
 - No schema guessed from data: schemas are declared in code, or read from the
   service's own schema endpoint (Notion).
 
-### 3.6 Lifecycle, locked mode and Crystal
+### 3.6 Lifecycle and Crystal
 
 | Stage | Multi-source handlers |
 |---|---|
 | Gas | Unchanged: cached in memory after its first successful run. |
 | Review | Unchanged loop. The review prompt shows the steps. |
 | Liquid | Unchanged rule (`lifecycle.ts`): enough successful runs, plus approval when a reviewer is set. |
-| Locked | Serves saved v2 handlers that pass the step lint against today's sources (§3.3). Adapters still run, so sources must be reachable. |
+| Saved | A saved handler is served only while it passes the step lint against today's sources (§3.3); otherwise it is generated again. Adapters still run, so sources must be reachable. |
 | Crystal | A single-SQL-step handler becomes a query module, as before. Any other handler becomes a steps module (2026-11-22, replacing MS9): `export const steps` (a plain literal of its Liquid steps) and `export function shape(data, input)`, checked by the same allowlist. The equivalence test calls the live sources on the app's instance (`Crystallizer`); a source that changes between the Liquid and the Crystal run makes it fail, never pass wrongly. `slime-crystal verify` without the app's sources accepts such a module only while it is exactly its Liquid code. |
 
 ### 3.7 Alternatives considered
@@ -695,7 +692,7 @@ around them. That is what the rules below are for.
 | S4 | **Non-JSON objects reach the sandbox** (adapter objects, functions, response objects with headers). | API rows are checked before they cross: a bigint, function, symbol or undefined is refused. SQL rows keep today's handling. | An API row with a function or bigint is refused; a SQL row with a `Date` still works. |
 | S5 | **Secrets in the environment** widen the damage of any future bug that reads it. On Lambda, `platform/runtime/src/lambda.ts:30-42` (the Lambda wrapper for Slime Cloud) loads every SSM parameter into `process.env`. | Pass each secret straight to its adapter. Separate follow-up in `platform/runtime`, outside this plan: load only what the runtime needs. | Runtime review item. |
 | S6 | **Too much data visible** (a data leak, not a secret leak). | Least privilege per source acts as the GRANT. Postgres: read-only user, as today. Notion: "Read content" only, integration shared only with the listed data sources; Slime exposes only `dataSources` minus `exclude`. `people` properties excluded. | Safety check fails if a listed data source is unreadable. Dictionary snapshot test shows no excluded properties. |
-| S7 | **An open explore endpoint.** `POST /slime` in explore mode lets anyone generate queries over everything all sources can read, and spend Notion quota. | R8: explore only in development; locked in production. R11: identity-bound values come from the server. Document this in the example. | Example README states it. A locked-mode test shows no generation. |
+| S7 | **An open generating endpoint.** An endpoint that passes the request body to `query()` (the example's `POST /slime`) lets anyone generate queries over everything all sources can read, and spend Notion and model quota. | R11: in production each endpoint chooses its intent and sets identity-bound values on the server; crystallize the handlers you rely on. `maxGenerationsPerHour` and `maxConcurrentGenerations` bound generation. Document this in the example. | Example README states it. |
 | S8 | **Prompt injection through data or metadata.** Notion page text, property names and option labels are written by Notion users, including outside customers. | Rows are never put in prompts. For v2, repair messages carry codes, paths and types, never values (§3.5). Source errors are final and redacted. Notion metadata is made single-line, stripped of control characters and cut at 200 characters before it enters the dictionary; Notion property descriptions are off by default. Every generated handler still passes lint and review. | A spy generator records every prompt while a first attempt is forced to fail over the Notion fixtures, so the repair path runs; no seeded row text appears in any prompt. |
 | S9 | **Resource abuse** (quota, memory, time). | `maxSteps`, `rowCap` per step, `statementTimeoutMs` for SQL steps, `apiTimeoutMs` for API steps, at most 2 in-flight Notion requests per source, the QuickJS memory cap. | Cap tests with a fake source. |
 | S10 | **Writes.** | API adapters expose only read operations. Notion's adapter calls only `GET` and the query `POST`. | The fixture stub fails the test on any other method or path. |
@@ -708,16 +705,15 @@ around them. That is what the rules below are for.
   and then `SOURCE_ERROR`.
 - `rowCap` bounds every step. A multi-step handler over a larger data set fails
   with `QUERY_TOO_LARGE` instead of answering wrongly.
-- Startup needs every source reachable, in explore and locked mode alike (Q6).
+- Startup needs every source reachable (Q6).
   A Notion outage stops the app from starting, including Lambda cold starts,
   where `platform/runtime` retries startup on each request; Notion startup
   costs N+1 calls (one per data source plus one identity check).
 - The Notion schema is read at every start. An edit in Notion (a new property,
-  a renamed option) changes `schemaHash`: explore mode regenerates every
-  handler; locked mode keeps serving the handlers that still pass the step
-  lint and stops serving the rest (§3.3).
-- Changing the prompts regenerates explore-mode handlers once, which matters
-  for a demo prepared in explore mode.
+  a renamed option) changes `schemaHash`, so every saved handler is generated
+  again on its next request (§3.3).
+- Changing the prompts regenerates every saved handler once, which matters
+  for a demo prepared in advance.
 - People properties are personal data and stay excluded.
 
 ## 7. Testing plan
@@ -730,7 +726,7 @@ opt-in.
 | T1 Unit | v2 handler parsing and lint (every rule in §3.5); dictionary rendering and `schemaHash` for API sources (deterministic, data-independent); with no API source, dictionary text and `schemaHash` byte-identical to today; the `shape(data, input)` convention; **v1 compatibility**: two v1 handlers committed under `core/test/fixtures/v1-handlers/` load and run unchanged; redaction. | CI |
 | T2 Source contract | A `describeApiSourceContract(options)` suite, like `core/src/testing/connector-contract.ts`. Run against `fakeApiSource`, the Notion adapter and the Ghibli adapter over recorded fixtures. Cases: `describe` is valid and stable; rows match declared types; null params add no filter; `rowCap` sets `truncated`; abort and timeout are honoured; 429 is retried within the timeout, then `SOURCE_ERROR`; no secret in any error; unknown operations or params are rejected; only allowed method and path pairs are called. | CI |
 | T3 HTTP fixtures | A fixture `fetch` passed to the constrained client replays recorded JSON, so no server process is needed. Ghibli fixtures are hand-curated (public data). Notion adapter tests first run on hand-written fixtures; a small Notion recorder then records the demo scenario. It scrubs by allowlist (only the fields the adapter reads are kept) and maps real ids to stable placeholder UUIDs in requests and responses alike, so request keys still match. Fixtures are reviewed in the pull request. | CI (replay); manual (record) |
-| T4 Engine integration | Postgres demo database (already a CI service) plus `fakeApiSource`, then the Notion and Ghibli fixtures, with a stub generator that returns pre-written handlers. Cases: <br>• the combined query returns the expected output; <br>• repeated runs promote it to liquid, with and without a stub reviewer; <br>• locked mode serves a saved v2 handler; <br>• locked mode refuses a saved v2 handler whose source was removed or whose Notion property was renamed, and startup lists it; <br>• a Notion schema change changes `schemaHash` (explore regenerates, locked warns); <br>• one source down gives a retryable `SOURCE_ERROR` and no partial data; <br>• a truncated step in a two-step handler fails with `QUERY_TOO_LARGE`; <br>• a single-SQL-step v2 artifact is stored as v1, gives the same result and crystallizes. | CI |
+| T4 Engine integration | Postgres demo database (already a CI service) plus `fakeApiSource`, then the Notion and Ghibli fixtures, with a stub generator that returns pre-written handlers. Cases: <br>• the combined query returns the expected output; <br>• repeated runs promote it to liquid, with and without a stub reviewer; <br>• a saved v2 handler is served while its sources match; <br>• a saved v2 handler whose source was removed or whose Notion property was renamed is generated again; <br>• a Notion schema change changes `schemaHash`, so the handler is generated again; <br>• one source down gives a retryable `SOURCE_ERROR` and no partial data; <br>• a truncated step in a two-step handler fails with `QUERY_TOO_LARGE`; <br>• a single-SQL-step v2 artifact is stored as v1, gives the same result and crystallizes. | CI |
 | T5 Security | The tests in §5.2's last column, plus the existing sandbox isolation tests. | CI |
 | T6 Live | A manual script with `NOTION_TOKEN` and `GROQ_API_KEY` (or `ANTHROPIC_API_KEY`), outside the `npm test` glob. Seed Notion, run the three demo intents (§8) against real Notion, Ghibli and a real model. Check the output shape, non-empty results, and promotion after N runs. Results go into the pull request. | manual |
 | T7 Example smoke | `examples/multi-source`: start it, `curl POST /slime` with the demo intents against the fixtures. | CI (new job) |
@@ -762,7 +758,7 @@ known so far.
 |---|---|---|
 | Ports | `ApiSource`, `OperationInfo`, `ParamInfo`, `SourceCallOptions`, `CallOptions`, `SourceError`; optional `kind` on `Connector` | `core/src/sources/api/types.ts`, `core/src/sources/sql/types.ts` |
 | Config | `sources` (exactly one SQL source), `maxSteps`, `apiTimeoutMs`; `connector` as shorthand; validation of source names | `core/src/config/*` |
-| Startup | `describe()` and `safetyCheck()` over every source through the redacting wrapper; locked-mode check of saved v2 handlers | `core/src/create-slime.ts`, `core/src/sources/api/call-source.ts` |
+| Startup | `describe()` and `safetyCheck()` over every source through the redacting wrapper | `core/src/create-slime.ts`, `core/src/sources/api/call-source.ts` |
 | Dictionary | Render API sources; `schemaHash` over every source; per-source hashes in provenance | `core/src/dictionary/dictionary.ts`, `core/src/request/key.ts` |
 | Handler | `Artifact` v2 with steps; single-SQL-step normalization; saved-handler lint on load | `core/src/models/types.ts`, `core/src/engine/types.ts`, `core/src/engine/handler-cache.ts` |
 | Errors | `SOURCE_ERROR`, `QUERY_TOO_LARGE`; `FINAL_CODES`; value-free v2 repair messages | `core/src/shared/errors.ts`, `core/src/engine/generation/generate.ts`, `core/src/request/shape.ts` |
@@ -833,7 +829,7 @@ Every question carries a recommendation. P0 recorded each one as a decision in [
 | Q3 | Constants in API arguments? | Yes, typed and checked against `values`. Otherwise intents like "open negative feedback" need extra inputs. | Recorded: MS4 |
 | Q4 | List-valued columns (multi_select, relation)? | No list columns in v1: multi_select is a joined string, relation is excluded. | Recorded: MS2 |
 | Q5 | Notion filters: generated equality and range params, or a model-written filter language? | Generated params in v1. Small, typed, lintable. Anything finer is done in `shape` over at most `rowCap` rows; more data fails the run (§3.5). | Recorded: MS12 |
-| Q6 | A source is down at startup? | Fail fast in explore and locked mode, matching today's behaviour when the database is unreachable. | Recorded: MS8 |
+| Q6 | A source is down at startup? | Fail fast, matching today's behaviour when the database is unreachable. | Recorded: MS8 |
 | Q7 | Crystal for handlers with API steps? | Not in v1 (S3, and equivalence on live data is not deterministic). Since 2026-11-22: yes, as steps modules (§3.6). | Recorded: MS9, replaced |
 | Q8 | Can a `defineApiSource` operation use raw `fetch`? | No. Only the constrained client, which takes headers, method and body options. | Recorded: MS10 |
 | Q9 | Naming and folders: "source" vs "connector"; `connectors/` vs `sources/`? | "Source" is the umbrella term, and the Postgres connector is a SQL source. New code goes in `core/src/sources/`. | Recorded: MS11 |

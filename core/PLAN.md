@@ -49,8 +49,7 @@ closed on 2026-11-21; core is built at `core/` as a new library
 instead. Its layering (core → server → platform) and the `@slime-cloud` name
 still hold: server and platform build on `createSlime()`.
 
-`platform/runtime` switches to the package (agreed with the team; its README
-still says `sandbox/` gets published, which is now out of date). The runtime
+`platform/runtime` switches to the package (agreed with the team). The runtime
 changes in a few places (§7, M7):
 
 * it uses `createSlime(new SlimeConfig(…))` instead of setting env before
@@ -72,7 +71,7 @@ Status: **Decided**, **Proposed** (default unless someone objects) or
 | C4 | Configuration | A `SlimeConfig` class. The app creates it and adds the parts it needs: connector, generator, store, limits. Each part can come from env, a secrets store or anywhere else in the app. The class fills defaults, validates everything at once (reporting every problem, not just the first), and is immutable; `config.with({...})` returns a changed copy for tests. Core never reads `process.env` or `.env`. | Decided (class shape: Proposed) |
 | C5 | Entry point | Three steps in the app: create a connector (where data comes from), create a Slime instance with `createSlime(config)`, then call `slime.query()` inside any endpoint. The instance's methods are listed in §5. | Decided |
 | C6 | Locked mode | Locked means no `generator` is passed. Then no model client is ever imported, by construction. An explicit `mode` setting can be added later without breaking this. Explore mode is the opposite: a `generator` is passed, and Slime generates handlers for new requests. **Superseded 2026-11-22:** there are no modes; a `generator` is required and every miss is generated (see R8). | Superseded |
-| C7 | Packaging of adapters | Subpath exports from one package: `@slime-cloud/core/postgres`, `/claude`, `/groq`, `/offline`. Model SDKs and database drivers are optional peer dependencies. | Decided |
+| C7 | Packaging of adapters | Subpath exports from one package: `@slime-cloud/core/postgres`, `/claude`, `/groq`, `/notion`. Canned handlers for tests and demos are in `/testing`. Model SDKs and database drivers are optional peer dependencies. | Decided |
 | C8 | What ships | Compiled JS and `.d.ts` in `dist/` (built with `tsc`), plus the shaping sandbox's worker file. Not TS source. | Decided |
 | C9 | HTTP | No HTTP in core. The app calls `slime.query()` from its own endpoint in any framework. A thrown `SlimeError` carries `status` and `toJSON()`, so the endpoint can return it directly. Admin data comes from methods only (`handlers()`, `stats()`, `evict()`); exposing and protecting them over HTTP is up to the app or `@slime-cloud/server`. | Decided |
 | C10 | Crystal | Crystal handlers are ordinary modules in the app's own code. The crystallize job writes JS modules (`.mjs`), plus a generated `index.mjs` with `index.d.mts` and a manifest. The app imports the index and passes it as `crystal` in `SlimeConfig`; leaving it out (or `false`) turns Crystal off. Because the code is compiled with the app, safety is checked when the job writes it (allowlist, SQL lint, equivalence test on recorded runs) and by a `check` command in the app's CI, which re-parses the sources and compares manifest hashes. Core doesn't re-check at startup. The job and `check` are a separate entry (`@slime-cloud/core/crystallize`, plus a bin), so an app's serving process never imports them. A host that stores Crystal modules elsewhere (Slime Cloud: S3) imports that entry to parse them as data; their shapes are source strings and run in the shaping sandbox. **Update 2026-11-22:** the job, `check`/`pin`/`verify` and the bin moved to their own package, `@slime-cloud/crystal` (`crystal/`), which uses core's internals through `@slime-cloud/core/tooling`; serving Crystal stays in core. | Decided |
@@ -99,18 +98,18 @@ without API sources (MS3).
 |---|---|---|
 | MS1 | `sources` config: a map of named sources with exactly one SQL source and any number of API sources. `connector: x` means `sources: { db: x }`, and `config.connector` stays a required `Connector`. | Proposed |
 | MS2 | API source port: `describe({ timeoutMs, signal })`, `call(operation, args, { timeoutMs, rowCap, signal })`, `safetyCheck({ timeoutMs, signal })`, `close()`, `secrets`. Rows are flat plain JSON in output-notation leaf types, nullable where declared, with no list columns. | Proposed |
-| MS3 | One artifact format, `{ version: 2, unsatisfiable, steps, shapeJs, assumptions }`, for every instance; one set of prompts and one prompt hash. The earlier single-query form (`{ sql, params, shapeJs(rows, input) }`) is only read from stored records and offline handlers, converted to one SQL step when loaded (`fromStoredArtifact`). Crystal runs one SQL query, so a one-SQL-step handler is turned back into that form for it (`asSingleQuery`). Changed 2026-11-22: it replaced a v1/v2 split that kept setups without API sources byte-identical; the cost was two prompts, two executors and a format flag. Existing handlers regenerate once in explore mode; `schemaHash` is unchanged for a database alone, so locked mode and Crystal keep matching. | Proposed |
+| MS3 | One artifact format, `{ version: 2, unsatisfiable, steps, shapeJs, assumptions }`, for every instance; one set of prompts and one prompt hash. The earlier single-query form (`{ sql, params, shapeJs(rows, input) }`) is only read from stored records and offline handlers, converted to one SQL step when loaded (`fromStoredArtifact`). Crystal runs one SQL query, so a one-SQL-step handler is turned back into that form for it (`asSingleQuery`). Changed 2026-11-22: it replaced a v1/v2 split that kept setups without API sources byte-identical; the cost was two prompts, two executors and a format flag. Existing handlers regenerate once in explore mode; `schemaHash` is unchanged for a database alone, so locked mode and Crystal keep matching. **Superseded 2026-11-22:** there are no modes; existing handlers regenerate once on their next request, and Crystal keeps matching because `schemaHash` is unchanged for a database alone. | Proposed |
 | MS4 | An API step's `args` is a list of `{ param, input, value }` with exactly one of `input` and `value` set (a list, because model structured output accepts only closed objects). Constants are checked against the parameter's type and `values`. | Proposed |
 | MS5 | New limits: `maxSteps` (default 4) and `apiTimeoutMs` (default 10 000). SQL steps keep `statementTimeoutMs`; every step keeps `rowCap`. | Proposed |
 | MS6 | A truncated step in a handler with more than one step fails the run with `QUERY_TOO_LARGE` (422). During generation it is repairable. | Proposed |
 | MS7 | API failures become `SOURCE_ERROR` (502): retryable for 429, 5xx and timeouts, not retryable for other 4xx. Final during generation. Details carry source, operation, status and attempts, never secrets. | Proposed |
-| MS8 | Startup fails if any source fails `describe()` or `safetyCheck()`, in explore and locked mode. | Proposed |
+| MS8 | Startup fails if any source fails `describe()` or `safetyCheck()`, in explore and locked mode. **Superseded 2026-11-22:** there are no modes; startup fails the same way for every instance. | Proposed |
 | MS9 | Handlers with an API step are not crystallized. | Proposed |
 | MS10 | API adapters reach the network only through the constrained HTTP client: fixed base URL, origin check, no `//` or `..` in paths, same-origin redirects only, 10 MB response cap. | Proposed |
 | MS11 | New code lives in `core/src/sources/`. | Proposed |
 | MS12 | Notion: schema discovered at startup; generated equality and range parameters; metadata sanitized; property descriptions opt-in; at most 2 requests in flight per source; `people`, `relation`, `files`, `formula` and `rollup` excluded. | Proposed |
 | MS13 | Cross-source join hints are column comments (`matches db.accounts.name`); there is no separate links config. | Proposed |
-| MS14 | Saved v2 handlers are linted against today's sources on load and at locked startup. A failing handler is not served: explore mode regenerates it, locked mode answers `HANDLER_NOT_FOUND`. | Proposed |
+| MS14 | Saved v2 handlers are linted against today's sources on load and at locked startup. A failing handler is not served: explore mode regenerates it, locked mode answers `HANDLER_NOT_FOUND`. **Superseded 2026-11-22:** there is no locked startup; a saved handler that fails the lint when it is loaded is a miss and is generated again. | Proposed |
 | MS15 | For v2, repair messages sent to the model carry error codes, paths and types, never values. | Proposed |
 | MS16 | Every source method is called through one wrapper that applies the timeout and redacts the source's secrets; the HTTP client adds every header value it sends to the secrets. | Proposed |
 | MS17 | Provenance records one hash per source (`sourceHashes`, additive). Crystal's schema warning compares only the SQL source's hash. | Proposed |
@@ -175,7 +174,7 @@ cases are in git history.
 | R6 | Paging? | `input.limit` and `input.offset` are reserved: non-negative integers. After each run Slime checks, without a model, that the top-level list has at most `limit` rows; a failed check is a failed run. | Decided |
 | R7 | Values written into the intent? | An intent that seems to contain a literal (a number, quoted text, an email, a UUID) gets a warning in `meta.warnings` that says to move the value into `input`. A warning, not an error, because "top 10" and possessives match too. | Proposed |
 | R8 | Explore vs locked in production? | Generation is for development. In explore mode anyone who can send a request (including from a browser's devtools) can make Slime generate a new read query against everything the connector's read-only database user (`slime_reader` in the examples) can see. So the documented setup is: **explore in development, locked in production** (C6), serving only handlers that were saved (Liquid) or crystallized. Intents then act as named routes. **Superseded 2026-11-22:** locked mode is removed; every instance generates on a miss and returns the generated code in `meta`. What still bounds a request: the read-only database user, the model-free checks, `maxQueryCost`, `rowCap`, `maxGenerationsPerHour` and `maxConcurrentGenerations`; and R11 (the app's endpoint chooses the intent, never the client). To pin production to known code, crystallize it. | Superseded |
-| R9 | Can the developer see what was generated? | Yes, in explore mode. `meta` then carries `sql`, `shapeJs` and the model's `assumptions`; in locked mode they are left out. On every new generation core emits an `onEvent` event (C11) with them, so a dev setup can print it to the console. A wrong answer is only fixable if it's visible. | Decided |
+| R9 | Can the developer see what was generated? | Yes, in explore mode. `meta` then carries `sql`, `shapeJs` and the model's `assumptions`; in locked mode they are left out. On every new generation core emits an `onEvent` event (C11) with them, so a dev setup can print it to the console. A wrong answer is only fixable if it's visible. **Superseded 2026-11-22:** there are no modes; `meta` always carries `sql` and `assumptions`, plus `shapeJs` and `steps` when the handler has them (`core/src/engine/meta.ts`). | Decided |
 | R10 | Matching by meaning (embeddings, a model normalizing the text)? | No. A non-deterministic key is worse than one extra generation. | Decided |
 | R11 | Can `input` carry authorization? | No. The caller can set any `input` value, including `null` (R5). In production the app's endpoint chooses the intent and sets every identity-bound value (account, user, tenant) on the server; it never passes the request body through. | Proposed |
 
@@ -190,8 +189,8 @@ once and renders a **dictionary**: the text every generation gets as context.
 | D2 | Who writes the dictionary? | Slime, not a model. It renders the metadata, the app's `glossary` and the app's `rules` as text. The same inputs always give the same text. Model-written SQL notes may be added later behind the same context, if the M6 bench shows they help. | Decided |
 | D3 | Where is it stored? | Nowhere. It is rebuilt from the live metadata at each start. | Decided |
 | D4 | Blocking or background? | `createSlime()` awaits it. It is one catalog read. | Decided |
-| D6 | When is it rebuilt? | At every start. Its hash is recorded in each handler (§4.7). In explore mode a changed hash regenerates a handler the next time it is requested. | Proposed |
-| D7 | Locked mode? | Built the same way; no model is needed. Saved handlers are served even if its hash differs from the one they recorded (§4.7). | Proposed |
+| D6 | When is it rebuilt? | At every start. Its hash is recorded in each handler (§4.7). In explore mode a changed hash regenerates a handler the next time it is requested. **Superseded 2026-11-22:** there are no modes; a changed hash always regenerates a handler the next time it is requested. | Proposed |
+| D7 | Locked mode? | Built the same way; no model is needed. Saved handlers are served even if its hash differs from the one they recorded (§4.7). **Superseded 2026-11-22:** locked mode is removed (C6, R8). A saved handler made with another hash is generated again (D6); only Crystal is served as it is (§4.7). | Superseded |
 
 D5 and D8 (waiting for a background build, `slime.dictionary()`) were dropped
 with the model-written dictionary on 2026-11-21; the numbers are not reused.
@@ -236,11 +235,11 @@ export interface SlimeStore {
 
 The engine keys handlers by the request key alone: `handlers` /
 `${requestKey}`. Each stored handler records where it came from: the schema,
-dictionary and prompt hashes and the model name. In explore mode, a handler
-whose record differs from the current values counts as a miss: Slime
-generates again and overwrites it. In locked mode Slime serves the stored
-handler as it is, and emits one `onEvent` warning at startup if the schema
-hash differs.
+dictionary and prompt hashes and the model name. A handler whose record
+differs from the current values counts as a miss: Slime generates again and
+overwrites it. So does a saved handler that fails today's source lint (MS14).
+Crystal is the exception: a Crystal handler made against another schema is
+served as it is, and `createSlime()` emits one `onEvent` warning.
 
 The app picks the store in `SlimeConfig`:
 
@@ -252,12 +251,12 @@ new SlimeConfig({ connector, store: myStore });               // anything implem
 
 #### Why files are the default
 
-They follow the explore → locked flow (R8).
-In development, handlers are written to `./.slime/`. The developer commits
-that folder, like Crystal. In production, locked mode only reads it: no
-database for Slime's own state, and no model. A team that doesn't want state
-in git uses a custom shared store; in production they then work in locked
-mode too, against a store filled during development.
+Slime needs no database for its own state. In development, handlers are
+written to `./.slime/`. The developer can commit that folder, like Crystal, so
+another checkout starts with them. A committed handler is served only while
+its provenance matches (§4.7); otherwise it is generated again, so every
+instance needs a `generator`. A team that doesn't want state in git uses a
+custom shared store.
 
 #### File store rules
 
@@ -265,8 +264,7 @@ mode too, against a store filled during development.
 * writes go to a temporary file first, then a rename, so a crash never leaves
   half a file;
 * **one writer per store:** core v1 assumes a single process writes to a
-  store. In locked mode Slime never writes, and run counts stay in memory.
-  Several writers need a custom store that handles them.
+  store. Several writers need a custom store that handles them.
 
 A shared store for several instances is a custom store: one table keyed by
 `(ns, key)` is enough.
@@ -291,7 +289,7 @@ import { crystals } from './slime-crystal/index.mjs';
 const config = new SlimeConfig({
   connector: postgresConnector({ url: process.env.READER_URL! }), // required; createSlime() refuses database users that can write
   store: fileStore('./.slime'),                                    // the default (§4.7)
-  generator: claude.generator({ apiKey: process.env.ANTHROPIC_API_KEY!, model: 'claude-sonnet-5-5', effort: 'low' }), // omit = locked mode
+  generator: claude.generator({ apiKey: process.env.ANTHROPIC_API_KEY!, model: 'claude-sonnet-5-5', effort: 'low' }), // required; writes a handler for each miss
   reviewer: claude.reviewer({ apiKey: process.env.ANTHROPIC_API_KEY!, model: 'claude-sonnet-5-5' }),  // omit = no review
   crystal: crystals,                                               // omit = off
   glossary: { revenue: 'sum of paid invoices, in cents' },        // optional; meaning of the app's words (§4.4)
@@ -344,7 +342,7 @@ interface QueryMeta {
   attempts?: number;                         // a miss: model calls, repairs included
   warnings: string[];
   review: 'none' | 'pending' | 'approved' | 'rejected';
-  sql?: string; shapeJs?: string; assumptions?: string[]; // explore mode only (R9)
+  sql?: string; shapeJs?: string; assumptions?: string[]; // the code that answered (R9)
 }
 type SlimeEvent =
   | { type: 'generated'; handlerKey: string; sql: string; shapeJs?: string; assumptions: string[]; tokens: number; ms: number }
@@ -395,7 +393,7 @@ core/
 │   ├── config/           # slime-config.ts (the SlimeConfig class), options, defaults, validation
 │   ├── connectors/       # PORT: types.ts; postgres/ → @slime-cloud/core/postgres
 │   ├── models/           # PORT: types.ts, model-client.ts, roles.ts, prompts, schemas
-│   │                     #   → @slime-cloud/core/models; claude/, groq/, offline/ each a subpath
+│   │                     #   → @slime-cloud/core/models; claude/, groq/ each a subpath
 │   ├── stores/           # PORT: types.ts, file-store.ts, memory-store.ts
 │   ├── sandbox/          # PORT: types.ts; quickjs/ (runner and worker → @slime-cloud/core/shape-worker)
 │   ├── engine/           # Slime instance, handler cache, generation, review loop, promotion;
@@ -595,7 +593,7 @@ the core; terraform triggers on `core/**`); core
 
 * **Several processes writing one store.** Writes are last-writer-wins, so
   run counts and promotions can be lost. Separate hosts with their own
-  `.slime/` drift apart. Explore with one process, or use a custom store
+  `.slime/` drift apart. Run one process per store, or use a custom store
   built for several writers.
 * **Authorization comes from `input`.** An app that passes `req.body` to
   `query()` lets any client read any row `slime_reader` can see. The README
@@ -608,11 +606,13 @@ the core; terraform triggers on `core/**`); core
 * **The worker file in a built package.** The worker is written in TS so tsc
   emits it. It is resolved with `new URL('./shape-worker.js',
   import.meta.url)`, and `check-pack.mjs` requires it from M2.
-* **Locked mode serves handlers made against another schema.** A handler
-  records the schema hash it was made with. If production's schema differs,
-  locked mode still serves it and warns once at startup. A query that no
-  longer fits fails with `QUERY_ERROR`. Regenerate in development after a
-  migration.
+* **Crystal serves handlers made against another schema.** A Crystal handler
+  records the schema hash it was made with. If today's schema differs, it is
+  still served, and `createSlime()` warns once at startup. If its query no
+  longer fits (`QUERY_ERROR`, `SHAPE_MISMATCH`, `INVALID_HANDLER` or
+  `SANDBOX_ERROR`), the answer falls back to Liquid or a new handler, with a
+  note in `meta.warnings` and one warning event per key. Crystallize again
+  after a migration.
 * **Crystal checks move from startup to CI (C10).** Crystal runs in the app
   process outside the shaping sandbox, with no CPU or memory limit; the
   allowlist is its only boundary. If an app skips `slime-crystal check` in
@@ -627,6 +627,6 @@ M0 to M3 and M5 are done; M4, M6 and M7 are built. Still to decide:
 
 * **Still Proposed, built as proposed in M2 and M3:** R4, R5, R7, R11, C12, C15 and
   C4's class shape. They stand unless someone objects.
-* **With the runtime owner:** Slime Cloud's production mode (explore,
-  locked, or chosen per tenant). `SLIME_MODE` sets it either way; the
-  handler copy makes locked mode safe to switch to.
+* **With the runtime owner:** Slime Cloud's production mode. **Answered
+  2026-11-22:** there is no mode to choose; locked mode and `SLIME_MODE` are
+  removed, and every tenant generates on a miss.

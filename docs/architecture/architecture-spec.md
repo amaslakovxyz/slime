@@ -1,6 +1,6 @@
 # Slime — Architecture Spec (dev)
 
-**Date:** Nov 20, 2026 · **Author:** @Tony · **Status:** Hackathon development spec
+**Date:** Nov 20, 2026 · **Author:** @Tony · **Status:** Superseded by [core/PLAN.md](../../core/PLAN.md) (kept as history; its implementation, `feat/shop-bench` and `chore/gas-v0-plan`, was never merged)
 
 ## Overview
 

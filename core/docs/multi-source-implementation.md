@@ -8,6 +8,8 @@
 | Date | 2026-11-21 |
 | Effort | about 20 person-days (18–22) for one developer, phases P0–P6 |
 
+* **Note (2026-11-22):** locked mode was removed after this plan was written; steps that mention explore/locked mode are kept as written. Today every miss, drift or lint failure regenerates (see [multi-source.md](multi-source.md)).
+
 This plan turns §10 of the design into steps that an engineer or a coding agent
 can take one at a time. Each step names its files, what changes, the tests that
 prove it, and when it is done. Read the design first. This plan says what to do
