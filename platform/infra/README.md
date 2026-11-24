@@ -124,8 +124,7 @@ export AWS_PROFILE=slime
 put() { aws ssm put-parameter --name "$1" --type SecureString --overwrite --value "$2" >/dev/null; }
 put /slime/admin/SESSION_SECRET "$(openssl rand -base64 36)"
 put /slime/admin/ADMIN_ALLOWED_EMAILS 'you@example.com,smoke@example.com'   # comma-separated, invite-only sign-up
-put /slime/shared/ANTHROPIC_API_KEY '<key>'                                  # only if endpoints use claude
-put /slime/shared/GROQ_API_KEY '<key>'                                       # only if endpoints use groq
+put /slime/shared/ANTHROPIC_API_KEY '<key>'                                  # the console offers only Claude
 ```
 
 Alarm delivery (Telegram forwarder, email subscription, the bot token in
@@ -190,7 +189,13 @@ Access and lifecycle:
   as verify-full, and the RDS CA is not in Node's trust store.
 - Full cloud lifecycle: `SMOKE_DB_URL=$(aws ssm get-parameter --with-decryption
   --name /slime/test-db/READER_URL --query Parameter.Value --output text) npm run
-  e2e:cloud` in `platform/admin` (with `SMOKE_EMAIL`/`SMOKE_PASSWORD`).
+  e2e:cloud` in `platform/admin` (with `SMOKE_EMAIL`/`SMOKE_PASSWORD`). After
+  every platform apply, CI runs it when the repository secret `SMOKE_DB_URL` is
+  set; set it only while the database runs and the shared Anthropic key works,
+  or every deploy fails:
+  `aws ssm get-parameter --with-decryption --name /slime/test-db/READER_URL
+  --query Parameter.Value --output text | gh secret set SMOKE_DB_URL`, and
+  `gh secret delete SMOKE_DB_URL` before pausing the database.
 - **Paused since 2026-11-24**: deleted with the final snapshot
   `slime-test-db-pause-2026-11-24` (≈ $0 while paused; running it costs
   ≈ $0.65/day, ≈ $20/month incl. its public IPv4). The security group and

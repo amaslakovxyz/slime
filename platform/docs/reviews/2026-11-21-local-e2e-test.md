@@ -119,8 +119,8 @@ Fix verification, after rebuilding core and restarting the admin:
 
 - E2E-01: `just landing` serves `http://localhost:8090/` (200) while DynamoDB Local holds :8000.
 - E2E-13: a Claude endpoint without a key now answers 502 `GENERATION_FAILED` "No Claude API key is set." in 6 ms, with no API call; core suite 332 pass.
-- E2E-16: Test connection in the console now shows `TABLES 5`; admin suite 44 pass. Its regression test creates a table in `slime_meta` that the reader can't read and expects 5.
-- E2E-16 follow-up (77d2b65): the count is the runtime's describe query (`core/src/sources/sql/postgres/describe.ts`), so a readable table outside `public` or a materialized view no longer counts, and a view in `public` does. The admin CI job now runs these tests against the demo Postgres with `REQUIRE_DB=1` (2d67e15); before, they skipped there.
+- E2E-16: Test connection in the console now shows `TABLES 5`; admin suite 44 pass. Its first regression test created a table in `slime_meta` that the reader couldn't read and expected 5; 7cbef8a replaced it (see the next line).
+- E2E-16 follow-up (77d2b65, 7d07d8b, 7cbef8a): the count is the runtime's describe query (`core/src/sources/sql/postgres/describe.ts`), so a readable table outside `public` or a materialized view no longer counts, and a view in `public` does. The tests count against a baseline (the local demo database is shared) and include a table the reader holds only REFERENCES on, which must not count: it fails if the `has_column_privilege` filter is removed. The admin CI job now runs them against the demo Postgres with `REQUIRE_DB=1` (2d67e15); before, they skipped there.
 
 None of the open items overlapped PR #22 (`fix/request-errors`, merged into
 the branch before the PR) or PR #33 (`feat/cloud-mvp`, docs only).

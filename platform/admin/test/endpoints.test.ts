@@ -80,13 +80,13 @@ describe('users and endpoints (DynamoDB Local)', { skip }, () => {
 
   test('createEndpoint (local mode) stores a pending item without a URL and its secrets', async () => {
     const owner = email('a');
-    const id = await createEndpoint(owner, { name: 'shop', provider: 'groq', databaseUrl: DB_URL });
+    const id = await createEndpoint(owner, { name: 'shop', provider: 'claude', databaseUrl: DB_URL });
     assert.match(id, /^ep-[0-9a-f]{10}$/);
 
     const ep = await getEndpoint(owner, id);
     assert.equal(ep?.status, 'pending');
     assert.equal(ep?.name, 'shop');
-    assert.equal(ep?.provider, 'groq');
+    assert.equal(ep?.provider, 'claude');
     assert.equal(ep?.owner, owner);
 
     const token = await revealToken(owner, id);
@@ -94,7 +94,7 @@ describe('users and endpoints (DynamoDB Local)', { skip }, () => {
     assert.equal(ep?.tokenHint, token!.slice(-4));
     assert.equal(await secretStore().get(id, 'DATABASE_URL'), DB_URL);
     // The runtime reads the provider from the secrets; the item keeps it for display.
-    assert.equal(await secretStore().get(id, 'SLIME_PROVIDER'), 'groq');
+    assert.equal(await secretStore().get(id, 'SLIME_PROVIDER'), 'claude');
     assert.equal(ep?.url, undefined);
 
     const file = process.env.SLIME_SECRETS_FILE!;
@@ -118,7 +118,7 @@ describe('users and endpoints (DynamoDB Local)', { skip }, () => {
 
   test('requestDelete only moves ready or failed endpoints to deleting', async () => {
     const owner = email('delete');
-    const id = await createEndpoint(owner, { name: 'gone', provider: 'groq', databaseUrl: DB_URL });
+    const id = await createEndpoint(owner, { name: 'gone', provider: 'claude', databaseUrl: DB_URL });
     await assert.rejects(requestDelete(owner, id), (err) => hasCode(err, 'NOT_DELETABLE'));
     assert.equal((await getEndpoint(owner, id))?.status, 'pending');
 
@@ -131,7 +131,7 @@ describe('users and endpoints (DynamoDB Local)', { skip }, () => {
 
   test('endpointStats sums a month of day items into tier totals, a daily series and an estimate', async () => {
     const owner = email('stats');
-    const id = await createEndpoint(owner, { name: 'billed', provider: 'groq', databaseUrl: DB_URL });
+    const id = await createEndpoint(owner, { name: 'billed', provider: 'claude', databaseUrl: DB_URL });
     const day = (sk: string, item: Record<string, unknown>) =>
       ddb().send(new PutCommand({ TableName: tables.control, Item: { pk: `USAGE#${id}`, sk, ...item } }));
     await day('2025-03-02', {
@@ -184,8 +184,8 @@ describe('users and endpoints (DynamoDB Local)', { skip }, () => {
   test('overview adds up endpoints for the current month, day by day', async () => {
     const owner = email('overview');
     const today = new Date().toISOString().slice(0, 10);
-    const a = await createEndpoint(owner, { name: 'a', provider: 'groq', databaseUrl: DB_URL });
-    const b = await createEndpoint(owner, { name: 'b', provider: 'groq', databaseUrl: DB_URL });
+    const a = await createEndpoint(owner, { name: 'a', provider: 'claude', databaseUrl: DB_URL });
+    const b = await createEndpoint(owner, { name: 'b', provider: 'claude', databaseUrl: DB_URL });
     await setStatus(owner, b, 'updating');
     const usage = { requests: 1000, generations: 2, gasRequests: 100, liquidRequests: 400, crystalRequests: 500, gasMs: 20000, tokens: 600 };
     // Only a reports a Liquid snapshot; b's missing one adds nothing.
@@ -211,7 +211,7 @@ describe('users and endpoints (DynamoDB Local)', { skip }, () => {
 
   test('updateConnector overwrites the secret, and redeploys only a ready or failed endpoint', async () => {
     const owner = email('connector');
-    const id = await createEndpoint(owner, { name: 'conn', provider: 'groq', databaseUrl: DB_URL });
+    const id = await createEndpoint(owner, { name: 'conn', provider: 'claude', databaseUrl: DB_URL });
     const url = (n: number) => `postgres://reader:pw${n}@db.example.com:5432/app`;
     const stored = () => secretStore().get(id, 'DATABASE_URL');
 
@@ -248,32 +248,33 @@ describe('users and endpoints (DynamoDB Local)', { skip }, () => {
     assert.equal((await getEndpoint(owner, id))?.status, 'failed');
   });
 
-  test('updateSettings renames in place; a provider change needs ready or failed, moves the provider secret and redeploys', async () => {
+  test('updateSettings renames in place; a Groq endpoint from before moves to Claude only when ready or failed, and redeploys', async () => {
     const owner = email('settings');
     const id = await createEndpoint(owner, { name: 'before', provider: 'claude', databaseUrl: DB_URL });
 
     await updateSettings(owner, id, { name: 'renamed', provider: 'claude' });
     let ep = await getEndpoint(owner, id);
     assert.deepEqual([ep?.name, ep?.status], ['renamed', 'pending']);
+    await assert.rejects(updateSettings(owner, id, { name: 'renamed', provider: 'groq' }), (err) => hasCode(err, 'INVALID'));
 
-    await assert.rejects(updateSettings(owner, id, { name: 'renamed', provider: 'groq' }), (err) =>
+    await setLegacyGroq(owner, id);
+    await assert.rejects(updateSettings(owner, id, { name: 'renamed', provider: 'claude' }), (err) =>
       hasCode(err, 'NOT_UPDATABLE'),
     );
-    assert.equal((await getEndpoint(owner, id))?.provider, 'claude');
-    assert.equal(await secretStore().get(id, 'SLIME_PROVIDER'), 'claude');
-
-    await setStatus(owner, id, 'ready');
-    assert.equal(await updateSettings(owner, id, { name: 'switched', provider: 'groq' }), true);
-    ep = await getEndpoint(owner, id);
-    assert.deepEqual([ep?.name, ep?.provider, ep?.status], ['switched', 'groq', 'updating']);
     assert.equal(await secretStore().get(id, 'SLIME_PROVIDER'), 'groq');
 
+    await setStatus(owner, id, 'ready');
+    assert.equal(await updateSettings(owner, id, { name: 'switched', provider: 'claude' }), true);
+    ep = await getEndpoint(owner, id);
+    assert.deepEqual([ep?.name, ep?.provider, ep?.status], ['switched', 'claude', 'updating']);
+    assert.equal(await secretStore().get(id, 'SLIME_PROVIDER'), 'claude');
+
     await setStatus(owner, id, 'deleting');
-    await assert.rejects(updateSettings(owner, id, { name: 'late', provider: 'groq' }), (err) =>
+    await assert.rejects(updateSettings(owner, id, { name: 'late', provider: 'claude' }), (err) =>
       hasCode(err, 'NOT_UPDATABLE'),
     );
     assert.equal((await getEndpoint(owner, id))?.name, 'switched');
-    await assert.rejects(updateSettings(owner, id, { name: '', provider: 'groq' }), (err) => hasCode(err, 'INVALID'));
+    await assert.rejects(updateSettings(owner, id, { name: '', provider: 'claude' }), (err) => hasCode(err, 'INVALID'));
   });
 
   test('invalid input throws before any write', async () => {
@@ -281,12 +282,13 @@ describe('users and endpoints (DynamoDB Local)', { skip }, () => {
     const readSecrets = () => readFile(process.env.SLIME_SECRETS_FILE!, 'utf8').catch(() => '');
     const before = await readSecrets();
     const cases = [
-      { name: 'x', provider: 'groq', databaseUrl: 'mysql://localhost/db' },
-      { name: '   ', provider: 'groq', databaseUrl: DB_URL },
-      { name: 'y'.repeat(41), provider: 'groq', databaseUrl: DB_URL },
+      { name: 'x', provider: 'claude', databaseUrl: 'mysql://localhost/db' },
+      { name: '   ', provider: 'claude', databaseUrl: DB_URL },
+      { name: 'y'.repeat(41), provider: 'claude', databaseUrl: DB_URL },
       { name: 'x', provider: 'openai', databaseUrl: DB_URL },
       { name: 'x', provider: 'offline', databaseUrl: DB_URL },
-      { name: 'x', provider: 'groq', databaseUrl: DB_URL, connectorType: 'clickhouse' },
+      { name: 'x', provider: 'groq', databaseUrl: DB_URL },
+      { name: 'x', provider: 'claude', databaseUrl: DB_URL, connectorType: 'clickhouse' },
     ];
     for (const input of cases) {
       await assert.rejects(createEndpoint(owner, input), (err) => hasCode(err, 'INVALID'));
@@ -305,5 +307,18 @@ describe('users and endpoints (DynamoDB Local)', { skip }, () => {
         ExpressionAttributeValues: { ':s': status },
       }),
     );
+  }
+
+  /** An endpoint created while the console still offered Groq: the item and the runtime secret say groq. */
+  async function setLegacyGroq(owner: string, id: string) {
+    await ddb().send(
+      new UpdateCommand({
+        TableName: tables.control,
+        Key: { pk: `USER#${owner}`, sk: `ENDPOINT#${id}` },
+        UpdateExpression: 'SET provider = :p',
+        ExpressionAttributeValues: { ':p': 'groq' },
+      }),
+    );
+    await secretStore().put(id, 'SLIME_PROVIDER', 'groq', { overwrite: true });
   }
 });
