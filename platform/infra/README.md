@@ -235,9 +235,12 @@ IPv6-only). Its `public` schema holds the Atlas demo data from
 - URLs: `/slime/test-db/SUPABASE_MASTER_URL` (`postgres.<ref>`, session pooler,
   5432) and `/slime/test-db/SUPABASE_READER_URL` (`slime_reader.<ref>`,
   transaction pooler, 6543); both end in `?sslmode=require&uselibpqcompat=true`.
-- Reload the Atlas tables: `examples/express/scripts/load-supabase.sh`. It drops
-  and regenerates only those five tables and reapplies the `slime_reader` grants
-  (no `password_hash`, read-only, 2 s timeout); the reader password is kept.
+- Reload the Atlas tables: `examples/express/scripts/load-supabase.sh`. In one
+  transaction it drops and regenerates only `plans`, `accounts`, `subscriptions`,
+  `invoices` and `usage_events` (the test tables above stay), and reapplies the
+  `slime_reader` grants (no `password_hash`, read-only, 2 s timeout); the reader
+  password is kept. While it runs (seconds) `atlas-demo` queries wait on the
+  table locks and may hit the 2 s timeout.
 - Since 2026-11-24 the `atlas-demo` endpoint (`ep-290cbb5eb4`) reads from it:
   `/slime/endpoints/ep-290cbb5eb4/DATABASE_URL` is a copy of
   `SUPABASE_READER_URL`. Back to RDS (after a restore): copy
