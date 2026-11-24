@@ -2,12 +2,13 @@ import Link from 'next/link';
 import { LivePoller } from '@/app/ui/live-poller';
 import { REQUESTS_PAGE_SIZE, RETAINED_REQUESTS, readRequests } from '@/lib/lifecycle';
 import { loadEndpoint } from '../data';
+import { RequestsLog } from './requests-log';
 
 // Every request that hit the endpoint, newest first, REQUESTS_PAGE_SIZE rows a page. The runtime keeps
 // the newest RETAINED_REQUESTS in the endpoint's store, the same on every instance (GET /v0/events).
 // Pages are cursors in the URL (?before=<id> older, ?after=<id> newer), so a page keeps its rows while
-// new requests land on top; LivePoller refreshes it in place. Read-only; no actions.
-const time = (iso: string) => new Date(iso).toLocaleTimeString('en-GB');
+// new requests land on top; LivePoller refreshes it in place. Click a row for its trace (RequestsLog,
+// client). Read-only; no actions.
 
 export default async function RequestsLogPage({
   params,
@@ -49,30 +50,7 @@ export default async function RequestsLogPage({
           )
         ) : (
           <>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Time</th>
-                    <th>Handler</th>
-                    <th>Stage</th>
-                    <th>Cache</th>
-                    <th className="num">Latency</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.events.map((e, i) => (
-                    <tr key={e.id ?? `${e.at}-${i}`}>
-                      <td className="mono">{time(e.at)}</td>
-                      <td className="mono" title={e.handlerKey}>#{e.handlerKey.slice(0, 6)}</td>
-                      <td>{e.tier ? <span className={`tier-pill tier-pill-${e.tier}`}>{e.tier}</span> : '—'}</td>
-                      <td>{e.route === 'crystal' ? 'own route' : e.cache}</td>
-                      <td className="num mono">{e.ms.toFixed(1)} ms</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <RequestsLog endpointId={id} events={data.events} />
             {(data.hasNewer || data.hasOlder) && (
               <nav className="pager" aria-label="Requests log pages">
                 <div>
