@@ -29,6 +29,11 @@ output "admin_url" {
   value       = "https://${var.admin_domain}/"
 }
 
+output "alerts_topic_arn" {
+  description = "SNS topic for the CloudWatch alarms; subscribe an email by hand (platform/infra/README.md)."
+  value       = aws_sns_topic.alerts.arn
+}
+
 output "cloudfront_distribution_id" {
   description = "Admin distribution; CI invalidates it after each apply."
   value       = aws_cloudfront_distribution.admin.id

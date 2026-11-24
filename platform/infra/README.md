@@ -94,6 +94,11 @@ flowchart LR
 - [`platform/control.tf`](platform/control.tf): DynamoDB `slime-control`
   (users, endpoints, usage), written by the admin and (usage only) the runtime.
   No stream.
+- [`platform/alerting.tf`](platform/alerting.tf): SNS topic `slime-alerts`
+  and seven CloudWatch alarms: Errors, Throttles and p99 Duration > 50 s for
+  `slime-runtime` and `slime-admin`, plus account Lambda concurrency >= 800.
+  Inside CloudWatch's free 10 alarms. The email subscription is made by hand
+  (below). Landing and Atlas have no alarms.
 
 Post-deploy CI checks: runtime `/healthz` → 401, unknown endpoint → 404, admin
 `/login` → 200 through CloudFront, a POST through CloudFront is neither 403 nor
@@ -117,6 +122,15 @@ put /slime/admin/SESSION_SECRET "$(openssl rand -base64 36)"
 put /slime/admin/ADMIN_ALLOWED_EMAILS 'you@example.com,smoke@example.com'   # comma-separated, invite-only sign-up
 put /slime/shared/ANTHROPIC_API_KEY '<key>'                                  # only if endpoints use claude
 put /slime/shared/GROQ_API_KEY '<key>'                                       # only if endpoints use groq
+```
+
+Subscribe to the alarms once, after the first apply that creates the topic
+(AWS emails a confirmation link; the subscription stays pending until it is
+clicked):
+
+```sh
+TOPIC=$(terraform -chdir=platform/infra/platform output -raw alerts_topic_arn)
+aws sns subscribe --topic-arn "$TOPIC" --protocol email --notification-endpoint you@example.com
 ```
 
 The admin loads `/slime/admin/*` at cold start: after changing one, force a

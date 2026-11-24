@@ -58,8 +58,16 @@ credits); 12-month offers no longer apply, only Always Free.
 | Budget `slime-monthly` | $30, alerts $21 + $30 actual, $30 forecast | Region `eu-central-1` until the `Project` tag is active, then tag `Project=slime` |
 | Budget action `freeze` | 100% actual of `slime-monthly`, automatic | Attaches `slime-budget-freeze` to `slime-deployer` and `slime-gha-apply`: no new paid resources or capacity increases (ECS/RDS/DynamoDB updates are blocked too); reads, code updates and deletes still work |
 | Cost Anomaly Detection | SERVICE monitor, daily email at >= $5 impact | Whole account, free |
+| Ops alarms ([`platform/alerting.tf`](platform/alerting.tf)) | 7 CloudWatch alarms -> SNS `slime-alerts` -> email (subscribed by hand) | Failures, not money: Lambda errors, throttles, p99 duration, account concurrency; free (<= 10 alarms) |
 
 Two budgets with one action stay inside AWS Budgets' free allowance.
+
+`bootstrap/` is applied by a human, so a merged change to it is not live until
+someone runs `terraform apply` there. Check the live budget after such a merge:
+`aws budgets describe-budget --account-id 025772230981 --budget-name slime-monthly
+--query Budget.BudgetLimit`. (On 2026-11-22 the $30 raise had been merged but
+not applied: the live budget was still $15, below the RDS's ≈ $19.5/month, so
+the freeze would have fired around the 23rd of the next month.)
 
 Undo a freeze after review (admin profile):
 
