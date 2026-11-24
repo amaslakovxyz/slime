@@ -73,6 +73,12 @@ variable "project_budget_alert_usd" {
   }
 }
 
+variable "alerts_topic_name" {
+  description = "Account-wide SNS topic (ex-infra, eu-central-1) that budgets, the freeze action and cost anomalies also notify. Apply ex-infra first: AWS checks the topic policy."
+  type        = string
+  default     = "ops-alerts"
+}
+
 variable "budget_alert_emails" {
   description = "Recipients of budget alerts. Keep real addresses in the gitignored terraform.tfvars."
   type        = list(string)

@@ -94,10 +94,19 @@ flowchart LR
 - [`platform/control.tf`](platform/control.tf): DynamoDB `slime-control`
   (users, endpoints, usage), written by the admin and (usage only) the runtime.
   No stream.
+- [`platform/alerting.tf`](platform/alerting.tf): nine CloudWatch alarms
+  publishing to `ops-alerts`, the account-wide topic that ex-infra owns and
+  forwards to Telegram (exo-bot) and email. Runtime: Errors (timeouts),
+  handled 500s and `Flush failed` (log metric filters), p99 Duration > 50 s.
+  Admin: Function URL 5xx and p99 Duration. Atlas: Function URL 5xx. Account:
+  claimed concurrency >= `account_concurrency_alarm` (800) and Throttles.
+  Post-deploy CI warns while the topic has no confirmed subscription. The
+  landing has no alarms (cached static page).
 
 Post-deploy CI checks: runtime `/healthz` → 401, unknown endpoint → 404, admin
 `/login` → 200 through CloudFront, a POST through CloudFront is neither 403 nor
-5xx, the landing links to the admin, the bucket and tables exist; then the
+5xx, the landing links to the admin, the bucket and tables exist, and the
+alerts topic has a confirmed subscription (a warning, not a failure); then the
 Playwright cloud smoke (`npm run e2e:cloud` in `platform/admin`) when the
 `SMOKE_EMAIL` / `SMOKE_PASSWORD` repository secrets are set.
 
@@ -118,6 +127,10 @@ put /slime/admin/ADMIN_ALLOWED_EMAILS 'you@example.com,smoke@example.com'   # co
 put /slime/shared/ANTHROPIC_API_KEY '<key>'                                  # only if endpoints use claude
 put /slime/shared/GROQ_API_KEY '<key>'                                       # only if endpoints use groq
 ```
+
+Alarm delivery (Telegram forwarder, email subscription, the bot token in
+SSM `/ex-infra/alerts/`) is set up in ex-infra: `infra/terraform/aws/README.md`
+("Ops alerting"). This repository only publishes to the topic.
 
 The admin loads `/slime/admin/*` at cold start: after changing one, force a
 cold start (update the function configuration or redeploy). The runtime

@@ -5,7 +5,9 @@
 #        slime-gha-apply (automatic, no approval)
 #     -> both roles can no longer create new paid resources; reading,
 #        updating code and DELETING still work, so spend can be cut
-#   cost anomaly with impact >= var.anomaly_alert_usd -> daily email
+#   cost anomaly with impact >= var.anomaly_alert_usd -> daily email, and
+#     immediately to SNS ops-alerts (Telegram)
+#   every budget alert and the freeze also go to ops-alerts
 #
 # The freeze does not stop already-running resources (e.g. a Lambda being
 # invoked). It stops the deploy path from growing the bill further.
@@ -132,6 +134,11 @@ resource "aws_budgets_budget_action" "freeze" {
     }
   }
 
+  subscriber {
+    address           = local.alerts_topic_arn
+    subscription_type = "SNS"
+  }
+
   depends_on = [aws_iam_role_policy.budgets_action]
 }
 
@@ -156,6 +163,28 @@ resource "aws_ce_anomaly_subscription" "services" {
       type    = "EMAIL"
       address = subscriber.value
     }
+  }
+
+  threshold_expression {
+    dimension {
+      key           = "ANOMALY_TOTAL_IMPACT_ABSOLUTE"
+      match_options = ["GREATER_THAN_OR_EQUAL"]
+      values        = [tostring(var.anomaly_alert_usd)]
+    }
+  }
+}
+
+# Same monitor and threshold, pushed as soon as an anomaly is detected: SNS
+# subscribers require IMMEDIATE, email subscribers DAILY or WEEKLY, so the
+# daily email digest above stays as it is.
+resource "aws_ce_anomaly_subscription" "services_immediate" {
+  name             = "account-services-immediate"
+  frequency        = "IMMEDIATE"
+  monitor_arn_list = [aws_ce_anomaly_monitor.services.arn]
+
+  subscriber {
+    type    = "SNS"
+    address = local.alerts_topic_arn
   }
 
   threshold_expression {
