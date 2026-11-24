@@ -30,8 +30,8 @@ output "admin_url" {
 }
 
 output "alerts_topic_arn" {
-  description = "SNS topic for the CloudWatch alarms; subscribe an email by hand (platform/infra/README.md)."
-  value       = aws_sns_topic.alerts.arn
+  description = "Account-wide alerts topic (owned by ex-infra) that the CloudWatch alarms publish to."
+  value       = local.alerts_topic_arn
 }
 
 output "cloudfront_distribution_id" {

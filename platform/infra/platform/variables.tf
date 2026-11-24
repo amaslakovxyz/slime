@@ -16,6 +16,12 @@ variable "log_retention_days" {
   default     = 14
 }
 
+variable "alerts_topic_name" {
+  description = "Account-wide SNS topic the alarms publish to; owned and subscribed by ex-infra (infra/terraform/aws/alerting.tf)."
+  type        = string
+  default     = "ops-alerts"
+}
+
 variable "account_concurrency_alarm" {
   description = "Alarm when account-wide claimed Lambda concurrency reaches this; keep near 80% of the quota (1000 on 2026-11-21, 10 earlier in 2026: check `aws lambda get-account-settings` after quota changes)."
   type        = number

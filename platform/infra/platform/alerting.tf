@@ -1,4 +1,9 @@
-# Operational alerting: CloudWatch alarms -> SNS slime-alerts -> email.
+# Operational alerting: CloudWatch alarms -> SNS ops-alerts -> Telegram + email.
+#
+# ops-alerts is the account-wide topic owned by ex-infra
+# (infra/terraform/aws/alerting.tf, applied by hand): this stack only
+# publishes to it by ARN and never manages it. CI may publish to and list
+# foreign topics, not change them (bootstrap gha-apply guard).
 #
 #   slime-runtime   Errors >= 1             timeouts, crashes (unhandled only)
 #                   handled 500s >= 1       log metric filter: app.onError and
@@ -19,22 +24,15 @@
 # from /healthz when a customer's database is unreachable (216 of 216 sampled
 # on 2026-11-21/22), which is the customer's problem, not the platform's.
 #
-# Nine alarms: inside CloudWatch's free 10. Budgets and Cost Anomaly Detection
-# (bootstrap/) cover money; these cover failures.
+# Nine alarms here plus ex-infra's forwarder alarm: exactly CloudWatch's free
+# 10 per account. Budgets and Cost Anomaly Detection (bootstrap/) cover money
+# and publish to the same topic; these cover failures.
 #
-# The email subscription is created by hand (platform/infra/README.md): the
-# address stays out of this CI-applied stack, and email subscriptions need a
-# click to confirm anyway. Post-deploy CI warns while none is confirmed.
-
-resource "aws_sns_topic" "alerts" {
-  name = "${var.project}-alerts"
-  # No encryption: CloudWatch alarms cannot publish to a topic under the AWS
-  # managed key aws/sns, and a customer-managed key costs $1/month. Alarm
-  # notifications carry metric names and values, no data (.trivyignore.yaml).
-}
+# Post-deploy CI warns while the topic has no confirmed subscription.
 
 locals {
-  alarm_actions      = [aws_sns_topic.alerts.arn]
+  alerts_topic_arn   = "arn:aws:sns:${var.region}:${local.account_id}:${var.alerts_topic_name}"
+  alarm_actions      = [local.alerts_topic_arn]
   alarm_period_s     = 300
   duration_alarm_ms  = 50000 # 10 s below both functions' 60 s timeout
   runtime_metrics_ns = "Slime/Runtime"

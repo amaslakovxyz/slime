@@ -296,18 +296,19 @@ jobs:
               aws dynamodb describe-table --table-name "$table" --query Table.TableStatus --output text
             done
           fi
-          # Alarms publish to a topic whose email subscription is made by hand
-          # (platform/infra/README.md). Warn, not fail: a missing subscriber
-          # must not block deploys, but must not go unnoticed either.
+          # Alarms publish to ex-infra's ops-alerts; its Telegram and email
+          # subscriptions are set up there (infra/terraform/aws/README.md).
+          # Warn, not fail: a missing subscriber must not block deploys, but
+          # must not go unnoticed either. Also warns while the topic is absent.
           topic=$(jq -r '.alerts_topic_arn.value // empty' <<<"$outputs")
           if [ -n "$topic" ]; then
             # jq, not --query: the CLI applies --query per page and can print
             # one count per page.
-            confirmed=$(aws sns list-subscriptions-by-topic --topic-arn "$topic" --output json |
-              jq '[.Subscriptions[] | select(.SubscriptionArn != "PendingConfirmation")] | length')
+            confirmed=$(aws sns list-subscriptions-by-topic --topic-arn "$topic" --output json 2>/dev/null |
+              jq '[.Subscriptions[] | select(.SubscriptionArn != "PendingConfirmation")] | length' || echo 0)
             echo "alerts topic confirmed subscriptions: $confirmed"
             if [ "$confirmed" = "0" ]; then
-              echo "::warning::No confirmed subscription on $topic: alarms notify nobody. See platform/infra/README.md."
+              echo "::warning::No confirmed subscription on $topic: alarms notify nobody. See ex-infra infra/terraform/aws/README.md."
             fi
           fi
       # Goal 10 of docs/architecture/2026-11-21-cloud-mvp-design.md: sign-in,

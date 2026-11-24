@@ -94,13 +94,14 @@ flowchart LR
 - [`platform/control.tf`](platform/control.tf): DynamoDB `slime-control`
   (users, endpoints, usage), written by the admin and (usage only) the runtime.
   No stream.
-- [`platform/alerting.tf`](platform/alerting.tf): SNS topic `slime-alerts`
-  and nine CloudWatch alarms (inside the free 10). Runtime: Errors (timeouts),
+- [`platform/alerting.tf`](platform/alerting.tf): nine CloudWatch alarms
+  publishing to `ops-alerts`, the account-wide topic that ex-infra owns and
+  forwards to Telegram (exo-bot) and email. Runtime: Errors (timeouts),
   handled 500s and `Flush failed` (log metric filters), p99 Duration > 50 s.
   Admin: Function URL 5xx and p99 Duration. Atlas: Function URL 5xx. Account:
-  claimed concurrency >= `account_concurrency_alarm` (800) and Throttles. The
-  email subscription is made by hand (below); post-deploy CI warns while none
-  is confirmed. The landing has no alarms (cached static page).
+  claimed concurrency >= `account_concurrency_alarm` (800) and Throttles.
+  Post-deploy CI warns while the topic has no confirmed subscription. The
+  landing has no alarms (cached static page).
 
 Post-deploy CI checks: runtime `/healthz` → 401, unknown endpoint → 404, admin
 `/login` → 200 through CloudFront, a POST through CloudFront is neither 403 nor
@@ -127,14 +128,9 @@ put /slime/shared/ANTHROPIC_API_KEY '<key>'                                  # o
 put /slime/shared/GROQ_API_KEY '<key>'                                       # only if endpoints use groq
 ```
 
-Subscribe to the alarms once, after the first apply that creates the topic
-(AWS emails a confirmation link; the subscription stays pending until it is
-clicked):
-
-```sh
-TOPIC=$(terraform -chdir=platform/infra/platform output -raw alerts_topic_arn)
-aws sns subscribe --topic-arn "$TOPIC" --protocol email --notification-endpoint you@example.com
-```
+Alarm delivery (Telegram forwarder, email subscription, the bot token in
+SSM `/ex-infra/alerts/`) is set up in ex-infra: `infra/terraform/aws/README.md`
+("Ops alerting"). This repository only publishes to the topic.
 
 The admin loads `/slime/admin/*` at cold start: after changing one, force a
 cold start (update the function configuration or redeploy). The runtime

@@ -32,11 +32,3 @@ misconfigurations:
       KMS key costs $1/month plus requests; TLS-only policy, versioning and
       blocked public access protect the modules, and the runtime checks each
       module's SHA-256 against the manifest before running it in QuickJS.
-  - id: AWS-0095
-    paths:
-      - "platform/infra/platform/alerting.tf"
-    statement: >-
-      Alerts topic is unencrypted. CloudWatch alarms cannot publish to a topic
-      under the AWS managed key aws/sns (its key policy cannot grant
-      cloudwatch.amazonaws.com), and a customer-managed key costs $1/month.
-      Messages carry only alarm names and metric values, no customer data.

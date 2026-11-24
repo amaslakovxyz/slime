@@ -55,10 +55,10 @@ credits); 12-month offers no longer apply, only Always Free.
 | Control | Setting | Effect |
 |---|---|---|
 | Budget `slime-account-monthly` | $50, alerts 50/80% actual, 100% forecast | Whole account |
-| Budget `slime-monthly` | $30, alerts $21 + $30 actual, $30 forecast | Region `eu-central-1` until the `Project` tag is active, then tag `Project=slime` |
+| Budget `slime-monthly` | $30, alerts $21 + $30 actual, $30 forecast (email and `ops-alerts`) | Region `eu-central-1` until the `Project` tag is active, then tag `Project=slime` |
 | Budget action `freeze` | 100% actual of `slime-monthly`, automatic | Attaches `slime-budget-freeze` to `slime-deployer` and `slime-gha-apply`: no new paid resources or capacity increases (ECS/RDS/DynamoDB updates are blocked too); reads, code updates and deletes still work |
-| Cost Anomaly Detection | SERVICE monitor, daily email at >= $5 impact | Whole account, free |
-| Ops alarms ([`platform/alerting.tf`](platform/alerting.tf)) | 9 CloudWatch alarms -> SNS `slime-alerts` -> email (subscribed by hand; CI warns while unconfirmed) | Failures, not money: runtime timeouts, handled 500s, failed usage writes; 5xx of admin and Atlas; p99 duration; account concurrency and throttles; free (<= 10 alarms) |
+| Cost Anomaly Detection | SERVICE monitor at >= $5 impact: daily email, and immediately to `ops-alerts` (Telegram) | Whole account, free |
+| Ops alarms ([`platform/alerting.tf`](platform/alerting.tf)) | 9 CloudWatch alarms -> SNS `ops-alerts` (ex-infra) -> Telegram + email; CI warns while nothing is subscribed | Failures, not money: runtime timeouts, handled 500s, failed usage writes; 5xx of admin and Atlas; p99 duration; account concurrency and throttles; free (<= 10 alarms) |
 
 Two budgets with one action stay inside AWS Budgets' free allowance.
 
