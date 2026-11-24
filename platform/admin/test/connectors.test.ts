@@ -38,11 +38,27 @@ describe('validateConnectionUrl', () => {
     );
   });
 
-  test('Supabase sslmode=require gets libpq semantics; other explicit modes are kept', () => {
+  test('Supabase require, prefer and libpq-incompatible require all become encrypted libpq require', () => {
     const base = `postgresql://slime_reader.ref123:p@${POOLER}:5432/postgres`;
-    assert.equal(validateConnectionUrl('supabase', `${base}?sslmode=require`), `${base}?sslmode=require&uselibpqcompat=true`);
-    assert.equal(validateConnectionUrl('supabase', `${base}?sslmode=verify-full`), `${base}?sslmode=verify-full`);
-    assert.equal(validateConnectionUrl('supabase', `${base}?sslmode=require&uselibpqcompat=false`), `${base}?sslmode=require&uselibpqcompat=false`);
+    const stored = `${base}?sslmode=require&uselibpqcompat=true`;
+    assert.equal(validateConnectionUrl('supabase', `${base}?sslmode=require`), stored);
+    assert.equal(validateConnectionUrl('supabase', `${base}?sslmode=prefer`), stored);
+    assert.equal(validateConnectionUrl('supabase', `${base}?sslmode=require&uselibpqcompat=false`), stored);
+  });
+
+  test('Supabase refuses plaintext modes and certificate checks without a CA', () => {
+    const base = `postgresql://slime_reader.ref123:p@${POOLER}:5432/postgres`;
+    invalid('supabase', `${base}?sslmode=disable`, /plaintext/);
+    invalid('supabase', `${base}?sslmode=allow`, /plaintext/);
+    invalid('supabase', `${base}?sslmode=verify-full`, /sslrootcert/);
+    assert.equal(
+      validateConnectionUrl('supabase', `${base}?sslmode=verify-full&sslrootcert=/opt/supabase-ca.crt`),
+      `${base}?sslmode=verify-full&sslrootcert=/opt/supabase-ca.crt`,
+    );
+  });
+
+  test('a malformed percent escape in the user is a form error, not a crash', () => {
+    invalid('supabase', `postgresql://slime_reader%ZZ.ref:p@${POOLER}:6543/postgres`, /could not be parsed/);
   });
 
   test('Supabase refuses the IPv6-only direct host and points at the pooler', () => {

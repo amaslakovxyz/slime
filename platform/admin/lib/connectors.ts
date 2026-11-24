@@ -63,15 +63,18 @@ const SUPABASE_POOLER_HOST = /\.pooler\.supabase\.com$/;
  * Supabase rules, all measured against a live project (2026-11-24):
  * - the direct host db.<ref>.supabase.co has only an AAAA record, and the runtime
  *   Lambda (no VPC) reaches the internet over IPv4 only, so only the pooler works;
- * - without sslmode node `pg` connects in plaintext, and `sslmode=require` alone
- *   means verify-full in pg 8, which fails on Supabase's own CA
- *   (SELF_SIGNED_CERT_IN_CHAIN); `uselibpqcompat=true` gives libpq's require
- *   (encrypted, certificate not verified), as the test RDS URLs use.
+ * - TLS is required: without sslmode (or with disable/allow) node `pg` logs in to the
+ *   pooler in plaintext. `sslmode=require` alone means verify-full in pg 8, which fails
+ *   on Supabase's own CA (SELF_SIGNED_CERT_IN_CHAIN), so require/prefer/none become
+ *   libpq's require via `uselibpqcompat=true` (encrypted, certificate not verified), as
+ *   the test RDS URLs use. verify-ca/verify-full work only with `sslrootcert` (Supabase's CA).
  */
 function supabaseUrl(url: string): string {
   let parsed: URL;
+  let user: string;
   try {
     parsed = new URL(url);
+    user = decodeURIComponent(parsed.username);
   } catch {
     throw new CodedError('INVALID', 'Supabase URL could not be parsed');
   }
@@ -93,13 +96,21 @@ function supabaseUrl(url: string): string {
     throw new CodedError('INVALID', 'Supabase pooler port is 5432 (session) or 6543 (transaction)');
   }
   // Supavisor routes on the project ref after the dot: slime_reader.<ref>.
-  if (!/^[^.]+\.[a-z0-9]+$/.test(decodeURIComponent(parsed.username))) {
+  if (!/^[^.]+\.[a-z0-9]+$/.test(user)) {
     throw new CodedError('INVALID', 'Supabase pooler user must be <role>.<project-ref>, e.g. slime_reader.abcdefghijklmnopqrst');
   }
-  if (!parsed.searchParams.has('sslmode')) parsed.searchParams.set('sslmode', 'require');
-  if (parsed.searchParams.get('sslmode') === 'require' && !parsed.searchParams.has('uselibpqcompat')) {
-    parsed.searchParams.set('uselibpqcompat', 'true');
+  const sslmode = parsed.searchParams.get('sslmode');
+  if (sslmode === 'disable' || sslmode === 'allow') {
+    throw new CodedError('INVALID', `sslmode=${sslmode} sends the password and data in plaintext; remove it and TLS is added`);
   }
+  if (sslmode === 'verify-ca' || sslmode === 'verify-full') {
+    if (!parsed.searchParams.has('sslrootcert')) {
+      throw new CodedError('INVALID', `sslmode=${sslmode} needs sslrootcert with Supabase's CA; remove sslmode to use encrypted require`);
+    }
+    return parsed.href;
+  }
+  parsed.searchParams.set('sslmode', 'require');
+  parsed.searchParams.set('uselibpqcompat', 'true');
   return parsed.href;
 }
 

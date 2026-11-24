@@ -93,10 +93,12 @@ readable tables whose row level security (RLS) shows the role no rows.
   returns no rows. The URL must use the
   pooler (`*.pooler.supabase.com`, port 5432 session or 6543 transaction, user
   `<role>.<project-ref>`): the direct host `db.<ref>.supabase.co` is IPv6-only and
-  the runtime Lambda reaches the internet over IPv4. Without `sslmode` the URL
-  gets `sslmode=require&uselibpqcompat=true`; `sslmode=require` alone gets
-  `uselibpqcompat=true`, because node `pg` 8 treats `require` as `verify-full`, which
-  fails on Supabase's own CA. The connection is encrypted, the certificate not verified.
+  the runtime Lambda reaches the internet over IPv4. TLS is enforced: without
+  `sslmode` node `pg` logs in to the pooler in plaintext (measured), so no
+  `sslmode`, `prefer` or `require` is stored as `sslmode=require&uselibpqcompat=true`
+  (node `pg` 8 treats a bare `require` as `verify-full`, which fails on Supabase's
+  own CA); `disable`/`allow` are refused, and `verify-ca`/`verify-full` are kept only
+  with an `sslrootcert`. The connection is encrypted, the certificate not verified.
   After a role's password changes, the pooler kept accepting only the old one for
   about a minute (seen on both ports), so a Test connection right after a
   rotation can fail with `password authentication failed`; retry after a minute.
