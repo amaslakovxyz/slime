@@ -62,7 +62,15 @@ export interface Reply {
     reports?: { key: string; outcome: string; reasons: string[] }[];
     handlers?: { key: string; tier: string; runs: number }[];
     instance?: boolean;
-    events?: { handlerKey: string }[];
+    events?: {
+      handlerKey: string;
+      status?: number;
+      code?: string;
+      route?: string;
+      intent?: string;
+      stopAt?: string;
+      trace?: { layer: string; status: string; note?: string }[];
+    }[];
     total?: number;
   };
 }
@@ -106,6 +114,7 @@ export async function harness({ maxEntries = 8, ttlMs = 30_000, dynamo = new Fak
     runner,
     now: () => clock.now,
     log: () => {},
+    storeClient: dynamo,
     build: async (env, deps) => {
       const id = env.SLIME_TENANT_ID ?? '';
       const runtime = await endpointRuntime(env, { ...deps, storeClient: dynamo, generator: cannedGenerator(CANNED_HANDLERS), log: () => {} });

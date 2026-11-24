@@ -223,7 +223,7 @@ All customer and admin traffic goes to the one `slime-runtime` Function URL. `<i
 | `/ep/<id>/healthz` GET | `slm_` | `{ok, database, …stats}`, 503 when the DB safety check fails; `?fresh=1` re-reads the endpoint's settings first, in the same call (the admin's check after a change) | per instance |
 | `/ep/<id>/v0/handlers` GET, `/ep/<id>/v0/handlers/<key>` DELETE | `slm_` | as today | per instance + DynamoDB |
 | `/ep/<id>/v0/lifecycle` GET | `slm_` | live + saved + Crystal rows, thresholds, warnings | merges this instance's Gas with DynamoDB and S3 |
-| `/ep/<id>/v0/events` GET | `slm_` | recent requests feed | DynamoDB (`events#` items), total from usage: the same on every instance (since 2026-11-22; was per instance) |
+| `/ep/<id>/v0/events` GET | `slm_` | recent requests feed | DynamoDB (`events#` items), total from usage: the same on every instance (since 2026-11-22; was per instance). Read without starting the engine, so it works while the endpoint's database is down (2026-11-24) |
 | `/ep/<id>/v0/crystallize` POST `{keys}` | `slm_` | crystallize reports; this instance swaps its engine at once | writes S3 |
 | `/ep/<id>/v0/reload` POST (new) | `slm_` | drops this instance's cached settings and engine, so the next request reloads | per instance |
 | anything else, including `/healthz` | none possible | 401 `UNAUTHORIZED` | none |
