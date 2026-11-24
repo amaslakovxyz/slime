@@ -120,7 +120,7 @@ const PROVIDER_KEYS = { claude: 'ANTHROPIC_API_KEY', groq: 'GROQ_API_KEY' } as c
 
 /**
  * A warning when the provider that generates has no key: saved and Crystal handlers still
- * serve, but every new request would be sent to the provider with an empty key and fail.
+ * serve, but every new request fails with "No <provider> API key is set." before any call.
  */
 export function missingProviderKey(env: Env): string | undefined {
   const name = PROVIDER_KEYS[env.SLIME_PROVIDER === 'groq' ? 'groq' : 'claude'];

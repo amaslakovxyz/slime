@@ -71,7 +71,7 @@ seconds, and its URL (`http://localhost:87xx/`) is in the Lifecycle tab.
 | `npm run local` | `next dev` and [scripts/local-runner.ts](scripts/local-runner.ts) together; Ctrl+C stops both and every endpoint |
 | `npm run runner` | the runner alone (the local stand-in for the cloud admin flows) |
 | `npm run seed -- <ep-id>` / `-- --owner <email>` | a month of demo usage, for the Usage and Billing charts |
-| `npm test` | unit tests; DynamoDB Local tests skip unless it is up (`REQUIRE_DYNAMO=1` makes that a failure, as in CI) |
+| `npm test` | unit tests; DynamoDB Local and demo Postgres tests skip unless they are up (`REQUIRE_DYNAMO=1` / `REQUIRE_DB=1` make that a failure, as in CI) |
 | `npm run typecheck`, `npm run build` | as CI runs them |
 | `npm run build:lambda` | the Lambda package, see below |
 | `npm run e2e` | Playwright against the local stack, see below |
