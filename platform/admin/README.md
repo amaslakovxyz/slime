@@ -97,8 +97,9 @@ readable tables whose row level security (RLS) shows the role no rows.
   `sslmode` node `pg` logs in to the pooler in plaintext (measured), so no
   `sslmode`, `prefer` or `require` is stored as `sslmode=require&uselibpqcompat=true`
   (node `pg` 8 treats a bare `require` as `verify-full`, which fails on Supabase's
-  own CA); `disable`/`allow` are refused, and `verify-ca`/`verify-full` are kept only
-  with an `sslrootcert`. The connection is encrypted, the certificate not verified.
+  own CA); `disable`/`allow` and `verify-ca`/`verify-full` are refused, and so are
+  `sslrootcert`/`sslcert`/`sslkey`, which node `pg` reads as file paths on the admin
+  and runtime servers. The connection is encrypted, the certificate not verified.
   After a role's password changes, the pooler kept accepting only the old one for
   about a minute (seen on both ports), so a Test connection right after a
   rotation can fail with `password authentication failed`; retry after a minute.

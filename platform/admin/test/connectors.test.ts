@@ -46,15 +46,19 @@ describe('validateConnectionUrl', () => {
     assert.equal(validateConnectionUrl('supabase', `${base}?sslmode=require&uselibpqcompat=false`), stored);
   });
 
-  test('Supabase refuses plaintext modes and certificate checks without a CA', () => {
+  test('Supabase refuses plaintext modes and certificate checks it cannot perform', () => {
     const base = `postgresql://slime_reader.ref123:p@${POOLER}:5432/postgres`;
     invalid('supabase', `${base}?sslmode=disable`, /plaintext/);
     invalid('supabase', `${base}?sslmode=allow`, /plaintext/);
-    invalid('supabase', `${base}?sslmode=verify-full`, /sslrootcert/);
-    assert.equal(
-      validateConnectionUrl('supabase', `${base}?sslmode=verify-full&sslrootcert=/opt/supabase-ca.crt`),
-      `${base}?sslmode=verify-full&sslrootcert=/opt/supabase-ca.crt`,
-    );
+    invalid('supabase', `${base}?sslmode=verify-ca`, /cannot verify/);
+    invalid('supabase', `${base}?sslmode=verify-full`, /cannot verify/);
+  });
+
+  test('Supabase refuses TLS parameters that name files on the server', () => {
+    const base = `postgresql://slime_reader.ref123:p@${POOLER}:5432/postgres`;
+    invalid('supabase', `${base}?sslmode=verify-full&sslrootcert=/etc/passwd`, /sslrootcert is a file path/);
+    invalid('supabase', `${base}?sslcert=/tmp/c.pem`, /sslcert is a file path/);
+    invalid('supabase', `${base}?sslkey=/tmp/k.pem`, /sslkey is a file path/);
   });
 
   test('a malformed percent escape in the user is a form error, not a crash', () => {

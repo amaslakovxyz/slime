@@ -67,7 +67,9 @@ const SUPABASE_POOLER_HOST = /\.pooler\.supabase\.com$/;
  *   pooler in plaintext. `sslmode=require` alone means verify-full in pg 8, which fails
  *   on Supabase's own CA (SELF_SIGNED_CERT_IN_CHAIN), so require/prefer/none become
  *   libpq's require via `uselibpqcompat=true` (encrypted, certificate not verified), as
- *   the test RDS URLs use. verify-ca/verify-full work only with `sslrootcert` (Supabase's CA).
+ *   the test RDS URLs use. verify-ca/verify-full are refused: the CA would have to be a
+ *   file on the admin and the runtime Lambda, and sslrootcert/sslcert/sslkey are refused
+ *   because pg reads them as local file paths on whichever server opens the connection.
  */
 function supabaseUrl(url: string): string {
   let parsed: URL;
@@ -99,15 +101,17 @@ function supabaseUrl(url: string): string {
   if (!/^[^.]+\.[a-z0-9]+$/.test(user)) {
     throw new CodedError('INVALID', 'Supabase pooler user must be <role>.<project-ref>, e.g. slime_reader.abcdefghijklmnopqrst');
   }
+  for (const param of ['sslrootcert', 'sslcert', 'sslkey']) {
+    if (parsed.searchParams.has(param)) {
+      throw new CodedError('INVALID', `${param} is a file path on Slime's servers and is not accepted; remove it`);
+    }
+  }
   const sslmode = parsed.searchParams.get('sslmode');
   if (sslmode === 'disable' || sslmode === 'allow') {
     throw new CodedError('INVALID', `sslmode=${sslmode} sends the password and data in plaintext; remove it and TLS is added`);
   }
   if (sslmode === 'verify-ca' || sslmode === 'verify-full') {
-    if (!parsed.searchParams.has('sslrootcert')) {
-      throw new CodedError('INVALID', `sslmode=${sslmode} needs sslrootcert with Supabase's CA; remove sslmode to use encrypted require`);
-    }
-    return parsed.href;
+    throw new CodedError('INVALID', `Slime cannot verify Supabase's CA yet; remove sslmode=${sslmode} to use encrypted require`);
   }
   parsed.searchParams.set('sslmode', 'require');
   parsed.searchParams.set('uselibpqcompat', 'true');
