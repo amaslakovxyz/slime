@@ -40,6 +40,10 @@ export interface GenerationOutcome {
   record: HandlerRecord;
   execution: Execution;
   usage: ModelUsage;
+  /** Model calls made, repairs included. */
+  attempts: number;
+  /** Checking attempts before the run that answered: every EXPLAIN, and the runs of failed attempts. */
+  checksMs: number;
 }
 
 export interface PreviousAttempt {
@@ -62,8 +66,11 @@ export async function generateHandler(deps: GenerationDeps, { key, request, prev
   let deadline = Date.now() + deps.limits.generationBudgetMs;
   let previous = startingPoint;
   let lastError: SlimeError | undefined;
+  let attempts = 0;
+  let checksMs = 0;
 
   for (let attempt = 0; attempt <= deps.limits.maxRepairs && deadline - Date.now() >= MIN_ATTEMPT_MS; attempt++) {
+    attempts++;
     const attemptNo = attempt + 1;
     const generation = await trace.time(
       'generate',
@@ -73,17 +80,23 @@ export async function generateHandler(deps: GenerationDeps, { key, request, prev
           { timeoutMs: deadline - Date.now() },
         );
         addUsage(usage, result);
-        deadline += result.waitMs; // provider rate-limit waits don't count against the budget
+        deadline += result.waitMs; // waits between provider retries don't count against the budget
         assertSatisfiable(result.artifact);
         return result;
       },
       { attempt: attemptNo, note: (g) => `${g.inputTokens + g.outputTokens} tokens` },
     );
     const { artifact } = generation;
+    const checkStartedAt = performance.now();
     try {
-      const execution = await tryArtifact(deps, artifact, request, trace, attemptNo);
-      return { record: newRecord({ deps, key, request, artifact, paramTypes }), execution, usage };
+      await checkArtifact(deps, artifact, request, trace, attemptNo);
+      const runStartedAt = performance.now();
+      checksMs += runStartedAt - checkStartedAt;
+      const execution = await runArtifact(deps, artifact, request, trace, attemptNo);
+      return { record: newRecord({ deps, key, request, artifact, paramTypes }), execution, usage, attempts, checksMs };
     } catch (error) {
+      // A failed attempt's checks and run are all checking time: the answer comes from a later one.
+      checksMs += performance.now() - checkStartedAt;
       lastError = asSlimeError(error);
       if (FINAL_CODES.has(lastError.code)) throw lastError;
       previous = { artifact, error: repairMessage(lastError) };
@@ -92,7 +105,8 @@ export async function generateHandler(deps: GenerationDeps, { key, request, prev
   throw lastError ?? new SlimeError('GENERATION_TIMEOUT', 'Ran out of generation time budget.', { retryable: true });
 }
 
-async function tryArtifact(deps: GenerationDeps, artifact: Artifact, request: ParsedRequest, trace: Trace, attempt: number): Promise<Execution> {
+/** The checks before an attempt runs: lint, then each SQL step's EXPLAIN cost. */
+async function checkArtifact(deps: GenerationDeps, artifact: Artifact, request: ParsedRequest, trace: Trace, attempt: number): Promise<void> {
   const { sqlSourceName, apiSchemas } = deps;
   const stepCount = artifact.steps.length;
   await trace.time('lint', () => lintSteps(artifact, { sqlSourceName, apiSchemas, input: request.input, maxSteps: deps.limits.maxSteps }), {
@@ -112,6 +126,10 @@ async function tryArtifact(deps: GenerationDeps, artifact: Artifact, request: Pa
       { attempt, note: (all) => `cost ${Math.max(0, ...all.map((c) => c ?? 0))} of ${deps.limits.maxQueryCost}` },
     );
   }
+}
+
+/** The attempt's run, recorded as the execute/shape/output spans. */
+async function runArtifact(deps: GenerationDeps, artifact: Artifact, request: ParsedRequest, trace: Trace, attempt: number): Promise<Execution> {
   try {
     const execution = await executeArtifact(deps, { artifact, output: request.output, input: request.input });
     trace.addExecution(execution, attempt);

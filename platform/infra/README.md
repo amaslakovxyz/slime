@@ -94,10 +94,19 @@ flowchart LR
 - [`platform/control.tf`](platform/control.tf): DynamoDB `slime-control`
   (users, endpoints, usage), written by the admin and (usage only) the runtime.
   No stream.
+- [`platform/alerting.tf`](platform/alerting.tf): nine CloudWatch alarms
+  publishing to `ops-alerts`, the account-wide topic that ex-infra owns and
+  forwards to Telegram (exo-bot) and email. Runtime: Errors (timeouts),
+  handled 500s and `Flush failed` (log metric filters), p99 Duration > 50 s.
+  Admin: Function URL 5xx and p99 Duration. Atlas: Function URL 5xx. Account:
+  claimed concurrency >= `account_concurrency_alarm` (800) and Throttles.
+  Post-deploy CI warns while the topic has no confirmed subscription. The
+  landing has no alarms (cached static page).
 
 Post-deploy CI checks: runtime `/healthz` → 401, unknown endpoint → 404, admin
 `/login` → 200 through CloudFront, a POST through CloudFront is neither 403 nor
-5xx, the landing links to the admin, the bucket and tables exist; then the
+5xx, the landing links to the admin, the bucket and tables exist, and the
+alerts topic has a confirmed subscription (a warning, not a failure); then the
 Playwright cloud smoke (`npm run e2e:cloud` in `platform/admin`) when the
 `SMOKE_EMAIL` / `SMOKE_PASSWORD` repository secrets are set.
 
@@ -118,6 +127,10 @@ put /slime/admin/ADMIN_ALLOWED_EMAILS 'you@example.com,smoke@example.com'   # co
 put /slime/shared/ANTHROPIC_API_KEY '<key>'                                  # only if endpoints use claude
 put /slime/shared/GROQ_API_KEY '<key>'                                       # only if endpoints use groq
 ```
+
+Alarm delivery (Telegram forwarder, email subscription, the bot token in
+SSM `/ex-infra/alerts/`) is set up in ex-infra: `infra/terraform/aws/README.md`
+("Ops alerting"). This repository only publishes to the topic.
 
 The admin loads `/slime/admin/*` at cold start: after changing one, force a
 cold start (update the function configuration or redeploy). The runtime
@@ -209,14 +222,24 @@ Access and lifecycle:
 The CI roles deny anything outside these names, so follow them:
 
 - IAM roles, policies, instance profiles: `slime-*`
+- Every IAM role sets `permissions_boundary` to
+  `arn:aws:iam::<account>:policy/slime-workload-boundary`: the apply role
+  refuses to create a role, or change a role's policies, without it, and the
+  boundary caps the role at the same fences (no foreign data, no IAM writes,
+  no role switching). See [`bootstrap/boundary.tf`](bootstrap/boundary.tf).
 - S3 buckets: `slime-*`; Secrets Manager: `slime-*`; SSM parameters: `/slime/*`
 - Lambda functions and EventBridge rules: `slime-*`; log groups contain `slime-`
 - DynamoDB tables, SQS queues, Kinesis streams, ECR repositories: `slime-*`
   (their data is unreadable to CI otherwise)
 - ACM certificates must carry `Project=slime` (provider `default_tags` does it)
 - Regional services only in `eu-central-1`
-- No changes to `slime-deployer`, `slime-gha-*`, OIDC providers, the state
-  bucket's configuration, or budgets: those belong to `bootstrap/`
+- No changes to `slime-deployer`, `slime-gha-*`, `slime-budgets-action`, the
+  `slime-budget-freeze` and `slime-workload-boundary` policies, OIDC providers,
+  the state bucket's configuration, or budgets: those belong to `bootstrap/`
+- Foreign resources stay read-only to CI: no writes to SSM parameters outside
+  `/slime/*`, no subscription filters or exports on foreign log groups, no
+  changes to foreign SNS topics (publishing and listing subscriptions are
+  allowed, e.g. on ex-infra's `ops-alerts`)
 
 Local run: `AWS_PROFILE=slime terraform -chdir=platform/infra/platform plan`.
 
@@ -226,7 +249,10 @@ The repository is private on GitHub Free: no branch protection and no
 environment reviewers. Any collaborator with write access can push to `main`
 (and so run apply) or open a PR (and so run plan with read-only access to the
 account). The deny fences above keep both roles off non-slime IAM, S3,
-secrets, Lambda, EventBridge, ACM, other regions, and budgets, but read-only
+secrets, Lambda, EventBridge, ACM, other regions, and budgets, and the
+workload boundary keeps every role CI creates inside the same fences (before
+it, a commit on `main` could create an unfenced role and read any SSM
+parameter in the account through a Lambda), but read-only
 metadata elsewhere (e.g. Route 53, Cost Explorer) stays visible to the plan
 role. Closing the gap needs GitHub Pro/Team (protected `main` + an `aws`
 environment with required reviewers) or a separate AWS account.

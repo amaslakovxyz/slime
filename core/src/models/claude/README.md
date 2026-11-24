@@ -37,6 +37,10 @@ dependency `@anthropic-ai/sdk`.
   - a rate limit → `GENERATION_RATE_LIMITED` (retryable);
   - a timeout → `GENERATION_TIMEOUT` (retryable);
   - a 5xx → `GENERATION_FAILED` (retryable).
+- **Retry waits are not model time.** The SDK retries 429s and 5xx itself
+  (`maxRetries`, 1 by default) and sleeps in between. Each call's HTTP
+  requests go through a timing `fetch` (`withOptions`), and the gaps between
+  them are reported as `waitMs`.
 - **Request size.** `max_tokens` is 16 000 per request (non-streaming), and
   the timeout is the one the engine passes per call.
 

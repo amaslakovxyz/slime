@@ -80,7 +80,8 @@ right types and date formats. A result that doesn't match fails with
 | `tier` | `gas` (new, in memory), `liquid` (saved) or `crystal` (code in your app). |
 | `cache` | `miss` (generated now), `hit` or `coalesced` (shared a generation with a concurrent request). |
 | `truncated` | `rowCap` cut the rows; `warnings` then says so too. |
-| `timingsMs` | `total`, `run`, `shape`, and `generate` on a miss. |
+| `timingsMs` | Where the time went, in ms; the parts don't overlap, so `total` minus their sum is only the engine's bookkeeping (a few ms). Always `total`, `run` (the steps of the run that answered) and `shape` (the shaping function). `lookup`: finding the handler in memory, then the store (absent for a Crystal). `queue`: on a miss, waiting for a free generation slot; when `coalesced`, waiting for the shared generation. On a miss: `generate` (model time over every attempt), `providerWait` (waits between provider retries: rate limits, backoff) and `checks` (EXPLAIN of every attempt, plus the runs of attempts that failed). `sandboxWait`: waiting for a sandbox worker, starting one or a free one in a busy pool. |
+| `attempts` | On a miss: the model calls it took, repairs included. |
 | `warnings` | For example, a value written into the intent. |
 | `review` | Where the handler is on its way to Liquid: `none` until it has had enough successful runs (`gasToLiquidRuns`, 3 by default), `pending` while a model reviews it in the background, then `approved` (saved as Liquid) or `rejected`. It changes between calls of one handler; a client can ignore it. |
 | `sql`, `shapeJs`, `assumptions` | What was generated, and how the model read the intent. |

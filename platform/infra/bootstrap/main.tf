@@ -1,4 +1,10 @@
 locals {
+  # Account-wide alerts topic owned by ex-infra (infra/terraform/aws/alerting.tf):
+  # it forwards to Telegram. Budgets and anomalies also email directly, so
+  # money alerts do not depend on that stack; the topic's own email
+  # subscription means those arrive twice by email (rare, accepted).
+  alerts_topic_arn = "arn:aws:sns:${var.region}:${data.aws_caller_identity.current.account_id}:${var.alerts_topic_name}"
+
   tags = {
     Project   = var.project
     ManagedBy = "terraform"
@@ -116,6 +122,7 @@ resource "aws_budgets_budget" "monthly" {
     threshold_type             = "PERCENTAGE"
     notification_type          = "ACTUAL"
     subscriber_email_addresses = var.budget_alert_emails
+    subscriber_sns_topic_arns  = [local.alerts_topic_arn]
   }
 
   notification {
@@ -124,6 +131,7 @@ resource "aws_budgets_budget" "monthly" {
     threshold_type             = "PERCENTAGE"
     notification_type          = "ACTUAL"
     subscriber_email_addresses = var.budget_alert_emails
+    subscriber_sns_topic_arns  = [local.alerts_topic_arn]
   }
 
   notification {
@@ -132,6 +140,7 @@ resource "aws_budgets_budget" "monthly" {
     threshold_type             = "PERCENTAGE"
     notification_type          = "FORECASTED"
     subscriber_email_addresses = var.budget_alert_emails
+    subscriber_sns_topic_arns  = [local.alerts_topic_arn]
   }
 }
 
@@ -167,6 +176,7 @@ resource "aws_budgets_budget" "project" {
     threshold_type             = "ABSOLUTE_VALUE"
     notification_type          = "ACTUAL"
     subscriber_email_addresses = var.budget_alert_emails
+    subscriber_sns_topic_arns  = [local.alerts_topic_arn]
   }
 
   notification {
@@ -175,6 +185,7 @@ resource "aws_budgets_budget" "project" {
     threshold_type             = "ABSOLUTE_VALUE"
     notification_type          = "ACTUAL"
     subscriber_email_addresses = var.budget_alert_emails
+    subscriber_sns_topic_arns  = [local.alerts_topic_arn]
   }
 
   notification {
@@ -183,5 +194,6 @@ resource "aws_budgets_budget" "project" {
     threshold_type             = "ABSOLUTE_VALUE"
     notification_type          = "FORECASTED"
     subscriber_email_addresses = var.budget_alert_emails
+    subscriber_sns_topic_arns  = [local.alerts_topic_arn]
   }
 }

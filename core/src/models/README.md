@@ -42,7 +42,8 @@ Providers, each its own subpath:
    - pick `outputMode`; in `'prompt'` mode, validate the reply with
      `parseJsonReply`;
    - honour `timeoutMs` and `signal`;
-   - report time spent waiting on rate limits as `usage.waitMs`, not `ms`;
+   - report every request's time, retried ones too, as `usage.ms`, and the
+     waits between retries (rate limits, backoff) as `usage.waitMs`;
    - throw `SlimeError`s: `GENERATION_RATE_LIMITED` and `GENERATION_TIMEOUT`
      (retryable), `GENERATION_FAILED` (retryable for a 5xx or a reply with
      wrong fields, final for a bad key or a refusal).

@@ -339,14 +339,16 @@ interface QueryMeta {
   tier: 'gas' | 'liquid' | 'crystal';
   cache: 'hit' | 'miss' | 'coalesced';
   truncated: boolean;                        // rowCap cut the rows
-  timingsMs: { total: number; generate?: number; run: number; shape: number };
+  // The parts don't overlap; total minus their sum is the engine's bookkeeping.
+  timingsMs: { total: number; lookup?: number; queue?: number; generate?: number; providerWait?: number; checks?: number; run: number; sandboxWait?: number; shape: number };
+  attempts?: number;                         // a miss: model calls, repairs included
   warnings: string[];
   review: 'none' | 'pending' | 'approved' | 'rejected';
   sql?: string; shapeJs?: string; assumptions?: string[]; // explore mode only (R9)
 }
 type SlimeEvent =
   | { type: 'generated'; handlerKey: string; sql: string; shapeJs?: string; assumptions: string[]; tokens: number; ms: number }
-  | { type: 'reviewed'; handlerKey: string; verdict: 'approved' | 'rejected'; notes: string }
+  | { type: 'reviewed'; handlerKey: string; verdict: 'approved' | 'rejected'; notes: string; tokens: number; ms: number }
   | { type: 'promoted'; handlerKey: string; tier: 'liquid' }
   | { type: 'warning'; message: string }
   | { type: 'error'; code: string; message: string };

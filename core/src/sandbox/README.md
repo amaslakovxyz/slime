@@ -25,8 +25,12 @@ Files in `quickjs/`:
 ## Interface
 
 - `new QuickJSRunner()`, then `run({ code, rows, input }, { timeoutMs,
-  memoryBytes })`, which resolves to the function's return value or throws
-  `SlimeError('SANDBOX_ERROR')`. `close()` kills every worker.
+  memoryBytes }, stats?)`, which resolves to the function's return value or
+  throws `SlimeError('SANDBOX_ERROR')`. `close()` kills every worker.
+- `stats` (`SandboxStats`, optional): the runner sets `stats.waitMs` to the
+  time it waited for a worker (starting one, or a free one in a busy pool)
+  before the code ran. The engine reports it as `timingsMs.sandboxWait` and
+  takes it out of `shape`. A host's own runner may leave it at 0.
 
 ## Invariants
 

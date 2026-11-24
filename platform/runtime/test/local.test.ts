@@ -227,6 +227,17 @@ describe('endpoint routes', () => {
     }
   });
 
+  test('Server-Timing lists every part of timingsMs, on /v0/query and on the Crystal route', async () => {
+    const timingsMs = { total: 900, lookup: 1, queue: 40, generate: 800, providerWait: 0, checks: 12, run: 5, sandboxWait: 30, shape: 2 };
+    const slime = { ...fakeSlime(), query: async () => ({ data: [{ ok: true }], meta: { ...meta('k1', 'gas'), timingsMs } }) } as unknown as Slime;
+    const app = createApp({ slime, connector, crystal });
+    const expected = 'total;dur=900, lookup;dur=1, queue;dur=40, generate;dur=800, providerWait;dur=0, checks;dur=12, run;dur=5, sandboxWait;dur=30, shape;dur=2';
+    const query = await app.request('/v0/query', { method: 'POST', body: JSON.stringify({ intent: 'x', output: [{ ok: 'boolean' }] }) });
+    assert.equal(query.headers.get('server-timing'), expected);
+    const viaCrystal = await app.request('/v0/e/k1', { method: 'POST', body: JSON.stringify({ input: { limit: 5 } }) });
+    assert.equal(viaCrystal.headers.get('server-timing'), expected);
+  });
+
   test('the Crystal route has the same 16 KB body limit as /v0/query', async () => {
     const queries: unknown[] = [];
     const app = createApp({ slime: fakeSlime(queries), connector, crystal });

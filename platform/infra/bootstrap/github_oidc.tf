@@ -231,6 +231,8 @@ locals {
 }
 
 data "aws_iam_policy_document" "gha_apply_guard" {
+  source_policy_documents = [data.aws_iam_policy_document.gha_foreign_changes.json]
+
   statement {
     sid     = "DenyIamOutsideProject"
     effect  = "Deny"
@@ -244,15 +246,91 @@ data "aws_iam_policy_document" "gha_apply_guard" {
     ]
   }
 
+  # Everything bootstrap owns in IAM. slime-budgets-action is here because CI
+  # could otherwise rewrite its trust and inline policy, assume it, and detach
+  # this very guard from slime-gha-apply; the two policies because rewriting
+  # them would empty the freeze or the workload boundary.
   statement {
     sid     = "DenyBootstrapIdentities"
     effect  = "Deny"
     actions = local.iam_write_actions
     resources = [
       aws_iam_role.deployer.arn,
+      aws_iam_role.budgets_action.arn,
       "${local.account_arn}:role/${var.project}-gha-*",
       "${local.account_arn}:oidc-provider/*",
+      aws_iam_policy.budget_freeze.arn,
+      local.workload_boundary_arn,
     ]
+  }
+
+  # Every role CI creates, or whose permissions it changes, must carry the
+  # workload boundary (boundary.tf). iam:PermissionsBoundary is the role's
+  # boundary after the call; a role without one fails the check, so an
+  # unbounded role can be given the boundary but nothing else.
+  statement {
+    sid       = "RequireWorkloadBoundary"
+    effect    = "Deny"
+    actions   = ["iam:CreateRole", "iam:PutRolePolicy", "iam:AttachRolePolicy", "iam:PutRolePermissionsBoundary"]
+    resources = ["*"]
+
+    condition {
+      test     = "StringNotEquals"
+      variable = "iam:PermissionsBoundary"
+      values   = [local.workload_boundary_arn]
+    }
+  }
+
+  statement {
+    sid       = "KeepWorkloadBoundary"
+    effect    = "Deny"
+    actions   = ["iam:DeleteRolePermissionsBoundary"]
+    resources = ["*"]
+  }
+}
+
+# Changes to resources outside the project, denied to slime-gha-apply and to
+# every bounded workload role (boundary.tf): kept apart from the IAM
+# statements above so the boundary stays under IAM's 6,144-character limit
+# (it denies all IAM writes anyway).
+data "aws_iam_policy_document" "gha_foreign_changes" {
+  # Foreign SSM parameters: no overwrite or delete (e.g. swapping another
+  # project's bot token for one CI controls). Reads are fenced in project-scope.
+  statement {
+    sid    = "DenyForeignParameterWrites"
+    effect = "Deny"
+    actions = [
+      "ssm:PutParameter", "ssm:DeleteParameter", "ssm:DeleteParameters", "ssm:LabelParameterVersion",
+      "ssm:UnlabelParameterVersion", "ssm:AddTagsToResource", "ssm:RemoveTagsFromResource",
+    ]
+    not_resources = ["arn:aws:ssm:*:*:parameter/${var.project}/*"]
+  }
+
+  # Streaming or exporting a foreign log group is a read by another route.
+  statement {
+    sid    = "DenyForeignLogExport"
+    effect = "Deny"
+    actions = [
+      "logs:PutSubscriptionFilter", "logs:DeleteSubscriptionFilter", "logs:CreateExportTask",
+      "logs:Unmask", "logs:DeleteLogGroup", "logs:PutRetentionPolicy",
+    ]
+    not_resources = [
+      "arn:aws:logs:*:*:log-group:*${var.project}-*",
+      "arn:aws:logs:*:*:log-group:*${var.project}-*:*",
+    ]
+  }
+
+  # Foreign topics (e.g. ex-infra's account-wide ops-alerts): CI may publish to
+  # them and list their subscriptions, never reroute or delete them.
+  statement {
+    sid    = "DenyForeignTopicChanges"
+    effect = "Deny"
+    actions = [
+      "sns:DeleteTopic", "sns:SetTopicAttributes", "sns:AddPermission", "sns:RemovePermission",
+      "sns:Subscribe", "sns:Unsubscribe", "sns:SetSubscriptionAttributes", "sns:PutDataProtectionPolicy",
+      "sns:TagResource", "sns:UntagResource",
+    ]
+    not_resources = ["arn:aws:sns:*:*:${var.project}-*"]
   }
 
   statement {

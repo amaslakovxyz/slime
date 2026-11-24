@@ -52,9 +52,14 @@ data "aws_iam_policy_document" "lambda_trust" {
   }
 }
 
+data "aws_caller_identity" "current" {}
+
+# Required on every role this stack creates: the CI apply role refuses to
+# create or change a role without it (bootstrap/boundary.tf).
 resource "aws_iam_role" "landing" {
-  name               = local.name
-  assume_role_policy = data.aws_iam_policy_document.lambda_trust.json
+  name                 = local.name
+  assume_role_policy   = data.aws_iam_policy_document.lambda_trust.json
+  permissions_boundary = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/${var.project}-workload-boundary"
 }
 
 resource "aws_cloudwatch_log_group" "landing" {

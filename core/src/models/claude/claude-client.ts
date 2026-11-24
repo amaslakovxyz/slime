@@ -36,9 +36,10 @@ export function claudeClient({ apiKey, model, effort, maxRetries = DEFAULT_MAX_R
       // JS callers may pass an unset env var, so undefined counts as missing too.
       if (!apiKey?.trim()) throw new SlimeError('GENERATION_FAILED', 'No Claude API key is set.');
       const startedAt = performance.now();
+      const timer = requestTimer();
       let response;
       try {
-        response = await client.beta.messages.parse(
+        response = await client.withOptions({ fetch: timer.fetch }).beta.messages.parse(
           {
             model,
             max_tokens: MAX_TOKENS,
@@ -59,10 +60,35 @@ export function claudeClient({ apiKey, model, effort, maxRetries = DEFAULT_MAX_R
       if (response.stop_reason === 'max_tokens' || !response.parsed_output) {
         throw new SlimeError('GENERATION_FAILED', `${call.label}: the model returned an incomplete reply.`, { retryable: true });
       }
-      const usage = { ms: performance.now() - startedAt, waitMs: 0, inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens };
+      const waitMs = timer.waitMs();
+      const usage = { ms: performance.now() - startedAt - waitMs, waitMs, inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens };
       return { value: response.parsed_output, usage };
     },
   };
+}
+
+interface RequestTimer {
+  fetch: typeof fetch;
+  /** The gaps between one call's HTTP requests: the SDK's backoff before each retry. */
+  waitMs: () => number;
+}
+
+// The SDK retries 429s and 5xx itself (maxRetries) and sleeps in between; the time between one
+// request's response and the next request is that sleep, so it is reported as a wait, not model time.
+function requestTimer(): RequestTimer {
+  let lastEndedAt: number | undefined;
+  let waitMs = 0;
+  const timedFetch = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+    const startedAt = performance.now();
+    if (lastEndedAt !== undefined) waitMs += startedAt - lastEndedAt;
+    try {
+      // Read at call time, as the SDK reads it at build time: tests stub globalThis.fetch.
+      return await globalThis.fetch(input, init);
+    } finally {
+      lastEndedAt = performance.now();
+    }
+  };
+  return { fetch: timedFetch as typeof fetch, waitMs: () => waitMs };
 }
 
 function toSlimeError(error: unknown, label: string): SlimeError {

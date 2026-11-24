@@ -184,11 +184,22 @@ components:
         truncated: { type: boolean }
         timingsMs:
           type: object
+          description: >
+            Where the time went, in ms. The parts don't overlap: total minus
+            their sum is only the engine's bookkeeping (a few ms).
           properties:
             total: { type: number }
-            run: { type: number }
-            shape: { type: number }
-            generate: { type: number, description: on a miss }
+            lookup: { type: number, description: finding the handler (memory, then the store); absent for a Crystal }
+            queue: { type: number, description: "miss: waiting for a generation slot; coalesced: waiting for the shared generation" }
+            generate: { type: number, description: "miss: model time over every attempt" }
+            providerWait: { type: number, description: "miss: waits between provider retries (rate limits, backoff)" }
+            checks: { type: number, description: "miss: EXPLAIN of every attempt plus the runs of failed attempts" }
+            run: { type: number, description: the steps of the run that answered }
+            sandboxWait: { type: number, description: waiting for a sandbox worker (start or busy pool) }
+            shape: { type: number, description: the shaping function itself }
+        attempts:
+          type: integer
+          description: "miss only: model calls it took, repairs included"
         warnings:
           type: array
           items: { type: string }

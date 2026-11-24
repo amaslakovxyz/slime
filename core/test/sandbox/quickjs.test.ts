@@ -48,6 +48,19 @@ describe('shaping sandbox (C3)', () => {
     assert.deepEqual(doubled, [2, 4, 6, 8, 10]);
   });
 
+  test("reports the wait for a worker: a cold start, then next to nothing", async () => {
+    const fresh = new QuickJSRunner();
+    try {
+      const [cold, warm] = [{ waitMs: 0 }, { waitMs: 0 }];
+      await fresh.run({ code: 'function shape(rows) { return rows }', rows: [], input: {} }, LIMITS, cold);
+      await fresh.run({ code: 'function shape(rows) { return rows }', rows: [], input: {} }, LIMITS, warm);
+      assert.ok(cold.waitMs > warm.waitMs, `cold ${cold.waitMs} ms, warm ${warm.waitMs} ms`);
+      assert.ok(warm.waitMs < 5, `warm ${warm.waitMs} ms`);
+    } finally {
+      await fresh.close();
+    }
+  });
+
   test('reports a shaping function that returns nothing', async () => {
     assert.match((await sandboxFailure('function shape() {}')).message, /returned nothing/);
   });
