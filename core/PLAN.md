@@ -1,6 +1,6 @@
 # @slime-cloud/core: library plan
 
-* **Status:** draft. M0 to M3 and M5 are done. M4, M6 and M7 are built: M4 and M6 wait for runs against a real model (M4's was done through the example app), and M7 waits for the runtime owner to run the handler copy and deploy. `sandbox/` is deleted.
+* **Status:** draft. M0 to M3, M5 and M7 are done. M4 and M6 are built and wait for runs against a real model (M4's was done through the example app). M7's runtime deploys from `main`; its handler copy was removed on 2026-11-24. `sandbox/` is deleted.
 * **Date:** 2026-11-20 (review fixes and follow-ups 2026-11-21)
 * **Owner:** Konstantin (core only; server and Slime Cloud are owned by others)
 
@@ -438,7 +438,7 @@ goal. Before a milestone starts, its row gets the files it creates or changes
 | M4 | **Models and Liquid.** Claude and Groq generators and reviewers with prompts updated for §4 (nullable parameters, the dictionary); the review loop; promotion to Liquid (rule below); `reviewed` and `promoted` events. | Review and promotion tests pass; one live run against Groq or Claude (`npm run bench` with `GROQ_API_KEY` or `ANTHROPIC_API_KEY`). | built; live run pending |
 | M5 | **Crystal.** Serving from an imported registry; the crystallize job writing `.mjs` modules with a generated index; the `check` command. | `crystal*.test.ts` ported; a hand-edited Crystal file fails `check`; the output passes the equivalence test. | done |
 | M6 | **Use it as a package, and retire `sandbox/`.** An example app that installs the packed tarball and calls `slime.query()` from an endpoint; docs for the request format; the bench ported to run on core. The example takes over what `sandbox/` still provides: the demo server, the demo database (`db/init.sql` and its Docker Compose file, used by core's tests and CI) and the offline handlers. Then `sandbox/` is deleted, with its CI job. Publishing to npm is not part of v1. | The example (`examples/express`, its own lockfile, run in CI from the packed tarball) answers a query. The bench, ported to `core/bench/`, gets the 5 cases recorded as correct in `docs/product/concepts_brief.md` right, and refuses the 2 unsafe ones. Core's tests and CI use the moved demo database. `sandbox/` and its CI job are gone. | built; bench with a model pending |
-| M7 | **Switch `platform/runtime` to the package** (with its owner). Drop the path mapping to `sandbox/src`; build the engine with `createSlime(new SlimeConfig(…))`; replace `DynamoHandlerStore` with a `SlimeStore` over the existing table that serves the items already there; keep `slime.flush()` before each response (C15). After the switch nothing compiles `sandbox/src`, so M6 can delete `sandbox/`. | The runtime's tests pass on the package; a deployed function answers from handlers stored by the new store. Handlers saved before the switch are still served. The previous deploy can be restored. | built; handler copy and deploy pending (runtime owner) |
+| M7 | **Switch `platform/runtime` to the package** (with its owner). Drop the path mapping to `sandbox/src`; build the engine with `createSlime(new SlimeConfig(…))`; replace `DynamoHandlerStore` with a `SlimeStore` over the existing table that serves the items already there; keep `slime.flush()` before each response (C15). After the switch nothing compiles `sandbox/src`, so M6 can delete `sandbox/`. | The runtime's tests pass on the package; a deployed function answers from handlers stored by the new store. Handlers saved before the switch are still served. The previous deploy can be restored. | done; deployed from `main`, handler copy removed 2026-11-24 |
 | M8 | **Multi-source handlers** (MS1–MS17, [docs/multi-source.md](docs/multi-source.md)): `sources` config, the `ApiSource` port, v2 step handlers, the step executor, `defineApiSource`, the constrained HTTP client, `@slime-cloud/core/notion`, `examples/multi-source`. | v1 pins unchanged; contract, security (S1–S10) and engine tests pass in CI; the example answers three demo intents on recorded responses; one live run against seeded Notion and a real model. | built and merged (PR #26, experimental); real Notion fixtures recorded; the live run (P6.5) and runtime wiring pending |
 
 **M2 engine rules.** `createSlime()` awaits `connector.safetyCheck()` (unsafe
@@ -558,10 +558,12 @@ review.
   runtime read, so the SSM parameters don't change.
 * **Store:** `DynamoSlimeStore` on the existing table, with sort keys
   `<ns>#<key>`. The core's store contract runs against it.
-* **Handler copy:** `npm run migrate` copies the sandbox runtime's Liquid
+* **Handler copy:** `npm run migrate` copied the sandbox runtime's Liquid
   handlers into the core's format (request key, coarse types, inputs-only
   fixtures). The old items are left as they are, so rolling back means
-  redeploying the previous bundle.
+  redeploying the previous bundle. **Removed 2026-11-24:** copied handlers
+  carried the sandbox's provenance, which never matches, so each was
+  generated again on its next request; the copy bought nothing.
 * **The Lambda flush is capped:** it waits up to `SLIME_FLUSH_LIMIT_MS`
   (5 s by default), because `flush()` now waits for reviews too and the
   function times out at 30 s.
@@ -599,10 +601,8 @@ the core; terraform triggers on `core/**`); core
   `query()` lets any client read any row `slime_reader` can see. The README
   and the example app follow R11.
 * **The deployed runtime still runs the sandbox engine until M7 is deployed.**
-  The code on this branch is switched and `sandbox/` is deleted, but the
-  live Lambda keeps the old bundle until the handler copy runs and the
-  platform stack is applied. Until then it serves the old items, which the
-  copy leaves untouched.
+  **Resolved:** `terraform.yml` deploys the runtime built from core on every
+  push to `main`.
 * **The worker file in a built package.** The worker is written in TS so tsc
   emits it. It is resolved with `new URL('./shape-worker.js',
   import.meta.url)`, and `check-pack.mjs` requires it from M2.

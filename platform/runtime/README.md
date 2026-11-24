@@ -31,7 +31,6 @@ replace the `file:` path with a version; nothing else changes.
 | [src/live-runs.ts](src/live-runs.ts) | Copies live Liquid run counts to the store (the core saves a handler only when it turns Liquid): before Crystallize, when an engine closes (shutdown, eviction, replacement), and at most every `SLIME_RUNS_SYNC_MS` (default 60 s) on flush |
 | [src/store-dynamodb.ts](src/store-dynamodb.ts) | The core's `SlimeStore` Port on the existing table; one partition per endpoint |
 | [src/usage.ts](src/usage.ts) | Daily usage counters (`USAGE#<endpoint>` / `YYYY-MM-DD` in `SLIME_USAGE_TABLE`): requests and latency per tier, generations, LLM tokens, handler snapshot per tier. `USAGE_ATTRIBUTES` lists every attribute written; the runtime role's IAM condition (`platform/infra/platform/runtime.tf`) mirrors it |
-| [src/legacy-handlers.ts](src/legacy-handlers.ts), [src/migrate-cli.ts](src/migrate-cli.ts) | One-off copy of the sandbox runtime's handlers into the core's format |
 | [scripts/build.mjs](scripts/build.mjs) | Deterministic bundle into `dist/lambda/` (same source, same zip hash), handler `index.handler` |
 | `test/canned-handlers.json` | Canned handlers the tests and the local admin E2E use instead of a model |
 
@@ -128,32 +127,9 @@ runner's restart loads it).
 No longer read: `META_DATABASE_URL`, `SLIME_META_TABLE`, `SLIME_THINKING`,
 `SLIME_SSM_PREFIX`.
 
-## Switching a deployed runtime to the core (M7)
-
-1. **Copy the handlers.** The new store keeps items under sort keys
-   `handlers#<request key>`. Items the sandbox runtime wrote have no `#`, so
-   they are left alone, and the previous deploy can still serve them after a
-   rollback. Copy them once before deploying, with credentials that may
-   Query, GetItem and PutItem on the table:
-
-   ```sh
-   SLIME_HANDLERS_TABLE=slime-handlers SLIME_TENANT_ID=<tenant> npm run migrate -- --dry-run
-   SLIME_HANDLERS_TABLE=slime-handlers SLIME_TENANT_ID=<tenant> npm run migrate
-   ```
-
-   Keys collide when the sandbox had several versions of one request (other
-   input types or scopes); the version with most runs is kept.
-2. **Deploy.** `platform/infra/platform` now lets the function Query, GetItem,
-   PutItem and DeleteItem (`UpdateItem` is no longer used).
-3. **Roll back** by redeploying the previous bundle: it reads the untouched
-   sandbox items.
-
-Migrated handlers record the sandbox's scope as their provenance, which never
-matches (the sandbox had no dictionary), so each one is generated again on its
-next request. Every endpoint generates on a miss; there is no serve-only mode.
-
 ## Behavior
 
+* Every endpoint generates on a miss; there is no serve-only mode.
 * Every endpoint route needs `x-api-key`: the endpoint key, or a Crystal's own
   token on that Crystal's route. An endpoint with no key configured refuses
   everything.

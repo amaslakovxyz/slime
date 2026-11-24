@@ -25,8 +25,7 @@ each one a status (Current, Design, Vision, Plan, Record, Superseded).
   the engine as an installable library. It replaced the `sandbox/` prototype,
   which was deleted in M6 (it is in git history).
   [PLAN.md](./core/PLAN.md) holds the decisions and milestones:
-  M0–M3 and M5 done; M4, M6 and M7 built (real-model runs and the runtime's
-  handler copy pending).
+  M0–M3, M5 and M7 done; M4 and M6 built (real-model runs pending).
   An npm workspace. Never imports `platform/`.
 - [crystal/](./crystal/README.md) - `@slime-cloud/crystal`, the build-time
   side of Crystal: the crystallize job, typed service methods and the

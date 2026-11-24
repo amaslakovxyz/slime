@@ -4,8 +4,7 @@
 // LeadingKeys condition can fence a tenant), sort key `artifactKey` set to
 // `${ns}#${key}`, and the value as a JSON string so nested shapes never meet
 // DynamoDB's type rules. Items the sandbox engine wrote have sort keys with
-// no '#'; they are never listed here, so a rollback to the old runtime still
-// finds them (see legacy-handlers.ts for copying them over).
+// no '#'; they are never listed or served here.
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DeleteCommand, DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import type { SlimeStore, StoreEntry } from '@slime-cloud/core';
