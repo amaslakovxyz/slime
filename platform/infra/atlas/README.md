@@ -63,7 +63,8 @@ AWS_PROFILE=slime terraform apply
 
 The page can only send a panel id and one of the panel's offered values; intent and
 output are fixed on the server. Every request therefore hits an existing Liquid handler
-or the Crystal and spends no model tokens. The worst case is Lambda and RDS reads.
+or the Crystal and spends no model tokens. The worst case is Lambda and database reads
+(the Supabase test project, see [../README.md](../README.md#supabase-test-project-not-in-terraform)).
 
 Stop all traffic: `aws lambda put-function-concurrency --function-name slime-atlas --reserved-concurrent-executions 0`.
 Restore: `aws lambda delete-function-concurrency --function-name slime-atlas`.

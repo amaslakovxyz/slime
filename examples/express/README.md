@@ -11,7 +11,9 @@ An Express app with three endpoints: Slime (`POST /slime`), crystallize
 - Crystallize the handlers you rely on, so production serves reviewed code.
 
 It also holds the demo database (`db/init.sql` and `docker-compose.yml`) that
-core's tests and CI use.
+core's tests and CI use. `scripts/load-supabase.sh` loads the same data into the
+Supabase test project that the cloud `atlas-demo` endpoint reads
+([platform/infra](../../platform/infra/README.md#supabase-test-project-not-in-terraform)).
 
 ## Interface
 
