@@ -188,15 +188,22 @@ describe('endpoint routes', () => {
     const res = await app.request('/v0/e/k1', { method: 'POST', body: JSON.stringify({ input: { limit: 5 } }) });
     assert.equal(res.status, 200);
     assert.deepEqual(queries[0], { intent: 'accounts per plan', input: { limit: 5 }, output: [{ plan: 'string' }] });
-    assert.equal((await events.list()).events[0]?.route, 'crystal');
+    const [e] = (await events.list()).events;
+    assert.equal(e?.route, 'crystal');
+    assert.equal(e?.intent, 'accounts per plan');
+    assert.match(e?.trace?.[0]?.note ?? '', /^Crystal token/);
   });
 
   test('a Crystal call without one of its inputs is a 400 that names them', async () => {
-    const app = createApp({ slime: fakeSlime(), connector, crystal });
+    const events = new RecentRequests();
+    const app = createApp({ slime: fakeSlime(), connector, crystal, events });
     const res = await app.request('/v0/e/k1', { method: 'POST', body: JSON.stringify({ input: {} }) });
     assert.equal(res.status, 400);
     const { error } = (await res.json()) as { error: { message: string } };
     assert.match(error.message, /takes input: limit \(number\)\. Missing: limit\./);
+    const [e] = (await events.list()).events;
+    assert.equal(e?.code, 'INVALID_REQUEST');
+    assert.equal(e?.stopAt, 'key');
   });
 
   test('a Crystal call with an unknown input name is a 400 and never reaches the engine', async () => {

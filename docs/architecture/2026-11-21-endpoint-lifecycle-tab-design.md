@@ -74,6 +74,12 @@ MVP design (L20–L23).
 | L23 | Gas rows and live run counts are per Lambda instance in the cloud, so the cloud Lifecycle view is approximate. The live feed (`/v0/events`) moved to the store on 2026-11-22 and is the same on every instance. | Durable counters and a shared feed need a store; out of scope for the MVP. |
 | L24 | The stage rail became an interactive diagram (2026-11-22): Connected → Gas → Liquid → Crystal with clickable stages and arrows, and a side panel that explains the selection (storage and model tokens as icon chips, handlers / recent requests / mean engine time, the handlers in it; for an arrow its steps, how many are on the way and ready, and a jump to Crystallize). Icon-led: each fact is an icon and a word, the full sentence is its tooltip and accessible name, and each transition rule is shown once, on its arrow. The panel follows the current stage until the operator picks one; the pick is client state and survives the 2 s poll. Crystal is ice-blue (`#8FD3FF`) across the admin, as on the landing page. | The rail showed four ticks without Gas, mixed setup steps with handler tiers, and did not render the notes `stagesOf` computed; the lavender Crystal read almost white. |
 
+Since 2026-11-22 the feed also carries each request's layer trace and the
+refused requests (status, code, stop layer); see
+[2026-11-22-request-trace-drawer-design.md](2026-11-22-request-trace-drawer-design.md).
+Because Gas handlers live per instance (L23), a generation event keeps its own
+code, and `GET /v0/handlers/:key/code` serves the code behind a hit.
+
 ## 4. Components
 
 ### 4.1 Runtime (`platform/runtime`)

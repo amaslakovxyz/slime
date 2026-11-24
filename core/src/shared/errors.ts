@@ -1,4 +1,5 @@
 // Each code has a fixed HTTP status, so an endpoint can answer with err.status and err.toJSON() (C9).
+import type { LayerSpan } from './trace.js';
 
 const STATUS_BY_CODE = {
   INVALID_REQUEST: 400,
@@ -38,6 +39,10 @@ export class SlimeError extends Error {
   readonly status: number;
   readonly retryable: boolean;
   readonly details: Record<string, unknown> | undefined;
+  /** The layers this request passed before it failed (request trace T3). Set by the engine; never in toJSON(). */
+  trace?: LayerSpan[];
+  /** The request's handler key, when it was computed before the failure. */
+  handlerKey?: string;
 
   constructor(
     readonly code: ErrorCode,

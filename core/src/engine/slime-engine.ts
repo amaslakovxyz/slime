@@ -27,6 +27,7 @@ import { queryMeta, type ResolveTimings } from './meta.js';
 import { reviewUntilSettled, type ReviewOutcome } from './generation/review-loop.js';
 import type { CacheOutcome, HandlerSummary, QueryResult, Slime, SlimeStats } from './types.js';
 import type { HandlerRecord } from '../handler/record.js';
+import { Trace, traceReview } from './trace.js';
 
 export interface EngineParts {
   config: SlimeConfig;
@@ -134,26 +135,34 @@ export class SlimeEngine implements Slime {
 
   async #answer(raw: unknown): Promise<QueryResult> {
     const startedAt = performance.now();
-    const request = parseRequest(raw);
-    const key = requestKey(request);
-    const crystal = this.#parts.config.crystal ? this.#parts.config.crystal[key] : undefined;
-    let fallbackWarning: string | undefined;
-    if (crystal) {
-      try {
-        return await answerFromCrystal(this.#parts, { key, crystal, request, startedAt });
-      } catch (error) {
-        if (!isCrystalDrift(error)) throw error;
-        fallbackWarning = this.#crystalFailed(key, error);
+    const trace = new Trace();
+    let key: string | undefined;
+    try {
+      const request = await trace.time('key', () => parseRequest(raw), { note: (r) => inputsNote(r.input) });
+      key = requestKey(request);
+      const crystal = this.#parts.config.crystal ? this.#parts.config.crystal[key] : undefined;
+      let fallbackWarning: string | undefined;
+      let routePrefix = '';
+      if (crystal) {
+        try {
+          return await answerFromCrystal(this.#parts, { key, crystal, request, startedAt, trace });
+        } catch (error) {
+          if (!isCrystalDrift(error)) throw error;
+          fallbackWarning = this.#crystalFailed(key, error);
+          routePrefix = `Crystal failed (${error.code}) → `;
+          trace.spans.length = 1; // keep only the key span; the fallback's route reads cleanly
+        }
       }
+      const { record, cache, firstRun, timings } = await this.#resolve(key, request, trace, routePrefix);
+      const execution = firstRun ?? (await this.#runSaved(record, request.input, trace));
+      const { tier, review, artifact, intent } = record;
+      this.#traceAfterRun(trace, record, cache);
+      const meta = queryMeta({ handlerKey: key, tier, cache, review, execution, code: { sql: sqlOf(artifact), shapeJs: artifact.shapeJs, assumptions: artifact.assumptions }, intent, totalMs: performance.now() - startedAt, resolve: timings, trace: trace.spans });
+      if (fallbackWarning) meta.warnings.push(fallbackWarning);
+      return { data: execution.data, meta };
+    } catch (error) {
+      throw trace.attach(error, key);
     }
-
-    const { record, cache, firstRun, timings } = await this.#resolve(key, request);
-    const execution = firstRun ?? (await this.#runSaved(record, request.input));
-    const { tier, review, artifact, intent } = record;
-    const code = { sql: sqlOf(artifact), shapeJs: artifact.shapeJs, assumptions: artifact.assumptions };
-    const meta = queryMeta({ handlerKey: key, tier, cache, review, execution, code, intent, totalMs: performance.now() - startedAt, resolve: timings });
-    if (fallbackWarning) meta.warnings.push(fallbackWarning);
-    return { data: execution.data, meta };
   }
 
   /** The note for meta.warnings; the warning event goes out once per key. */
@@ -168,27 +177,41 @@ export class SlimeEngine implements Slime {
 
 
 
-  async #resolve(key: string, request: ParsedRequest): Promise<ResolvedHandler> {
+  async #resolve(key: string, request: ParsedRequest, trace: Trace, routePrefix: string): Promise<ResolvedHandler> {
     const lookupStartedAt = performance.now();
     const found = await this.#cache.find(key);
     const lookupMs = performance.now() - lookupStartedAt;
-    if (found) return { record: found, cache: 'hit', timings: { lookupMs } };
+    if (found) {
+      trace.add('route', 'pass', { note: `${routePrefix}cache hit · ${found.tier}` });
+      return { record: found, cache: 'hit', timings: { lookupMs } };
+    }
     const waitStartedAt = performance.now();
-    const { promise, isShared } = this.#generations.run(key, () => this.#generate(this.#parts.config.generator, key, request));
+    const { promise, isShared } = this.#generations.run(key, () => this.#generate(this.#parts.config.generator, key, request, trace, routePrefix));
+    if (isShared) {
+      trace.add('route', 'pass', { note: `${routePrefix}same request already generating → joined it` });
+      trace.add('limits', 'skip', { note: 'joined a generation in flight' });
+      const outcome = await promise;
+      // A follower's whole wait is queue time: it runs the handler itself afterwards.
+      const queueMs = performance.now() - waitStartedAt;
+      trace.add('generate', 'skip', { ms: queueMs, note: "waited for the same request's generation" });
+      trace.add('lint', 'skip', { note: 'checked in the shared generation' });
+      trace.add('cost', 'skip', { note: 'checked in the shared generation' });
+      return { record: outcome.record, cache: 'coalesced', timings: { lookupMs, queueMs } };
+    }
     const outcome = await promise;
-    // A follower's whole wait is queue time: it runs the handler itself afterwards.
-    if (isShared) return { record: outcome.record, cache: 'coalesced', timings: { lookupMs, queueMs: performance.now() - waitStartedAt } };
     const { usage, attempts, checksMs, queueMs } = outcome;
     const generation = { modelMs: usage.ms, providerWaitMs: usage.waitMs, checksMs, attempts };
     return { record: outcome.record, cache: 'miss', firstRun: outcome.execution, timings: { lookupMs, queueMs, generation } };
   }
 
-  async #generate(generator: Generator, key: string, request: ParsedRequest): Promise<QueuedGeneration> {
+  async #generate(generator: Generator, key: string, request: ParsedRequest, trace: Trace, routePrefix: string): Promise<QueuedGeneration> {
+    trace.add('route', 'pass', { note: `${routePrefix}cache miss → generate` });
+    const { maxGenerationsPerHour } = this.#parts.config.limits;
     const queueStartedAt = performance.now();
-    const releaseSlot = await this.#limits.acquire();
+    const releaseSlot = await trace.time('limits', () => this.#limits.acquire(), { note: () => `${this.#limits.generationsThisHour} of ${maxGenerationsPerHour} this hour` });
     const queueMs = performance.now() - queueStartedAt;
     try {
-      const outcome = await generateHandler(generationDeps(this.#parts, generator), { key, request });
+      const outcome = await generateHandler(generationDeps(this.#parts, generator), { key, request, trace });
       this.#cache.addGas(outcome.record);
       this.#emit(generatedEvent(outcome.record, outcome.usage));
       this.#promotion.afterRun(outcome.record);
@@ -198,13 +221,32 @@ export class SlimeEngine implements Slime {
     }
   }
 
-  async #runSaved(record: HandlerRecord, input: InputValues): Promise<Execution> {
-    record.paramTypes = checkParamTypes(record.paramTypes, input);
-    const execution = await executeArtifact(executionDeps(this.#parts), { artifact: record.artifact, output: record.output, input });
-    this.#promotion.recordRun(record, input);
-    return execution;
+  async #runSaved(record: HandlerRecord, input: InputValues, trace: Trace): Promise<Execution> {
+    if (!trace.spans.some((s) => s.layer === 'generate')) {
+      trace.add('limits', 'skip', { note: 'no model call' });
+      trace.add('generate', 'skip', { note: `code written ${record.createdAt.slice(0, 10)}` });
+      trace.add('lint', 'skip', { note: 'checked when generated' });
+      trace.add('cost', 'skip', { note: 'checked when generated' });
+    }
+    try {
+      record.paramTypes = checkParamTypes(record.paramTypes, input);
+      const execution = await executeArtifact(executionDeps(this.#parts), { artifact: record.artifact, output: record.output, input });
+      trace.addExecution(execution);
+      this.#promotion.recordRun(record, input);
+      return execution;
+    } catch (error) {
+      trace.fail(error);
+      throw error;
+    }
   }
 
+  /** The cache and review spans, after the run counted. */
+  #traceAfterRun(trace: Trace, record: HandlerRecord, cache: CacheOutcome): void {
+    const { gasToLiquidRuns, crystalReadyRuns } = this.#parts.config.tiers;
+    const progress = record.tier === 'liquid' ? `${record.runs} of ${crystalReadyRuns} runs to Crystal-ready` : `${record.runs} of ${gasToLiquidRuns} runs to Liquid`;
+    trace.add('cache', 'pass', { note: cache === 'miss' ? `kept as Gas · ${progress}` : progress });
+    traceReview(trace, record.review, Boolean(this.#parts.config.reviewer), gasToLiquidRuns);
+  }
 
   #reviewFunction(): ((record: HandlerRecord) => Promise<ReviewOutcome>) | undefined {
     const { generator, reviewer, limits } = this.#parts.config;
@@ -216,4 +258,9 @@ export class SlimeEngine implements Slime {
   #emit(event: SlimeEvent): void {
     emitSafely(this.#parts.config.onEvent, event);
   }
+}
+
+function inputsNote(input: InputValues): string {
+  const names = Object.keys(input);
+  return names.length ? `inputs: ${names.join(', ')}` : 'no inputs';
 }

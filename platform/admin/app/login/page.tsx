@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { login, signup } from '@/app/actions';
-import { currentUser } from '@/lib/auth';
+import { sessionUser } from '@/lib/auth';
 
 const ERRORS: Record<string, string> = {
   invalid: 'Wrong email or password',
@@ -14,7 +14,7 @@ const ERRORS: Record<string, string> = {
 // fields to signup. Kept as an explicit choice instead of auto-creating an
 // account on unknown email, so a typo in the email cannot open a new account.
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  if (await currentUser()) redirect('/');
+  if (await sessionUser()) redirect('/');
   const { error } = await searchParams;
   const message = error ? ERRORS[error] : undefined;
   return (

@@ -5,16 +5,41 @@
 // endpoint's store, so every instance serves the same feed: the cloud runtime is one
 // Lambda with several warm instances, and a per-process feed made each admin poll show
 // whichever instance answered it (0 on a fresh one, another count on the next poll).
-import type { QueryMeta, SlimeStore } from '@slime-cloud/core';
+import type { LayerId, LayerSpan, QueryMeta, SlimeStore } from '@slime-cloud/core';
 
 export interface RequestEvent {
   at: string;
+  /** Empty when the request was refused before it had a key. */
   handlerKey: string;
-  tier: QueryMeta['tier'];
-  cache: QueryMeta['cache'];
+  /** Absent on refused requests. */
+  tier?: QueryMeta['tier'];
+  cache?: QueryMeta['cache'];
   ms: number;
-  /** Set when the request came through a Crystal's own route (`/v0/e/<key>`). */
   route?: 'crystal';
+  /** HTTP status; absent on events written before traces (they were all 200). */
+  status?: number;
+  code?: string;
+  stopAt?: LayerId;
+  intent?: string;
+  /** Input names only, sorted; never values. */
+  inputs?: string[];
+  trace?: LayerSpan[];
+  /** The generated code, on generations (`cache: 'miss'`) only. */
+  generated?: { sql: string; shapeJs?: string; assumptions: string[] };
+}
+
+/** What the route knows about the request besides the engine's answer. */
+export interface RequestInfo {
+  body?: unknown;
+  edge: LayerSpan;
+}
+
+export interface RequestFailure {
+  status: number;
+  code: string;
+  ms: number;
+  handlerKey?: string;
+  trace: LayerSpan[];
 }
 
 export const DEFAULT_EVENT_CAP = 50;
@@ -44,9 +69,10 @@ export interface FeedList {
   hasNewer: boolean;
 }
 
-/** What the routes need from a feed: record an answered request, list a page. */
+/** What the routes need from a feed: record an answered or refused request, list a page. */
 export interface RequestFeed {
-  record(meta: QueryMeta, route?: 'crystal'): void;
+  record(meta: QueryMeta, route?: 'crystal', request?: RequestInfo): void;
+  recordFailure(failure: RequestFailure, route?: 'crystal', request?: RequestInfo): void;
   list(query?: PageQuery): FeedList | Promise<FeedList>;
 }
 
@@ -86,7 +112,21 @@ function toFeedList(page: FeedPage, total: number): FeedList {
   return { total, events: page.entries.map(({ key, value }) => ({ ...(value as RequestEvent), id: key })), hasOlder: page.hasOlder, hasNewer: page.hasNewer };
 }
 
-function toEvent(meta: QueryMeta, route?: 'crystal'): RequestEvent {
+const INTENT_MAX = 200;
+
+function describeRequest(body: unknown): Pick<RequestEvent, 'intent' | 'inputs'> {
+  if (!body || typeof body !== 'object') return {};
+  const { intent, input } = body as { intent?: unknown; input?: unknown };
+  return {
+    ...(typeof intent === 'string' ? { intent: intent.slice(0, INTENT_MAX) } : {}),
+    ...(input && typeof input === 'object' && !Array.isArray(input) ? { inputs: Object.keys(input).sort() } : {}),
+  };
+}
+
+function toEvent(meta: QueryMeta, route?: 'crystal', request?: RequestInfo): RequestEvent {
+  const generated = meta.cache === 'miss' && typeof meta.sql === 'string'
+    ? { generated: { sql: meta.sql, assumptions: meta.assumptions ?? [], ...(meta.shapeJs ? { shapeJs: meta.shapeJs } : {}) } }
+    : {};
   return {
     at: new Date().toISOString(),
     handlerKey: meta.handlerKey,
@@ -94,6 +134,25 @@ function toEvent(meta: QueryMeta, route?: 'crystal'): RequestEvent {
     cache: meta.cache,
     ms: meta.timingsMs.total,
     ...(route ? { route } : {}),
+    status: 200,
+    ...describeRequest(request?.body),
+    ...(request ? { trace: [request.edge, ...(meta.trace ?? [])] } : meta.trace ? { trace: meta.trace } : {}),
+    ...generated,
+  };
+}
+
+function toFailedEvent(failure: RequestFailure, route?: 'crystal', request?: RequestInfo): RequestEvent {
+  const stop = [...failure.trace].reverse().find((s) => s.status === 'stop');
+  return {
+    at: new Date().toISOString(),
+    handlerKey: failure.handlerKey ?? '',
+    ms: Math.round(failure.ms * 100) / 100,
+    ...(route ? { route } : {}),
+    status: failure.status,
+    code: failure.code,
+    ...(stop ? { stopAt: stop.layer } : {}),
+    ...describeRequest(request?.body),
+    trace: failure.trace,
   };
 }
 
@@ -107,9 +166,16 @@ export class RecentRequests implements RequestFeed {
     this.#cap = cap;
   }
 
-  record(meta: QueryMeta, route?: 'crystal'): void {
+  record(meta: QueryMeta, route?: 'crystal', request?: RequestInfo): void {
+    this.#push(toEvent(meta, route, request));
+  }
+
+  recordFailure(failure: RequestFailure, route?: 'crystal', request?: RequestInfo): void {
+    this.#push(toFailedEvent(failure, route, request));
+  }
+
+  #push(event: RequestEvent): void {
     this.#total += 1;
-    const event = toEvent(meta, route);
     this.#events.unshift({ key: eventId(event.at, this.#seq++), value: event });
     if (this.#events.length > this.#cap) this.#events.length = this.#cap;
   }
@@ -157,8 +223,15 @@ export class StoredRequests implements RequestFeed {
     this.#log = log;
   }
 
-  record(meta: QueryMeta, route?: 'crystal'): void {
-    const event = toEvent(meta, route);
+  record(meta: QueryMeta, route?: 'crystal', request?: RequestInfo): void {
+    this.#push(toEvent(meta, route, request));
+  }
+
+  recordFailure(failure: RequestFailure, route?: 'crystal', request?: RequestInfo): void {
+    this.#push(toFailedEvent(failure, route, request));
+  }
+
+  #push(event: RequestEvent): void {
     this.#pending.push({ key: eventId(event.at, this.#seq++), event });
   }
 

@@ -16,6 +16,8 @@ export interface Env {
   allowedEmails?: string[];
   /** Value CloudFront sends in `x-slime-origin`; requests without it are refused (proxy.ts). */
   originSecret?: string;
+  /** Local mode only: with no session cookie, every request is this user, so testing needs no login. Ignored in cloud mode. */
+  devUser?: string;
 }
 
 export function env(): Env {
@@ -43,6 +45,8 @@ export function env(): Env {
             .map((email) => email.trim().toLowerCase())
             .filter(Boolean),
     originSecret: process.env.SLIME_ORIGIN_SECRET || undefined,
+    // Never in cloud mode: the hosted admin's login must not be skippable by an env var.
+    devUser: (!runtimeUrl && process.env.ADMIN_DEV_USER?.trim().toLowerCase()) || undefined,
   };
 }
 

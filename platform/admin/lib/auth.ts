@@ -60,9 +60,15 @@ export function verifySession(token: string): Session | null {
   return { email, exp };
 }
 
-export async function currentUser(): Promise<string | null> {
+/** The user of a valid session cookie only (the login page uses it, so the form stays reachable locally). */
+export async function sessionUser(): Promise<string | null> {
   const cookie = (await cookies()).get(SESSION_COOKIE);
-  return cookie ? (verifySession(cookie.value)?.email ?? null) : null;
+  return (cookie && verifySession(cookie.value)?.email) || null;
+}
+
+/** The signed-in user; locally, without a valid session, `ADMIN_DEV_USER` (see `env().devUser`). */
+export async function currentUser(): Promise<string | null> {
+  return (await sessionUser()) ?? env().devUser ?? null;
 }
 
 export async function requireUser(): Promise<string> {

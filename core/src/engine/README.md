@@ -108,6 +108,11 @@ classes and functions here are internal.
 - **`close()`.** It closes the shaping sandbox (when it owns it), the store
   and every source. One failing close doesn't stop the others; it then rejects
   with the first failure.
+- **Trace.** Every answer has `meta.trace`, one span per harness layer in the
+  order `key → route → limits → generate → lint → cost → execute → shape →
+  output → cache → review`; every refusal from `query()` carries the same on
+  `SlimeError.trace` (ending in a stop) and the key on `SlimeError.handlerKey`.
+  Notes hold counts, names and limits, never input values or rows.
 
 ## Side Effects
 

@@ -2,6 +2,7 @@ import { literalsInIntent } from '../request/parse.js';
 import type { Execution } from './execution/execute.js';
 import type { CacheOutcome, QueryMeta, QueryTimings } from './types.js';
 import type { ReviewStatus, Tier } from '../handler/record.js';
+import type { LayerSpan } from '../shared/trace.js';
 
 export interface GeneratedCode {
   sql: string;
@@ -34,19 +35,20 @@ export interface MetaParts {
   intent: string;
   totalMs: number;
   resolve?: ResolveTimings;
+  trace?: LayerSpan[];
 }
 
 const MS_PRECISION = 100;
 // Repeated in warnings so a client that only checks warnings still learns the data is incomplete.
 const TRUNCATED_WARNING = 'The result was cut at the row cap, so data is incomplete; narrow the request or page it with limit and offset.';
 
-export function queryMeta({ handlerKey, tier, cache, review, execution, code, intent, totalMs, resolve = {} }: MetaParts): QueryMeta {
+export function queryMeta({ handlerKey, tier, cache, review, execution, code, intent, totalMs, resolve = {}, trace }: MetaParts): QueryMeta {
   const timingsMs = queryTimings(totalMs, resolve, execution);
   const warnings = literalsInIntent(intent).map(literalWarning);
   if (execution.truncated) warnings.push(TRUNCATED_WARNING);
   const steps = execution.steps ? { steps: execution.steps } : {};
   const attempts = resolve.generation ? { attempts: resolve.generation.attempts } : {};
-  return { handlerKey, tier, cache, truncated: execution.truncated, timingsMs, ...attempts, warnings, review, ...steps, ...generatedCode(code) };
+  return { handlerKey, tier, cache, truncated: execution.truncated, timingsMs, ...attempts, warnings, review, ...steps, ...generatedCode(code), ...(trace ? { trace } : {}) };
 }
 
 // In the order the parts happen; total minus their sum is the engine's own bookkeeping.

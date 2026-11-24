@@ -26,7 +26,7 @@ import {
 import { isCloud } from '@/lib/env';
 import { CodedError, hasCode } from '@/lib/errors';
 import { crystalToken, issueCrystalTokens } from '@/lib/crystal-tokens';
-import { crystallizeOn, reloadOn, type CrystallizeReport } from '@/lib/lifecycle';
+import { crystallizeOn, readHandlerCode, reloadOn, type CrystallizeReport, type HandlerCode } from '@/lib/lifecycle';
 import { withSpan } from '@/lib/telemetry';
 import { checkLogin, createUser } from '@/lib/users';
 
@@ -266,6 +266,14 @@ export async function issueCrystalTokenAction(endpointId: string, key: string): 
   } catch (err) {
     return { error: (err as Error).message };
   }
+}
+
+/** Requests log trace drawer: the code behind a handler, for the lazy "Show code" button on a cache hit. */
+export async function loadHandlerCode(endpointId: string, key: string): Promise<HandlerCode | null> {
+  const email = await requireUser();
+  const ep = await getEndpoint(email, endpointId);
+  if (!ep) return null;
+  return readHandlerCode(ep, key);
 }
 
 export async function revealCrystalTokenAction(endpointId: string, key: string): Promise<string | null> {

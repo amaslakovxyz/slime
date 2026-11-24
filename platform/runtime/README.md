@@ -47,8 +47,17 @@ Paths are the endpoint's own; the Lambda serves them under `/ep/<id>/`.
 | `GET /v0/handlers`, `DELETE /v0/handlers/<key>` | `slm_` | live handlers and Crystals; evict one |
 | `GET /v0/lifecycle` | `slm_` | saved, live and Crystal rows, thresholds, warnings; `instance: true` on Lambda, where Gas rows are this instance's only |
 | `GET /v0/events?limit=&before=&after=` | `slm_` | `{ total, events, hasOlder, hasNewer }`, newest first, the same on every instance: `limit` 1-100 (default 50), `before`/`after` an event's `id` for the older or newer page (not both; anything else is 400); `total` is the endpoint's usage count |
+| `GET /v0/handlers/<key>/code` | `slm_` | `{ key, tier, sql, shapeJs?, assumptions }` for the trace drawer: the Crystal, else this instance's live handler, else the store; 404 `HANDLER_NOT_FOUND` |
 | `POST /v0/crystallize` `{keys?}` | `slm_` | crystallize reports (no `keys`: every ready handler); on Lambda the Crystals go to S3 and this instance swaps its engine at once, other instances within the TTL. Mounted only with a Crystal store: always on Lambda, locally only with `SLIME_CRYSTAL_DIR` |
 | `POST /v0/reload` | `slm_` | 204; on Lambda this instance forgets the endpoint's settings and engine, locally a no-op |
+
+Events also cover refused requests (`status`, `code`, `stopAt` name the HTTP
+status, the error code and the layer that stopped the request), and carry
+`intent` (first 200 characters), the input names (never their values) and the
+layer `trace` behind `edge` (the host's own span, first). Generations
+(`cache: 'miss'`) also carry `generated` (`sql`, `assumptions`, `shapeJs?`),
+so a Gas handler's code is visible even from another Lambda instance. Events
+written before this change lack all of these fields.
 
 Router answers on Lambda: 404 `ENDPOINT_NOT_FOUND` (malformed id, or no
 parameters under its SSM path), 401 `UNAUTHORIZED` (wrong or missing key, or
