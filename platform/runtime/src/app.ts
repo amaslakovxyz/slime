@@ -102,6 +102,14 @@ export function mergeHandlers(lists: LifecycleHandler[][]): LifecycleHandler[] {
 
 const MAX_BODY_BYTES = 16 * 1024;
 
+/** Every part of meta.timingsMs, in its order, so browser dev tools show where the time went. */
+function serverTiming({ timingsMs }: QueryMeta): string {
+  return Object.entries(timingsMs)
+    .filter((entry): entry is [string, number] => typeof entry[1] === 'number')
+    .map(([name, ms]) => `${name};dur=${ms}`)
+    .join(', ');
+}
+
 export function createApp({ slime, connector, crystal, onQuery, log, events, savedHandlers, crystallize, thresholds, warnings, isPerInstance }: RuntimeParts): Hono {
   const app = new Hono();
   const logLine = log ?? ((line: Record<string, unknown>) => console.log(JSON.stringify(line)));
@@ -137,7 +145,7 @@ export function createApp({ slime, connector, crystal, onQuery, log, events, sav
       const { data, meta } = await slime.query(body);
       onQuery?.(meta);
       events?.record(meta);
-      c.header('Server-Timing', `total;dur=${meta.timingsMs.total}, generate;dur=${meta.timingsMs.generate ?? 0}`);
+      c.header('Server-Timing', serverTiming(meta));
       logLine({ at: new Date().toISOString(), handler: meta.handlerKey, tier: meta.tier, cache: meta.cache, ms: meta.timingsMs });
       return c.json({ data, meta });
     },
@@ -181,6 +189,7 @@ export function createApp({ slime, connector, crystal, onQuery, log, events, sav
     const { data, meta } = await slime.query({ intent: handler.intent, input, output: handler.output } as never);
     onQuery?.(meta);
     events?.record(meta, 'crystal');
+    c.header('Server-Timing', serverTiming(meta));
     return c.json({ data, meta });
   });
 
