@@ -61,8 +61,8 @@ Open http://localhost:3100: with `ADMIN_DEV_USER` (in `.env.example`) you are
 already signed in as that user, no account needed; **Log out** opens the login form, and a
 session from it takes precedence, and cloud mode ignores the variable. Create an endpoint with
 the demo database's read-only role:
-`postgres://slime_reader:slime_reader@localhost:54329/slime`. Claude or Groq
-need `ANTHROPIC_API_KEY` or `GROQ_API_KEY` in the environment of `npm run local` (the runner passes it to
+`postgres://slime_reader:slime_reader@localhost:54329/slime`. Claude (the only provider)
+needs `ANTHROPIC_API_KEY` in the environment of `npm run local` (the runner passes it to
 the endpoints, nothing else reads it). The endpoint turns `ready` within a few
 seconds, and its URL (`http://localhost:87xx/`) is in the Lifecycle tab.
 
@@ -126,10 +126,12 @@ refuses), and delete removes the endpoint.
 against https://admin.amaslakov.com (`ADMIN_URL` overrides it) with
 `SMOKE_EMAIL` / `SMOKE_PASSWORD`, and is skipped without them. The email must
 be in `/slime/admin/ADMIN_ALLOWED_EMAILS`; the account is created on the first
-run. It has no database, so it checks only: sign-in, create → `failed` with the
+run. Without a database it checks only: sign-in, create → `failed` with the
 database reason, the endpoint URL refuses `/v0/query` without a key (401), an
 unknown id answers 404, and delete (plus the empty SSM path when AWS credentials
-are present). Reports go to `playwright-report/` and `test-results/`.
+are present). With `SMOKE_DB_URL` (a read-only URL to the demo schema) it also
+runs the whole lifecycle on a Claude endpoint: ready, Liquid, Crystallize, the
+Crystal route, delete. Reports go to `playwright-report/` and `test-results/`.
 
 ## Hosted admin (AWS Lambda)
 

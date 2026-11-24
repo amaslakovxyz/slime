@@ -314,12 +314,16 @@ jobs:
       # Goal 10 of docs/architecture/2026-11-21-cloud-mvp-design.md: sign-in,
       # create -> failed (no cloud database), keyless 401, unknown id 404,
       # delete. Runs without the AWS credentials: it only talks HTTPS.
+      # With the SMOKE_DB_URL secret (a read-only URL to a database with the demo
+      # schema) it also runs the whole lifecycle on AWS; that needs a working
+      # /slime/shared/ANTHROPIC_API_KEY, since the smoke endpoint uses Claude.
       - name: Admin cloud smoke
         if: steps.fresh.outputs.current == 'true' && matrix.stack == 'platform'
         working-directory: platform/admin
         env:
           SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}
           SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
+          SMOKE_DB_URL: ${{ secrets.SMOKE_DB_URL }}
         run: |
           if [ -z "$SMOKE_EMAIL" ] || [ -z "$SMOKE_PASSWORD" ]; then
             echo "::notice::Admin cloud smoke skipped: set the SMOKE_EMAIL and SMOKE_PASSWORD secrets (an allowlisted user)."
