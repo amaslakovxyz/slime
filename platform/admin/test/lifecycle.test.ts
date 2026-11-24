@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import type { Endpoint } from '../lib/endpoints';
-import { REQUESTS_PAGE_SIZE, readLifecycle, readRequests, stagesOf, toRow, type LifecycleData, type RuntimeHandler } from '../lib/lifecycle';
+import { REQUESTS_PAGE_SIZE, readHandlerCode, readLifecycle, readRequests, stagesOf, toRow, type LifecycleData, type RuntimeHandler } from '../lib/lifecycle';
 import { secretStore } from '../lib/secrets';
 
 const t = { liquidRuns: 3, crystalRuns: 10 };
@@ -151,5 +151,45 @@ describe('readRequests (the Requests log pages)', () => {
       server.closeAllConnections();
       await new Promise((done) => server.close(done));
     }
+  });
+});
+
+describe('readHandlerCode (the trace drawer)', () => {
+  test('asks the runtime by key, never for a malformed one, and reports a miss as null', async () => {
+    process.env.SESSION_SECRET = 'x'.repeat(32);
+    process.env.SLIME_SECRETS = 'file';
+    process.env.SLIME_SECRETS_FILE = join(mkdtempSync(join(tmpdir(), 'slime-hc-')), 'secrets.json');
+    delete process.env.SLIME_RUNTIME_URL;
+    await secretStore().put('ep-code', 'SLIME_API_KEY', 'slm_test');
+    const asked: string[] = [];
+    const code = { key: 'a3f9c1e07d', tier: 'liquid', sql: 'select 1', assumptions: [] };
+    const server = createServer((req, res) => {
+      asked.push(req.url ?? '');
+      if (req.url === '/v0/handlers/a3f9c1e07d/code') {
+        res.setHeader('content-type', 'application/json');
+        res.end(JSON.stringify(code));
+      } else {
+        res.statusCode = 404;
+        res.end();
+      }
+    });
+    await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
+    try {
+      const ep = { endpointId: 'ep-code', url: `http://127.0.0.1:${(server.address() as AddressInfo).port}/`, status: 'ready' } as Endpoint;
+      assert.deepEqual(await readHandlerCode(ep, 'a3f9c1e07d'), code);
+      assert.equal(await readHandlerCode(ep, 'missing-key'), null);
+      // A key with a slash or a parent-dir segment never reaches fetch: it fails the key shape first.
+      assert.equal(await readHandlerCode(ep, '../secrets'), null);
+      assert.equal(await readHandlerCode(ep, 'a/b'), null);
+      assert.deepEqual(asked, ['/v0/handlers/a3f9c1e07d/code', '/v0/handlers/missing-key/code']);
+    } finally {
+      server.closeAllConnections();
+      await new Promise((done) => server.close(done));
+    }
+  });
+
+  test('an endpoint that is not running never answers', async () => {
+    const ep = { endpointId: 'ep-down', status: 'pending' } as Endpoint;
+    assert.equal(await readHandlerCode(ep, 'a3f9c1e07d'), null);
   });
 });

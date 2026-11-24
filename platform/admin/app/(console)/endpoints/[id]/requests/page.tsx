@@ -65,7 +65,7 @@ export default async function RequestsLogPage({
                     <tr key={e.id ?? `${e.at}-${i}`}>
                       <td className="mono">{time(e.at)}</td>
                       <td className="mono" title={e.handlerKey}>#{e.handlerKey.slice(0, 6)}</td>
-                      <td><span className={`tier-pill tier-pill-${e.tier}`}>{e.tier}</span></td>
+                      <td>{e.tier ? <span className={`tier-pill tier-pill-${e.tier}`}>{e.tier}</span> : '—'}</td>
                       <td>{e.route === 'crystal' ? 'own route' : e.cache}</td>
                       <td className="num mono">{e.ms.toFixed(1)} ms</td>
                     </tr>

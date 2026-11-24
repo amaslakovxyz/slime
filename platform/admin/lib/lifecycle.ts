@@ -24,15 +24,34 @@ export interface RuntimeHandler {
   stale?: boolean;
 }
 
+export type LayerId = 'edge' | 'key' | 'route' | 'limits' | 'generate' | 'lint' | 'cost' | 'execute' | 'shape' | 'output' | 'cache' | 'review';
+
+export interface TraceSpan {
+  layer: string;
+  status: string;
+  ms?: number;
+  note?: string;
+  attempt?: number;
+}
+
 export interface RuntimeEvent {
   /** The cursor for the Requests log's pages; set by runtimes that page their feed. */
   id?: string;
   at: string;
   handlerKey: string;
-  tier: Tier;
-  cache: string;
+  /** Absent on refused requests. */
+  tier?: Tier;
+  cache?: string;
   ms: number;
   route?: 'crystal';
+  /** Absent on events written before traces (all 200). */
+  status?: number;
+  code?: string;
+  stopAt?: LayerId;
+  intent?: string;
+  inputs?: string[];
+  trace?: TraceSpan[];
+  generated?: { sql: string; shapeJs?: string; assumptions: string[] };
 }
 
 export interface Thresholds {
@@ -286,6 +305,33 @@ export async function readRequests(ep: Endpoint, { before, after }: { before?: s
     return page;
   } catch {
     return miss(cloud ? 'Endpoint runtime did not answer.' : 'Endpoint is not running. Is `npm run local` up?');
+  }
+}
+
+export interface HandlerCode {
+  key: string;
+  tier: Tier;
+  sql: string;
+  shapeJs?: string;
+  assumptions: string[];
+}
+
+const HANDLER_KEY = /^[0-9A-Za-z_-]{1,128}$/;
+
+/** Server only: the code behind a handler, for the trace drawer; null when this instance and the store do not have it. */
+export async function readHandlerCode(ep: Endpoint, key: string): Promise<HandlerCode | null> {
+  if (!HANDLER_KEY.test(key) || !ep.url || (ep.status !== 'ready' && ep.status !== 'updating')) return null;
+  const token = await secretStore().get(ep.endpointId, 'SLIME_API_KEY');
+  if (!token) return null;
+  try {
+    const res = await fetch(new URL(`v0/handlers/${encodeURIComponent(key)}/code`, ep.url), {
+      headers: { 'x-api-key': token },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(isCloud() ? 8000 : 3000),
+    });
+    return res.ok ? ((await res.json()) as HandlerCode) : null;
+  } catch {
+    return null;
   }
 }
 
