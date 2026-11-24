@@ -45,7 +45,7 @@ export type {
   ReviewResult,
   Reviewer,
 } from './models/types.js';
-export type { SandboxLimits, SandboxRunner, ShapeJob } from './sandbox/types.js';
+export type { SandboxLimits, SandboxRunner, SandboxStats, ShapeJob } from './sandbox/types.js';
 export { QuickJSRunner } from './sandbox/quickjs/quickjs-runner.js';
 export type { InputScalar, InputValue, InputValues, SlimeRequest } from './request/parse.js';
 export type { ParamType, ParamTypesForModel } from './request/params.js';

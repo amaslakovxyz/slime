@@ -1,7 +1,7 @@
 // Generated shaping code runs in QuickJS (WebAssembly) in a worker thread. It
 // gets rows and input as JSON only: no database, network, files or timers.
 import { SlimeError } from '../../shared/errors.js';
-import type { SandboxLimits, SandboxRunner, ShapeJob } from '../types.js';
+import type { SandboxLimits, SandboxRunner, SandboxStats, ShapeJob } from '../types.js';
 import { INTERRUPTED_MESSAGE, type ShapeReply } from './messages.js';
 import { ShapeWorker, shapeTimeout } from './shape-worker-client.js';
 
@@ -13,11 +13,13 @@ export class QuickJSRunner implements SandboxRunner {
   readonly #waiting: ((worker: ShapeWorker) => void)[] = [];
   #nextTaskId = 1;
 
-  async run(job: ShapeJob, { timeoutMs, memoryBytes }: SandboxLimits): Promise<unknown> {
+  async run(job: ShapeJob, { timeoutMs, memoryBytes }: SandboxLimits, stats?: SandboxStats): Promise<unknown> {
+    const waitStartedAt = performance.now();
     const worker = await this.#acquire();
     let reply: ShapeReply;
     try {
       await worker.ready;
+      if (stats) stats.waitMs = performance.now() - waitStartedAt;
       reply = await worker.run({ id: this.#nextTaskId++, program: toProgram(job), timeoutMs, memoryBytes });
     } finally {
       this.#release(worker);

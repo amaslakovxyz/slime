@@ -73,9 +73,15 @@ classes and functions here are internal.
   longer fits the sources (MS14), is a miss and is generated again.
 - **Every miss is generated.** A generator is required.
 - **Generation.** At most `1 + maxRepairs` attempts, while at least 1 s of
-  budget is left; provider rate-limit waits extend the budget.
+  budget is left; waits between provider retries extend the budget.
   `WRITE_REFUSED` and `ACCESS_DENIED` are final. An `unsatisfiable` reason
   that reads like a write becomes `WRITE_REFUSED`.
+- **Timings add up.** `meta.timingsMs` parts don't overlap, so `total`
+  minus their sum is only the engine's own bookkeeping: lookup, slot or
+  coalesced wait (`queue`), model time, retry waits, checks of every attempt,
+  the answering run, the sandbox wait and the shape are each named
+  (`test/engine/timings.test.ts`). A review runs in the background, so its
+  time and tokens go in the `reviewed` event instead.
 - **Cached only after it ran.** A generated handler is cached only after its
   first run passed lint, the cost check, the output check and R6.
 - **Parameter types.** Every later run checks the input against the

@@ -20,9 +20,9 @@ export type ReviewOutcome = 'approved' | 'rejected';
 /** Reviews the handler; after a rejection, revises it with the reviewer's notes, up to maxReviews reviews (M4 rule). */
 export async function reviewUntilSettled(deps: ReviewDeps, record: HandlerRecord): Promise<ReviewOutcome> {
   for (let reviewCount = 1; ; reviewCount++) {
-    const { verdict, problems } = await deps.reviewer.review(reviewRequest(deps, record), { timeoutMs: deps.reviewTimeoutMs });
+    const { verdict, problems, ms, inputTokens, outputTokens } = await deps.reviewer.review(reviewRequest(deps, record), { timeoutMs: deps.reviewTimeoutMs });
     const isApproved = verdict === 'approve';
-    deps.emit({ type: 'reviewed', handlerKey: record.key, verdict: isApproved ? 'approved' : 'rejected', notes: problems.join(' ') });
+    deps.emit({ type: 'reviewed', handlerKey: record.key, verdict: isApproved ? 'approved' : 'rejected', notes: problems.join(' '), tokens: inputTokens + outputTokens, ms });
     if (isApproved) return 'approved';
     if (reviewCount >= deps.maxReviews || !(await revise(deps, record, problems))) return 'rejected';
   }
