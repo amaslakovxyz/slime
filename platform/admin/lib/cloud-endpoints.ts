@@ -1,7 +1,7 @@
 // Cloud mode (SLIME_RUNTIME_URL set): no runner watches slime-control, so the
 // admin's server actions finish each transition of Contract 3 in the same request.
 //   create:      item `provisioning` (+ url) -> GET <url>healthz -> ready | failed
-//   reconfigure: item `updating` -> POST <url>v0/reload -> healthz -> ready | failed
+//   reconfigure: item `updating` -> GET <url>healthz?fresh=1 (reload + check in one call) -> ready | failed
 //   check:       the same, for an item an interrupted action left behind
 //   remove:      item `deleting` -> shared teardown -> gone | failed (deletable again)
 // The shared runtime already serves every id whose SSM path exists, so there is

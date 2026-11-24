@@ -37,12 +37,12 @@ In:
 * a **local runner** that turns a `pending` endpoint into a running runtime
   process on localhost, in place of the AWS provisioner (since removed: in
   the cloud the admin provisions endpoints itself);
-* runtime additions: a Node server entry, a recent-requests feed, a local-only
-  crystallize route;
+* runtime additions: a Node server entry, a recent-requests feed, a
+  crystallize route (local first; the cloud MVP mounts it on Lambda too, L20);
 * the admin **Lifecycle** tab, wired to a real endpoint.
 
 Out (later): a GitHub PR for Crystal, an MCP endpoint (`/mcp`), multi-user
-concurrency, persistence of the feed. AWS deployment of this flow is the cloud
+concurrency, persistence of the feed (since added, L23). AWS deployment of this flow is the cloud
 MVP design (L20–L23).
 
 ## 3. Decisions
@@ -51,7 +51,7 @@ MVP design (L20–L23).
 |---|---|---|
 | L1 | Crystallize writes modules into the endpoint's own folder and restarts it. No PR. | The whole cycle is visible without GitHub; a PR is the next step. |
 | L2 | A separate `local-runner` process supervises runtimes; admin and runner talk only through `slime-control`, like the AWS provisioner. | Next.js dev reloads must not kill or orphan child processes. Same state machine as AWS (`pending → ready`, `updating → ready`). |
-| L3 | Crystallize runs inside the endpoint's runtime (`POST /v0/crystallize`, only in the local entry `src/local.ts` when `SLIME_CRYSTAL_DIR` is set; the Lambda entry never mounts it). Local entry; cloud: see L20/L22. | The runtime already holds the store and connector that `crystallize()` needs. |
+| L3 | Crystallize runs inside the endpoint's runtime (`POST /v0/crystallize`, mounted only when the endpoint has a Crystal store: locally `SLIME_CRYSTAL_DIR`, on Lambda the S3 store since the cloud MVP, L20). | The runtime already holds the store and connector that `crystallize()` needs. |
 | L4 | After crystallizing, the admin sets `status=updating`; the runner restarts the runtime, which loads the new `index.mjs`. Local entry; cloud: see L20/L22. | Reuses the existing reconfigure flow; Crystal is read at startup. |
 | L5 | The tab polls the runtime every 2 s through server code (token from the secret store). | No token in the browser; same polling pattern as `StatusPoller`. |
 | L6 | Snippet tabs v1: **Prompt** and **HTTP** only. The MCP tab returns when `/mcp` exists. | Never show a command that does not work. |
@@ -72,6 +72,7 @@ MVP design (L20–L23).
 | L21 | Cloud Crystals run as data in the engine's QuickJS runner with Liquid's time and memory limits, after a SHA-256 check against the manifest; they are never `import()`ed. Self-hosted apps that import `index.mjs` keep running Crystal functions in-process. | One process holds every endpoint's settings: a heavy or hostile Crystal must not stall or read them. |
 | L22 | In the cloud, `POST /v0/reload` replaces the restart: after Crystallize or a settings change the admin calls it on the instance it reaches; other warm instances pick up changes within the 30 s settings TTL. Locally `/v0/reload` is a no-op (204). | There is no process to restart, and per-endpoint functions are gone. |
 | L23 | Gas rows and live run counts are per Lambda instance in the cloud, so the cloud Lifecycle view is approximate. The live feed (`/v0/events`) moved to the store on 2026-11-22 and is the same on every instance. | Durable counters and a shared feed need a store; out of scope for the MVP. |
+| L24 | The stage rail became an interactive diagram (2026-11-22): Connected → Gas → Liquid → Crystal with clickable stages and arrows, and a side panel that explains the selection (storage and model tokens as icon chips, handlers / recent requests / mean engine time, the handlers in it; for an arrow its steps, how many are on the way and ready, and a jump to Crystallize). Icon-led: each fact is an icon and a word, the full sentence is its tooltip and accessible name, and each transition rule is shown once, on its arrow. The panel follows the current stage until the operator picks one; the pick is client state and survives the 2 s poll. Crystal is ice-blue (`#8FD3FF`) across the admin, as on the landing page. | The rail showed four ticks without Gas, mixed setup steps with handler tiers, and did not render the notes `stagesOf` computed; the lavender Crystal read almost white. |
 
 Since 2026-11-22 the feed also carries each request's layer trace and the
 refused requests (status, code, stop layer); see
@@ -89,10 +90,12 @@ code, and `GET /v0/handlers/:key/code` serves the code behind a hit.
   capped by `SLIME_FLUSH_LIMIT_MS` (a running review can take tens of seconds;
   the tab polls with a 3 s timeout). GETs skip the wait. Crystallize itself
   waits for every write, so `runs` and fixtures are current when it reads them.
-* **Recent requests:** a ring buffer of the last 50 answered queries
-  (`{at, handlerKey, tier, cache, ms}`), fed by the existing `onQuery` hook.
-  `GET /v0/events` returns it. Memory only.
-* **`POST /v0/crystallize`** `{ keys?: string[] }` (local entry only, when `SLIME_CRYSTAL_DIR` is set):
+* **Recent requests:** answered queries (`{id, at, handlerKey, tier, cache, ms}`,
+  plus `route: 'crystal'` for a call on a Crystal's route), fed by the existing
+  `onQuery` hook. `GET /v0/events?limit=&before=&after=` returns one page,
+  newest first. First a 50-entry memory buffer; since 2026-11-22 the
+  endpoint's store keeps the newest 500 (L23).
+* **`POST /v0/crystallize`** `{ keys?: string[] }` (mounted only with a Crystal store: locally `SLIME_CRYSTAL_DIR`, on Lambda S3, L20):
   runs `crystallize({ connector, store, dir: SLIME_CRYSTAL_DIR, minRuns, provenance })`
   without an optimizer (the unchanged Liquid code is the candidate). `keys`
   limits the job through a read-only store view whose `list()` returns only
@@ -106,7 +109,7 @@ code, and `GET /v0/handlers/:key/code` serves the code behind a hit.
   no handler ever reaches `minRuns` from live traffic (`syncLiveRuns`).
 * **`GET /v0/lifecycle`** merges saved, live and Crystal handlers (one row per
   key, most mature tier wins; a stale saved row ranks below live Gas, L18) and
-  returns the thresholds (`gasToLiquidRuns`, `CRYSTAL_MIN_RUNS`) and the
+  returns the thresholds (`{liquidRuns, crystalRuns}`, from `gasToLiquidRuns` and `CRYSTAL_MIN_RUNS`) and the
   engine's startup warnings (L19).
 * **`POST /v0/e/<crystal key>`**: a Crystal's own route (L8); refuses missing
   and unknown input names (L17).
@@ -144,8 +147,11 @@ code, and `GET /v0/handlers/:key/code` serves the code behind a hit.
   derive
   * per handler: stage, progress label (`n/3 to Liquid`, `n/10 to Crystal`,
     `ready to crystallize`), review label;
-  * the rail: Connected (endpoint `ready`), Agent linked (any handler),
-    Liquid (any Liquid or Crystal), Crystal (any Crystal).
+  * the lifecycle diagram (L24): Connected (endpoint `ready`), Gas (any
+    handler; the first request links the agent), Liquid (any Liquid or
+    Crystal), Crystal (any Crystal); each tier stage counts its handlers now;
+    the three transitions with their trigger, actor and the handlers on the
+    way; per-tier request count and mean engine time over the recent feed.
   * Review label comes from the engine (`HandlerSummary.review`, saved records,
     Crystal manifest); no inference from runs. `pending` → `reviewing…`; a
     non-Gas handler with `none` → `no reviewer`; Gas with `none` → `—`.
@@ -190,7 +196,7 @@ sequenceDiagram
 
 ## 7. Testing
 
-* Runtime: events buffer (cap, order), crystallize route off by default and
+* Runtime: events buffer (cap, order), crystallize route mounted only with a Crystal store and
   limited to `keys`.
 * Runner: start/updating/deleting against fake spawn and fake table;
   failed health check → `failed` with stderr.

@@ -796,8 +796,8 @@ Work happens in `.worktrees/cloud-mvp` on branch `feat/cloud-mvp`. Commits follo
 
 *   **Type / Scope**: Cloud state machine (Contract 3).
 *   **Proposed Changes**:
-    - Functions `provision(owner, id)`, `reconfigure(owner, id)`, `check(owner, id)`, `reload(ep)` and `remove(owner, id)`.
-    - `healthz` retries every 1 s for up to 20 s on 503 or network errors.
+    - Functions `provision(owner, id)`, `reconfigure(owner, id)`, `check(owner, id)` and `remove(owner, id)`. The reload after Crystallize is `reloadOn(ep)` in `lib/lifecycle.ts` (`POST <url>v0/reload`).
+    - `healthz` retries every 1 s for up to 20 s on 5xx or network errors; `reconfigure` sends one `GET <url>healthz?fresh=1`, which reloads and checks in the same call.
     - Outcome writes reuse the `ready`/`failed` + `error` shape. Errors are capped at 300 characters, as `provisioner/src/outcome.ts` does.
     - All runtime calls send the `slm_` key from the secret store.
 
@@ -893,7 +893,7 @@ Work happens in `.worktrees/cloud-mvp` on branch `feat/cloud-mvp`. Commits follo
 *   **Proposed Changes**:
     - Allowlist accept and refuse, including case.
     - Cloud provision against a fake runtime HTTP server: ready on 200, failed with the body on 503 after the retry window, and a stuck `provisioning` item deletable.
-    - Reconfigure calls reload, then healthz.
+    - Reconfigure sends exactly one `GET /ep/<id>/healthz?fresh=1` (no separate reload, which another instance could answer).
     - Teardown order and the id guard, for dir and S3 (fake client).
     - The proxy refuses a missing or wrong header and passes the right one.
     - The endpoints test adds `SLIME_PROVIDER` to the expected secrets.

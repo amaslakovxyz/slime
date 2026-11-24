@@ -7,6 +7,7 @@ Project-wide docs. Code-local docs live next to their code and are listed at the
 | [product/concepts_brief.md](product/concepts_brief.md) | Current | Konstantin | Slime v0 tech stack, scope and benchmark results. |
 | [product/2026-11-21-agent-integrations-research.md](product/2026-11-21-agent-integrations-research.md) | Record | @Tony | Slime for coding agents: research record behind the unified frame (federation, Linear/Notion limits, N+1, "no customer data"). |
 | [product/product_frame_v0_2.md](product/product_frame_v0_2.md) | Design | @Tony | Unified product frame (slime-client / slime-cloud): merged decisions from both 2026-11-21 research tracks, demo vertical, risks. |
+| [product/agent_api_v1.md](product/agent_api_v1.md), [product/agent_api_v1.openapi.yaml](product/agent_api_v1.openapi.yaml) | Design | amaslakov | Agent API v1: headless lifecycle for coding agents (one `slm_` token, delegated crystallize); each route and field marked shipped or proposed against main's runtime. |
 | [product/customer-demo-use-cases.md](product/customer-demo-use-cases.md) | Current | @Tony | Customer demo: three use cases from the customer's coding agent (Cloud endpoint, Crystal, self-hosted multi-source), fast-value table, demo script, measured run. |
 | [product/atlas-demo.md](product/atlas-demo.md) | Current | @Tony | DEMO: Atlas, the made-up customer with no backend; what the site shows, what Atlas needed, why it is real. One page for hackathon visitors. |
 | [product/atlas-demo-cheatsheet.md](product/atlas-demo-cheatsheet.md) | Current | @Tony | DEMO cheatsheet: who does what (visitor, Atlas's agent and server, operator, runtime), diagrams of the request and the Gas → Liquid → Crystal lifecycle, 7-step onboarding, keys, errors, talking points. |
@@ -35,3 +36,4 @@ Project-wide docs. Code-local docs live next to their code and are listed at the
 - [../platform/runtime/README.md](../platform/runtime/README.md) (Current)
 - [../platform/infra/README.md](../platform/infra/README.md) and [../platform/infra/FINOPS.md](../platform/infra/FINOPS.md) (Current)
 - [../platform/docs/reviews/2026-11-20-infra-review.md](../platform/docs/reviews/2026-11-20-infra-review.md) (Record)
+- [../platform/docs/reviews/2026-11-22-api-path-audit.md](../platform/docs/reviews/2026-11-22-api-path-audit.md) (Record, runtime and admin API paths against docs and specs)

@@ -139,6 +139,15 @@ export function createApp({ slime, connector, crystal, onQuery, log, events, sav
     return c.json({ error: { code: 'INTERNAL', message: 'Unexpected server error.', retryable: true } }, 500);
   });
 
+  // Same error shape as every other answer, so an agent that joined a URL wrong (`//v0/query`)
+  // or used the wrong method can read what happened. The path is the endpoint's own (no /ep/<id>).
+  app.notFound((c) =>
+    c.json(
+      { error: { code: 'NOT_FOUND', message: `This endpoint does not serve ${c.req.method} ${c.req.path}. Data requests go to POST /v0/query.`, retryable: false } },
+      404,
+    ),
+  );
+
   // The one data endpoint. Behind the API key: callers are the tenant's own backend, not browsers.
   app.post(
     '/v0/query',
