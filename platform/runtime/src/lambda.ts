@@ -8,7 +8,11 @@
 //                                                                 the endpoint (tenants.ts)
 //                     GET /healthz?fresh=1 (endpoint key)      -> reload, then healthz on the
 //                                                                 new settings, in one invocation
-//                     engine cannot start                      -> 503 NOT_READY with the cause
+//                     GET /v0/events                           -> the feed from the endpoint's
+//                                                                 store, without the engine
+//                     engine cannot start                      -> 503 NOT_READY with the cause;
+//                                                                 a refused query or Crystal call
+//                                                                 is recorded in the feed
 //                     otherwise the endpoint's own app (app.ts) answers <route>
 //   anything else     401, including /healthz: there is no key to check it against
 //
@@ -22,6 +26,7 @@ import { SSMClient } from '@aws-sdk/client-ssm';
 import { QuickJSRunner } from '@slime-cloud/core';
 import { Hono, type Context } from 'hono';
 import { handle, type LambdaContext } from 'hono/aws-lambda';
+import { pageQuery } from './app.js';
 import { isAuthorized } from './auth.js';
 import { S3CrystalStore } from './crystal-store.js';
 import { startupErrorMessage, type LogLine } from './endpoint-runtime.js';
@@ -38,6 +43,9 @@ const DEFAULT_FLUSH_LIMIT_MS = 5_000;
 const DEFAULT_TENANT_CACHE_MAX = 8;
 const DEFAULT_TENANT_TTL_MS = 30_000;
 const DEFAULT_SHARED_SSM_PREFIX = '/slime/shared/';
+/** The app's body limit (app.ts): a larger body is not read for the NOT_READY record. */
+const MAX_RECORDED_BODY_BYTES = 16 * 1024;
+const NOTE_MAX = 200;
 
 type Bindings = { lambdaContext?: LambdaContext };
 
@@ -85,6 +93,7 @@ async function serveEndpoint(
   flushLimitMs: number,
   log: (line: LogLine) => void,
 ): Promise<Response> {
+  const startedAt = performance.now();
   let tenant: Tenant | undefined = ENDPOINT_ID.test(id) ? await tenants.get(id) : undefined;
   if (!tenant) return refuse(c, 404, 'ENDPOINT_NOT_FOUND', 'No endpoint with this id.');
   const method = c.req.method;
@@ -103,11 +112,22 @@ async function serveEndpoint(
     if (!fresh) return refuse(c, 404, 'ENDPOINT_NOT_FOUND', 'No endpoint with this id.');
     tenant = fresh;
   }
+  // The Requests log reads only the store: it must stay readable while the database is down.
+  if (method === 'GET' && route === '/v0/events') {
+    const query = pageQuery(c.req.query());
+    if (typeof query === 'string') return c.json({ error: { code: 'INVALID_REQUEST', message: query, retryable: false } }, 400);
+    return c.json(await tenant.feed().list(query));
+  }
   let runtime;
   try {
     runtime = await tenant.runtime();
   } catch (err) {
-    return refuse(c, 503, 'NOT_READY', `Endpoint is not ready: ${startupErrorMessage(err)}`, true);
+    const message = `Endpoint is not ready: ${startupErrorMessage(err)}`;
+    // Best effort: the caller gets its 503 whether or not the record could be written.
+    await recordNotReady(c, tenant, route, message, performance.now() - startedAt, flushLimitMs).catch((recordErr: unknown) =>
+      log({ endpointId: id, warning: `Could not record NOT_READY: ${startupErrorMessage(recordErr)}` }),
+    );
+    return refuse(c, 503, 'NOT_READY', message, true);
   }
   const hasBody = method !== 'GET' && method !== 'HEAD';
   // Concatenated, not resolved: new URL('//v0/query', origin) would read a doubled slash as a host.
@@ -120,6 +140,29 @@ async function serveEndpoint(
   const flushing = runtime.flush().catch((err: unknown) => log({ endpointId: id, warning: `Flush failed: ${startupErrorMessage(err)}` }));
   await Promise.race([flushing, sleep(flushLimitMs, undefined, { ref: false })]);
   return response;
+}
+
+/**
+ * A query or Crystal call the engine never saw, as the app records its own refusals (app.ts), so
+ * the Requests log shows the outage. Admin views (healthz, lifecycle) are not requests: not recorded.
+ */
+async function recordNotReady(c: Context, tenant: Tenant, route: string, message: string, ms: number, flushLimitMs: number): Promise<void> {
+  const isCrystal = route.startsWith('/v0/e/');
+  if (c.req.method !== 'POST' || (route !== '/v0/query' && !isCrystal)) return;
+  const edge = { layer: 'edge' as const, status: 'stop' as const, note: message.slice(0, NOTE_MAX) };
+  const feed = tenant.feed();
+  feed.recordFailure({ status: 503, code: 'NOT_READY', ms, trace: [edge] }, isCrystal ? 'crystal' : undefined, { body: await jsonBody(c), edge });
+  await Promise.race([feed.flush(), sleep(flushLimitMs, undefined, { ref: false })]);
+}
+
+/** The parsed body, for the intent and input names; undefined when it is too large or not JSON. */
+async function jsonBody(c: Context): Promise<unknown> {
+  try {
+    const text = await c.req.text();
+    return Buffer.byteLength(text) <= MAX_RECORDED_BODY_BYTES ? JSON.parse(text) : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function refuse(c: Context, status: 401 | 404 | 503, code: string, message: string, retryable = false): Response {

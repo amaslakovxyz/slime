@@ -63,7 +63,11 @@ Router answers on Lambda: 404 `ENDPOINT_NOT_FOUND` (malformed id, or no
 parameters under its SSM path), 401 `UNAUTHORIZED` (wrong or missing key, or
 any path outside `/ep/<id>/`, root `/healthz` included), 503 `NOT_READY` (the
 endpoint's engine cannot start, for example an unreachable database or no
-`DATABASE_URL`; the message names the cause).
+`DATABASE_URL`; the message names the cause). On Lambda, `GET /v0/events` is
+read from the endpoint's store without starting the engine, so the Requests log
+stays readable while the database is down, and a `POST /v0/query` or
+`POST /v0/e/<key>` refused with `NOT_READY` is recorded in it (`stopAt: edge`,
+the cause in the edge span's note).
 
 Both entries: a body above 16 KB on `POST /v0/query` or `POST /v0/e/<key>` is
 413 `INVALID_REQUEST`; an unexpected error is 500 `INTERNAL`; core errors keep
