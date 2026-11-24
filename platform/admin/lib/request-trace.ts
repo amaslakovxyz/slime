@@ -142,6 +142,11 @@ export function routeOf(event: RuntimeEvent, rows: TraceRow[]): { lit: NodeId[];
   };
 }
 
+/** Earlier attempts worth a line: those that ended differently from the row's final outcome (a repeat says nothing new). */
+export function notableAttempts(row: TraceRow): TraceRow['attempts'] {
+  return row.attempts.filter((a) => a.status !== row.status || a.note !== row.note);
+}
+
 export function waterfallOf(event: RuntimeEvent): { label: string; start: number; ms: number; kind: 'pass' | 'stop' | 'skip' | 'background' }[] {
   const spans = event.trace ?? [];
   const bars: { label: string; start: number; ms: number; kind: 'pass' | 'stop' | 'skip' | 'background' }[] = [];

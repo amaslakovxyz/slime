@@ -82,7 +82,8 @@ export function RequestsLog({ endpointId, events }: { endpointId: string; events
               <th>Intent</th>
               <th className="trace-col-stage">Stage</th>
               <th className="trace-col-cache">Cache</th>
-              <th className="trace-col-result">Result</th>
+              {/* Beside the drawer the column is only ✓/✕, too narrow for its title (the cells carry a title). */}
+              <th className="trace-col-result" aria-label="Result"><span className="trace-res-text">Result</span></th>
               <th className="num trace-col-lat">Latency</th>
             </tr>
           </thead>

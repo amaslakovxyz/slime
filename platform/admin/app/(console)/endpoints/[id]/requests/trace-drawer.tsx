@@ -73,10 +73,8 @@ export function TraceDrawer({
             </div>
             <div className="trace-d-meta">
               <TierPill tier={event.tier} />
+              {/* Input names live in the Parse & key row; the header keeps only tier and latency. */}
               <span className="mono" title="Total latency">⏱ {fmtMs(event.ms)}</span>
-              {event.inputs?.map((name) => (
-                <span key={name} className="trace-chip mono" title="Input name (values are never recorded)">{name}</span>
-              ))}
             </div>
             {rows && <Verdict event={event} rows={rows} />}
             {rows && (
@@ -121,7 +119,7 @@ function Verdict({ event, rows }: { event: RuntimeEvent; rows: NonNullable<Retur
     return (
       <div className="trace-verdict trace-verdict-ok">
         <span>✓ Answered</span>
-        <span className="trace-v-count" title={`${v.passed} layers passed, ${v.skipped} not needed on this route`}>{v.passed}/{rows.length}</span>
+        <span className="trace-v-count" title={`${v.passed} layers passed, ${v.skipped} not needed on this route`}>{v.passed}/{rows.length} layers</span>
       </div>
     );
   }

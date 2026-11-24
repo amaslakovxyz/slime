@@ -4,7 +4,7 @@
 // and an old event recorded before traces existed.
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { LAYERS, routeOf, traceRows, verdictOf, waterfallOf } from '../lib/request-trace';
+import { LAYERS, notableAttempts, routeOf, traceRows, verdictOf, waterfallOf } from '../lib/request-trace';
 import type { RuntimeEvent } from '../lib/lifecycle';
 
 const span = (layer: string, status: string, extra: Record<string, unknown> = {}) => ({ layer, status, ...extra });
@@ -185,5 +185,16 @@ describe('verdictOf / routeOf / waterfallOf', () => {
     const route = routeOf(EXPENSIVE, traceRows(EXPENSIVE)!);
     assert.ok(route.lit.includes('guard'));
     assert.equal(route.stop, 'guard');
+  });
+});
+
+describe('notableAttempts', () => {
+  const row = (id: string, event: RuntimeEvent) => traceRows(event)!.find((r) => r.id === id)!;
+  test('an earlier attempt that ended differently is shown', () => {
+    assert.deepEqual(notableAttempts(row('lint', MISS)).map((a) => [a.attempt, a.status]), [[1, 'stop']]);
+  });
+  test('attempts that repeat the final outcome are hidden', () => {
+    assert.deepEqual(notableAttempts(row('generate', MISS)), []);
+    assert.deepEqual(notableAttempts(row('cost', EXPENSIVE)), [], 'both attempts stopped at cost with the same note');
   });
 });

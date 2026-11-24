@@ -4,7 +4,7 @@
 // the Task 5 pure functions (traceRows, routeOf, waterfallOf) — no layer logic is re-derived here. The
 // route map lives in its own file (route-map.tsx) so this one stays focused.
 import { Fragment, useState } from 'react';
-import { LAYERS, type TraceRow } from '@/lib/request-trace';
+import { LAYERS, notableAttempts, type TraceRow } from '@/lib/request-trace';
 import type { HandlerCode, RuntimeEvent } from '@/lib/lifecycle';
 import { waterfallOf } from '@/lib/request-trace';
 
@@ -40,8 +40,22 @@ export type CodeEntry = { status: 'loading' } | { status: 'done'; value: Handler
 
 /** The code shown under Execute on a cache hit: lazily loaded, with the page's miss event as a fallback. */
 function ExecuteCode({ event, events, entry, onShow }: { event: RuntimeEvent; events: RuntimeEvent[]; entry?: CodeEntry; onShow: () => void }) {
-  if (!entry) return <button type="button" className="trace-icon-btn trace-code-btn" onClick={onShow}>{'</>'} Code</button>;
-  if (entry.status === 'loading') return <p className="trace-detail muted">Loading code…</p>;
+  // The toggle stays put once open, so the code can be folded away again (the same affordance as Generated code).
+  const [open, setOpen] = useState(false);
+  const toggle = () => {
+    if (!open && !entry) onShow();
+    setOpen(!open);
+  };
+  return (
+    <>
+      <button type="button" className="trace-code-toggle" aria-expanded={open} onClick={toggle}>{open ? '▾' : '▸'} {'</>'} Code</button>
+      {open && <ExecuteCodeBody event={event} events={events} entry={entry} />}
+    </>
+  );
+}
+
+function ExecuteCodeBody({ event, events, entry }: { event: RuntimeEvent; events: RuntimeEvent[]; entry?: CodeEntry }) {
+  if (!entry || entry.status === 'loading') return <p className="trace-detail muted">Loading code…</p>;
   if (entry.value) return <CodeBlock code={entry.value} />;
   // The instance did not have it; another request to the same handler on this page may carry its code.
   const fallback = events.find((e) => e.handlerKey === event.handlerKey && e.generated)?.generated;
@@ -76,9 +90,9 @@ export function LayersView({
                 {row.note ? <span className="trace-l-detail">{row.note}</span> : null}
               </div>
               {row.status === 'stop' ? <div className="trace-l-guard">limit: {row.guard}</div> : null}
-              {row.attempts.length > 0 && (
+              {notableAttempts(row).length > 0 && (
                 <ul className="trace-attempts">
-                  {row.attempts.map((a) => (
+                  {notableAttempts(row).map((a) => (
                     <li key={a.attempt}>
                       <span className="mono">#{a.attempt} {GLYPH[a.status]}</span>
                       {a.note ? ` ${a.note}` : ''}

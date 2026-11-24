@@ -2150,8 +2150,7 @@ code.inline {
 .trace-verdict-stop { background: var(--stop-bg, rgba(255, 90, 110, 0.12)); border: 1px solid var(--stop-border, rgba(255, 90, 110, 0.45)); }
 .trace-verdict b { font-family: var(--font-code); font-weight: 500; }
 .trace-v-count { margin-left: auto; font: 13px var(--font-code); color: var(--text-muted); }
-.trace-chip { border: 1px solid var(--border-color); border-radius: 6px; padding: 1px 7px; font-size: 12px; }
-.trace-icon-btn.trace-code-btn { font-size: 12px; color: var(--plasma-highlight); }
+.trace-code-toggle { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; font-size: 12px; color: var(--plasma-highlight); }
 .trace-vtabs { display: flex; gap: 2px; }
 .trace-vtabs button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 12px; cursor: pointer; color: var(--text-muted); font: inherit; font-size: 14px; }
 .trace-vtabs button.on { color: var(--text-pure); border-color: var(--plasma-primary); }
