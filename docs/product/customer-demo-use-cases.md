@@ -108,8 +108,9 @@ flowchart LR
 ## Demo script (about 7 minutes)
 
 Prerequisites:
-- `slime-test-db` is running. It runs permanently since 2026-11-22 (database `slime`, see
-  [platform/infra/README.md](../../platform/infra/README.md)).
+- `slime-test-db` is running (database `slime`). It is paused since 2026-11-24: restore it
+  from its snapshot first, see
+  [platform/infra/README.md](../../platform/infra/README.md).
 - The 1Password vault `Slime Hackathon` holds `Slime — Atlas demo endpoint` (URL, `slm_`
   key) and `Slime — Atlas demo Crystal (plan revenue)` (Crystal key, `slc_` token).
 - For case 3, the model key: `Slime — Anthropic API key (shared runtime)` in the same

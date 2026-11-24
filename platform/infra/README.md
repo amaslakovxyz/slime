@@ -178,8 +178,27 @@ Access and lifecycle:
 - Full cloud lifecycle: `SMOKE_DB_URL=$(aws ssm get-parameter --with-decryption
   --name /slime/test-db/READER_URL --query Parameter.Value --output text) npm run
   e2e:cloud` in `platform/admin` (with `SMOKE_EMAIL`/`SMOKE_PASSWORD`).
-- Runs permanently since 2026-11-22 (the stop schedule and its role are
-  deleted), ≈ $20/month; budget `slime-monthly` was raised to $30 for it
+- **Paused since 2026-11-24**: deleted with the final snapshot
+  `slime-test-db-pause-2026-11-24` (≈ $0 while paused; running it costs
+  ≈ $0.65/day, ≈ $20/month incl. its public IPv4). The security group and
+  `/slime/test-db/*` were kept. Restore (≈ 10 min; the same identifier gives the
+  same hostname, and the snapshot keeps the passwords, so the SSM URLs stay
+  valid; `AWS_PROFILE=default`):
+
+  ```sh
+  aws rds restore-db-instance-from-db-snapshot --region eu-central-1 \
+    --db-instance-identifier slime-test-db \
+    --db-snapshot-identifier slime-test-db-pause-2026-11-24 \
+    --db-instance-class db.t4g.micro --storage-type gp3 \
+    --db-subnet-group-name default --vpc-security-group-ids sg-025c001b096625ec1 \
+    --publicly-accessible --no-multi-az \
+    --tags Key=Project,Value=slime Key=Purpose,Value='cloud E2E test and demo shop database'
+  aws rds wait db-instance-available --region eu-central-1 --db-instance-identifier slime-test-db
+  ```
+
+  Before the pause it ran permanently from 2026-11-22 (the stop schedule and
+  its role are deleted; RDS restarts a stopped instance after 7 days anyway);
+  budget `slime-monthly` was raised to $30 for it
   (`bootstrap/variables.tf`). Remove it for good with
   `aws rds delete-db-instance --db-instance-identifier slime-test-db
   --skip-final-snapshot`, then delete the security group and `/slime/test-db/*`
