@@ -221,6 +221,18 @@ jobs:
         image: amazon/dynamodb-local:latest
         ports:
           - 8000:8000
+      # The demo database for the Test connection tests (test/connectors.test.ts).
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: slime_admin
+          POSTGRES_PASSWORD: slime_admin
+          POSTGRES_DB: slime
+        ports:
+          - 54329:5432
+        options: >-
+          --health-cmd "pg_isready -U slime_admin -d slime"
+          --health-interval 2s --health-timeout 3s --health-retries 30
     env:
       AWS_REGION: eu-central-1
       AWS_ENDPOINT_URL_DYNAMODB: http://localhost:8000
@@ -235,11 +247,14 @@ jobs:
           cache: npm
           cache-dependency-path: platform/admin/package-lock.json
       - run: npm ci
+      - run: psql "postgres://slime_admin:slime_admin@localhost:54329/slime" -v ON_ERROR_STOP=1 -f examples/express/db/init.sql
+        working-directory: .
       - run: npm run typecheck
-      # REQUIRE_DYNAMO makes the DynamoDB Local tests fail instead of skipping.
+      # REQUIRE_DYNAMO and REQUIRE_DB make the DynamoDB Local and Postgres tests fail instead of skipping.
       - run: npm test
         env:
           REQUIRE_DYNAMO: "1"
+          REQUIRE_DB: "1"
       - run: npm run build
 
   # Playwright against `npm run local` (admin + local runner): DynamoDB Local,
