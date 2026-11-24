@@ -6,7 +6,9 @@ name: Crystal agents
 # allows it: the branch changes nothing outside the Crystal folder, verify passes on the
 # committed folder, and every reviewer approved. Otherwise the PR waits for a person.
 #
-# Off until the repository has the ANTHROPIC_API_KEY secret. Opening the PR needs
+# Authenticates to the Claude API through Workload Identity Federation (no stored key):
+# crystal/scripts/anthropic-token.sh, allowed by the federation rule in the Claude Console.
+# Opening the PR needs
 # Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests".
 
 on:
@@ -17,6 +19,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  id-token: write
 
 concurrency:
   group: crystal-agents
@@ -40,45 +43,35 @@ jobs:
           --health-cmd "pg_isready -U slime_admin -d slime"
           --health-interval 2s --health-timeout 3s --health-retries 30
     env:
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      ANTHROPIC_FEDERATION_RULE_ID: fdrl_01NTc6gNf4VuFDNxixzKEaSK
+      ANTHROPIC_ORGANIZATION_ID: 0d870091-34dd-4e78-862d-c8760f1ac305
+      ANTHROPIC_SERVICE_ACCOUNT_ID: svac_0185YHb3rXuNuegUvLMDFrzG
+      ANTHROPIC_WORKSPACE_ID: wrkspc_01CQ7wJetxgXVCgPKKfBYLfe
       DATABASE_URL: postgres://slime_reader:slime_reader@localhost:54329/slime
       CRYSTAL_DIR: examples/express/slime-crystal
       GH_TOKEN: ${{ github.token }}
     steps:
-      - name: Needs ANTHROPIC_API_KEY
-        id: key
-        run: |
-          if [ -z "$ANTHROPIC_API_KEY" ]; then
-            echo "::notice::ANTHROPIC_API_KEY is not set: the Crystal agents are off."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          fi
-      - if: steps.key.outputs.skip != 'true'
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
-      - if: steps.key.outputs.skip != 'true'
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: |
             package-lock.json
             examples/express/package-lock.json
-      - if: steps.key.outputs.skip != 'true'
-        run: psql "postgres://slime_admin:slime_admin@localhost:54329/slime" -v ON_ERROR_STOP=1 -f examples/express/db/init.sql
-      - if: steps.key.outputs.skip != 'true'
-        run: |
+      - run: psql "postgres://slime_admin:slime_admin@localhost:54329/slime" -v ON_ERROR_STOP=1 -f examples/express/db/init.sql
+      - run: |
           npm ci
           npm run build -w @slime-cloud/core -w @slime-cloud/crystal
           npm ci --prefix examples/express
           npm install -g @anthropic-ai/claude-code@2.1.330
       - name: Grow the example's handlers to Crystal
-        if: steps.key.outputs.skip != 'true'
         working-directory: examples/express
         run: node scripts/grow-crystals.mjs
       - name: Commit what crystallize wrote
         id: crystallize
-        if: steps.key.outputs.skip != 'true'
         run: |
           if [ -z "$(git status --porcelain -- "$CRYSTAL_DIR")" ]; then
             echo "::notice::No handler is newly ready for Crystal."
@@ -91,7 +84,7 @@ jobs:
           git add -- "$CRYSTAL_DIR"
           git commit -m "crystallize: new Crystal in $CRYSTAL_DIR"
       - name: Writer and reviewer agents
-        if: steps.key.outputs.skip != 'true' && steps.crystallize.outputs.nothing != 'true'
+        if: steps.crystallize.outputs.nothing != 'true'
         run: |
           node crystal/scripts/agent-loop.mjs --dir "$CRYSTAL_DIR" --database-url "$DATABASE_URL" --report "$RUNNER_TEMP/report.json"
           if [ -n "$(git status --porcelain -- "$CRYSTAL_DIR")" ]; then
@@ -100,7 +93,7 @@ jobs:
           fi
           git push -u origin "crystal/agents-${GITHUB_RUN_ID}"
       - name: Open the PR, and merge it if the gate allows
-        if: steps.key.outputs.skip != 'true' && steps.crystallize.outputs.nothing != 'true'
+        if: steps.crystallize.outputs.nothing != 'true'
         run: |
           node -e '
             const r = require(process.argv[1]);

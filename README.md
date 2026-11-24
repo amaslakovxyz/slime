@@ -77,9 +77,11 @@ each one a status (Current, Design, Vision, Plan, Record, Superseded).
   `platform/infra/` stack except `bootstrap/` on pull requests and applies
   them on `main`; [terraform-quality.yml](./.github/workflows/terraform-quality.yml)
   runs tflint and trivy; [crystal-agents.yml](./.github/workflows/crystal-agents.yml)
-  (weekly or manual, off until the `ANTHROPIC_API_KEY` secret exists) grows the
+  (weekly or manual; Claude through Workload Identity Federation, no stored key) grows the
   express example's handlers to Crystal, lets writer and reviewer agents
-  ([crystal/agents/](./crystal/agents/)) optimize them, and opens a PR.
+  ([crystal/agents/](./crystal/agents/)) optimize them, and opens a PR;
+  [anthropic-wif.yml](./.github/workflows/anthropic-wif.yml) (manual) checks that
+  federation: token exchange, a Messages call, the `claude` CLI.
 
 Root files: [AGENTS.md](./AGENTS.md) (repository contract for agents),
 [justfile](./justfile) (task runner),

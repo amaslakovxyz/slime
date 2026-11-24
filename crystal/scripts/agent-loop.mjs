@@ -8,8 +8,10 @@
 //     [--keys k1,k2] [--rounds 2] [--report <file>] [--cli "node crystal/dist/bin.js"]
 //     [--writer-model <model>] [--reviewer-model <model>] [--writer-effort <level>] [--reviewer-effort low] [--max-budget-usd <n>]
 //
-// Needs the `claude` CLI and a built @slime-cloud/crystal. With ANTHROPIC_API_KEY set it
-// runs --bare (CI); otherwise it uses the local login, without MCP servers or skills.
+// Needs the `claude` CLI and a built @slime-cloud/crystal. In CI (ANTHROPIC_FEDERATION_RULE_ID
+// set) it runs --bare with crystal/scripts/anthropic-token.sh as the apiKeyHelper, so every
+// agent call gets a short-lived federated token; with ANTHROPIC_API_KEY set it runs --bare on
+// that key; otherwise it uses the local login, without MCP servers or skills.
 import { execFile } from 'node:child_process';
 import { cp, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -196,7 +198,9 @@ async function claude({ prompt, model, effort, tools, allowed, schema }) {
   const emptyMcp = join(await mkdtemp(join(tmpdir(), 'crystal-agent-mcp-')), 'mcp.json');
   await writeFile(emptyMcp, '{"mcpServers":{}}');
   const flags = ['-p', prompt, '--output-format', 'json', '--model', model, ...(effort ? ['--effort', effort] : []), '--tools', tools, '--disable-slash-commands', '--strict-mcp-config', '--mcp-config', emptyMcp, '--max-budget-usd', args['max-budget-usd']];
-  if (process.env.ANTHROPIC_API_KEY) flags.push('--bare');
+  // --bare reads only ANTHROPIC_API_KEY or an apiKeyHelper, never a login.
+  if (process.env.ANTHROPIC_FEDERATION_RULE_ID) flags.push('--bare', '--settings', JSON.stringify({ apiKeyHelper: `bash ${join(REPO_ROOT, 'crystal', 'scripts', 'anthropic-token.sh')}` }));
+  else if (process.env.ANTHROPIC_API_KEY) flags.push('--bare');
   if (schema) flags.push('--json-schema', JSON.stringify(schema));
   if (allowed.length > 0) flags.push('--allowedTools', ...allowed);
   const { stdout } = await run('claude', flags, { cwd: REPO_ROOT, env: { ...process.env, CRYSTAL_DATABASE_URL: databaseUrl }, maxBuffer: 64 * 1024 * 1024, timeout: AGENT_TIMEOUT_MS });
