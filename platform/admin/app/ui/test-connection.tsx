@@ -5,18 +5,28 @@ import { testConnectionAction, testStoredConnectionAction } from '@/app/actions'
 import type { ConnectionTest } from '@/lib/connectors/postgres';
 
 /**
- * Either tests `url` (create form) or the endpoint's stored URL, which stays
- * on the server. Clears its result when the URL changes.
+ * Either tests `url` as `connectorType` (create form) or the endpoint's stored URL,
+ * which stays on the server. Clears its result when the URL or connector changes.
  */
-export function TestConnection({ url, endpointId }: { url?: string; endpointId?: string }) {
+export function TestConnection({
+  url,
+  connectorType = 'postgres',
+  endpointId,
+}: {
+  url?: string;
+  connectorType?: string;
+  endpointId?: string;
+}) {
   const [result, setResult] = useState<{ for: string; value: ConnectionTest } | null>(null);
   const [pending, startTransition] = useTransition();
-  const key = endpointId ?? url ?? '';
+  const key = endpointId ?? `${connectorType} ${url ?? ''}`;
   const shown = result && result.for === key ? result.value : null;
 
   const run = () =>
     startTransition(async () => {
-      const value = endpointId ? await testStoredConnectionAction(endpointId) : await testConnectionAction(url ?? '');
+      const value = endpointId
+        ? await testStoredConnectionAction(endpointId)
+        : await testConnectionAction(connectorType, url ?? '');
       setResult({ for: key, value });
     });
 
@@ -66,6 +76,13 @@ function ConnectionResult({ result }: { result: ConnectionTest }) {
         <ul className="result-problems">
           {result.problems.map((p) => (
             <li key={p}>{p}</li>
+          ))}
+        </ul>
+      )}
+      {result.warnings.length > 0 && (
+        <ul className="result-warnings">
+          {result.warnings.map((w) => (
+            <li key={w}>{w}</li>
           ))}
         </ul>
       )}
