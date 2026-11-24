@@ -1,20 +1,36 @@
 import './setup.js';
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { codeOfRecord, codeOfCrystal } from '../src/handler-code.js';
+import type { Artifact } from '@slime-cloud/core';
+import { recordFromStore, sqlOf } from '@slime-cloud/core/tooling';
 import { createApp } from '../src/app.js';
+import { codeOfCrystal, codeOfRecord } from '../src/handler-code.js';
 
 const connector = { safetyCheck: async () => ({ ok: true }) } as never;
 const slime = { handlers: () => [] } as never;
 
+const artifact: Artifact = {
+  version: 2,
+  unsatisfiable: null,
+  steps: [
+    { name: 'a', source: 'postgres', sql: 'SELECT 1', params: [] },
+    { name: 'b', source: 'films', operation: 'list', args: [] },
+    { name: 'c', source: 'postgres', sql: 'SELECT 2', params: [] },
+  ],
+  shapeJs: '(r) => r',
+  assumptions: ['x'],
+};
+
 describe('handler code', () => {
-  test('a stored record in the current form joins its SQL steps', () => {
-    const code = codeOfRecord({ key: 'k', tier: 'liquid', artifact: { steps: [{ name: 'a', source: 'postgres', sql: 'SELECT 1', params: [] }, { name: 'b', source: 'films', operation: 'list' }, { name: 'c', source: 'postgres', sql: 'SELECT 2', params: [] }], shapeJs: '(r) => r', assumptions: ['x'] } });
-    assert.deepEqual(code, { key: 'k', tier: 'liquid', sql: 'SELECT 1;\n\nSELECT 2', shapeJs: '(r) => r', assumptions: ['x'] });
+  test('a stored record in the current form joins its SQL steps the same way sqlOf does', () => {
+    const code = codeOfRecord({ key: 'k', tier: 'liquid', artifact });
+    assert.deepEqual(code, { key: 'k', tier: 'liquid', sql: sqlOf(artifact), shapeJs: '(r) => r', assumptions: ['x'] });
   });
 
-  test('a legacy single-query record', () => {
-    assert.deepEqual(codeOfRecord({ key: 'k', tier: 'gas', artifact: { sql: 'SELECT 3' } }), { key: 'k', tier: 'gas', sql: 'SELECT 3', assumptions: [] });
+  test('a legacy stored record still yields its SQL', () => {
+    const stored = { key: 'k', tier: 'gas', artifact: { unsatisfiable: null, sql: 'SELECT 3', params: [], shapeJs: null, assumptions: [] } };
+    const record = recordFromStore(stored, 'postgres');
+    assert.deepEqual(codeOfRecord(record), { key: 'k', tier: 'gas', sql: 'SELECT 3', assumptions: [] });
   });
 
   test('a Crystal', () => {

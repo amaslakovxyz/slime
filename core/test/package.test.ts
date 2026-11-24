@@ -57,7 +57,7 @@ test('adapters have their own subpaths, so the main entry never loads them (C7)'
   assert.deepEqual(Object.keys(await import('../src/models/index.js')).sort(), ['modelRoles', 'parseJsonReply', 'providerRoles']);
   assert.equal(pkg.exports['./crystallize'], undefined, 'the crystallize job is @slime-cloud/crystal');
   assert.deepEqual(pkg.exports['./tooling'], { types: './dist/tooling.d.ts', default: './dist/tooling.js' });
-  assert.deepEqual(Object.keys(await import('../src/tooling.js')).sort(), ['HANDLERS_NS', 'SQL_SOURCE_DEFAULT_NAME', 'asSingleQuery', 'assertReadOnlySql', 'bindParams', 'canonicalJSON', 'executeArtifact', 'isApiStep', 'isStepsCrystal', 'paramTypesForModel', 'queryLimits', 'recordFromStore', 'runCrystal', 'sha256', 'slimeInternals']);
+  assert.deepEqual(Object.keys(await import('../src/tooling.js')).sort(), ['HANDLERS_NS', 'SQL_SOURCE_DEFAULT_NAME', 'asSingleQuery', 'assertReadOnlySql', 'bindParams', 'canonicalJSON', 'executeArtifact', 'isApiStep', 'isStepsCrystal', 'paramTypesForModel', 'queryLimits', 'recordFromStore', 'runCrystal', 'sha256', 'slimeInternals', 'sqlOf']);
   assert.deepEqual(pkg.exports['./testing'], { types: './dist/testing/index.d.ts', default: './dist/testing/index.js' });
   assert.deepEqual(Object.keys(await import('../src/testing/index.js')).sort(), [
     'FAKE_SECRET',
