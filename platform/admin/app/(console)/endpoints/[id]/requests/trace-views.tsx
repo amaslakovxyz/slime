@@ -90,7 +90,7 @@ export function LayersView({
                   <CodeBlock code={event.generated} />
                 </details>
               )}
-              {row.id === 'execute' && !event.generated && row.status === 'pass' && (
+              {row.id === 'execute' && !event.generated && (row.status === 'pass' || row.status === 'stop') && (
                 <div className="trace-more">
                   <ExecuteCode event={event} events={events} entry={codeEntry} onShow={onShowCode} />
                 </div>

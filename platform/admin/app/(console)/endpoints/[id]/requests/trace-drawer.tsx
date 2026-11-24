@@ -4,7 +4,7 @@
 // the Task 5 functions and shows its header, verdict and three tabs. Non-modal (role="complementary", no
 // scrim) so the log behind it stays clickable and ↑/↓ walk between requests; RequestsLog owns that keyboard
 // and the open/close state. The code behind a cache hit loads lazily, once per handler key, cached here.
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { loadHandlerCode } from '@/app/actions';
 import { traceRows, verdictOf } from '@/lib/request-trace';
 import type { HandlerCode, RuntimeEvent } from '@/lib/lifecycle';
@@ -51,7 +51,9 @@ export function TraceDrawer({
     setCodes((c) => ({ ...c, [key]: { status: 'done', value } }));
   }
 
-  const rows = event ? traceRows(event) : null;
+  // Stable per request, so the route map's edge-drawing effect redraws only on a new request (and on resize),
+  // not on unrelated drawer re-renders (tab switch, code load, waterfall scale).
+  const rows = useMemo(() => (event ? traceRows(event) : null), [event]);
 
   return (
     <aside className={`trace-drawer${open ? ' trace-drawer-open' : ''}`} role="complementary" aria-label="Request trace" aria-hidden={!open}>
