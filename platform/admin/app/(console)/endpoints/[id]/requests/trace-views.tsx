@@ -40,7 +40,7 @@ export type CodeEntry = { status: 'loading' } | { status: 'done'; value: Handler
 
 /** The code shown under Execute on a cache hit: lazily loaded, with the page's miss event as a fallback. */
 function ExecuteCode({ event, events, entry, onShow }: { event: RuntimeEvent; events: RuntimeEvent[]; entry?: CodeEntry; onShow: () => void }) {
-  if (!entry) return <button type="button" className="trace-icon-btn" onClick={onShow}>Show code</button>;
+  if (!entry) return <button type="button" className="trace-icon-btn trace-code-btn" onClick={onShow}>{'</>'} Code</button>;
   if (entry.status === 'loading') return <p className="trace-detail muted">Loading code…</p>;
   if (entry.value) return <CodeBlock code={entry.value} />;
   // The instance did not have it; another request to the same handler on this page may carry its code.
@@ -65,28 +65,30 @@ export function LayersView({
 }) {
   return (
     <>
-      <p className="trace-detail muted trace-limits-note">Guard captions are the core default limits.</p>
       <ol className="trace-layers">
         {rows.map((row) => (
-          <li key={row.id} className={`trace-layer trace-layer-${row.status}`}>
+          // The guard is the same core default on every request: a hover hint, shown inline only where it stopped one.
+          <li key={row.id} className={`trace-layer trace-layer-${row.status}`} title={`Default limit: ${row.guard}`}>
             <div className="trace-dot">{GLYPH[row.status]}</div>
             <div>
-              <div className="trace-l-name">{row.name}</div>
-              <div className="trace-l-guard">{row.guard}</div>
-              {row.note ? <div className="trace-l-detail">{row.note}</div> : null}
+              <div className="trace-l-line">
+                <span className="trace-l-name">{row.name}</span>
+                {row.note ? <span className="trace-l-detail">{row.note}</span> : null}
+              </div>
+              {row.status === 'stop' ? <div className="trace-l-guard">limit: {row.guard}</div> : null}
               {row.attempts.length > 0 && (
                 <ul className="trace-attempts">
                   {row.attempts.map((a) => (
                     <li key={a.attempt}>
-                      <span className="mono">attempt {a.attempt}</span> {GLYPH[a.status]}
-                      {a.note ? ` · ${a.note}` : ''}
+                      <span className="mono">#{a.attempt} {GLYPH[a.status]}</span>
+                      {a.note ? ` ${a.note}` : ''}
                     </li>
                   ))}
                 </ul>
               )}
               {row.id === 'generate' && event.generated && (
                 <details className="trace-more" open={row.status === 'stop'}>
-                  <summary>Show generated code</summary>
+                  <summary>{'</>'} Generated code</summary>
                   <CodeBlock code={event.generated} />
                 </details>
               )}
@@ -96,7 +98,8 @@ export function LayersView({
                 </div>
               )}
             </div>
-            <div className="trace-l-ms">{row.ms === undefined ? '' : fmtMs(row.ms)}</div>
+            {/* Sub-0.1 ms reads as noise next to the real costs; the waterfall keeps every value. */}
+            <div className="trace-l-ms">{row.ms === undefined || row.ms < 0.05 ? '' : fmtMs(row.ms)}</div>
           </li>
         ))}
       </ol>
@@ -118,8 +121,7 @@ export function WaterfallView({ event }: { event: RuntimeEvent }) {
 
   return (
     <>
-      <div className="trace-wf-scale">
-        Time scale
+      <div className="trace-wf-scale" role="group" aria-label="Time scale">
         <button type="button" className={scale === 'linear' ? 'on' : undefined} onClick={() => setScale('linear')}>linear</button>
         <button type="button" className={scale === 'log' ? 'on' : undefined} onClick={() => setScale('log')}>log</button>
       </div>

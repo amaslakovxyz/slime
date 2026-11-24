@@ -146,14 +146,17 @@ export function waterfallOf(event: RuntimeEvent): { label: string; start: number
   const spans = event.trace ?? [];
   const bars: { label: string; start: number; ms: number; kind: 'pass' | 'stop' | 'skip' | 'background' }[] = [];
   let cursor = 0;
+  // Same names as the Layers tab; "#n" only when the model really had several attempts.
+  const severalAttempts = new Set(spans.map((s) => s.attempt).filter((a) => a !== undefined)).size > 1;
+  const nameOf = (layer: string) => LAYERS.find((l) => l.id === layer)?.name ?? layer;
   for (const span of spans) {
     if (span.layer === 'cache' || span.layer === 'review') continue;
     const ms = span.ms ?? 0;
     const kind = span.status === 'stop' ? 'stop' : span.status === 'skip' ? 'skip' : 'pass';
-    const label = span.attempt !== undefined ? `${span.layer} · attempt ${span.attempt}` : span.layer;
+    const label = severalAttempts && span.attempt !== undefined ? `${nameOf(span.layer)} #${span.attempt}` : nameOf(span.layer);
     bars.push({ label, start: cursor, ms, kind });
     cursor += ms;
   }
-  if (spans.some((s) => s.layer === 'review' && s.status === 'pending')) bars.push({ label: 'review (background)', start: cursor, ms: 0, kind: 'background' });
+  if (spans.some((s) => s.layer === 'review' && s.status === 'pending')) bars.push({ label: 'Review (background)', start: cursor, ms: 0, kind: 'background' });
   return bars;
 }

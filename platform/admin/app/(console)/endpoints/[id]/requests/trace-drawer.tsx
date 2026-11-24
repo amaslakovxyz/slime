@@ -62,19 +62,21 @@ export function TraceDrawer({
           <div className="trace-d-head">
             <div className="trace-d-top">
               <div>
-                <div className="muted small mono">
-                  {[time(event.at), event.handlerKey ? `handler #${event.handlerKey.slice(0, 6)}` : 'handler —', event.route === 'crystal' ? 'own route' : event.cache ? `cache ${event.cache}` : null]
+                <div className="muted small mono" title="time · handler · route">
+                  {[time(event.at), event.handlerKey ? `#${event.handlerKey.slice(0, 6)}` : null, event.route === 'crystal' ? 'own route' : event.cache]
                     .filter(Boolean)
                     .join(' · ')}
                 </div>
-                <div className="trace-d-intent">{event.intent || 'Intent not recorded'}</div>
+                <div className="trace-d-intent" title={event.intent}>{event.intent || 'Intent not recorded'}</div>
               </div>
-              <button type="button" className="trace-icon-btn" onClick={onClose} aria-label="Close trace">Esc ✕</button>
+              <button type="button" className="trace-icon-btn" onClick={onClose} aria-label="Close trace" title="Close (Esc)">✕</button>
             </div>
             <div className="trace-d-meta">
               <TierPill tier={event.tier} />
-              <span className="mono">{fmtMs(event.ms)} total</span>
-              {event.inputs && event.inputs.length > 0 && <span className="mono">inputs: {event.inputs.join(', ')}</span>}
+              <span className="mono" title="Total latency">⏱ {fmtMs(event.ms)}</span>
+              {event.inputs?.map((name) => (
+                <span key={name} className="trace-chip mono" title="Input name (values are never recorded)">{name}</span>
+              ))}
             </div>
             {rows && <Verdict event={event} rows={rows} />}
             {rows && (
@@ -118,14 +120,15 @@ function Verdict({ event, rows }: { event: RuntimeEvent; rows: NonNullable<Retur
   if (v.ok) {
     return (
       <div className="trace-verdict trace-verdict-ok">
-        ✓ Answered · passed <strong>{v.passed}</strong> layers, {v.skipped} not needed on this route
+        <span>✓ Answered</span>
+        <span className="trace-v-count" title={`${v.passed} layers passed, ${v.skipped} not needed on this route`}>{v.passed}/{rows.length}</span>
       </div>
     );
   }
   return (
     <div className="trace-verdict trace-verdict-stop">
-      ✕ Stopped at <strong>{v.stopAt ? layerName(v.stopAt) : 'the request'}</strong>
-      {v.code ? <> — <b>{v.code}</b></> : null} · {v.passed} layers passed before it
+      <span>✕ Stopped at <strong>{v.stopAt ? layerName(v.stopAt) : 'the request'}</strong></span>
+      {v.code ? <b className="trace-v-count">{v.code}</b> : null}
     </div>
   );
 }

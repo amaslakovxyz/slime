@@ -140,9 +140,15 @@ describe('verdictOf / routeOf / waterfallOf', () => {
   });
   test('waterfall bars start where the previous one ended', () => {
     const bars = waterfallOf(MISS);
-    const gen2 = bars.find((b) => b.label === 'generate · attempt 2')!;
+    const gen2 = bars.find((b) => b.label === 'Generate #2')!;
     assert.equal(gen2.start, 1000);
     assert.equal(bars.at(-1)!.kind, 'background');
+  });
+
+  test('waterfall labels are the layer names; the attempt shows only when there were several', () => {
+    assert.deepEqual(waterfallOf(MISS).slice(0, 5).map((b) => b.label), ['Edge', 'Parse & key', 'Route', 'Generation limits', 'Generate #1']);
+    assert.ok(waterfallOf(HIT).every((b) => !b.label.includes('#')));
+    assert.equal(waterfallOf(MISS).at(-1)!.label, 'Review (background)');
   });
 
   test('a Liquid hit lights cache but leaves gen dim', () => {

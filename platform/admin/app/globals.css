@@ -2117,17 +2117,19 @@ code.inline {
 .trace-res-ok { color: var(--gas-accent); }
 .trace-res-stop { color: var(--stop, #FF5A6E); }
 .trace-res-stop small { color: var(--text-muted); }
-.trace-res-short { display: none; }
 .trace-res-stop, .trace-res-ok, td.num { white-space: nowrap; }
 
 /* with the drawer open the log hides what the header repeats and keeps only what you scan by */
 .main { transition: margin 0.22s ease; }
-.main:has(.trace-log-open) { margin-right: min(600px, 100vw); }
-.trace-log-open .trace-col-handler, .trace-log-open .trace-col-cache { display: none; }
-.trace-log-open .trace-intent { max-width: 170px; }
-.trace-log-open .trace-res-long { display: none; }
-.trace-log-open .trace-res-short { display: inline; }
-.trace-log-open .trace-res-stop small { display: none; }
+/* .main is width: 100%, so the drawer's room comes out of the width too, or the log slides under the drawer */
+.main:has(.trace-log-open) { margin-right: min(600px, 100vw); width: calc(100% - min(600px, 100vw)); }
+.trace-log-open .trace-col-handler, .trace-log-open .trace-col-cache, .trace-log-open .trace-col-lat, .trace-log-open .trace-res-text { display: none; }
+/* fixed layout so the narrowed log fits beside the drawer: the intent takes what is left and ellipsizes */
+.trace-log-open table { table-layout: fixed; width: 100%; }
+.trace-log-open .trace-col-time { width: 96px; }
+.trace-log-open .trace-col-stage { width: 104px; }
+.trace-log-open .trace-col-result { width: 64px; text-align: center; font-size: 16px; }
+.trace-log-open .trace-intent { max-width: none; white-space: nowrap; }
 
 /* drawer shell */
 .trace-drawer {
@@ -2147,6 +2149,9 @@ code.inline {
 .trace-verdict-ok { background: var(--gas-bg); border: 1px solid var(--gas-border); }
 .trace-verdict-stop { background: var(--stop-bg, rgba(255, 90, 110, 0.12)); border: 1px solid var(--stop-border, rgba(255, 90, 110, 0.45)); }
 .trace-verdict b { font-family: var(--font-code); font-weight: 500; }
+.trace-v-count { margin-left: auto; font: 13px var(--font-code); color: var(--text-muted); }
+.trace-chip { border: 1px solid var(--border-color); border-radius: 6px; padding: 1px 7px; font-size: 12px; }
+.trace-icon-btn.trace-code-btn { font-size: 12px; color: var(--plasma-highlight); }
 .trace-vtabs { display: flex; gap: 2px; }
 .trace-vtabs button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 12px; cursor: pointer; color: var(--text-muted); font: inherit; font-size: 14px; }
 .trace-vtabs button.on { color: var(--text-pure); border-color: var(--plasma-primary); }
@@ -2154,10 +2159,10 @@ code.inline {
 .trace-detail { font-size: 13px; }
 
 /* variant A: layers */
-.trace-limits-note { margin-bottom: 12px; }
 .trace-layers { list-style: none; margin: 0; padding: 0; position: relative; }
 .trace-layers::before { content: ""; position: absolute; left: 13px; top: 14px; bottom: 14px; width: 2px; background: var(--border-color); }
-.trace-layer { position: relative; display: grid; grid-template-columns: 28px 1fr auto; gap: 0 12px; padding: 8px 0; }
+.trace-layer { position: relative; display: grid; grid-template-columns: 28px 1fr auto; gap: 0 12px; padding: 6px 0; align-items: start; }
+.trace-l-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; padding-top: 4px; }
 .trace-dot { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font: 600 13px var(--font-code); background: var(--bg-surface); border: 2px solid var(--border-bright); z-index: 1; }
 .trace-layer-pass .trace-dot { border-color: var(--gas-accent); color: var(--gas-accent); }
 .trace-layer-stop .trace-dot { border-color: var(--stop, #FF5A6E); color: var(--stop, #FF5A6E); background: #2a0f16; box-shadow: 0 0 0 5px rgba(255, 90, 110, 0.12); }
@@ -2166,8 +2171,8 @@ code.inline {
 .trace-layer-skip .trace-l-name, .trace-layer-unreached .trace-l-name { color: var(--text-muted); }
 .trace-layer-unreached { opacity: 0.45; }
 .trace-l-name { font-weight: 600; font-size: 14px; }
-.trace-l-guard { font: 12px var(--font-code); color: var(--wireframe-grey); }
-.trace-l-detail { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+.trace-l-guard { font: 12px var(--font-code); color: var(--text-muted); margin-top: 2px; }
+.trace-l-detail { font-size: 13px; color: var(--text-muted); }
 .trace-layer-stop .trace-l-detail { color: #FFC2CA; }
 .trace-l-ms { font: 12px var(--font-code); color: var(--text-muted); white-space: nowrap; padding-top: 4px; }
 .trace-attempts { list-style: none; margin: 6px 0 0; padding: 0; font-size: 12px; color: var(--text-muted); display: grid; gap: 2px; }
@@ -2195,7 +2200,6 @@ pre.trace-code { background: #0E0911; border: 1px solid var(--border-color); bor
 .trace-node-ms { position: absolute; right: 8px; top: 6px; font: 11px var(--font-code); color: var(--text-muted); }
 .trace-map-legend { display: flex; gap: 14px; font-size: 12px; color: var(--text-muted); margin: 14px 0 4px; flex-wrap: wrap; }
 .trace-map-legend i { display: inline-block; width: 18px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 5px; }
-.trace-map-note { font-size: 13px; color: var(--text-muted); margin-top: 10px; }
 
 /* variant C: waterfall */
 .trace-wf { display: grid; grid-template-columns: 150px 1fr 70px; gap: 6px 10px; align-items: center; font-size: 13px; }

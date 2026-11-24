@@ -18,16 +18,15 @@ function TierCell({ tier }: { tier?: RuntimeEvent['tier'] }) {
 }
 
 function ResultCell({ e }: { e: RuntimeEvent }) {
+  // With the drawer open only the icon stays (trace-res-text hides): the drawer header says the rest.
   if (e.code) {
     return (
-      <span className="trace-res-stop" title={e.code}>
-        <span className="trace-res-long">✕ {e.code}</span>
-        <span className="trace-res-short">✕ {e.status ?? ''}</span>
-        {e.stopAt ? <small> · {layerName(e.stopAt)}</small> : null}
+      <span className="trace-res-stop" title={`${e.code}${e.stopAt ? ` · ${layerName(e.stopAt)}` : ''}`}>
+        ✕<span className="trace-res-text"> {e.code}{e.stopAt ? <small> · {layerName(e.stopAt)}</small> : null}</span>
       </span>
     );
   }
-  return <span className="trace-res-ok">✓ {e.status ?? 200}</span>;
+  return <span className="trace-res-ok" title={String(e.status ?? 200)}>✓<span className="trace-res-text"> {e.status ?? 200}</span></span>;
 }
 
 const editableTarget = (el: EventTarget | null) => {
@@ -78,13 +77,13 @@ export function RequestsLog({ endpointId, events }: { endpointId: string; events
         <table>
           <thead>
             <tr>
-              <th>Time</th>
+              <th className="trace-col-time">Time</th>
               <th className="trace-col-handler">Handler</th>
               <th>Intent</th>
-              <th>Stage</th>
+              <th className="trace-col-stage">Stage</th>
               <th className="trace-col-cache">Cache</th>
-              <th>Result</th>
-              <th className="num">Latency</th>
+              <th className="trace-col-result">Result</th>
+              <th className="num trace-col-lat">Latency</th>
             </tr>
           </thead>
           <tbody>
@@ -105,13 +104,13 @@ export function RequestsLog({ endpointId, events }: { endpointId: string; events
                     }
                   }}
                 >
-                  <td className="mono" suppressHydrationWarning>{time(e.at)}</td>
+                  <td className="mono trace-col-time" suppressHydrationWarning>{time(e.at)}</td>
                   <td className="mono trace-col-handler" title={e.handlerKey}>{e.handlerKey ? `#${e.handlerKey.slice(0, 6)}` : '—'}</td>
                   <td className="trace-intent" title={e.intent}>{e.intent || '—'}</td>
-                  <td><TierCell tier={e.tier} /></td>
+                  <td className="trace-col-stage"><TierCell tier={e.tier} /></td>
                   <td className="trace-col-cache">{e.route === 'crystal' ? 'own route' : e.cache}</td>
-                  <td><ResultCell e={e} /></td>
-                  <td className="num mono">{fmtMs(e.ms)}</td>
+                  <td className="trace-col-result"><ResultCell e={e} /></td>
+                  <td className="num mono trace-col-lat">{fmtMs(e.ms)}</td>
                 </tr>
               );
             })}

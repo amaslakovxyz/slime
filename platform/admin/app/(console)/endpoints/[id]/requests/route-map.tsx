@@ -97,7 +97,8 @@ export function RouteMapView({ event, rows }: { event: RuntimeEvent; rows: Trace
             <div key={id} ref={(el) => void (el ? nodeRefs.current.set(id, el) : nodeRefs.current.delete(id))} className={`trace-node ${cls}`} style={{ gridRow, gridColumn }}>
               <span className="trace-node-ms">{ms === undefined ? '' : fmtMs(ms)}</span>
               {name}
-              <small>{sub}</small>
+              {/* Only nodes on this request's path carry their caption; dim nodes are context, not reading matter. */}
+              {lit || route.stop === id ? <small>{sub}</small> : null}
             </div>
           );
         })}
@@ -108,11 +109,6 @@ export function RouteMapView({ event, rows }: { event: RuntimeEvent; rows: Trace
         <span><i style={{ borderColor: 'var(--pending)', borderTopStyle: 'dashed' }} />background</span>
         <span><i style={{ borderColor: 'var(--border-bright)' }} />not taken</span>
       </div>
-      <p className="trace-map-note">
-        {event.code
-          ? <>Red node: the request stopped here with <code>{event.code}</code>. Dim nodes were never reached.</>
-          : <>Lit path: what answered this request. Dim nodes were not needed on this route{route.background.length ? '; dashed: still running in the background' : ''}.</>}
-      </p>
     </>
   );
 }
