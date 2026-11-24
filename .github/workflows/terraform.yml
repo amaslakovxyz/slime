@@ -296,6 +296,20 @@ jobs:
               aws dynamodb describe-table --table-name "$table" --query Table.TableStatus --output text
             done
           fi
+          # Alarms publish to a topic whose email subscription is made by hand
+          # (platform/infra/README.md). Warn, not fail: a missing subscriber
+          # must not block deploys, but must not go unnoticed either.
+          topic=$(jq -r '.alerts_topic_arn.value // empty' <<<"$outputs")
+          if [ -n "$topic" ]; then
+            # jq, not --query: the CLI applies --query per page and can print
+            # one count per page.
+            confirmed=$(aws sns list-subscriptions-by-topic --topic-arn "$topic" --output json |
+              jq '[.Subscriptions[] | select(.SubscriptionArn != "PendingConfirmation")] | length')
+            echo "alerts topic confirmed subscriptions: $confirmed"
+            if [ "$confirmed" = "0" ]; then
+              echo "::warning::No confirmed subscription on $topic: alarms notify nobody. See platform/infra/README.md."
+            fi
+          fi
       # Goal 10 of docs/architecture/2026-11-21-cloud-mvp-design.md: sign-in,
       # create -> failed (no cloud database), keyless 401, unknown id 404,
       # delete. Runs without the AWS credentials: it only talks HTTPS.

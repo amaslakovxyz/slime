@@ -58,7 +58,7 @@ credits); 12-month offers no longer apply, only Always Free.
 | Budget `slime-monthly` | $30, alerts $21 + $30 actual, $30 forecast | Region `eu-central-1` until the `Project` tag is active, then tag `Project=slime` |
 | Budget action `freeze` | 100% actual of `slime-monthly`, automatic | Attaches `slime-budget-freeze` to `slime-deployer` and `slime-gha-apply`: no new paid resources or capacity increases (ECS/RDS/DynamoDB updates are blocked too); reads, code updates and deletes still work |
 | Cost Anomaly Detection | SERVICE monitor, daily email at >= $5 impact | Whole account, free |
-| Ops alarms ([`platform/alerting.tf`](platform/alerting.tf)) | 7 CloudWatch alarms -> SNS `slime-alerts` -> email (subscribed by hand) | Failures, not money: Lambda errors, throttles, p99 duration, account concurrency; free (<= 10 alarms) |
+| Ops alarms ([`platform/alerting.tf`](platform/alerting.tf)) | 9 CloudWatch alarms -> SNS `slime-alerts` -> email (subscribed by hand; CI warns while unconfirmed) | Failures, not money: runtime timeouts, handled 500s, failed usage writes; 5xx of admin and Atlas; p99 duration; account concurrency and throttles; free (<= 10 alarms) |
 
 Two budgets with one action stay inside AWS Budgets' free allowance.
 

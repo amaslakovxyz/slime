@@ -95,14 +95,17 @@ flowchart LR
   (users, endpoints, usage), written by the admin and (usage only) the runtime.
   No stream.
 - [`platform/alerting.tf`](platform/alerting.tf): SNS topic `slime-alerts`
-  and seven CloudWatch alarms: Errors, Throttles and p99 Duration > 50 s for
-  `slime-runtime` and `slime-admin`, plus account Lambda concurrency >= 800.
-  Inside CloudWatch's free 10 alarms. The email subscription is made by hand
-  (below). Landing and Atlas have no alarms.
+  and nine CloudWatch alarms (inside the free 10). Runtime: Errors (timeouts),
+  handled 500s and `Flush failed` (log metric filters), p99 Duration > 50 s.
+  Admin: Function URL 5xx and p99 Duration. Atlas: Function URL 5xx. Account:
+  claimed concurrency >= `account_concurrency_alarm` (800) and Throttles. The
+  email subscription is made by hand (below); post-deploy CI warns while none
+  is confirmed. The landing has no alarms (cached static page).
 
 Post-deploy CI checks: runtime `/healthz` → 401, unknown endpoint → 404, admin
 `/login` → 200 through CloudFront, a POST through CloudFront is neither 403 nor
-5xx, the landing links to the admin, the bucket and tables exist; then the
+5xx, the landing links to the admin, the bucket and tables exist, and the
+alerts topic has a confirmed subscription (a warning, not a failure); then the
 Playwright cloud smoke (`npm run e2e:cloud` in `platform/admin`) when the
 `SMOKE_EMAIL` / `SMOKE_PASSWORD` repository secrets are set.
 
