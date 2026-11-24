@@ -9,7 +9,7 @@ export interface ConnectionTest {
   user: string | null;
   database: string | null;
   serverVersion: string | null;
-  /** Tables (incl. partitioned) outside the system schemas that the role can read. */
+  /** Tables and views in `public` the role can read: what the runtime describes to the model. */
   tables: number | null;
   problems: string[];
   error?: string;
@@ -56,11 +56,12 @@ export async function testConnection(databaseUrl: string): Promise<ConnectionTes
         AND (has_table_privilege(c.oid, 'INSERT') OR has_table_privilege(c.oid, 'UPDATE')
           OR has_table_privilege(c.oid, 'DELETE') OR has_table_privilege(c.oid, 'TRUNCATE'))
       LIMIT 5`);
-    // Only what the role can read (column grants count): Slime can't query the rest, so counting it misleads (E2E-16).
+    // The same rows as the runtime's describe (core/src/sources/sql/postgres/describe.ts): readable
+    // columns in public, the connector's default schema. Views count, materialized views don't (E2E-16).
     const tables = await client.query<{ count: string }>(`
-      SELECT count(*) AS count FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-      WHERE c.relkind IN ('r', 'p') AND ${USER_SCHEMAS}
-        AND has_schema_privilege(n.oid, 'USAGE') AND has_any_column_privilege(c.oid, 'SELECT')`);
+      SELECT count(DISTINCT c.table_name) AS count FROM information_schema.columns c
+      WHERE c.table_schema = 'public'
+        AND has_column_privilege(format('%I.%I', c.table_schema, c.table_name), c.column_name, 'SELECT')`);
 
     const r = role.rows[0];
     const problems: string[] = [];
