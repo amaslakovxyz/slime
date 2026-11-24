@@ -65,4 +65,23 @@ describe('env', () => {
       process.env.SESSION_SECRET = saved;
     }
   });
+
+  test('ADMIN_DEV_USER signs everyone in as that user, locally only', () => {
+    const saved = { dev: process.env.ADMIN_DEV_USER, runtime: process.env.SLIME_RUNTIME_URL };
+    try {
+      delete process.env.SLIME_RUNTIME_URL;
+      process.env.ADMIN_DEV_USER = ' Demo@Slime.dev ';
+      assert.equal(env().devUser, 'demo@slime.dev');
+      process.env.ADMIN_DEV_USER = '';
+      assert.equal(env().devUser, undefined, 'empty means off (the E2E stack sets it so)');
+      process.env.ADMIN_DEV_USER = 'demo@slime.dev';
+      process.env.SLIME_RUNTIME_URL = 'https://runtime.example/';
+      assert.equal(env().devUser, undefined, 'the hosted admin never skips login');
+    } finally {
+      for (const [key, value] of [['ADMIN_DEV_USER', saved.dev], ['SLIME_RUNTIME_URL', saved.runtime]] as const) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
+  });
 });

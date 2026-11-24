@@ -57,7 +57,9 @@ npm run tables                # slime-control and slime-handlers
 npm run local                 # admin on :3100 (PORT=…) + local runner
 ```
 
-Open http://localhost:3100, create an account, and create an endpoint with
+Open http://localhost:3100: with `ADMIN_DEV_USER` (in `.env.example`) you are
+already signed in as that user, no account needed; **Log out** opens the login form, and a
+session from it takes precedence, and cloud mode ignores the variable. Create an endpoint with
 the demo database's read-only role:
 `postgres://slime_reader:slime_reader@localhost:54329/slime`. Claude or Groq
 need `ANTHROPIC_API_KEY` or `GROQ_API_KEY` in the environment of `npm run local` (the runner passes it to

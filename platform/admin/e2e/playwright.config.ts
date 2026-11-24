@@ -51,6 +51,8 @@ export default defineConfig({
         env: {
           PORT: String(LOCAL_PORT),
           ADMIN_ALLOWED_EMAILS: 'e2e@example.com',
+          // The journeys test the real login, so the local auto-login (.env.local) is off here.
+          ADMIN_DEV_USER: '',
           NEXT_TELEMETRY_DISABLED: '1',
           SLIME_CANNED_HANDLERS: resolve(adminDir, '../runtime/test/canned-handlers.json'),
         },
