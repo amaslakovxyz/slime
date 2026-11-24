@@ -78,11 +78,13 @@ describe('testConnection', () => {
 
   // The runtime describes only public, views included and materialized views not
   // (core/src/sources/sql/postgres/describe.ts), so the count matches what Slime can query.
+  // Counts are relative to a baseline: locally the demo database is shared with other checkouts.
   test('counts the views in public the role can read', { skip: skipDb }, async () => {
     const view = `public.view_${randomBytes(4).toString('hex')}`;
+    const before = (await testConnection(DEMO_URL)).tables!;
     await asAdmin(`CREATE VIEW ${view} AS SELECT id FROM plans; GRANT SELECT ON ${view} TO slime_reader`);
     try {
-      assert.equal((await testConnection(DEMO_URL)).tables, 6);
+      assert.equal((await testConnection(DEMO_URL)).tables, before + 1);
     } finally {
       await asAdmin(`DROP VIEW IF EXISTS ${view}`);
     }
@@ -92,12 +94,13 @@ describe('testConnection', () => {
     const suffix = randomBytes(4).toString('hex');
     const schema = `other_${suffix}`;
     const matview = `public.matview_${suffix}`;
+    const before = (await testConnection(DEMO_URL)).tables;
     await asAdmin(`
       CREATE SCHEMA ${schema}; GRANT USAGE ON SCHEMA ${schema} TO slime_reader;
       CREATE TABLE ${schema}.readable (id int); GRANT SELECT ON ${schema}.readable TO slime_reader;
       CREATE MATERIALIZED VIEW ${matview} AS SELECT id FROM plans; GRANT SELECT ON ${matview} TO slime_reader`);
     try {
-      assert.equal((await testConnection(DEMO_URL)).tables, 5);
+      assert.equal((await testConnection(DEMO_URL)).tables, before);
     } finally {
       await asAdmin(`DROP MATERIALIZED VIEW IF EXISTS ${matview}; DROP SCHEMA IF EXISTS ${schema} CASCADE`);
     }
