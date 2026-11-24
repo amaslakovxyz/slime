@@ -12,6 +12,8 @@
 .superpowers/
 .remember/
 .egm/
+.claude/settings.local.json
+.claude/worktrees/
 
 # Node
 node_modules/

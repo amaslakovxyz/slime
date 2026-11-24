@@ -70,7 +70,8 @@ each one a status (Current, Design, Vision, Plan, Record, Superseded).
 - **`docs/`** - project-wide docs, indexed with statuses in
   [docs/README.md](./docs/README.md): `product/`, `architecture/`, `brand/`.
 - `.github/workflows/` (no contract file) - [ci.yml](./.github/workflows/ci.yml)
-  runs pre-commit, the core, crystal, example, runtime and admin tests, the
+  runs pre-commit, a gitleaks secret scan of the full history, the core,
+  crystal, example, runtime and admin tests, the
   admin's Playwright E2E against the local stack, the landing function tests
   and the Lambda bundle build on every push and pull request;
   [terraform.yml](./.github/workflows/terraform.yml) plans every
@@ -84,6 +85,7 @@ each one a status (Current, Design, Vision, Plan, Record, Superseded).
 Root files: [AGENTS.md](./AGENTS.md) (repository contract for agents),
 [justfile](./justfile) (task runner),
 [.pre-commit-config.yaml](./.pre-commit-config.yaml) (hooks),
+[.gitleaks.toml](./.gitleaks.toml) (secret-scan rules and allowed false positives),
 [.tflint.hcl](./.tflint.hcl) and [.trivyignore.yaml](./.trivyignore.yaml)
 (Terraform checks; each accepted trivy finding carries its rationale), and
 [package.json](./package.json) (npm workspaces for `core` and `crystal`;
@@ -96,15 +98,18 @@ the npm examples (express, hono, multi-source, customer-site),
   "Core and Crystal tests" job fails if they do.
 - Enforced on every commit and in CI by
   [.pre-commit-config.yaml](./.pre-commit-config.yaml): `trailing-whitespace`,
-  `end-of-file-fixer`, `check-yaml`, `check-merge-conflict`, and
-  `check-added-large-files` (`--maxkb=1000`).
+  `end-of-file-fixer`, `check-yaml`, `check-merge-conflict`,
+  `check-added-large-files` (`--maxkb=1000`), and `gitleaks` (staged changes;
+  CI's `secrets` job scans every commit instead).
 - Pre-commit hooks must pass; `--no-verify` is not allowed
   ([AGENTS.md](./AGENTS.md)).
 
 ## Global Side Effects
 
 - CI: [ci.yml](./.github/workflows/ci.yml) job `pre-commit` runs
-  `pre-commit/action@v3.0.1` on `push` and `pull_request`.
+  `pre-commit/action@v3.0.1` on `push` and `pull_request`; job `secrets` runs
+  gitleaks v8.30.1 (image pinned by digest) over the full Git history with
+  [.gitleaks.toml](./.gitleaks.toml).
 - Deploy: [terraform.yml](./.github/workflows/terraform.yml) applies every
   `platform/infra/` stack except `bootstrap/` on each push to `main` that
   touches `platform/`, `core/`, `crystal/`, the root `package.json` /

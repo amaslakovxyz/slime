@@ -1,0 +1,14 @@
+# Secret scanning config for gitleaks (pre-commit hook and the CI "Secret scan" job).
+# Extends the default rules; only the false positives below are allowed.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+# Handler keys in test fixtures are SHA-256 content hashes (64 hex) or the
+# stand-in 'abcdef123456', not credentials; generic-api-key flags them because
+# the field is called "key".
+description = "Handler content hashes in tests"
+condition = "AND"
+paths = ['''(^|/)test/''']
+regexes = ['''^(?:[0-9a-f]{64}|abcdef123456)$''']
