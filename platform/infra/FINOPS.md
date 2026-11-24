@@ -26,9 +26,9 @@ zone. No WAF on the admin distribution, for the same reason as the landing
 (see `.trivyignore.yaml`).
 
 **Model spend is outside the AWS budget.** Every endpoint spends the shared
-`/slime/shared/` model keys, and the budgets and the freeze below see none of
-it. Set a spend limit on the Anthropic workspace (and Groq, if used) by hand
-before inviting anyone; sign-up is invite-only (`ADMIN_ALLOWED_EMAILS`).
+`/slime/shared/ANTHROPIC_API_KEY`, and the budgets and the freeze below see none
+of it. Set a spend limit on the Anthropic workspace by hand before inviting
+anyone; sign-up is invite-only (`ADMIN_ALLOWED_EMAILS`).
 
 Always Free usage (all far below limits): Lambda 1.6k / 1M requests and
 183 / 400k GB-s, CloudFront 3k / 10M requests and 0.02 / 1024 GB out,

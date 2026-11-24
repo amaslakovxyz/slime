@@ -16,7 +16,10 @@ import { CodedError } from './errors';
 import { crystallizationSavings, estimateBill, TIERS, type Tier } from './pricing';
 import { secretStore } from './secrets';
 
-export const PROVIDERS = ['claude', 'groq'] as const;
+// Groq was dropped from the console on 2026-11-24: the cloud has no Groq key. The runtime still
+// accepts SLIME_PROVIDER=groq for self-hosting; an endpoint saved with it moves to Claude on its
+// next settings save.
+export const PROVIDERS = ['claude'] as const;
 export type Provider = (typeof PROVIDERS)[number];
 export const STATUSES = ['pending', 'provisioning', 'ready', 'failed', 'updating', 'deleting'] as const;
 export type Status = (typeof STATUSES)[number];

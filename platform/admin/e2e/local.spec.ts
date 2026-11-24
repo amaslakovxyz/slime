@@ -22,7 +22,7 @@ test('invited developer: sign up, create, Gas -> Liquid -> Crystal, call the Cry
 test('Requests log: a request opens its non-modal trace drawer, arrows walk between rows, Esc closes it', async ({ page, request }) => {
   const run = randomBytes(3).toString('hex');
   await signIn(page, 'e2e@example.com', PASSWORD);
-  const id = await createEndpoint(page, { name: `trace-${run}`, provider: 'groq', databaseUrl: DEMO_DB });
+  const id = await createEndpoint(page, { name: `trace-${run}`, provider: 'claude', databaseUrl: DEMO_DB });
   await expectStatus(page, 'ready');
   const url = await endpointUrl(page);
 

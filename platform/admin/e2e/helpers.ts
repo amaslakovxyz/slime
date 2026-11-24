@@ -87,8 +87,8 @@ export async function lifecycleJourney(
   { name, databaseUrl, onCreated }: { name: string; databaseUrl: string; /** So a failed run can still delete what it made. */ onCreated?: (endpointId: string) => void },
 ): Promise<void> {
   const id = await test.step('CUJ 2: create on the demo database -> ready', async () => {
-    // Locally the runtime answers with canned handlers (SLIME_CANNED_HANDLERS); in the cloud, Groq generates once.
-    const endpointId = await createEndpoint(page, { name, provider: 'groq', databaseUrl });
+    // Locally the runtime answers with canned handlers (SLIME_CANNED_HANDLERS); in the cloud, Claude generates once.
+    const endpointId = await createEndpoint(page, { name, provider: 'claude', databaseUrl });
     onCreated?.(endpointId);
     await expectStatus(page, 'ready');
     return endpointId;

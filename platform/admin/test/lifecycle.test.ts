@@ -166,7 +166,7 @@ describe('tierStats', () => {
 });
 
 describe('readLifecycle without a running endpoint', () => {
-  const base = { endpointId: 'ep-0a1b2c3d4e', owner: 'a@b.c', name: 'n', provider: 'groq', connectorType: 'postgres', tokenHint: 'abcd', createdAt: '', updatedAt: '' } as const;
+  const base = { endpointId: 'ep-0a1b2c3d4e', owner: 'a@b.c', name: 'n', provider: 'claude', connectorType: 'postgres', tokenHint: 'abcd', createdAt: '', updatedAt: '' } as const;
 
   test('a failed endpoint shows why it failed', async () => {
     const data = await readLifecycle({ ...base, status: 'failed', error: 'Health check failed: connect ECONNREFUSED 127.0.0.1:1' } as Endpoint);

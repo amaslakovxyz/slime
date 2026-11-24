@@ -114,11 +114,11 @@ describe('cloud endpoint flows (fake runtime, DynamoDB Local)', { skip }, () => 
 
   test('create writes provisioning with the endpoint URL and the provider secret; healthz 200 settles it ready', async () => {
     const who = owner('create');
-    const id = await create(who, 'groq');
+    const id = await create(who);
     const created = await getEndpoint(who, id);
     assert.equal(created?.status, 'provisioning');
     assert.equal(created?.url, `${runtimeBase}/ep/${id}/`);
-    assert.equal(await secretStore().get(id, 'SLIME_PROVIDER'), 'groq');
+    assert.equal(await secretStore().get(id, 'SLIME_PROVIDER'), 'claude');
 
     await provision(who, id, FAST);
     const ready = await getEndpoint(who, id);
@@ -200,15 +200,17 @@ describe('cloud endpoint flows (fake runtime, DynamoDB Local)', { skip }, () => 
     assert.deepEqual(runtime.calls(id).slice(before), [`GET /ep/${id}/healthz?fresh=1`]);
     assert.equal((await getEndpoint(who, id))?.status, 'ready');
 
-    runtime.healthz.set(id, [{ status: 503, body: '{"error":{"code":"NOT_READY","message":"GROQ_API_KEY is not set"}}' }]);
-    assert.equal(await updateSettings(who, id, { name: 'cloud', provider: 'groq' }), true);
-    assert.equal(await secretStore().get(id, 'SLIME_PROVIDER'), 'groq');
+    // An endpoint saved with Groq before the console dropped it moves to Claude, which has no key here.
+    await setLegacyGroq(who, id);
+    runtime.healthz.set(id, [{ status: 503, body: '{"error":{"code":"NOT_READY","message":"ANTHROPIC_API_KEY is not set"}}' }]);
+    assert.equal(await updateSettings(who, id, { name: 'cloud', provider: 'claude' }), true);
+    assert.equal(await secretStore().get(id, 'SLIME_PROVIDER'), 'claude');
     await reconfigure(who, id, FAST);
     const ep = await getEndpoint(who, id);
-    assert.deepEqual([ep?.status, ep?.error, ep?.provider], ['failed', 'GROQ_API_KEY is not set', 'groq']);
+    assert.deepEqual([ep?.status, ep?.error, ep?.provider], ['failed', 'ANTHROPIC_API_KEY is not set', 'claude']);
 
     // A rename alone does not touch the runtime.
-    assert.equal(await updateSettings(who, id, { name: 'renamed', provider: 'groq' }), false);
+    assert.equal(await updateSettings(who, id, { name: 'renamed', provider: 'claude' }), false);
   });
 
   test('Retry check settles what an interrupted action left behind, and refuses a settled endpoint', async () => {
@@ -291,5 +293,18 @@ describe('cloud endpoint flows (fake runtime, DynamoDB Local)', { skip }, () => 
         ExpressionAttributeValues: { ':s': status, ...(updatedAt ? { ':u': updatedAt } : {}) },
       }),
     );
+  }
+
+  /** An endpoint created while the console still offered Groq: the item and the runtime secret say groq. */
+  async function setLegacyGroq(who: string, id: string) {
+    await ddb().send(
+      new UpdateCommand({
+        TableName: tables.control,
+        Key: endpointKey(who, id),
+        UpdateExpression: 'SET provider = :p',
+        ExpressionAttributeValues: { ':p': 'groq' },
+      }),
+    );
+    await secretStore().put(id, 'SLIME_PROVIDER', 'groq', { overwrite: true });
   }
 });
