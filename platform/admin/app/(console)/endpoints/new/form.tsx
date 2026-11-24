@@ -4,16 +4,18 @@ import { startTransition, useActionState, useState, type FormEvent } from 'react
 import { createEndpointAction, type FormState } from '@/app/actions';
 import { ConnectorLogo } from '@/app/ui/connector-logo';
 import { PROVIDER_INFO } from '@/app/ui/providers';
+import { SupabaseSetup } from '@/app/ui/supabase-setup';
 import { TestConnection } from '@/app/ui/test-connection';
-import { CONNECTOR_SPECS, CONNECTORS } from '@/lib/connectors';
+import { CONNECTOR_SPECS, CONNECTORS, isConnectorType, type ConnectorType } from '@/lib/connectors';
 
 // Submitted through onSubmit instead of <form action>: React resets a form
 // after an action, which would wipe the fields whenever validation fails.
 export function NewEndpointForm({ providers }: { providers: string[] }) {
   const [state, action, pending] = useActionState<FormState, FormData>(createEndpointAction, {});
-  // Controlled only because Test connection needs the current value.
+  // Controlled only because Test connection needs the current values.
   const [url, setUrl] = useState('');
-  const spec = CONNECTOR_SPECS.postgres;
+  const [connectorType, setConnectorType] = useState<ConnectorType>('postgres');
+  const spec = CONNECTOR_SPECS[connectorType];
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -63,7 +65,8 @@ export function NewEndpointForm({ providers }: { providers: string[] }) {
                   name="connectorType"
                   value={c.type}
                   disabled={!c.available}
-                  defaultChecked={c.type === 'postgres'}
+                  checked={c.type === connectorType}
+                  onChange={() => isConnectorType(c.type) && setConnectorType(c.type)}
                 />
                 <span className="choice-top">
                   <ConnectorLogo type={c.type} />
@@ -80,6 +83,7 @@ export function NewEndpointForm({ providers }: { providers: string[] }) {
           <legend>
             <span className="step-num">3</span> Connection
           </legend>
+          {connectorType === 'supabase' && <SupabaseSetup />}
           <label className="field">
             <span className="field-label">{spec.field}</span>
             <input
@@ -92,9 +96,9 @@ export function NewEndpointForm({ providers }: { providers: string[] }) {
               onChange={(e) => setUrl(e.target.value)}
               placeholder={spec.placeholder}
             />
-            <span className="field-hint">Read-only role.</span>
+            <span className="field-hint">{spec.hint}</span>
           </label>
-          <TestConnection url={url.trim()} />
+          <TestConnection url={url.trim()} connectorType={connectorType} />
         </fieldset>
 
         <div className="form-actions">

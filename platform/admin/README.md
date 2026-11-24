@@ -77,6 +77,33 @@ seconds, and its URL (`http://localhost:87xx/`) is in the Lifecycle tab.
 | `npm run e2e` | Playwright against the local stack, see below |
 | `npm run e2e:cloud` | the Playwright smoke against the hosted admin |
 
+## Connectors
+
+[lib/connectors.ts](lib/connectors.ts) lists them. Both available ones store one
+secret, `DATABASE_URL`, which the runtime opens with core's Postgres connector;
+**Test connection** ([lib/connectors/postgres.ts](lib/connectors/postgres.ts))
+runs the runtime's safety check from the admin and warns, without failing, about
+readable tables whose row level security (RLS) shows the role no rows.
+
+- **PostgreSQL**: any `postgres://` URL, stored as typed.
+- **Supabase**: the create form shows SQL for a `slime_reader` role (password
+  generated in the browser) and where the pooler URL is. The role gets `SELECT`
+  on `public` and `BYPASSRLS`: Supabase's `ensure_rls` event trigger turns RLS on
+  for every new table with policies for app users only, so without it every query
+  returns no rows. The URL must use the
+  pooler (`*.pooler.supabase.com`, port 5432 session or 6543 transaction, user
+  `<role>.<project-ref>`): the direct host `db.<ref>.supabase.co` is IPv6-only and
+  the runtime Lambda reaches the internet over IPv4. TLS is enforced: without
+  `sslmode` node `pg` logs in to the pooler in plaintext (measured), so no
+  `sslmode`, `prefer` or `require` is stored as `sslmode=require&uselibpqcompat=true`
+  (node `pg` 8 treats a bare `require` as `verify-full`, which fails on Supabase's
+  own CA); `disable`/`allow` and `verify-ca`/`verify-full` are refused, and so are
+  `sslrootcert`/`sslcert`/`sslkey`, which node `pg` reads as file paths on the admin
+  and runtime servers. The connection is encrypted, the certificate not verified.
+  After a role's password changes, the pooler kept accepting only the old one for
+  about a minute (seen on both ports), so a Test connection right after a
+  rotation can fail with `password authentication failed`; retry after a minute.
+
 ## Local runner
 
 Runs each endpoint as a `platform/runtime/src/local.ts` process on localhost
