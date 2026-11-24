@@ -14,7 +14,8 @@ through the role it creates.
 | Budget `slime-account-monthly` | Account-wide backstop ($50): alerts at 50% / 80% actual, 100% forecasted |
 | S3 bucket `slime-tfstate-<account>` | Remote state for every slime stack; versioned, SSE-S3, public access blocked, TLS-only, native lockfile |
 | IAM role `slime-gha-plan` | GitHub OIDC, PRs only: `ReadOnlyAccess` + state read + lockfile write |
-| IAM role `slime-gha-apply` | GitHub OIDC, `main` only: `AdministratorAccess` minus IAM outside `slime-*`, bootstrap identities, state-bucket config, budgets |
+| IAM role `slime-gha-apply` | GitHub OIDC, `main` only: `AdministratorAccess` minus IAM outside `slime-*`, bootstrap identities, state-bucket config, budgets, and changes to foreign SSM parameters, log groups, topics, Lambdas, tables, rules and certificates |
+| IAM policy `slime-workload-boundary` | Permissions boundary that `slime-gha-apply` must put on every role it creates or changes: the CI fences, no IAM writes, no `sts:AssumeRole` ([boundary.tf](boundary.tf)) |
 
 Both CI roles also carry `region-guard` and a project scope that denies S3,
 Secrets Manager, and SSM reads outside `slime-*` names. The GitHub OIDC

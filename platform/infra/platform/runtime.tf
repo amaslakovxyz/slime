@@ -85,8 +85,9 @@ data "aws_iam_policy_document" "lambda_trust" {
 }
 
 resource "aws_iam_role" "runtime" {
-  name               = local.runtime_name
-  assume_role_policy = data.aws_iam_policy_document.lambda_trust.json
+  name                 = local.runtime_name
+  assume_role_policy   = data.aws_iam_policy_document.lambda_trust.json
+  permissions_boundary = local.workload_boundary_arn
 }
 
 resource "aws_cloudwatch_log_group" "runtime" {

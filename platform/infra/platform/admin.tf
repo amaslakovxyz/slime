@@ -28,8 +28,9 @@ locals {
 # --- Execution role ---------------------------------------------------------------
 
 resource "aws_iam_role" "admin" {
-  name               = local.admin_name
-  assume_role_policy = data.aws_iam_policy_document.lambda_trust.json
+  name                 = local.admin_name
+  assume_role_policy   = data.aws_iam_policy_document.lambda_trust.json
+  permissions_boundary = local.workload_boundary_arn
 }
 
 resource "aws_cloudwatch_log_group" "admin" {
