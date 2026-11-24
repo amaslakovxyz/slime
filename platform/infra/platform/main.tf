@@ -8,3 +8,9 @@
 # Anything else fails at plan or apply with an explicit deny.
 
 data "aws_caller_identity" "current" {}
+
+# Required on every role this stack creates: the CI apply role refuses to
+# create or change a role without it (bootstrap/boundary.tf).
+locals {
+  workload_boundary_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/${var.project}-workload-boundary"
+}

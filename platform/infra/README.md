@@ -209,14 +209,24 @@ Access and lifecycle:
 The CI roles deny anything outside these names, so follow them:
 
 - IAM roles, policies, instance profiles: `slime-*`
+- Every IAM role sets `permissions_boundary` to
+  `arn:aws:iam::<account>:policy/slime-workload-boundary`: the apply role
+  refuses to create a role, or change a role's policies, without it, and the
+  boundary caps the role at the same fences (no foreign data, no IAM writes,
+  no role switching). See [`bootstrap/boundary.tf`](bootstrap/boundary.tf).
 - S3 buckets: `slime-*`; Secrets Manager: `slime-*`; SSM parameters: `/slime/*`
 - Lambda functions and EventBridge rules: `slime-*`; log groups contain `slime-`
 - DynamoDB tables, SQS queues, Kinesis streams, ECR repositories: `slime-*`
   (their data is unreadable to CI otherwise)
 - ACM certificates must carry `Project=slime` (provider `default_tags` does it)
 - Regional services only in `eu-central-1`
-- No changes to `slime-deployer`, `slime-gha-*`, OIDC providers, the state
-  bucket's configuration, or budgets: those belong to `bootstrap/`
+- No changes to `slime-deployer`, `slime-gha-*`, `slime-budgets-action`, the
+  `slime-budget-freeze` and `slime-workload-boundary` policies, OIDC providers,
+  the state bucket's configuration, or budgets: those belong to `bootstrap/`
+- Foreign resources stay read-only to CI: no writes to SSM parameters outside
+  `/slime/*`, no subscription filters or exports on foreign log groups, no
+  changes to foreign SNS topics (publishing and listing subscriptions are
+  allowed, e.g. on ex-infra's `ops-alerts`)
 
 Local run: `AWS_PROFILE=slime terraform -chdir=platform/infra/platform plan`.
 
@@ -226,7 +236,10 @@ The repository is private on GitHub Free: no branch protection and no
 environment reviewers. Any collaborator with write access can push to `main`
 (and so run apply) or open a PR (and so run plan with read-only access to the
 account). The deny fences above keep both roles off non-slime IAM, S3,
-secrets, Lambda, EventBridge, ACM, other regions, and budgets, but read-only
+secrets, Lambda, EventBridge, ACM, other regions, and budgets, and the
+workload boundary keeps every role CI creates inside the same fences (before
+it, a commit on `main` could create an unfenced role and read any SSM
+parameter in the account through a Lambda), but read-only
 metadata elsewhere (e.g. Route 53, Cost Explorer) stays visible to the plan
 role. Closing the gap needs GitHub Pro/Team (protected `main` + an `aws`
 environment with required reviewers) or a separate AWS account.
