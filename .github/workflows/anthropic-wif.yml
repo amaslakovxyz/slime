@@ -1,0 +1,47 @@
+name: Anthropic WIF check
+
+# Checks that this repository's GitHub Actions can reach the Claude API through Workload
+# Identity Federation (no ANTHROPIC_API_KEY secret): the token exchange, a Messages call,
+# and the `claude` CLI the Crystal agents run, with crystal/scripts/anthropic-token.sh as
+# its apiKeyHelper. The federation rule in the Claude Console decides which refs may.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [chore/anthropic-wif]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  check:
+    name: Exchange, Messages, claude CLI
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ANTHROPIC_FEDERATION_RULE_ID: fdrl_01NTc6gNf4VuFDNxixzKEaSK
+      ANTHROPIC_ORGANIZATION_ID: 0d870091-34dd-4e78-862d-c8760f1ac305
+      ANTHROPIC_SERVICE_ACCOUNT_ID: svac_0185YHb3rXuNuegUvLMDFrzG
+      ANTHROPIC_WORKSPACE_ID: wrkspc_01CQ7wJetxgXVCgPKKfBYLfe
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Token exchange
+        run: |
+          token=$(bash crystal/scripts/anthropic-token.sh)
+          echo "::add-mask::$token"
+          case "$token" in sk-ant-oat01-*) echo "access token minted (${#token} chars)";; *) echo "unexpected token shape"; exit 1;; esac
+      - name: Messages call with the federated token
+        run: |
+          token=$(bash crystal/scripts/anthropic-token.sh)
+          echo "::add-mask::$token"
+          curl -sS --fail-with-body https://api.anthropic.com/v1/messages \
+            -H "authorization: Bearer $token" -H "anthropic-version: 2023-06-01" -H "content-type: application/json" \
+            -d '{"model":"claude-sonnet-5-5","max_tokens":16,"messages":[{"role":"user","content":"Reply with OK"}]}' \
+            | jq '{model, stop_reason, text: .content[0].text, usage}'
+      - name: claude CLI with the token script as apiKeyHelper
+        run: |
+          npm install -g @anthropic-ai/claude-code@2.1.330
+          claude -p --bare --model claude-sonnet-5-5 \
+            --settings '{"apiKeyHelper":"bash crystal/scripts/anthropic-token.sh"}' \
+            "Reply with exactly: OK"
