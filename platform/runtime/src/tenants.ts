@@ -16,6 +16,10 @@
 // The env object an engine is built from is the Lambda env, then the shared
 // parameters, then the endpoint's, then SLIME_TENANT_ID. Nothing is ever written to
 // process.env: endpoints share this process.
+//
+// Each endpoint's requests feed is also reachable without its engine (Tenant.feed):
+// it lives in the handler store, so the Requests log stays readable, and records
+// refused requests, while the endpoint's database is down.
 import { createHash } from 'node:crypto';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { GetParametersByPathCommand, type GetParametersByPathCommandOutput } from '@aws-sdk/client-ssm';
@@ -24,6 +28,9 @@ import { parseCrystalTokens } from './auth.js';
 import type { Env } from './config.js';
 import type { CrystalLoad, CrystalStore } from './crystal-store.js';
 import { endpointRuntime, startupErrorMessage, type EndpointDeps, type EndpointRuntime, type LogLine } from './endpoint-runtime.js';
+import { StoredRequests } from './events.js';
+import { DynamoSlimeStore, type DocClient } from './store-dynamodb.js';
+import { UsageMeter, type UsageClient } from './usage.js';
 
 export const ENDPOINT_ID = /^ep-[0-9a-f]{10}$/;
 export const ENDPOINTS_SSM_PREFIX = '/slime/endpoints/';
@@ -58,6 +65,10 @@ export interface TenantCacheOptions {
   retireLimitMs?: number;
   /** Builds one endpoint's runtime; tests wrap it to pass fakes. */
   build?: (env: Env, deps: EndpointDeps) => Promise<EndpointRuntime>;
+  /** The handler store's client for Tenant.feed; tests pass a fake. */
+  storeClient?: DocClient;
+  /** The usage table's client for the feed's total; tests pass a fake. */
+  usageClient?: UsageClient;
   log?: (line: LogLine) => void;
 }
 
@@ -68,6 +79,8 @@ export interface Tenant {
   readonly crystalTokens: Readonly<Record<string, string>>;
   /** The endpoint's engine, built on first use and rebuilt when its settings changed; throws when it cannot start. */
   runtime(): Promise<EndpointRuntime>;
+  /** The endpoint's requests feed in its store: no engine, so no database connection. */
+  feed(): StoredRequests;
 }
 
 type Values = Record<string, string>;
@@ -86,11 +99,13 @@ class Entry implements Tenant {
   etag: string | undefined;
   engine: Engine | undefined;
   building: Promise<EndpointRuntime> | undefined;
+  storedFeed: StoredRequests | undefined;
   isDropped = false;
 
   constructor(
     readonly id: string,
     readonly runtime: () => Promise<EndpointRuntime>,
+    readonly feed: () => StoredRequests,
   ) {}
 
   /** Applies freshly read settings; the auth part takes effect at once, without touching the engine. */
@@ -196,7 +211,7 @@ export class TenantCache {
     const [shared, etag] = await Promise.all([this.#sharedValues(), this.#options.crystals.version(id)]);
     let entry = this.#entries.get(id);
     if (!entry) {
-      const created: Entry = new Entry(id, () => this.#runtimeFor(created));
+      const created: Entry = new Entry(id, () => this.#runtimeFor(created), () => this.#feedFor(created));
       entry = created;
       this.#entries.set(id, entry);
       await this.#evictBeyondCap();
@@ -204,6 +219,25 @@ export class TenantCache {
     this.#touch(entry);
     entry.update(own, shared, etag, this.#now());
     return entry;
+  }
+
+  /** Built once per entry: the table and the tenant id never change for an id. */
+  #feedFor(entry: Entry): StoredRequests {
+    if (entry.storedFeed) return entry.storedFeed;
+    const env = this.#envFor(entry);
+    const log = (line: LogLine) => this.#log({ endpointId: entry.id, ...line });
+    const store = new DynamoSlimeStore({
+      table: env.SLIME_HANDLERS_TABLE ?? '',
+      tenantId: entry.id,
+      ...(this.#options.storeClient ? { client: this.#options.storeClient } : {}),
+    });
+    // The same total as the engine's feed (endpoint-runtime.ts): the usage count across instances.
+    // This meter only reads, so its snapshot is never taken.
+    const meter = env.SLIME_USAGE_TABLE
+      ? new UsageMeter(env.SLIME_USAGE_TABLE, entry.id, () => ({ gas: 0, liquid: 0, crystal: 0 }), this.#options.usageClient)
+      : undefined;
+    entry.storedFeed = new StoredRequests({ store, ...(meter ? { total: () => meter.total() } : {}), log });
+    return entry.storedFeed;
   }
 
   #runtimeFor(entry: Entry): Promise<EndpointRuntime> {

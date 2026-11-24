@@ -12,6 +12,8 @@ const A = 'ep-00000000a1';
 const B = 'ep-00000000b2';
 const C = 'ep-00000000c3';
 const TTL_MS = 30_000;
+/** Nothing listens on port 1: the connection is refused at once. */
+const UNREACHABLE_DATABASE_URL = 'postgres://slime_reader:x@127.0.0.1:1/slime';
 const COUNT_PER_PLAN = {
   intent: 'number of accounts on each plan',
   input: {},
@@ -307,6 +309,50 @@ describe('tenant cache with live engines', { skip: !hasDatabase && 'demo Postgre
       h.addEndpoint(A);
       const { status, json } = await h.call(`/ep/${A}/v0/lifecycle`, { key: keyOf(A) });
       assert.deepEqual([status, json?.instance], [200, true]);
+    } finally {
+      await h.close();
+    }
+  });
+
+  test('the requests feed is read from the store without starting the engine', async () => {
+    const h = await harness();
+    try {
+      h.addEndpoint(A);
+      const { status, json } = await h.call(`/ep/${A}/v0/events`, { key: keyOf(A) });
+      assert.deepEqual([status, json?.total, json?.events], [200, 0, []]);
+      assert.equal(h.built.length, 0, 'no engine, so no database connection');
+      const bad = await h.call(`/ep/${A}/v0/events?before=x&after=y`, { key: keyOf(A) });
+      assert.deepEqual([bad.status, bad.json?.error?.code], [400, 'INVALID_REQUEST']);
+    } finally {
+      await h.close();
+    }
+  });
+
+  test('an unreachable database keeps the requests feed readable, and its refused queries land in it as NOT_READY', async () => {
+    const h = await harness({ ttlMs: TTL_MS });
+    try {
+      h.addEndpoint(A);
+      for (let i = 0; i < 2; i++) assert.equal((await h.call(`/ep/${A}/v0/query`, { key: keyOf(A), body: COUNT_PER_PLAN })).status, 200);
+      h.addEndpoint(A, { DATABASE_URL: UNREACHABLE_DATABASE_URL });
+      assert.equal((await h.call(`/ep/${A}/v0/reload`, { key: keyOf(A), method: 'POST' })).status, 204);
+
+      const before = await h.call(`/ep/${A}/v0/events`, { key: keyOf(A) });
+      assert.deepEqual([before.status, before.json?.events?.length], [200, 2], 'the earlier requests are still listed');
+
+      const refused = await h.call(`/ep/${A}/v0/query`, { key: keyOf(A), body: COUNT_PER_PLAN });
+      assert.deepEqual([refused.status, refused.json?.error?.code], [503, 'NOT_READY']);
+      const crystal = await h.call(`/ep/${A}/v0/e/somekey`, { key: keyOf(A), body: { input: {} } });
+      assert.equal(crystal.status, 503);
+      assert.equal((await h.call(`/ep/${A}/v0/lifecycle`, { key: keyOf(A) })).status, 503);
+
+      const after = await h.call(`/ep/${A}/v0/events`, { key: keyOf(A) });
+      assert.equal(after.status, 200);
+      const events = after.json?.events ?? [];
+      assert.equal(events.length, 4, 'two answered, two refused; the admin view is not a request');
+      const [newest, next] = events;
+      assert.deepEqual([newest?.status, newest?.code, newest?.route, newest?.stopAt], [503, 'NOT_READY', 'crystal', 'edge']);
+      assert.deepEqual([next?.status, next?.code, next?.intent, next?.stopAt], [503, 'NOT_READY', COUNT_PER_PLAN.intent, 'edge']);
+      assert.match(next?.trace?.[0]?.note ?? '', /not ready/i);
     } finally {
       await h.close();
     }

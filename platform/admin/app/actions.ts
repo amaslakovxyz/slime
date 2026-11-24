@@ -109,10 +109,11 @@ export async function createEndpointAction(_prev: FormState, form: FormData): Pr
 }
 
 /** Tests a URL typed into the create form; the URL already travels to the server for create. */
-export async function testConnectionAction(databaseUrl: string): Promise<ConnectionTest> {
+export async function testConnectionAction(connectorType: string, databaseUrl: string): Promise<ConnectionTest> {
   await requireUser();
-  return withSpan('connector.test', { 'slime.connector.type': 'postgres' }, async (span) => {
-    const result = await testConnection(databaseUrl);
+  const attrs = isConnectorType(connectorType) ? { 'slime.connector.type': connectorType } : {};
+  return withSpan('connector.test', attrs, async (span) => {
+    const result = await testConnection(connectorType, databaseUrl);
     span.setAttribute('slime.connector.ok', result.ok);
     return result;
   });
@@ -121,11 +122,22 @@ export async function testConnectionAction(databaseUrl: string): Promise<Connect
 /** Re-tests the stored URL server-side, so it never reaches the browser. */
 export async function testStoredConnectionAction(endpointId: string): Promise<ConnectionTest> {
   const owner = await requireUser();
-  return withSpan('connector.test', { 'slime.endpoint.id': endpointId, 'slime.connector.type': 'postgres' }, async (span) => {
+  const ep = await getEndpoint(owner, endpointId);
+  const connectorType = ep?.connectorType ?? 'postgres';
+  return withSpan('connector.test', { 'slime.endpoint.id': endpointId, 'slime.connector.type': connectorType }, async (span) => {
     const url = await connectionUrl(owner, endpointId);
     const result: ConnectionTest = url
-      ? await testConnection(url)
-      : { ok: false, user: null, database: null, serverVersion: null, tables: null, problems: [], error: 'No stored connection URL' };
+      ? await testConnection(connectorType, url)
+      : {
+          ok: false,
+          user: null,
+          database: null,
+          serverVersion: null,
+          tables: null,
+          problems: [],
+          warnings: [],
+          error: 'No stored connection URL',
+        };
     span.setAttribute('slime.connector.ok', result.ok);
     return result;
   });

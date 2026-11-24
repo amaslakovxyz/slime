@@ -1251,6 +1251,12 @@ select:disabled {
   background: var(--crystal-bg);
 }
 
+.logo-supabase {
+  color: var(--gas-accent);
+  border-color: var(--gas-border);
+  background: var(--gas-bg);
+}
+
 .aside-card {
   display: flex;
   flex-direction: column;
@@ -1361,6 +1367,29 @@ select:disabled {
   margin: 0;
   padding-left: 18px;
   color: #FFC2DD;
+}
+
+.result-warnings {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--plasma-highlight);
+}
+
+/* Supabase setup steps on the create form: role SQL, then where the pooler URL is. */
+.supabase-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.supabase-setup ol {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 /* ---------- Endpoint header, tabs, details ---------- */

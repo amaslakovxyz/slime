@@ -1,6 +1,6 @@
-// Connection test for a customer Postgres URL, run from the admin's network.
-// The role checks mirror the runtime's safetyCheck (core/src/
-// postgres/safety.ts), which gates `ready`, so a URL that passes here should pass there.
+// Connection test for a customer Postgres URL (PostgreSQL or Supabase connector),
+// run from the admin's network. The role checks mirror the runtime's safetyCheck
+// (core/src/sources/sql/postgres/safety.ts), which gates `ready`, so a URL that passes here should pass there.
 import pg from 'pg';
 import { validateConnectionUrl } from '../connectors';
 
@@ -9,19 +9,31 @@ export interface ConnectionTest {
   user: string | null;
   database: string | null;
   serverVersion: string | null;
-  /** Tables (incl. partitioned) outside the system schemas that the role can read. */
+  /** Tables and views in `public` the role can read: what the runtime describes to the model. */
   tables: number | null;
+  /** Unsafe role: the runtime refuses to start, so `ok` is false. */
   problems: string[];
+  /** Safe but surprising, e.g. RLS hiding every row; `ok` stays true. */
+  warnings: string[];
   error?: string;
 }
 
 const USER_SCHEMAS = `n.nspname NOT IN ('pg_catalog', 'information_schema') AND n.nspname NOT LIKE 'pg_toast%'`;
+const NAMES_SHOWN = 5;
 
-export async function testConnection(databaseUrl: string): Promise<ConnectionTest> {
-  const result: ConnectionTest = { ok: false, user: null, database: null, serverVersion: null, tables: null, problems: [] };
+export async function testConnection(connectorType: string, databaseUrl: string): Promise<ConnectionTest> {
+  const result: ConnectionTest = {
+    ok: false,
+    user: null,
+    database: null,
+    serverVersion: null,
+    tables: null,
+    problems: [],
+    warnings: [],
+  };
   let connectionString: string;
   try {
-    connectionString = validateConnectionUrl('postgres', databaseUrl);
+    connectionString = validateConnectionUrl(connectorType, databaseUrl);
   } catch (err) {
     return { ...result, error: (err as Error).message };
   }
@@ -56,17 +68,44 @@ export async function testConnection(databaseUrl: string): Promise<ConnectionTes
         AND (has_table_privilege(c.oid, 'INSERT') OR has_table_privilege(c.oid, 'UPDATE')
           OR has_table_privilege(c.oid, 'DELETE') OR has_table_privilege(c.oid, 'TRUNCATE'))
       LIMIT 5`);
-    // Only what the role can read (column grants count): Slime can't query the rest, so counting it misleads (E2E-16).
+    // The same rows as the runtime's describe (core/src/sources/sql/postgres/describe.ts): readable
+    // columns in public, the connector's default schema. Views count, materialized views don't (E2E-16).
     const tables = await client.query<{ count: string }>(`
-      SELECT count(*) AS count FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-      WHERE c.relkind IN ('r', 'p') AND ${USER_SCHEMAS}
-        AND has_schema_privilege(n.oid, 'USAGE') AND has_any_column_privilege(c.oid, 'SELECT')`);
+      SELECT count(DISTINCT c.table_name) AS count FROM information_schema.columns c
+      WHERE c.table_schema = 'public'
+        AND has_column_privilege(format('%I.%I', c.table_schema, c.table_name), c.column_name, 'SELECT')`);
+    // Readable public tables (what the runtime describes) whose RLS lets no row through to
+    // this role: no BYPASSRLS, not the owner (owners bypass unless FORCE), and no permissive
+    // SELECT policy for it or PUBLIC. Supabase's ensure_rls event trigger enables RLS on
+    // every new public table, with policies only for anon/authenticated.
+    const hidden = await client.query<{ name: string }>(`
+      SELECT c.relname AS name
+      FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE c.relkind IN ('r', 'p') AND n.nspname = 'public' AND c.relrowsecurity
+        AND has_any_column_privilege(c.oid, 'SELECT')
+        AND NOT (SELECT rolbypassrls FROM pg_roles WHERE rolname = current_user)
+        AND (c.relforcerowsecurity OR NOT pg_has_role(current_user, c.relowner, 'USAGE'))
+        AND NOT EXISTS (
+          SELECT 1 FROM pg_policy p
+          WHERE p.polrelid = c.oid AND p.polpermissive AND p.polcmd IN ('r', '*')
+            AND (0 = ANY (p.polroles) OR EXISTS (
+              SELECT 1 FROM unnest(p.polroles) AS pr(oid) WHERE pg_has_role(current_user, pr.oid, 'USAGE'))))
+      ORDER BY 1
+      LIMIT ${NAMES_SHOWN + 1}`);
 
     const r = role.rows[0];
     const problems: string[] = [];
     if (r.rolsuper || r.rds_superuser) problems.push(`"${r.user}" is a superuser; use a dedicated read-only role.`);
     if (r.rolcreaterole || r.rolcreatedb) problems.push(`"${r.user}" can create roles or databases.`);
     if (writable.rows.length) problems.push(`"${r.user}" can write to: ${writable.rows.map((w) => w.name).join(', ')}.`);
+    const warnings: string[] = [];
+    if (hidden.rows.length) {
+      const names = hidden.rows.slice(0, NAMES_SHOWN).map((h) => h.name);
+      const more = hidden.rows.length > NAMES_SHOWN ? ' and more' : '';
+      warnings.push(
+        `Row level security hides every row from "${r.user}" in: ${names.join(', ')}${more}. Add a SELECT policy for the role or grant it BYPASSRLS.`,
+      );
+    }
     return {
       ok: problems.length === 0,
       user: r.user,
@@ -74,6 +113,7 @@ export async function testConnection(databaseUrl: string): Promise<ConnectionTes
       serverVersion: r.version,
       tables: Number(tables.rows[0].count),
       problems,
+      warnings,
     };
   } catch (err) {
     // ECONNREFUSED on a dual-stack host arrives as an AggregateError with an empty message.
