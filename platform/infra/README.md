@@ -174,7 +174,8 @@ fixed IPs; security group `slime-test-db` opens 5432, SSL is forced, passwords
 are random). It holds two databases:
 
 - `slime`: the SaaS demo schema from `examples/express/db/init.sql`, used by the
-  cloud smoke. Read-only `slime_reader`: SSM `/slime/test-db/READER_URL`.
+  cloud smoke. Read-only `slime_reader`: SSM `/slime/test-db/READER_URL`. Since
+  the pause the same data lives in the Supabase test project (below).
 - `shop`: the demo online shop from `examples/shop/db/shop.sql`
   ([examples/shop](../../examples/shop/README.md)). Read-only `shop_reader`:
   SSM `/slime/test-db/SHOP_READER_URL`. Reload with
@@ -219,8 +220,31 @@ Access and lifecycle:
   budget `slime-monthly` was raised to $30 for it
   (`bootstrap/variables.tf`). Remove it for good with
   `aws rds delete-db-instance --db-instance-identifier slime-test-db
-  --skip-final-snapshot`, then delete the security group and `/slime/test-db/*`
-  (three parameters).
+  --skip-final-snapshot`, then delete the security group and the three RDS
+  parameters `/slime/test-db/{MASTER_URL,READER_URL,SHOP_READER_URL}` (keep
+  `SUPABASE_*`, below).
+
+### Supabase test project (not in Terraform)
+
+Project ref `lgazqnkvjqhvaerxvmqm` (PostgreSQL 17, database `postgres`), reached
+only through the pooler `aws-1-eu-west-1.pooler.supabase.com` (the direct host is
+IPv6-only). Its `public` schema holds the Atlas demo data from
+`examples/express/db/init.sql` next to five unrelated test tables (`customers`,
+`orders`, `order_items`, `products`, `profiles`).
+
+- URLs: `/slime/test-db/SUPABASE_MASTER_URL` (`postgres.<ref>`, session pooler,
+  5432) and `/slime/test-db/SUPABASE_READER_URL` (`slime_reader.<ref>`,
+  transaction pooler, 6543); both end in `?sslmode=require&uselibpqcompat=true`.
+- Reload the Atlas tables: `examples/express/scripts/load-supabase.sh`. In one
+  transaction it drops and regenerates only `plans`, `accounts`, `subscriptions`,
+  `invoices` and `usage_events` (the test tables above stay), and reapplies the
+  `slime_reader` grants (no `password_hash`, read-only, 2 s timeout); the reader
+  password is kept. While it runs (seconds) `atlas-demo` queries wait on the
+  table locks and may hit the 2 s timeout.
+- Since 2026-11-24 the `atlas-demo` endpoint (`ep-290cbb5eb4`) reads from it:
+  `/slime/endpoints/ep-290cbb5eb4/DATABASE_URL` is a copy of
+  `SUPABASE_READER_URL`. Back to RDS (after a restore): copy
+  `/slime/test-db/READER_URL` there the same way, without printing it.
 
 ## Rules for `platform/`
 
