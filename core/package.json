@@ -55,7 +55,8 @@
     "test": "node --import tsx --test 'test/**/*.test.ts'",
     "check:pack": "node scripts/check-pack.mjs",
     "prepack": "npm run build",
-    "bench": "npm run build && node bench/run.mjs"
+    "bench": "npm run build && node bench/run.mjs",
+    "trace": "npm run build && node bench/trace.mjs"
   },
   "dependencies": {
     "quickjs-emscripten": "^0.32.0",

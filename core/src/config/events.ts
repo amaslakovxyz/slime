@@ -19,6 +19,9 @@ export interface ReviewedEvent {
   handlerKey: string;
   verdict: 'approved' | 'rejected';
   notes: string;
+  /** The review call's input + output tokens and model time: reviews run in the background, so no meta shows them. */
+  tokens: number;
+  ms: number;
 }
 
 export interface PromotedEvent {

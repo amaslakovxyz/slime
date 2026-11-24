@@ -23,7 +23,7 @@ import { HandlerCache } from './handler-cache.js';
 import { savedHandlerProblem } from '../handler/fits-sources.js';
 import { HandlerPromotion } from './promotion.js';
 import { registerInternals } from './internals.js';
-import { queryMeta } from './meta.js';
+import { queryMeta, type ResolveTimings } from './meta.js';
 import { reviewUntilSettled, type ReviewOutcome } from './generation/review-loop.js';
 import type { CacheOutcome, HandlerSummary, QueryResult, Slime, SlimeStats } from './types.js';
 import type { HandlerRecord } from '../handler/record.js';
@@ -45,7 +45,12 @@ interface ResolvedHandler {
   cache: CacheOutcome;
   /** Set on a miss: the generating run already answered this request. */
   firstRun?: Execution;
-  generateMs?: number;
+  timings: ResolveTimings;
+}
+
+/** The generation and how long it waited for a slot; shared with coalesced requests, whose wait is their own. */
+interface QueuedGeneration extends GenerationOutcome {
+  queueMs: number;
 }
 
 // Errors that mean the Crystal no longer fits the data (a migration, a changed column); the
@@ -63,7 +68,7 @@ export class SlimeEngine implements Slime {
   readonly #limits: GenerationLimits;
   readonly #background: BackgroundTasks;
   readonly #promotion: HandlerPromotion;
-  readonly #generations = new Coalescer<GenerationOutcome>();
+  readonly #generations = new Coalescer<QueuedGeneration>();
   // A broken Crystal is reported once per key and instance, not on every request it falls back.
   readonly #reportedCrystals = new Set<string>();
 
@@ -142,10 +147,11 @@ export class SlimeEngine implements Slime {
       }
     }
 
-    const { record, cache, firstRun, generateMs } = await this.#resolve(key, request);
+    const { record, cache, firstRun, timings } = await this.#resolve(key, request);
     const execution = firstRun ?? (await this.#runSaved(record, request.input));
     const { tier, review, artifact, intent } = record;
-    const meta = queryMeta({ handlerKey: key, tier, cache, review, execution, code: { sql: sqlOf(artifact), shapeJs: artifact.shapeJs, assumptions: artifact.assumptions }, intent, totalMs: performance.now() - startedAt, ...(generateMs === undefined ? {} : { generateMs }) });
+    const code = { sql: sqlOf(artifact), shapeJs: artifact.shapeJs, assumptions: artifact.assumptions };
+    const meta = queryMeta({ handlerKey: key, tier, cache, review, execution, code, intent, totalMs: performance.now() - startedAt, resolve: timings });
     if (fallbackWarning) meta.warnings.push(fallbackWarning);
     return { data: execution.data, meta };
   }
@@ -163,22 +169,30 @@ export class SlimeEngine implements Slime {
 
 
   async #resolve(key: string, request: ParsedRequest): Promise<ResolvedHandler> {
+    const lookupStartedAt = performance.now();
     const found = await this.#cache.find(key);
-    if (found) return { record: found, cache: 'hit' };
+    const lookupMs = performance.now() - lookupStartedAt;
+    if (found) return { record: found, cache: 'hit', timings: { lookupMs } };
+    const waitStartedAt = performance.now();
     const { promise, isShared } = this.#generations.run(key, () => this.#generate(this.#parts.config.generator, key, request));
     const outcome = await promise;
-    if (isShared) return { record: outcome.record, cache: 'coalesced' };
-    return { record: outcome.record, cache: 'miss', firstRun: outcome.execution, generateMs: outcome.usage.ms };
+    // A follower's whole wait is queue time: it runs the handler itself afterwards.
+    if (isShared) return { record: outcome.record, cache: 'coalesced', timings: { lookupMs, queueMs: performance.now() - waitStartedAt } };
+    const { usage, attempts, checksMs, queueMs } = outcome;
+    const generation = { modelMs: usage.ms, providerWaitMs: usage.waitMs, checksMs, attempts };
+    return { record: outcome.record, cache: 'miss', firstRun: outcome.execution, timings: { lookupMs, queueMs, generation } };
   }
 
-  async #generate(generator: Generator, key: string, request: ParsedRequest): Promise<GenerationOutcome> {
+  async #generate(generator: Generator, key: string, request: ParsedRequest): Promise<QueuedGeneration> {
+    const queueStartedAt = performance.now();
     const releaseSlot = await this.#limits.acquire();
+    const queueMs = performance.now() - queueStartedAt;
     try {
       const outcome = await generateHandler(generationDeps(this.#parts, generator), { key, request });
       this.#cache.addGas(outcome.record);
       this.#emit(generatedEvent(outcome.record, outcome.usage));
       this.#promotion.afterRun(outcome.record);
-      return outcome;
+      return { ...outcome, queueMs };
     } finally {
       releaseSlot();
     }

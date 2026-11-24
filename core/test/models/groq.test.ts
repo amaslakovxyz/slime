@@ -89,6 +89,14 @@ describe('Groq adapter (M4)', () => {
     assert.ok(result.waitMs > 0);
   });
 
+  test('a retried 5xx counts its request time as model time too', async () => {
+    const replies = [() => new Response('upstream failed', { status: 503 }), () => completion(ARTIFACT)];
+    globalThis.fetch = (async () => (await new Promise((resolve) => setTimeout(resolve, 40)), replies.shift()!())) as typeof fetch;
+    const result = await groq.generator(OPTIONS).generate(REQUEST, CALL);
+    assert.ok(result.ms >= 75, `ms ${result.ms} should cover both requests`);
+    assert.equal(result.waitMs, 0);
+  });
+
   test('the reviewer returns a validated verdict', async () => {
     stubFetch([completion({ verdict: 'reject', problems: ['wrong sort direction'] })]);
     const review = await groq.reviewer(OPTIONS).review({ ...REQUEST, artifact: ARTIFACT }, CALL);

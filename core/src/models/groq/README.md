@@ -27,7 +27,8 @@ called with `fetch`, so it needs no extra package.
   at most 65 s, up to 6 times), and reports the time as `waitMs`, not model
   time; the engine doesn't count it against the generation budget.
 - **Transient failures get two more tries:** dropped connections, replies
-  Groq rejects as invalid JSON, and 5xx.
+  Groq rejects as invalid JSON, and 5xx. Every request's time, retried ones
+  too, counts in `ms`.
 - **Cancellable.** The call's `signal` aborts the request and any further
   retries, with a final `GENERATION_FAILED`.
 - **`reasoning_effort`** is sent only to models that reason before

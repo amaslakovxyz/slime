@@ -43,28 +43,38 @@ async function callGroqJson<T>(options: GroqOptions, call: ModelCall<T>): Promis
   // JS callers may pass an unset env var, so undefined counts as missing too.
   if (!options.apiKey?.trim()) throw new SlimeError('GENERATION_FAILED', 'No Groq API key is set.');
   let waitMs = 0;
+  // Every request's time is model time, retried ones too; only the sleeps before a retry are waits.
+  let modelMs = 0;
   let transientRetries = 0;
   for (let rateLimitRetries = 0; ; ) {
     if (call.signal?.aborted) throw cancelledError(call.label);
     const startedAt = performance.now();
+    const requestMs = (): number => performance.now() - startedAt;
     const response = await post(options, call).catch((error: unknown) => {
       if (call.signal?.aborted) throw cancelledError(call.label);
       if ((error as Error).name === 'TimeoutError') throw new SlimeError('GENERATION_TIMEOUT', `${call.label} took too long.`, { retryable: true });
       if (transientRetries++ >= MAX_TRANSIENT_RETRIES) throw new SlimeError('GENERATION_FAILED', `Could not reach Groq: ${(error as Error).message}`, { retryable: true });
       return undefined;
     });
-    if (!response) continue;
+    if (!response) {
+      modelMs += requestMs();
+      continue;
+    }
     if (response.status === HTTP_TOO_MANY_REQUESTS && rateLimitRetries++ < MAX_RATE_LIMIT_RETRIES) {
+      modelMs += requestMs();
       const delayMs = Math.min(retryAfterMs(response), MAX_WAIT_MS);
       await new Promise((resolve) => setTimeout(resolve, delayMs));
       waitMs += delayMs;
       continue;
     }
     const failure = await failureOf(response);
-    if (failure?.isTransient && transientRetries++ < MAX_TRANSIENT_RETRIES) continue;
+    if (failure?.isTransient && transientRetries++ < MAX_TRANSIENT_RETRIES) {
+      modelMs += requestMs();
+      continue;
+    }
     if (failure) throw failure.error;
     const completion = (await response.json()) as ChatCompletion;
-    const usage = { ms: performance.now() - startedAt, waitMs, inputTokens: completion.usage?.prompt_tokens ?? 0, outputTokens: completion.usage?.completion_tokens ?? 0 };
+    const usage = { ms: modelMs + requestMs(), waitMs, inputTokens: completion.usage?.prompt_tokens ?? 0, outputTokens: completion.usage?.completion_tokens ?? 0 };
     return { value: parseReply(completion, call), usage };
   }
 }

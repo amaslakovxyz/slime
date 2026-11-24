@@ -3,7 +3,7 @@ import type { LimitOptions } from '../../config/options.js';
 import { SlimeError } from '../../shared/errors.js';
 import type { Connector, QueryLimits } from '../../sources/sql/types.js';
 import type { Artifact } from '../../artifact/artifact.js';
-import type { SandboxRunner, ShapeInput } from '../../sandbox/types.js';
+import type { SandboxLimits, SandboxRunner, SandboxStats, ShapeInput } from '../../sandbox/types.js';
 import type { ApiSchema } from '../../sources/api/types.js';
 import type { Source } from '../../sources/types.js';
 import { executeSteps, type StepTiming } from './steps.js';
@@ -28,18 +28,32 @@ export interface Execution {
   data: unknown;
   truncated: boolean;
   runMs: number;
+  /** The shaping function, without sandboxWaitMs. */
   shapeMs: number;
+  /** Waiting for a sandbox worker; absent when no shape ran in the sandbox. */
+  sandboxWaitMs?: number;
   /** Absent for a single-query Crystal. */
   steps?: StepTiming[];
 }
 
 export async function executeArtifact(deps: ExecutionDeps, { artifact, output, input }: ExecutionJob): Promise<Execution> {
-  const { runner, limits } = deps;
-  const shapeLimits = { timeoutMs: limits.shapeTimeoutMs, memoryBytes: limits.shapeMemoryBytes };
-  const shapeData = (data: unknown): Promise<unknown> => runner.run({ code: artifact.shapeJs ?? '', rows: data as ShapeInput, input }, shapeLimits);
-  const execution = await executeSteps(deps, { artifact, output, input }, shapeData);
+  const sandbox = sandboxShaper(deps, artifact.shapeJs ?? '', input);
+  const execution = withoutSandboxWait(await executeSteps(deps, { artifact, output, input }, sandbox.shape), artifact.shapeJs ? sandbox.stats : undefined);
   assertValidOutput(output, execution.data, input, true); // MS15: no values in the mismatch text
   return execution;
+}
+
+/** Shapes data in the sandbox with Liquid's limits, recording how long it waited for a worker. */
+export function sandboxShaper({ runner, limits }: Pick<ExecutionDeps, 'runner' | 'limits'>, code: string, input: InputValues): { shape: (data: unknown) => Promise<unknown>; stats: SandboxStats } {
+  const stats: SandboxStats = { waitMs: 0 };
+  const shapeLimits: SandboxLimits = { timeoutMs: limits.shapeTimeoutMs, memoryBytes: limits.shapeMemoryBytes };
+  return { stats, shape: (data) => runner.run({ code, rows: data as ShapeInput, input }, shapeLimits, stats) };
+}
+
+/** Moves the sandbox wait out of shapeMs (it was measured around the whole call), so the parts don't overlap. */
+export function withoutSandboxWait<T extends Execution>(execution: T, stats: SandboxStats | undefined): T {
+  if (!stats) return execution;
+  return { ...execution, shapeMs: Math.max(0, execution.shapeMs - stats.waitMs), sandboxWaitMs: stats.waitMs };
 }
 
 /** The checks every handler's result must pass, whatever tier ran it: the output shape and R6. */

@@ -134,7 +134,7 @@ with `400 INVALID_REQUEST`, bodies above 16 KB refused with
 `413 INVALID_REQUEST`.
 
 Shipped `meta`: `handlerKey`, `tier` (`gas | liquid | crystal`), `cache`
-(`miss | hit | coalesced`), `truncated`, `timingsMs`, `warnings`, `review`
+(`miss | hit | coalesced`), `truncated`, `timingsMs`, `attempts` (on a miss), `warnings`, `review`
 (`none | pending | approved | rejected`), and `sql`, `shapeJs`,
 `assumptions`, `steps` when present (`core/src/engine/types.ts`). Proposed
 additions carry the lifecycle position:
