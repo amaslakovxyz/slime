@@ -1,6 +1,6 @@
 # Request trace drawer (Requests log): design
 
-* **Status:** Approved for implementation (2026-11-22)
+* **Status:** Built on feat/request-trace-drawer (2026-11-22)
 * **Author:** @Tony (with an agent)
 * **Mockup:** [mockups/2026-11-22-request-trace-drawer.html](mockups/2026-11-22-request-trace-drawer.html)
   (static; three variants, all three kept)
@@ -119,3 +119,22 @@ keyed by event id).
   never appear; body > 16 KB and invalid JSON; `/v0/handlers/:key/code`.
 * admin: `request-trace.ts` unit tests over the seven mockup scenarios and an
   old event; `readHandlerCode`; typecheck and `next build`.
+
+## 8. As built: deviations from this design
+
+* **Unknown layer ids are dropped, not shown.** §6 says an unknown layer id
+  renders as `unknown`; `traceRows` keeps the fixed 12 rows and ignores spans
+  for layers it does not know. An unknown *status* still renders as `unknown`.
+* **Handler code uses core's SQL format.** `/v0/handlers/:key/code` formats
+  SQL with `sqlOf()` (now exported from `@slime-cloud/core/tooling`), the
+  same `-- step <name>` form a miss event carries, so a hit and a miss of one
+  handler show identical code.
+* **Show code under Execute** appears when Execute ran (passed or stopped),
+  so a failing cached query still shows its SQL.
+* **Crystal drift fallback** passes the Crystal route note into generation, so
+  the route span reads `Crystal failed (<CODE>) → …` followed by the cache/generation route.
+* The drawer is `role="complementary"` (non-modal); the route map lives in
+  `route-map.tsx` beside `trace-views.tsx`.
+* The local E2E scenario in `platform/admin/e2e/local.spec.ts` is written but
+  was not run during implementation (no local stack); the drawer was checked
+  with screenshots against the mockup.

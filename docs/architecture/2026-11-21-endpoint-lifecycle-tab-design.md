@@ -73,6 +73,12 @@ MVP design (L20–L23).
 | L22 | In the cloud, `POST /v0/reload` replaces the restart: after Crystallize or a settings change the admin calls it on the instance it reaches; other warm instances pick up changes within the 30 s settings TTL. Locally `/v0/reload` is a no-op (204). | There is no process to restart, and per-endpoint functions are gone. |
 | L23 | Gas rows and live run counts are per Lambda instance in the cloud, so the cloud Lifecycle view is approximate. The live feed (`/v0/events`) moved to the store on 2026-11-22 and is the same on every instance. | Durable counters and a shared feed need a store; out of scope for the MVP. |
 
+Since 2026-11-22 the feed also carries each request's layer trace and the
+refused requests (status, code, stop layer); see
+[2026-11-22-request-trace-drawer-design.md](2026-11-22-request-trace-drawer-design.md).
+Because Gas handlers live per instance (L23), a generation event keeps its own
+code, and `GET /v0/handlers/:key/code` serves the code behind a hit.
+
 ## 4. Components
 
 ### 4.1 Runtime (`platform/runtime`)

@@ -85,6 +85,25 @@ keeps its port across restarts, so the URL an agent holds survives. The
 provider comes from the `SLIME_PROVIDER` secret (the control item's `provider`
 for endpoints created before that secret existed).
 
+## Requests log and trace drawer
+
+The endpoint's Requests log reads the runtime feed (`GET /v0/events`, newest
+500, `?before=`/`?after=` pages, refreshed every 2 s). Clicking a row opens a
+non-modal drawer on the right (`Escape` closes, `↑`/`↓` move between rows)
+showing which harness layers the request passed, where it was stopped and why,
+and its route: **Layers**, **Route map** and **Waterfall**, all built from
+[lib/request-trace.ts](lib/request-trace.ts). Refused requests are in the log
+too (`✕ <CODE> · <layer>`); unauthenticated ones are not recorded. The feed
+holds input names, never input values or result rows.
+
+Code: a generation (`cache: miss`) event carries its SQL and shape; for a hit
+the drawer calls the `loadHandlerCode` server action once per handler key,
+which reads `GET /v0/handlers/:key/code` (Crystal, then the instance's live
+record, then the store). If none has it, the drawer reuses a miss event of the
+same key on the page, else says the code is not available on this instance.
+Events written before traces existed show `Trace not recorded for this request.`
+Design: [2026-11-22-request-trace-drawer-design.md](../../docs/architecture/2026-11-22-request-trace-drawer-design.md).
+
 ## End-to-end tests (Playwright)
 
 ```sh
