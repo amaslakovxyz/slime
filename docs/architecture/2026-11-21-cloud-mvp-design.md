@@ -1,7 +1,7 @@
 # Slime Cloud MVP on AWS: shared runtime Lambda, hosted admin, Crystals in S3
 
 *   **Author:** amaslakov
-*   **Status:** Proposed
+*   **Status:** Built; on `main`
 *   **Date:** 2026-11-21
 
 --------------------------------------------------------------------------------

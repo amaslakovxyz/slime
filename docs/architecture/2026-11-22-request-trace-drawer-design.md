@@ -1,6 +1,6 @@
 # Request trace drawer (Requests log): design
 
-* **Status:** Built on feat/request-trace-drawer (2026-11-22)
+* **Status:** Built; on `main` via PR #65 (designed 2026-11-22)
 * **Author:** @Tony (with an agent)
 * **Mockup:** [mockups/2026-11-22-request-trace-drawer.html](mockups/2026-11-22-request-trace-drawer.html)
   (static; three variants, all three kept)
