@@ -88,8 +88,8 @@ Root files: [AGENTS.md](./AGENTS.md) (repository contract for agents),
 [.tflint.hcl](./.tflint.hcl) and [.trivyignore.yaml](./.trivyignore.yaml)
 (Terraform checks; each accepted trivy finding carries its rationale), and
 [package.json](./package.json) (npm workspaces for `core` and `crystal`;
-each example app, `platform/runtime` and `platform/admin` keep their own
-lockfiles).
+the npm examples (express, hono, multi-source, customer-site),
+`platform/runtime` and `platform/admin` keep their own lockfiles).
 
 ## Global Invariants
 
