@@ -22,7 +22,8 @@ response=$(jq -n --arg assertion "$jwt" '{
 }' | curl -sS https://api.anthropic.com/v1/oauth/token -H 'content-type: application/json' --data @-)
 
 if ! token=$(jq -er .access_token <<<"$response"); then
-  echo "Anthropic token exchange failed: $(jq -c '.error // .' <<<"$response")" >&2
+  # The 401 is opaque by design; these claims are what the federation rule matched against.
+  claims=$(jq -rR 'split(".")[1] | gsub("-";"+") | gsub("_";"/") | . + "=" * ((4 - length % 4) % 4) | @base64d | fromjson | {sub, aud, repository, ref, event_name}' <<<"$jwt" | jq -c .)
+  echo "Anthropic token exchange failed: $(jq -c '.error // .' <<<"$response"); token claims: $claims" >&2
   exit 1
 fi
-printf '%s' "$token"
