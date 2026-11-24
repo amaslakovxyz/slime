@@ -9,7 +9,7 @@ export interface ConnectionTest {
   user: string | null;
   database: string | null;
   serverVersion: string | null;
-  /** Tables (incl. partitioned) outside the system schemas that the role can read. */
+  /** Tables and views in `public` the role can read: what the runtime describes to the model. */
   tables: number | null;
   /** Unsafe role: the runtime refuses to start, so `ok` is false. */
   problems: string[];
@@ -68,19 +68,21 @@ export async function testConnection(connectorType: string, databaseUrl: string)
         AND (has_table_privilege(c.oid, 'INSERT') OR has_table_privilege(c.oid, 'UPDATE')
           OR has_table_privilege(c.oid, 'DELETE') OR has_table_privilege(c.oid, 'TRUNCATE'))
       LIMIT 5`);
-    // Only what the role can read (column grants count): Slime can't query the rest, so counting it misleads (E2E-16).
+    // The same rows as the runtime's describe (core/src/sources/sql/postgres/describe.ts): readable
+    // columns in public, the connector's default schema. Views count, materialized views don't (E2E-16).
     const tables = await client.query<{ count: string }>(`
-      SELECT count(*) AS count FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-      WHERE c.relkind IN ('r', 'p') AND ${USER_SCHEMAS}
-        AND has_schema_privilege(n.oid, 'USAGE') AND has_any_column_privilege(c.oid, 'SELECT')`);
-    // Readable tables whose RLS lets no row through to this role: no BYPASSRLS, not the
-    // owner (owners bypass unless FORCE), and no permissive SELECT policy for it or PUBLIC.
-    // Supabase's ensure_rls event trigger enables RLS on every new public table, with policies only for anon/authenticated.
+      SELECT count(DISTINCT c.table_name) AS count FROM information_schema.columns c
+      WHERE c.table_schema = 'public'
+        AND has_column_privilege(format('%I.%I', c.table_schema, c.table_name), c.column_name, 'SELECT')`);
+    // Readable public tables (what the runtime describes) whose RLS lets no row through to
+    // this role: no BYPASSRLS, not the owner (owners bypass unless FORCE), and no permissive
+    // SELECT policy for it or PUBLIC. Supabase's ensure_rls event trigger enables RLS on
+    // every new public table, with policies only for anon/authenticated.
     const hidden = await client.query<{ name: string }>(`
-      SELECT n.nspname || '.' || c.relname AS name
+      SELECT c.relname AS name
       FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-      WHERE c.relkind IN ('r', 'p') AND ${USER_SCHEMAS} AND c.relrowsecurity
-        AND has_schema_privilege(n.oid, 'USAGE') AND has_any_column_privilege(c.oid, 'SELECT')
+      WHERE c.relkind IN ('r', 'p') AND n.nspname = 'public' AND c.relrowsecurity
+        AND has_any_column_privilege(c.oid, 'SELECT')
         AND NOT (SELECT rolbypassrls FROM pg_roles WHERE rolname = current_user)
         AND (c.relforcerowsecurity OR NOT pg_has_role(current_user, c.relowner, 'USAGE'))
         AND NOT EXISTS (
