@@ -4,6 +4,7 @@ Project-wide docs. Code-local docs live next to their code and are listed at the
 
 | Doc | Status | Owner | What it is |
 |---|---|---|---|
+| [spec.md](spec.md) | Current | amaslakov | **Start here.** One product and technical spec for main: thesis, vocabulary, v0 flow, engine, Crystallize, runtime, admin, infra, security, status, and the doc drift found against the code. |
 | [product/concepts_brief.md](product/concepts_brief.md) | Current | Konstantin | Slime v0 tech stack, scope and benchmark results. |
 | [product/2026-11-21-agent-integrations-research.md](product/2026-11-21-agent-integrations-research.md) | Record | @Tony | Slime for coding agents: research record behind the unified frame (federation, Linear/Notion limits, N+1, "no customer data"). |
 | [product/product_frame_v0_2.md](product/product_frame_v0_2.md) | Design | @Tony | Unified product frame (slime-client / slime-cloud): merged decisions from both 2026-11-21 research tracks, demo vertical, risks. |

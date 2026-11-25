@@ -16,8 +16,9 @@ two halves:
   landing page, AWS infrastructure, the admin, and the Lambda runtime that
   runs the core for every endpoint.
 
-Project-wide specs live in `docs/`; [docs/README.md](./docs/README.md) gives
-each one a status (Current, Design, Vision, Plan, Record, Superseded).
+Project-wide specs live in `docs/`; start with [docs/spec.md](./docs/spec.md), the
+one product and technical spec for `main`. [docs/README.md](./docs/README.md) gives
+each doc a status (Current, Design, Vision, Plan, Record, Superseded).
 
 ## Subdirectories & System Boundaries
 
