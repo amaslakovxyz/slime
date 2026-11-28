@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Idea 1 — Live prod rebuilding · Slime research</title>
+<style>
+  :root{
+    --bg:#0B070C; --surface:#161019; --surface2:#1d1521; --border:#2D1F33; --border-b:#442D4D;
+    --text:#F8F6FC; --muted:#A396AC; --wire:#6E5C77;
+    --gas:#38F8B8; --plasma:#FF1476; --plasma-hi:#FF85C0; --crystal:#C4B5FD; --crystal-hi:#F2EAFF;
+    --amber:#FFC857;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font:15px/1.6 'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif}
+  a{color:var(--crystal)} a:hover{color:var(--crystal-hi)}
+  code{font:13px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface2);
+    border:1px solid var(--border);border-radius:4px;padding:1px 5px;color:var(--crystal-hi)}
+  .wrap{max-width:1080px;margin:0 auto;padding:40px 28px 80px}
+  header{border-bottom:1px solid var(--border);padding-bottom:28px;margin-bottom:28px}
+  .eyebrow{color:var(--muted);font-size:12px;letter-spacing:.12em;text-transform:uppercase}
+  h1{font-size:36px;line-height:1.15;margin:8px 0 10px;letter-spacing:-.02em}
+  h1 span{color:var(--plasma-hi)}
+  h2{font-size:22px;margin:48px 0 14px;letter-spacing:-.01em;display:flex;gap:10px;align-items:baseline}
+  h2 .n{color:var(--wire);font-size:14px;font-weight:600}
+  h3{font-size:16px;margin:22px 0 8px}
+  p{margin:8px 0 12px} .muted{color:var(--muted)}
+  .meta{display:flex;flex-wrap:wrap;gap:8px 18px;color:var(--muted);font-size:13px}
+  nav{position:sticky;top:0;z-index:5;background:rgba(11,7,12,.92);backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--border);margin:0 -28px 0;padding:10px 28px;display:flex;gap:16px;flex-wrap:wrap;font-size:13px}
+  nav a{color:var(--muted);text-decoration:none} nav a:hover{color:var(--text)}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px}
+  .grid{display:grid;gap:14px} .g2{grid-template-columns:repeat(2,1fr)} .g3{grid-template-columns:repeat(3,1fr)}
+  @media (max-width:820px){.g2,.g3{grid-template-columns:1fr} h1{font-size:28px}}
+  .verdict{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:start;border-color:var(--border-b)}
+  .pill{display:inline-block;font-size:12px;font-weight:700;border-radius:999px;padding:3px 10px;letter-spacing:.04em;white-space:nowrap}
+  .p-go{background:rgba(56,248,184,.12);color:var(--gas);border:1px solid rgba(56,248,184,.4)}
+  .p-no{background:rgba(255,20,118,.12);color:var(--plasma-hi);border:1px solid rgba(255,20,118,.45)}
+  .p-def{background:rgba(255,200,87,.1);color:var(--amber);border:1px solid rgba(255,200,87,.4)}
+  .p-cr{background:rgba(196,181,253,.12);color:var(--crystal);border:1px solid rgba(196,181,253,.4)}
+  .big{font-size:20px;font-weight:700;line-height:1.3}
+  ul.tight{margin:6px 0;padding-left:20px} ul.tight li{margin:3px 0}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;vertical-align:top;padding:9px 10px;border-bottom:1px solid var(--border)}
+  th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+  td:first-child{color:var(--text);font-weight:600;white-space:nowrap}
+  .stat{font-size:28px;font-weight:800;letter-spacing:-.02em;color:var(--crystal-hi)}
+  .stat small{display:block;font-size:12px;font-weight:500;color:var(--muted);letter-spacing:0}
+  .phase{border-left:3px solid var(--wire);padding-left:12px}
+  .phase.gas{border-color:var(--gas)} .phase.liq{border-color:var(--plasma)} .phase.cry{border-color:var(--crystal)}
+  .phase b.gas{color:var(--gas)} .phase b.liq{color:var(--plasma-hi)} .phase b.cry{color:var(--crystal)}
+  svg text{font-family:inherit}
+  .diagram{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;overflow-x:auto}
+  .obj{margin:14px 0;border:1px solid var(--border);border-radius:12px;background:var(--surface);overflow:hidden}
+  .obj summary{cursor:pointer;list-style:none;padding:14px 18px;display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center}
+  .obj summary::-webkit-details-marker{display:none}
+  .obj .id{color:var(--wire);font-weight:800}
+  .obj .body{padding:0 18px 16px 74px}
+  .obj .body p{margin:6px 0}
+  .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:700;margin-top:10px}
+  .attack{color:var(--plasma-hi)} .defense{color:var(--gas)}
+  .steel{border-left:3px solid var(--crystal);background:linear-gradient(90deg,rgba(196,181,253,.06),transparent)}
+  .kbd{font:12px ui-monospace,Menlo,monospace;color:var(--muted)}
+  .rec{font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:#0f0a11;border:1px solid var(--border);
+    border-radius:8px;padding:12px 14px;white-space:pre;overflow-x:auto;color:var(--crystal-hi)}
+  .rec .c{color:var(--wire)}
+  footer{margin-top:56px;border-top:1px solid var(--border);padding-top:18px;color:var(--muted);font-size:13px}
+  .chk li{list-style:none;margin-left:-18px} .chk li::before{content:"□ ";color:var(--wire)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">Slime · research · Idea 1</div>
+  <h1>Live prod rebuilding: <span>Crystal as an evergreen backend copy</span></h1>
+  <p class="muted" style="max-width:820px">Can Slime sit next to a live production service at the load balancer, watch its
+    requests and responses, and keep rebuilding the service through Gas → Liquid → Crystal, with production
+    itself as the test oracle? This is the approach Anthropic used to move its Messages API from Python to Rust,
+    taken one step further.</p>
+  <div class="meta">
+    <span>2026-11-28</span><span>Status: Research (not a plan)</span>
+    <span>Source: <a href="https://www.anthropic.com/research/migrating-api-to-rust">anthropic.com/research/migrating-api-to-rust</a> (Nov 25, 2026)</span>
+    <span>Gated by an adversarial review: 9 objections</span>
+  </div>
+</header>
+
+<nav>
+  <a href="#verdict">Verdict</a><a href="#anthropic">What Anthropic did</a><a href="#gap">The key difference</a>
+  <a href="#mapping">Mapping onto Slime</a><a href="#prior">Prior art</a><a href="#review">Adversarial review</a>
+  <a href="#ledger">Ledger</a><a href="#mvp">Hackathon slice</a><a href="#decide">Decisions for Anton</a>
+</nav>
+
+<!-- ============================================================ -->
+<h2 id="verdict"><span class="n">00</span>Verdict</h2>
+<div class="card verdict">
+  <span class="pill p-go">GO · NARROWED</span>
+  <div>
+    <div class="big">Worth building, but only as a <em>shadow verifier</em> for read endpoints. It should not be a
+      "copy of any backend" that serves traffic.</div>
+    <ul class="tight">
+      <li><b>What carries over from Anthropic.</b> The production service acts as the oracle. Diff records hold the
+        shape of a difference, not its content. The work runs in three loops: inner, outer and memory. Slime already
+        has two of the pieces: the gate in <code>crystal/src/equivalence.ts</code> and the writer/reviewer/merge-gate
+        agent loop.</li>
+      <li><b>What does not carry over.</b> Anthropic <em>ported code it already had</em>. A listener at the load
+        balancer has no source code: it would have to <em>infer</em> the logic from examples. Matching all the
+        traffic it has seen does not make it correct on traffic it has not seen. Anthropic's own numbers show this:
+        the Rust port passed about 98% of its tests while only about 25% of production inputs matched.</li>
+      <li><b>Hard limits on scope.</b> Read-only GET endpoints backed by a database. The copy never answers end users
+        (O2). Recordings stay inside the client's own network (O5). Writes are deferred (O4).</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="anthropic"><span class="n">01</span>What Anthropic actually did</h2>
+<div class="grid g3">
+  <div class="card"><div class="stat">~70%<small>less CPU per request on Rust</small></div></div>
+  <div class="card"><div class="stat">~20%<small>lower median time to first token</small></div></div>
+  <div class="card"><div class="stat">98% vs ~25%<small>tests passing vs production inputs matching (April)</small></div></div>
+</div>
+<div class="grid g2" style="margin-top:14px">
+  <div class="card">
+    <h3 style="margin-top:0">Why tests weren't enough</h3>
+    <ul class="tight">
+      <li>~700 integration tests ran the Python API inside the test process. Porting the tests along with the code
+        weakened <b>100+ assertions</b>.</li>
+      <li>20 binary options already give over a million combinations. The real definition of correct is
+        whatever production users rely on.</li>
+      <li>Parity was a moving target: the Python API kept shipping features during the migration.</li>
+    </ul>
+    <h3>Shadowing on production traffic</h3>
+    <ul class="tight">
+      <li>The model ran <b>once</b>, and its output was replayed to Rust. This handles nondeterminism, and a
+        customer is never billed twice.</li>
+      <li>The two versions were compared at <b>checkpoints</b> (accept/reject → settings → prompt pieces) and had to
+        match exactly. The first checkpoint that differed showed where the bug was.</li>
+      <li>A <b>fingerprint</b> (step, piece, first differing byte, both lengths) separated one bug from another
+        without anyone reading user text.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3 style="margin-top:0">Three verification loops</h3>
+    <ul class="tight">
+      <li><b>Grouping:</b> every 10–30 minutes a script grouped the diff records by kind. A coordinator agent was
+        alerted only for a <em>new kind</em>, and gave each new kind to its own worker agent plus a Slack thread.</li>
+      <li><b>Inner loop:</b> a cloud sandbox with both codebases. A local input/output check took under a second.
+        The agent wrote a request that reproduced the fingerprint, edited the Rust until the outputs matched, and
+        added a test.</li>
+      <li><b>The seam between loops was human review.</b> Example: an engineer rejected a web-search
+        "fix" that copied tool text into files. The verifier rewards a match, not a good fix.</li>
+      <li><b>Outer loop:</b> deploys with and without the fix, compared by how often the fingerprint appeared on
+        shadowed traffic of the same kind.</li>
+      <li><b>Memory loop:</b> reviewers' corrections became CLAUDE.md rules, tests, lints and a merge check
+        ("a Python change needs a matching Rust change").</li>
+    </ul>
+  </div>
+</div>
+<p class="muted">Example diff record, as the post shows it (made-up values):</p>
+<div class="rec">step:        build prompt   <span class="c">← where in the code</span>
+piece:       2              <span class="c">← where in the prompt</span>
+first diff:  byte 17        <span class="c">← fingerprint</span>
+python:      190 bytes      <span class="c">← fingerprint</span>
+rust:        190 bytes      <span class="c">← fingerprint</span></div>
+
+<!-- ============================================================ -->
+<h2 id="gap"><span class="n">02</span>The key difference: porting vs inferring</h2>
+<p>Anthropic leaned on the <b>generator–verifier gap</b>: writing the Rust from known Python was cheap, and
+  verifying it was the bottleneck. A listener at the load balancer reverses this. Generation turns into
+  <em>program synthesis from examples</em>, which has many valid answers, and verification is only as good as
+  what the observed traffic happens to cover.</p>
+<div class="card" style="padding:4px 8px">
+<table>
+  <tr><th></th><th>Anthropic: Python → Rust</th><th>Idea 1: Slime listening at the load balancer</th></tr>
+  <tr><td>Source code</td><td>Both codebases are in the agent's sandbox</td><td>None in black-box mode; <b>available</b> if the client gives its repository (mode B)</td></tr>
+  <tr><td>Oracle</td><td>Production Python at each internal checkpoint</td><td>The production response, end to end only</td></tr>
+  <tr><td>Bug location</td><td>Checkpoints show the stage that differs</td><td>JSON path of the difference; only on Slime's side can it split SQL rows from shape</td></tr>
+  <tr><td>Nondeterminism</td><td>The model ran once, its output replayed</td><td>Database state at time <i>t</i>, replica lag, timestamps/UUIDs, ordering</td></tr>
+  <tr><td>Side effects</td><td>Billing and limits counted once</td><td>Writes cannot be shadowed safely; Slime is read-only by design</td></tr>
+  <tr><td>Privacy</td><td>Shape-only records, no text</td><td>Synthesis needs values, but Slime Cloud promises <i>never to store rows</i></td></tr>
+  <tr><td>End state</td><td>Cutover to Rust</td><td>An "evergreen copy" that never cuts over, or a migration target</td></tr>
+</table>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="mapping"><span class="n">03</span>Mapping onto Slime ("Slime Mirror")</h2>
+<div class="diagram">
+<svg viewBox="0 0 1000 470" width="100%" role="img" aria-label="Slime Mirror data flow">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#A396AC"/></marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#38F8B8"/></marker>
+    <marker id="ap" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#FF85C0"/></marker>
+  </defs>
+  <g font-size="13" fill="#F8F6FC">
+    <!-- prod lane -->
+    <rect x="20" y="30" width="130" height="56" rx="8" fill="#1d1521" stroke="#442D4D"/><text x="85" y="63" text-anchor="middle">Client</text>
+    <rect x="230" y="30" width="170" height="56" rx="8" fill="#1d1521" stroke="#FFC857"/><text x="315" y="54" text-anchor="middle">LB / tee proxy</text><text x="315" y="72" text-anchor="middle" font-size="11" fill="#A396AC">Envoy tap or a small proxy</text>
+    <rect x="480" y="30" width="200" height="56" rx="8" fill="#1d1521" stroke="#442D4D"/><text x="580" y="54" text-anchor="middle">Prod service</text><text x="580" y="72" text-anchor="middle" font-size="11" fill="#A396AC">the oracle; still serves users</text>
+    <rect x="780" y="30" width="190" height="46" rx="8" fill="#1d1521" stroke="#442D4D"/><text x="875" y="58" text-anchor="middle">DB primary</text>
+    <rect x="780" y="110" width="190" height="46" rx="8" fill="#1d1521" stroke="#442D4D"/><text x="875" y="138" text-anchor="middle">Read replica</text>
+    <line x1="150" y1="58" x2="228" y2="58" stroke="#A396AC" marker-end="url(#a)"/>
+    <line x1="400" y1="58" x2="478" y2="58" stroke="#A396AC" marker-end="url(#a)"/>
+    <line x1="680" y1="53" x2="778" y2="53" stroke="#A396AC" marker-end="url(#a)"/>
+    <line x1="875" y1="76" x2="875" y2="108" stroke="#6E5C77" stroke-dasharray="4 4" marker-end="url(#a)"/>
+    <text x="885" y="97" font-size="11" fill="#6E5C77">lag</text>
+    <!-- tee down -->
+    <path d="M315,86 V160 H110 V210" fill="none" stroke="#FFC857" stroke-width="1.5" marker-end="url(#a)"/>
+    <text x="325" y="125" font-size="11" fill="#FFC857">copy of request + prod response</text>
+    <!-- mirror container -->
+    <rect x="20" y="180" width="960" height="275" rx="12" fill="none" stroke="#442D4D" stroke-dasharray="6 5"/>
+    <text x="130" y="200" font-size="11" fill="#A396AC" letter-spacing="1">SLIME MIRROR · runs in the client's VPC (self-hosted core)</text>
+    <!-- row1 -->
+    <rect x="40" y="212" width="140" height="60" rx="8" fill="#161019" stroke="#442D4D"/><text x="110" y="238" text-anchor="middle">Route template</text><text x="110" y="256" text-anchor="middle" font-size="11" fill="#A396AC">GET /orders/{id}</text>
+    <rect x="200" y="212" width="140" height="60" rx="8" fill="#161019" stroke="#38F8B8"/><text x="270" y="238" text-anchor="middle" fill="#38F8B8">Gas</text><text x="270" y="256" text-anchor="middle" font-size="11" fill="#A396AC">schema + examples (+src)</text>
+    <rect x="360" y="212" width="170" height="60" rx="8" fill="#161019" stroke="#442D4D"/><text x="445" y="238" text-anchor="middle">Shadow run</text><text x="445" y="256" text-anchor="middle" font-size="11" fill="#A396AC">same input, same replica</text>
+    <rect x="550" y="212" width="180" height="60" rx="8" fill="#161019" stroke="#FF85C0"/><text x="640" y="238" text-anchor="middle">Diff → fingerprint</text><text x="640" y="256" text-anchor="middle" font-size="11" fill="#A396AC">route · path · kind · Δlen</text>
+    <rect x="760" y="212" width="200" height="60" rx="8" fill="#161019" stroke="#442D4D"/><text x="860" y="238" text-anchor="middle">Agent inner loop</text><text x="860" y="256" text-anchor="middle" font-size="11" fill="#A396AC">reproduce → fix → test</text>
+    <line x1="180" y1="242" x2="198" y2="242" stroke="#A396AC" marker-end="url(#a)"/>
+    <line x1="340" y1="242" x2="358" y2="242" stroke="#A396AC" marker-end="url(#a)"/>
+    <line x1="530" y1="242" x2="548" y2="242" stroke="#A396AC" marker-end="url(#a)"/>
+    <line x1="730" y1="242" x2="758" y2="242" stroke="#FF85C0" marker-end="url(#ap)"/>
+    <text x="733" y="232" font-size="10" fill="#FF85C0">new kind</text>
+    <path d="M445,212 V150 H778" fill="none" stroke="#6E5C77" stroke-dasharray="3 3" marker-end="url(#a)"/>
+    <!-- row2 -->
+    <rect x="360" y="345" width="170" height="60" rx="8" fill="#161019" stroke="#FF1476"/><text x="445" y="371" text-anchor="middle" fill="#FF85C0">Liquid</text><text x="445" y="389" text-anchor="middle" font-size="11" fill="#A396AC">N matches + review</text>
+    <rect x="550" y="345" width="180" height="60" rx="8" fill="#161019" stroke="#C4B5FD"/><text x="640" y="371" text-anchor="middle" fill="#C4B5FD">Crystal</text><text x="640" y="389" text-anchor="middle" font-size="11" fill="#A396AC">cases = prod outputs</text>
+    <rect x="760" y="345" width="200" height="60" rx="8" fill="#161019" stroke="#FFC857"/><text x="860" y="371" text-anchor="middle">PR gate (human)</text><text x="860" y="389" text-anchor="middle" font-size="11" fill="#A396AC">merge-gate.mjs + review</text>
+    <path d="M580,272 L470,343" fill="none" stroke="#38F8B8" marker-end="url(#ag)"/>
+    <text x="470" y="312" font-size="10" fill="#38F8B8">match ×N</text>
+    <line x1="530" y1="375" x2="548" y2="375" stroke="#A396AC" marker-end="url(#a)"/>
+    <line x1="860" y1="272" x2="860" y2="343" stroke="#A396AC" marker-end="url(#a)"/>
+    <line x1="760" y1="375" x2="732" y2="375" stroke="#A396AC" marker-end="url(#a)"/>
+    <path d="M680,345 V274" fill="none" stroke="#C4B5FD" stroke-dasharray="4 3" marker-end="url(#a)"/>
+    <text x="688" y="318" font-size="10" fill="#C4B5FD">keeps being shadowed</text>
+    <text x="40" y="440" font-size="11" fill="#6E5C77">Outer loop = per-route match rate on shadowed traffic, split by build id. Memory loop = review notes → agents/*.md rules + new cases.</text>
+  </g>
+</svg>
+</div>
+
+<h3>The three phases in mirror mode</h3>
+<div class="grid g3">
+  <div class="card phase gas"><b class="gas">Gas</b> <span class="muted">(today: model on a new request)</span>
+    <p>A new route template appears in the traffic. The generator gets the schema, the dictionary and K observed
+      pairs, plus the route's source code in mode B, and writes SQL and a shape function. The result is
+      <b>never</b> returned to a user; it only runs in the shadow.</p></div>
+  <div class="card phase liq"><b class="liq">Liquid</b> <span class="muted">(today: runs + review)</span>
+    <p>Promoted after N matches in a row on distinct inputs, a noise-classified diff of zero, and an approved review.
+      A mismatch sends the handler back to Gas with the fingerprint as context.</p></div>
+  <div class="card phase cry"><b class="cry">Crystal</b> <span class="muted">(today: cases = Liquid reference)</span>
+    <p>The key change: <b>the reference becomes the production response</b>, not the Liquid output. The cases file
+      holds (input, prod output, build id). "Evergreen" means the continuous shadow keeps checking the Crystal
+      against new prod builds.</p></div>
+</div>
+
+<h3>Reuse vs new work (checked against the repository)</h3>
+<div class="grid g2">
+  <div class="card"><span class="pill p-go">REUSE</span>
+    <ul class="tight">
+      <li>Generator, sandbox, read-only lint, row cap and timeouts (<code>@slime-cloud/core</code>)</li>
+      <li>The equivalence rules: floats to 9 significant digits, list order counts (<code>crystal/src/equivalence.ts</code>)</li>
+      <li><code>&lt;key&gt;.cases.json</code>, <code>slime-crystal pin/verify</code>, cost ≤ 1.1× the reference</li>
+      <li>Agent loop: writer → gate → 3 reviewers → <code>merge-gate.mjs</code> (<code>crystal/agents/</code>, <code>crystal/scripts/</code>)</li>
+      <li>Provenance drift (schemaHash), which extends naturally to the upstream build id</li>
+    </ul></div>
+  <div class="card"><span class="pill p-cr">NEW</span>
+    <ul class="tight">
+      <li>A tee that captures the <b>prod response</b> (Istio mirroring discards responses, so it isn't enough)</li>
+      <li>Route templating and a request key without <code>intent</code> text (O7)</li>
+      <li>Cases with prod output as the oracle instead of the Liquid reference</li>
+      <li>A JSON diff, fingerprinting, and grouping by kind</li>
+      <li>A noise classifier (Diffy-style, field-level only)</li>
+      <li>Per-route match rate by build: the dashboard and the stopping criterion</li>
+    </ul></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="prior"><span class="n">04</span>Prior art (links checked)</h2>
+<div class="card" style="padding:4px 8px">
+<table>
+  <tr><th>Tool / idea</th><th>What it does</th><th>What we take from it</th></tr>
+  <tr><td><a href="https://github.com/opendiffy/diffy">Diffy</a></td><td>A candidate plus <b>two</b> instances of the known-good primary. Real differences are measured against noise between the primary and the secondary.</td><td>Field-level noise detection. Anthropic warns that ignoring noise wholesale hides bugs.</td></tr>
+  <tr><td><a href="https://github.com/github/scientist">GitHub Scientist</a></td><td>Control/candidate experiment in code. The control's value is always the one returned.</td><td>The rule "the copy never answers the user"</td></tr>
+  <tr><td><a href="https://github.com/keploy/keploy">Keploy</a></td><td>eBPF captures API calls <b>and database queries</b> and replays them as tests with mocks.</td><td>Capture database reads, to avoid replica lag (O3). Don't build capture from scratch.</td></tr>
+  <tr><td><a href="https://github.com/buger/goreplay">GoReplay</a></td><td>Captures and replays HTTP traffic</td><td>Offline replay for the inner loop</td></tr>
+  <tr><td><a href="https://istio.io/latest/docs/tasks/traffic-management/mirroring/">Istio mirroring</a></td><td>Fire-and-forget: <b>the mirror's responses are discarded</b>; supports a mirror percentage</td><td>Mirroring alone is not enough: a tee must capture the prod response</td></tr>
+  <tr><td><a href="https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/tap_filter">Envoy HTTP tap</a></td><td>Records HTTP traffic at the proxy, with a body size limit</td><td>A ready-made tee at the load balancer</td></tr>
+  <tr><td><a href="https://docs.aws.amazon.com/vpc/latest/mirroring/what-is-traffic-mirroring.html">AWS VPC Traffic Mirroring</a></td><td>Copies packets at the network interface level</td><td>Rejected: packets need TLS termination and reassembly, which is too low-level</td></tr>
+  <tr><td><a href="https://martinfowler.com/bliki/StranglerFigApplication.html">Strangler Fig</a></td><td>Replace a system route by route behind a facade</td><td>The unit of cutover is a route, and only once its match rate holds</td></tr>
+  <tr><td><a href="https://plse.cs.washington.edu/daikon/">Daikon</a></td><td>Infers likely invariants from observed runs</td><td>The theory behind "the spec is inferred from traffic", and its limit: invariants hold only on what was seen</td></tr>
+  <tr><td>Programming by example (Gulwani, FlashFill, POPL 2011)</td><td>Synthesizes programs from input/output pairs</td><td>Why black-box mode is underdetermined (O1)</td></tr>
+</table>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="review"><span class="n">05</span>Adversarial review</h2>
+<div class="card steel">
+  <div class="lbl" style="margin-top:0">Steelman: the idea at its strongest</div>
+  <p>Production is the most complete specification a service has. Slime already turns observations into verified
+    code: it has the read-only sandbox, the equivalence gate and the agent loop with a merge gate. With a tee at the
+    load balancer and production as the oracle, Slime gets an endless stream of test cases for free. Gas, Liquid and
+    Crystal become a ladder of trust, from "matches sometimes" to "frozen and verified". That gives an evergreen,
+    verified copy of the read side of the backend, a target for migration (for example to a cheaper runtime), and an
+    automatically maintained regression corpus.</p>
+</div>
+<p class="muted">The objections were raised one at a time, strongest first. Each is stated, attacked, defended, and given a
+  status. Click an objection to expand it.</p>
+
+<details class="obj" open><summary><span class="id">O1</span><span><b>The analogy breaks: Anthropic ported, and Slime would have to infer</b></span><span class="pill p-no">SURVIVED · PARTIAL</span></summary>
+<div class="body">
+  <p class="attack"><b>Attack.</b> The method rested on the generator–verifier gap: generating from known source was
+    cheap. At the load balancer there is no source, so generating means synthesizing from input/output pairs, and the
+    problem is underdetermined. With 10 runs (<code>CRYSTAL_MIN_RUNS</code>), many different programs match. For
+    example, <code>ORDER BY created_at</code> and <code>ORDER BY id</code> agree on every observed case until the
+    first backfill. Anthropic had 98% of tests passing and ~25% of production inputs matching, and that was while
+    <em>porting known code</em>.</p>
+  <p class="defense"><b>Defense.</b> Split it into two modes. <b>Mode B (source-assisted):</b> the client owns the
+    service, so it gives Slime the repository. The generator ports the route handler (the Anthropic setting), and
+    the traffic only verifies. <b>Mode A (black-box):</b> only for the narrow class of "a projection of SQL over a
+    known schema", and the honest claim is <i>parity on the observed distribution</i>, never "a copy of the
+    service".</p>
+  <p><b>Status:</b> mode B answers it. In mode A the risk stays, and the pitch must not promise "copies any
+    backend".</p>
+</div></details>
+
+<details class="obj"><summary><span class="id">O2</span><span><b>Authorization is invisible in input/output, so the copy becomes an IDOR generator</b></span><span class="pill p-no">SURVIVED</span></summary>
+<div class="body">
+  <p class="attack"><b>Attack.</b> <code>GET /orders?user_id=42</code> returns only user 42's orders because
+    middleware checked the JWT. The observed pairs never contain a refusal, so the synthesized SQL filters only by
+    the parameter. If the copy ever serves traffic, any <code>user_id</code> returns someone else's data (an
+    insecure direct object reference, IDOR). Tenant scoping, feature flags and time-dependent logic are invisible in
+    the same way.</p>
+  <p class="defense"><b>Defense.</b> (1) The copy is <b>shadow-only</b>: it never answers a user, the Scientist
+    rule. (2) The verified principal and tenant become an explicit input of the key, and the cases must include
+    refusals (401/403/404). (3) Read with a database role that has row-level security per tenant.</p>
+  <p><b>Status:</b> rule (1) closes it for v0. Any plan to serve traffic from the copy needs a separate security
+    review.</p>
+</div></details>
+
+<details class="obj"><summary><span class="id">O3</span><span><b>Database state and replica lag produce false mismatches; there are no checkpoints</b></span><span class="pill p-go">ANSWERED</span></summary>
+<div class="body">
+  <p class="attack"><b>Attack.</b> The response depends on the input, the database state at time <i>t</i>, the clock,
+    and calls to neighbouring services. The load balancer sees only the input and the response. Replaying a request
+    later against a changed database gives a mismatch with no bug behind it. A shadow run on a replica reads with
+    lag. And with only an end-to-end diff there is nothing to localize with: Anthropic's checkpoints have no
+    equivalent here.</p>
+  <p class="defense"><b>Defense.</b> (1) Run the shadow <b>at once</b> against the same replica, and on a mismatch
+    re-request the original once. This is safe for GET, and it is Diffy's primary/secondary idea: fields that
+    differ between two prod responses are noise, <em>only for those fields</em>. (2) The checkpoints move to
+    Slime's own side: are the SQL rows wrong, or the shape? Slime controls its handler's steps. (3) The fingerprint
+    is <code>route · JSON path · kind (missing/extra/type/value/order) · Δlen · build</code>. (4) Later: capture
+    the database reads Keploy-style for exact replay.</p>
+</div></details>
+
+<details class="obj"><summary><span class="id">O4</span><span><b>A "backend copy" without writes is not a backend</b></span><span class="pill p-def">DEFERRED</span></summary>
+<div class="body">
+  <p class="attack"><b>Attack.</b> Most microservice traffic includes mutations. Slime is read-only by invariant,
+    and shadowing writes either duplicates side effects or needs a database fork for every request.</p>
+  <p class="defense"><b>Defense.</b> v0 covers GET routes only. Later: compare the <em>planned</em> writes (the
+    SQL the copy would run) with the writes the original actually made, from change data capture (CDC) or the
+    Postgres log, without executing them. That needs its own design; the product frame already says writes have no
+    rollback.</p>
+  <p><b>Status:</b> parked. The claims must say "read-side copy".</p>
+</div></details>
+
+<details class="obj"><summary><span class="id">O5</span><span><b>Recording bodies breaks "Slime Cloud never stores rows"</b></span><span class="pill p-no">SURVIVED · NEEDS A DECISION</span></summary>
+<div class="body">
+  <p class="attack"><b>Attack.</b> <code>product_frame_v0_2.md</code>: Slime Cloud <i>never stores rows or
+    content</i>. The tee records production responses (personal data) and feeds them to the generator's prompt.
+    Anthropic got around this with shape-only diffs, but it had source code; black-box synthesis needs the values.</p>
+  <p class="defense"><b>Defense.</b> Mirror runs <b>self-hosted, inside the client's network</b> (core is a
+    library, and that path exists). Recordings and cases never leave it. Only shape-only fingerprints go up to Slime
+    Cloud. The generator sees the schema, types and (in mode B) source code, plus examples redacted by a schema
+    dictionary.</p>
+  <p><b>Status:</b> the cloud variant cannot happen without breaking the invariant. Anton has to choose (see
+  Decisions).</p>
+</div></details>
+
+<details class="obj"><summary><span class="id">O6</span><span><b>A simpler alternative: Keploy + Diffy + Claude Code gets 80% of the value</b></span><span class="pill p-go">ANSWERED · WITH A CAVEAT</span></summary>
+<div class="body">
+  <p class="attack"><b>Attack.</b> Capturing traffic and turning it into tests is Keploy. Diffing is Diffy.
+    Porting is Claude Code. Why build another tee?</p>
+  <p class="defense"><b>Defense.</b> Slime's unique part is not capture or diffing. It is the <b>automatic
+    ladder</b> (Gas → Liquid → Crystal with a gate the agents cannot change) and the <b>self-healing loop</b>
+    with a merge gate. Both already exist in the repository. The caveat: <em>don't build the capture yourself</em>.
+    Take an Envoy tap, a small Node proxy for the demo, or Keploy.</p>
+</div></details>
+
+<details class="obj"><summary><span class="id">O7</span><span><b>Slime's key needs an <code>intent</code>, and REST traffic has none</b></span><span class="pill p-go">ANSWERED</span></summary>
+<div class="body">
+  <p class="attack"><b>Attack.</b> Today the key is the normalized intent, the input names and the output shape.
+    REST has a method, a path, query parameters and a body. Responses with optional fields would change the
+    "output shape" and break the key.</p>
+  <p class="defense"><b>Defense.</b> intent := <code>METHOD /route/{template}</code>, plus the OpenAPI summary if
+    there is one. Templating follows the usual rule: numbers, UUIDs and high-cardinality segments become
+    <code>{param}</code>. Output := the union JSON Schema over the observed responses. The key is the route
+    template, not the shape of each response. This needs a new key version, <code>KEY_VERSION</code>.</p>
+</div></details>
+
+<details class="obj"><summary><span class="id">O8</span><span><b>The long tail: rare routes and branches never reach N</b></span><span class="pill p-go">ANSWERED</span></summary>
+<div class="body">
+  <p class="attack"><b>Attack.</b> Error paths, empty results, the last page of pagination and admin-only
+    parameters show up rarely or never. The Crystal is green on the 95% of traffic it saw and wrong on the rest.
+    Production also weights bugs by frequency, as the Anthropic post notes.</p>
+  <p class="defense"><b>Defense.</b> Parity is a <b>statistical metric per route</b> (match rate over a window,
+    split by build), as in Anthropic's daily chart, not a binary "Crystal = done". A route counts as covered only at
+    ≥ X% matches over ≥ M distinct inputs. The inner loop generates its own requests for the boundary cases,
+    from the schema and the source code.</p>
+</div></details>
+
+<details class="obj"><summary><span class="id">O9</span><span><b>"Evergreen" turns into an endless chase plus overfitted fixes</b></span><span class="pill p-go">ANSWERED</span></summary>
+<div class="body">
+  <p class="attack"><b>Attack.</b> Every prod deploy moves the target. Agents will patch outputs to make them match,
+    like the web-search shortcut in the post, and the copy collects workarounds.</p>
+  <p class="defense"><b>Defense.</b> (1) The tee reads a build id from a response header, and match rates are
+    counted per build. A spike after a deploy demotes the Crystal to Liquid as a fallback, and the reason is a deploy,
+    not a bug. (2) A fix gets into the Crystal only through <code>merge-gate.mjs</code> and a human PR review, the
+    seam between loops. (3) Memory loop: rejections become rules in <code>crystal/agents/*.md</code>. (4) The
+    budget is capped: no more than K agent runs per fingerprint kind.</p>
+</div></details>
+
+<h3>What would have to be true</h3>
+<ul class="tight chk">
+  <li>The target routes are read-only and backed by one database whose schema Slime can see.</li>
+  <li>A response is a deterministic function of (input, principal, database snapshot) once noise fields are removed.</li>
+  <li>Authorization can be expressed as an input (the principal or tenant in the key).</li>
+  <li>There is enough traffic per route to reach M distinct inputs within the window.</li>
+  <li>The client allows a tee at the load balancer and lets Slime run inside its network.</li>
+  <li>For mode B, the client gives read access to the route's source code.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="ledger"><span class="n">06</span>Ledger</h2>
+<div class="card" style="padding:4px 8px">
+<table>
+  <tr><th>#</th><th>Objection</th><th>Status</th><th>Resolution / what's left</th></tr>
+  <tr><td>O1</td><td>Porting vs inferring</td><td><span class="pill p-no">survived · partial</span></td><td>Mode B answers it; mode A claims only "parity on the observed distribution"</td></tr>
+  <tr><td>O2</td><td>Authorization invisible, IDOR</td><td><span class="pill p-no">survived</span></td><td>Shadow-only in v0; serving traffic only after a separate security review</td></tr>
+  <tr><td>O5</td><td>Privacy vs "never stores rows"</td><td><span class="pill p-no">survived</span></td><td>Self-hosted inside the client's network, shape-only up to the cloud; needs Anton's decision</td></tr>
+  <tr><td>O4</td><td>Writes</td><td><span class="pill p-def">deferred</span></td><td>GET only; "planned writes vs CDC" is a separate design</td></tr>
+  <tr><td>O3</td><td>Database state, lag, no checkpoints</td><td><span class="pill p-go">answered</span></td><td>Immediate shadow plus a second prod request, field-level noise, rows vs shape on Slime's side</td></tr>
+  <tr><td>O6</td><td>Keploy/Diffy are enough</td><td><span class="pill p-go">answered</span></td><td>The value is the ladder and the gate; don't build capture yourself</td></tr>
+  <tr><td>O7</td><td>No intent in REST</td><td><span class="pill p-go">answered</span></td><td>Route template as the intent, a new KEY_VERSION</td></tr>
+  <tr><td>O8</td><td>The long tail</td><td><span class="pill p-go">answered</span></td><td>Match rate per route and build; covered only at ≥X% over ≥M inputs</td></tr>
+  <tr><td>O9</td><td>Endless chase, overfitting</td><td><span class="pill p-go">answered</span></td><td>Build id, demotion, merge gate plus human review, memory loop, budget</td></tr>
+</table>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="mvp"><span class="n">07</span>Hackathon slice: what can be shown in 1–2 days</h2>
+<div class="grid g2">
+  <div class="card">
+    <h3 style="margin-top:0">Demo script</h3>
+    <ol style="padding-left:20px;margin:6px 0">
+      <li>A small <b>hand-written</b> REST service (3–4 GET routes) over the demo database <code>examples/express/db/init.sql</code>. This is the "legacy prod".</li>
+      <li>A Node tee proxy in front of it that captures (request, response, <code>x-build-id</code>) and passes them to Mirror.</li>
+      <li>A load script. On screen, the match rate per route climbs from 0% to 100%, and the routes go Gas → Liquid → Crystal.</li>
+      <li>"Prod deploys": one field changes format, for example cents → dollars. The fingerprint
+        <code>GET /orders/{id} · $.total · value · build 7</code> appears, the Crystal is demoted, the agent loop opens a PR, and after the merge the route is green again.</li>
+    </ol>
+  </div>
+  <div class="card">
+    <h3 style="margin-top:0">Success / kill criteria</h3>
+    <ul class="tight">
+      <li><b>Success:</b> ≥ 3 of 4 routes reach Crystal with a ≥ 99% match rate on ≥ 200 distinct inputs. A new fingerprint after the "deploy" is caught within 1 minute.</li>
+      <li><b>Kill:</b> mode A cannot get above 80% on even one route without the source code, so mode A is dead and only mode B is pitched.</li>
+      <li><b>Out of scope:</b> writes, the cloud variant, Envoy/Kubernetes, serving traffic from the copy.</li>
+    </ul>
+    <h3>The pitch in one sentence</h3>
+    <p class="muted">"Anthropic made production the verifier for a migration. We make that a product: Slime listens to
+      your service and grows a verified copy of its read side, one route at a time, without touching production."</p>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="decide"><span class="n">08</span>Decisions for Anton</h2>
+<div class="grid g3">
+  <div class="card"><b>D1 · Mode</b><p class="muted">B (source-assisted) as the main mode, A as an experiment with a kill criterion. <b>Recommended: B.</b></p></div>
+  <div class="card"><b>D2 · Where it runs</b><p class="muted">Self-hosted inside the client's network (keeps the "no rows" promise) vs the cloud (breaks it). <b>Recommended: self-hosted.</b></p></div>
+  <div class="card"><b>D3 · End state</b><p class="muted">Shadow-only (verifier and regression corpus) vs a migration target with gradual cutover. <b>Recommended: shadow-only for v0.</b></p></div>
+</div>
+
+<footer>
+  Sources: the Anthropic post (fetched 2026-11-28); in this repository: <code>docs/product/concepts_brief.md</code>,
+  <code>docs/product/product_frame_v0_2.md</code>, <code>crystal/README.md</code>. Prior-art links checked by HTTP status
+  on 2026-11-28; claims about Diffy, Keploy, Scientist and Istio were checked against their READMEs and docs.
+  Not checked: performance of the tee, model quality in mode A (that is the kill criterion).
+</footer>
+</div>
+</body>
+</html>
